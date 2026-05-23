@@ -235,12 +235,11 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
   }
 }
 
-// Per-instance chain VFX colour drift along Path A (Arc Reach) — the
-// orb + arcs deepen from pale cool blue toward a saturated cool steel
-// blue. Blue stays pinned at 1.0 (additive glow), red drops hardest and
-// green settles mid so the hue tracks steel blue (#4682B4) as it
-// darkens. Returned multipliers replace the base RGB constants in
-// TowerVfx.tsx (which then multiply against each mesh's material colour).
+// Per-instance chain orb colour drift along Path A (Arc Reach) — the orb
+// deepens from pale cool blue toward a saturated cool steel blue. Blue
+// stays pinned at 1.0 (additive glow), red drops hardest and green
+// settles mid so the hue tracks steel blue (#4682B4) as it darkens. The
+// crossed arcs no longer drift; they hold a fixed tint in TowerVfx.tsx.
 export function chainOrbBase(tierA: number): [number, number, number] {
   const t = Math.min(3, Math.max(0, tierA | 0));
   return [
@@ -248,26 +247,6 @@ export function chainOrbBase(tierA: number): [number, number, number] {
     [0.46, 0.74, 1.0],
     [0.34, 0.62, 1.0],
     [0.26, 0.52, 1.0],
-  ][t] as [number, number, number];
-}
-
-export function chainArcABase(tierA: number): [number, number, number] {
-  const t = Math.min(3, Math.max(0, tierA | 0));
-  return [
-    [0.7, 0.85, 1.0],
-    [0.54, 0.74, 1.0],
-    [0.4, 0.62, 1.0],
-    [0.3, 0.54, 1.0],
-  ][t] as [number, number, number];
-}
-
-export function chainArcBBase(tierA: number): [number, number, number] {
-  const t = Math.min(3, Math.max(0, tierA | 0));
-  return [
-    [0.66, 0.92, 1.0],
-    [0.5, 0.78, 1.0],
-    [0.38, 0.64, 1.0],
-    [0.28, 0.55, 1.0],
   ][t] as [number, number, number];
 }
 

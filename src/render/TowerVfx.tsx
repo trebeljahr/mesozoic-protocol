@@ -4,7 +4,7 @@ import * as THREE from "three";
 import type { Tower } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
-import { chainArcABase, chainArcBBase, chainOrbBase } from "./towerTints";
+import { chainOrbBase } from "./towerTints";
 
 // Overlay VFX for towers. Drives "charge up" visuals off `cooldown` progress:
 //   charge = 1 - cooldown / (1/fireRate)   -> 0 just fired, 1 ready to fire.
@@ -14,6 +14,12 @@ import { chainArcABase, chainArcBBase, chainOrbBase } from "./towerTints";
 // dropped in favor of just the model itself.
 
 const MAX_PER_KIND = 64;
+
+// Crossed arcs hold a fixed pale cool-blue tint — upgrades drift only the
+// orb (Path A) and the body mesh (Path B), never the arcs. Live `intensity`
+// still flickers these with charge.
+const CHAIN_ARC_A_TINT: [number, number, number] = [0.7, 0.85, 1.0];
+const CHAIN_ARC_B_TINT: [number, number, number] = [0.66, 0.92, 1.0];
 
 const chargeProgress = (tower: Tower): number => {
   if (tower.fireRate <= 0) return 0;
@@ -50,11 +56,10 @@ export const TowerVfx = () => {
       const intensity = baseGlow + (1 - baseGlow) * charge * flicker;
       const orbY = 1.35;
 
-      // Path A (Arc Reach) drifts the orb + arcs toward a cool steel
-      // blue. Path B is reflected on the body mesh in ModelTowerMesh.
+      // Path A (Arc Reach) drifts the orb toward a cool steel blue; the
+      // arcs hold a fixed tint. Path B is reflected on the body mesh in
+      // ModelTowerMesh.
       const orbBase = chainOrbBase(t.upgrades.a);
-      const arcABase = chainArcABase(t.upgrades.a);
-      const arcBBase = chainArcBBase(t.upgrades.a);
 
       // Core orb
       dummy.position.set(t.pos.x, orbY, -t.pos.y);
@@ -72,14 +77,22 @@ export const TowerVfx = () => {
       dummy.scale.setScalar(arcScale);
       dummy.updateMatrix();
       chainArcARef.current!.setMatrixAt(chainCount, dummy.matrix);
-      color.setRGB(arcABase[0] * intensity, arcABase[1] * intensity, arcABase[2] * intensity);
+      color.setRGB(
+        CHAIN_ARC_A_TINT[0] * intensity,
+        CHAIN_ARC_A_TINT[1] * intensity,
+        CHAIN_ARC_A_TINT[2] * intensity,
+      );
       chainArcARef.current!.setColorAt(chainCount, color);
 
       dummy.rotation.set(time * 2.4 + t.id * 1.3, 0, time * -1.8 + t.id * 0.4);
       dummy.scale.setScalar(arcScale);
       dummy.updateMatrix();
       chainArcBRef.current!.setMatrixAt(chainCount, dummy.matrix);
-      color.setRGB(arcBBase[0] * intensity, arcBBase[1] * intensity, arcBBase[2] * intensity);
+      color.setRGB(
+        CHAIN_ARC_B_TINT[0] * intensity,
+        CHAIN_ARC_B_TINT[1] * intensity,
+        CHAIN_ARC_B_TINT[2] * intensity,
+      );
       chainArcBRef.current!.setColorAt(chainCount, color);
 
       chainCount++;
