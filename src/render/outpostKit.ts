@@ -15,6 +15,11 @@ import type { Vec2 } from "../sim/types";
 // per-cluster `scale` then sizes the whole colony.
 
 export const OUTPOST_MODEL_DIR = "/models/outpost";
+// Quaternius "Ultimate Space Kit" base structures (geodesic dome and other
+// habitat shells). A second CC0 kit with its OWN texture atlas, so pieces
+// from it carry an explicit `dir` and the renderer keeps each kit's atlas
+// separate (see OutpostClusters).
+export const SPACEKIT_MODEL_DIR = "/models/spacekit";
 
 // World units per native kit unit. A basemodule dome (native 2.2 wide,
 // 1.0 tall) lands at ~2.5 wide / 1.15 tall — a touch larger than a tower
@@ -22,7 +27,8 @@ export const OUTPOST_MODEL_DIR = "/models/outpost";
 // playfield.
 export const KIT_SCALE = 1.15;
 
-export const outpostUrl = (model: string): string => `${OUTPOST_MODEL_DIR}/${model}.glb`;
+export const outpostUrl = (model: string, dir: string = OUTPOST_MODEL_DIR): string =>
+  `${dir}/${model}.glb`;
 
 // A single placed piece within a template, authored in native kit units
 // in the template's local frame (+dx = east, +dz = north). `lift` is extra
@@ -36,6 +42,9 @@ export type OutpostPart = {
   lift?: number;
   scale?: number;
   yaw?: number;
+  // Asset directory the model lives in. Defaults to the KayKit outpost dir;
+  // set to SPACEKIT_MODEL_DIR for Quaternius Ultimate Space Kit structures.
+  dir?: string;
 };
 
 export type OutpostTemplate = {
@@ -168,8 +177,11 @@ export const HQ_COMMAND_TEMPLATE: OutpostTemplate = {
   id: "hq-command",
   footprint: 3.6,
   parts: [
-    // Command dome dead-centre at the back, with a comms roof.
-    ...stack("basemodule-a", "roofmodule-base", 0, -1.9),
+    // Command dome dead-centre at the back — a Quaternius Ultimate Space
+    // Kit geodesic dome as the HQ's signature structure. `scale` brings the
+    // kit's large native mesh (~8.5 native wide) down to ~2.5 world wide so
+    // it reads at the same footprint as the KayKit habs flanking it.
+    { model: "geodesicdome", dir: SPACEKIT_MODEL_DIR, dx: 0, dz: -1.9, scale: 0.3 },
     // Flanking habs. structure-tall is the hive-drone mesh, so the right
     // flank is a second habitat stack rather than reusing that model.
     ...stack("basemodule-c", "roofmodule-solarpanels", -2.5, -0.6, Math.PI / 2),
@@ -217,10 +229,13 @@ export type PlacedOutpost = {
   scale: number;
 };
 
-// Every model URL referenced by any template — for useGLTF.preload.
+// Every model URL referenced by any template (scatter colonies + the HQ
+// command base) — for useGLTF.preload. HQ_COMMAND_TEMPLATE is included so
+// its Quaternius geodesic dome warms with the rest of the kit.
 export const ALL_OUTPOST_URLS: string[] = (() => {
   const set = new Set<string>();
-  for (const t of OUTPOST_TEMPLATES) for (const p of t.parts) set.add(outpostUrl(p.model));
+  for (const t of [...OUTPOST_TEMPLATES, HQ_COMMAND_TEMPLATE])
+    for (const p of t.parts) set.add(outpostUrl(p.model, p.dir));
   return [...set];
 })();
 

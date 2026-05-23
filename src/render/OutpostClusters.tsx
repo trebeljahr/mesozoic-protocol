@@ -4,10 +4,13 @@ import * as THREE from "three";
 import { collectMeshSource } from "./meshSource";
 import { ALL_OUTPOST_URLS, KIT_SCALE, outpostUrl, type PlacedOutpost } from "./outpostKit";
 
-// Every baked KayKit GLB embeds the same 1024² atlas. We reuse the first
-// texture we see across every piece so the whole kit is one GPU upload
-// instead of ~30 identical copies.
-let sharedMap: THREE.Texture | null = null;
+// Every baked GLB within a kit embeds the same atlas (KayKit's 1024²
+// spacebits atlas; Quaternius' Ultimate Space Kit atlas). We reuse the
+// first texture we see *per kit* across every piece so each kit is one GPU
+// upload instead of ~30 identical copies. Keyed by the model's directory so
+// two kits never cross-assign atlases (which would texture Quaternius domes
+// with KayKit's palette, or vice versa).
+const sharedMaps = new Map<string, THREE.Texture>();
 
 // Renders a list of placed outpost clusters. Each cluster expands into its
 // template's pieces; pieces are flattened across every cluster and grouped
@@ -44,17 +47,20 @@ const ModelInstances = ({
   const source = useMemo(() => {
     const s = collectMeshSource(scene);
     if (s) {
+      // Kit key = the model's directory, so each kit shares its own atlas.
+      const kitKey = url.slice(0, url.lastIndexOf("/"));
       for (const part of s.parts) {
         const mat = part.material as THREE.MeshStandardMaterial;
         if (!mat.map) continue;
         // Collapse every identical embedded atlas onto one shared texture.
-        if (sharedMap) mat.map = sharedMap;
-        else sharedMap = mat.map;
+        const existing = sharedMaps.get(kitKey);
+        if (existing) mat.map = existing;
+        else sharedMaps.set(kitKey, mat.map);
         mat.needsUpdate = true;
       }
     }
     return s;
-  }, [scene]);
+  }, [scene, url]);
   const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
   useEffect(() => {
@@ -119,7 +125,7 @@ export const OutpostClusters = ({
       for (const part of cluster.template.parts) {
         const wx = cluster.pos.x + (part.dx * cos - part.dz * sin) * s;
         const wy = cluster.pos.y + (part.dx * sin + part.dz * cos) * s;
-        const url = outpostUrl(part.model);
+        const url = outpostUrl(part.model, part.dir);
         const list = byUrl.get(url) ?? [];
         list.push({
           x: wx,
