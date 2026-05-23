@@ -58,17 +58,45 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
 
   switch (kind) {
     case "pulse": {
-      // Damage path starts cool/blue and drifts toward neutral white,
-      // fire-rate path starts dark and brightens the barrel per tier.
-      // Both bake into the same PaletteMaterial001, so we combine them.
-      const damageHue: [number, number, number] = [
-        [0.45, 0.62, 1.0],
-        [0.6, 0.74, 1.0],
-        [0.78, 0.86, 1.0],
+      // Damage path (A) drives the body colour from the stock orange toward
+      // a solid palette blue; fire-rate path (B) darkens the barrel from
+      // grey to near-black. Both bake into the single shared
+      // PaletteMaterial001.
+      //
+      // The baked atlas is orange (205,97,0) for the body and greys for the
+      // barrels. Orange has a zero blue channel, so a multiply tint can only
+      // ever mud it toward brown — it can never reach blue (this is why the
+      // old cool tints read "muted"). The blue therefore has to come from an
+      // additive emissive, exactly like the chain tower lifts its near-black
+      // base toward steel blue. The multiply still pulls the orange's R/G
+      // down per tier so the emissive blue isn't fighting a warm albedo, and
+      // it tints the grey parts cool. Blue ratio sits near the palette's
+      // azure accent (#5ad6ff) — B pinned, G mid, R low — for a vivid,
+      // legibly-blue read rather than cyan.
+      const colorHue: [number, number, number] = [
         [1.0, 1.0, 1.0],
+        [0.72, 0.8, 1.0],
+        [0.44, 0.6, 1.0],
+        [0.18, 0.4, 1.0],
       ][a] as [number, number, number];
-      const rateLum = [0.58, 0.7, 0.85, 1.0][b];
-      return atlas(damageHue, rateLum, "PaletteMaterial001");
+      const blueGlow: [number, number, number] = [
+        [0, 0, 0],
+        [0.05, 0.11, 0.3],
+        [0.1, 0.22, 0.6],
+        [0.14, 0.34, 0.95],
+      ][a] as [number, number, number];
+      // Fire-rate darkening: 1.0 keeps the stock grey barrel, ramping toward
+      // black. A single material means one emissive for the whole
+      // silhouette, so max damage turns the entire tower (barrels included)
+      // solid blue; this factor attenuates BOTH the albedo and that blue
+      // glow so heavy fire-rate investment drives the barrel to black
+      // instead of leaving it lit blue.
+      const barrelDark = [1.0, 0.72, 0.46, 0.26][b];
+      return atlas(colorHue, barrelDark, "PaletteMaterial001", [
+        blueGlow[0] * barrelDark,
+        blueGlow[1] * barrelDark,
+        blueGlow[2] * barrelDark,
+      ]);
     }
 
     case "chain": {
