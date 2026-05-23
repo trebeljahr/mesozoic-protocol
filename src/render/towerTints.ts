@@ -93,9 +93,9 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
       // holds the steel-blue ratio (R≈0.39·B, G≈0.72·B) at every tier.
       const voltageGlow: [number, number, number] = [
         [0, 0, 0],
+        [0.04, 0.07, 0.1],
         [0.07, 0.13, 0.18],
-        [0.12, 0.23, 0.32],
-        [0.18, 0.33, 0.46],
+        [0.1, 0.19, 0.26],
       ][b] as [number, number, number];
       return atlas(voltageHue, voltageLum, "PaletteMaterial001", voltageGlow);
     }
