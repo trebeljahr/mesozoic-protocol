@@ -100,8 +100,8 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
     }
 
     case "chain": {
-      // Path A (Arc Reach) recolours the orb/arcs in TowerVfx.
-      // Path B (Voltage) tints the body — electric stays cool and
+      // Path A (Arc Reach) recolours the orb in TowerVfx (arcs hold a
+      // fixed tint). Path B (Voltage) tints the body — electric stays cool and
       // drifts toward a cool steel blue with each tier so the tower
       // reads as "more charged". Blue stays pinned while red drops hard
       // and green settles mid, landing near steel blue (#4682B4) at the
