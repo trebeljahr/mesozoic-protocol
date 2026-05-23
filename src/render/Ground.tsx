@@ -159,59 +159,96 @@ const NatureInstances = ({
   url,
   placements,
   castShadow,
+  tint,
 }: {
   url: string;
   placements: Placement[];
   castShadow: boolean;
+  tint?: [number, number, number];
 }) => {
   const { scene } = useGLTF(url);
-  const instRef = useRef<THREE.InstancedMesh>(null);
+  const instRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
+  // Quaternius/KayKit models are authored as several primitives — one mesh per
+  // colour region (trunk / foliage / snow cap). The loader exposes each as its
+  // own mesh, so we instance every one of them with the shared placement
+  // transforms; taking only the first primitive would drop all but one colour
+  // of the model. minY is taken across the whole model so the parts stay
+  // aligned and the model's lowest point rests on the ground.
   const source = useMemo(() => {
-    let mesh: THREE.Mesh | null = null;
+    const meshes: THREE.Mesh[] = [];
     scene.traverse((o) => {
-      if (!mesh && (o as THREE.Mesh).isMesh) mesh = o as THREE.Mesh;
+      if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
     });
-    if (!mesh) return null;
-    const m = mesh as THREE.Mesh;
-    m.updateMatrixWorld(true);
-    const geom = m.geometry.clone();
-    geom.applyMatrix4(m.matrixWorld);
-    geom.computeBoundingBox();
-    const minY = geom.boundingBox?.min.y ?? 0;
-    return { geom, material: m.material as THREE.Material, minY };
-  }, [scene]);
+    if (meshes.length === 0) return null;
+    // useGLTF caches the scene, so its materials are shared across every biome
+    // that references this GLB. When a layer asks for a tint we must clone
+    // before recolouring, otherwise (e.g.) the forest grass would inherit the
+    // snowfield's blue wash.
+    const wash = tint ? new THREE.Color(tint[0], tint[1], tint[2]) : null;
+    const tintMat = (mat: THREE.Material): THREE.Material => {
+      if (!wash) return mat;
+      const c = mat.clone();
+      const std = c as THREE.MeshStandardMaterial;
+      if (std.color) std.color.multiply(wash);
+      c.needsUpdate = true;
+      return c;
+    };
+    let minY = Number.POSITIVE_INFINITY;
+    const parts = meshes.map((m) => {
+      m.updateMatrixWorld(true);
+      const geom = m.geometry.clone();
+      geom.applyMatrix4(m.matrixWorld);
+      geom.computeBoundingBox();
+      minY = Math.min(minY, geom.boundingBox?.min.y ?? 0);
+      const material = Array.isArray(m.material)
+        ? m.material.map(tintMat)
+        : tintMat(m.material as THREE.Material);
+      return { geom, material };
+    });
+    return { parts, minY: Number.isFinite(minY) ? minY : 0 };
+  }, [scene, tint]);
 
   useEffect(() => {
-    const im = instRef.current;
-    if (!im || !source) return;
+    if (!source) return;
     const dummy = new THREE.Object3D();
-    for (let i = 0; i < placements.length; i++) {
-      const p = placements[i];
-      dummy.position.set(p.x, -source.minY * p.scale, -p.y);
-      dummy.rotation.set(0, p.rot, 0);
-      dummy.scale.setScalar(p.scale);
-      dummy.updateMatrix();
-      im.setMatrixAt(i, dummy.matrix);
-    }
-    im.count = placements.length;
-    im.instanceMatrix.needsUpdate = true;
+    source.parts.forEach((_, idx) => {
+      const im = instRefs.current[idx];
+      if (!im) return;
+      for (let i = 0; i < placements.length; i++) {
+        const p = placements[i];
+        dummy.position.set(p.x, -source.minY * p.scale, -p.y);
+        dummy.rotation.set(0, p.rot, 0);
+        dummy.scale.setScalar(p.scale);
+        dummy.updateMatrix();
+        im.setMatrixAt(i, dummy.matrix);
+      }
+      im.count = placements.length;
+      im.instanceMatrix.needsUpdate = true;
+    });
   }, [placements, source]);
 
   if (!source || placements.length === 0) return null;
 
   return (
-    <instancedMesh
-      ref={instRef}
-      args={[source.geom, source.material, placements.length]}
-      castShadow={castShadow}
-      receiveShadow
-      // Positions are baked into per-instance matrices, so the default
-      // origin-centered bounding sphere fails the frustum test once the
-      // player zooms in and pans away from origin — culling the whole
-      // batch and making the ground decor vanish. Disable per-batch culling.
-      frustumCulled={false}
-    />
+    <>
+      {source.parts.map((part, idx) => (
+        <instancedMesh
+          key={part.geom.uuid}
+          ref={(el) => {
+            instRefs.current[idx] = el;
+          }}
+          args={[part.geom, part.material, placements.length]}
+          castShadow={castShadow}
+          receiveShadow
+          // Positions are baked into per-instance matrices, so the default
+          // origin-centered bounding sphere fails the frustum test once the
+          // player zooms in and pans away from origin — culling the whole
+          // batch and making the ground decor vanish. Disable per-batch culling.
+          frustumCulled={false}
+        />
+      ))}
+    </>
   );
 };
 
@@ -298,6 +335,7 @@ export const Ground = () => {
             url={spec.urls[vi]}
             placements={placements}
             castShadow={spec.castShadow}
+            tint={spec.tint}
           />
         )),
       )}

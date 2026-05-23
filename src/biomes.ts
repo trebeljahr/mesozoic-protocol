@@ -47,6 +47,11 @@ export type BiomeLayer = {
   // groundCover-layer overlap uses a smaller slack so dense grass doesn't
   // shut out mushrooms/flowers placed afterward.
   groundCover?: boolean;
+  // Optional per-layer colour multiply applied to the instanced material
+  // (Ground.tsx clones the cached material first, so other biomes reusing
+  // the same GLB are unaffected). Lets a biome reuse a neutral model with a
+  // climate wash — e.g. the snowfield tints the grassland grass tufts blue.
+  tint?: [number, number, number];
 };
 
 export type BiomeStyle = {
@@ -319,6 +324,89 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     blocks: true,
     cluster: { seeds: 4, sigma: 2.0 },
   },
+  // Background scenery — non-blocking, non-removable decoration. Listed
+  // before the dense ground-cover so the sparse, larger props claim their
+  // spots first and the grass/brush carpet fills in around them.
+  {
+    // Snowmen — KayKit holiday-bits A/B as a rare, characterful landmark.
+    // Used very sparingly so they read as a surprise, not set-dressing.
+    seed: 9393,
+    urls: ["/models/biomes/snow/SnowmanA.glb", "/models/biomes/snow/SnowmanB.glb"],
+    count: 3,
+    clearance: PATH_WIDTH / 2 + 0.6,
+    minScale: 0.5,
+    maxScale: 0.62,
+    castShadow: true,
+    footprint: 0.5,
+  },
+  {
+    // Background conifers — birch + pine snow variants kept small (saplings/
+    // young trees) so they read as backdrop scenery, distinct from the
+    // larger clearable obstacle trees (BIOME_TREE_URLS). Sparse.
+    seed: 8181,
+    urls: [
+      "/models/biomes/snow/PineTreeSnow1.glb",
+      "/models/biomes/snow/PineTreeSnow2.glb",
+      "/models/biomes/snow/PineTreeSnow3.glb",
+      "/models/biomes/snow/PineTreeSnow4.glb",
+      "/models/biomes/snow/PineTreeSnow5.glb",
+      "/models/biomes/snow/BirchTreeSnow1.glb",
+      "/models/biomes/snow/BirchTreeSnow2.glb",
+      "/models/biomes/snow/BirchTreeSnow3.glb",
+      "/models/biomes/snow/BirchTreeSnow4.glb",
+      "/models/biomes/snow/BirchTreeSnow5.glb",
+    ],
+    count: 12,
+    clearance: PATH_WIDTH / 2 + 1.0,
+    minScale: 0.28,
+    maxScale: 0.46,
+    castShadow: true,
+    footprint: 0.6,
+  },
+  {
+    // Fallen snow-dusted log — sparse ground feature.
+    seed: 2626,
+    urls: ["/models/biomes/snow/WoodlogSnow.glb"],
+    count: 5,
+    clearance: PATH_WIDTH / 2 + 0.5,
+    minScale: 0.3,
+    maxScale: 0.45,
+    castShadow: true,
+    footprint: 0.55,
+  },
+  {
+    // Surface rocks — the full snow rock set at mid scale, scattered as
+    // non-interactive ground stones (smaller than the clearable blocker
+    // boulders, larger than the ice-shard pebbles below).
+    seed: 4848,
+    urls: [
+      "/models/biomes/snow/RockSnow1.glb",
+      "/models/biomes/snow/RockSnow2.glb",
+      "/models/biomes/snow/RockSnow3.glb",
+      "/models/biomes/snow/RockSnow4.glb",
+      "/models/biomes/snow/RockSnow5.glb",
+      "/models/biomes/snow/RockSnow6.glb",
+      "/models/biomes/snow/RockSnow7.glb",
+    ],
+    count: 34,
+    clearance: PATH_WIDTH / 2 + 0.4,
+    minScale: 0.32,
+    maxScale: 0.62,
+    castShadow: true,
+    footprint: 0.4,
+  },
+  {
+    // Blue crystals — the alien-biome crystal pack making a sparse early
+    // cameo here, foreshadowing the later biomes. Very sparingly.
+    seed: 7878,
+    urls: ["/models/biomes/alien/Crystal_Small_1.glb", "/models/biomes/alien/Crystal_Small_2.glb"],
+    count: 6,
+    clearance: PATH_WIDTH / 2 + 0.3,
+    minScale: 0.055,
+    maxScale: 0.095,
+    castShadow: false,
+    footprint: 0.22,
+  },
   {
     // Snow-scrub patches — biome Bush meshes downscaled into low tufts so
     // the snowfield reads as windswept brush instead of bare. Non-blocking
@@ -346,6 +434,21 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     castShadow: false,
     footprint: 0.18,
     groundCover: true,
+  },
+  {
+    // Frosted grass tufts — the grassland grass models reused with a cool
+    // blue colour multiply (see BiomeLayer.tint) so the snowfield keeps the
+    // soft sprinkle of the forest floor, tinted for the climate.
+    seed: 1717,
+    urls: ["/models/nature/Grass1.glb", "/models/nature/Grass2.glb", "/models/nature/Grass3.glb"],
+    count: 130,
+    clearance: PATH_WIDTH / 2 + 0.3,
+    minScale: 0.55,
+    maxScale: 1.0,
+    castShadow: false,
+    footprint: 0.26,
+    groundCover: true,
+    tint: [0.7, 0.85, 1.0],
   },
 ];
 
