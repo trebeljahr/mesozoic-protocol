@@ -64,7 +64,7 @@
  *     death penalty; real engagement depends on positioning + ability cycling.
  */
 
-import { LEVELS, levelHasMode, resolveLevelMode } from "../src/levels";
+import { LEVELS, levelHasMode, resolveLevelMode, scaleWaveCounts } from "../src/levels";
 import { LEVEL_MODES, type LevelMode } from "../src/progress";
 import { availableDamageTypes, ensureImmunityCoverage } from "../src/sim/immunityCoverage";
 import {
@@ -861,6 +861,10 @@ const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "n
   const level = LEVELS[levelIdx];
   const cfg = resolveLevelMode(level, mode);
   const hpScale = level.hpScale ?? 1;
+  // Mirror createWorld: widen the roster by countScale before any other
+  // pass so totalHp, combat window, bounty, and coverage all see the same
+  // stream the live game spawns.
+  const baseWaves = scaleWaveCounts(cfg.waves, level.countScale ?? 1);
   const longestPath = Math.max(...level.paths.map(pathLength));
   const towerStarBudget = opts.towerStarBudget ?? defaultTowerStarBudget(level.id);
   const robotSkillBudget = opts.robotSkillBudget ?? defaultRobotSkillBudget(level.id);
@@ -873,10 +877,10 @@ const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "n
   // immunities they can actually crack.
   const waves = opts.applyImmunityCoverage
     ? ensureImmunityCoverage(
-        cfg.waves,
+        baseWaves,
         availableDamageTypes(new Set(cfg.forbiddenTowers ?? []), cfg.lockedLoadout ?? null),
       )
-    : cfg.waves;
+    : baseWaves;
 
   const adaptPenalty = opts.applyAdaptivePenalty ? adaptivePenalty(level.id) : 1;
 
@@ -1000,6 +1004,7 @@ const printLevel = (
   console.log(
     `\n${C.bold}═══ L${level.id}: ${level.name}${modeTag}${C.reset}${rulesTag}` +
       `${level.hpScale ? ` ${C.dim}(hpScale ${level.hpScale}×)${C.reset}` : ""}` +
+      `${level.countScale ? ` ${C.dim}(countScale ${level.countScale}×)${C.reset}` : ""}` +
       ` ${C.dim}startGold=${cfg.startGold}, paths=${level.paths.length}, longestPath=${fmt(longestPath, 1)}u, ` +
       `robot=${robotLabel}, towerStars=${towerStarBudget}, base=${baseLabel}, ${adaptLabel}, ${immunityLabel}${C.reset}`,
   );

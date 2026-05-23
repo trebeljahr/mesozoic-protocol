@@ -41,6 +41,13 @@ export type LevelConfig = {
   startGold: number;
   nodePos: { x: number; y: number };
   hpScale?: number;
+  // Per-level roster-density multiplier. Scales every non-boss spawn count
+  // (boss matriarchs stay singleton). Lets the early campaign run denser
+  // waves without re-authoring each builder call — a maxed player's single
+  // upgraded tower can't cover the wider stream, and the higher total HP
+  // raises the DPS bar so earned gold actually has to be spent. Baked at
+  // world creation alongside hpScale; the feasibility scripts honor it too.
+  countScale?: number;
   // Biome is inferred from nodePos via biomeForPos() — there is no per-level
   // override. See src/biomes.ts for zone definitions.
   heroic?: ModeConfig;
@@ -55,6 +62,23 @@ export const resolveLevelMode = (level: LevelConfig, mode: LevelMode): ModeConfi
   if (mode === "heroic" && level.heroic) return level.heroic;
   if (mode === "iron" && level.iron) return level.iron;
   return { startGold: level.startGold, waves: level.waves };
+};
+
+// Inflate roster density by scaling every non-boss spawn count by
+// `countScale` (see LevelConfig.countScale). Boss spawns keep their count
+// untouched — a matriarch is a singleton event and duplicating her would
+// break the boss-wave banner/bonus/child-stream semantics. Rounds to a
+// whole enemy with a floor of 1 so a chip never scales itself out of the
+// wave. Returns the same array reference when countScale is 1 so the no-op
+// path allocates nothing.
+export const scaleWaveCounts = (waves: WaveSpec[], countScale: number): WaveSpec[] => {
+  if (countScale === 1) return waves;
+  return waves.map((w) => ({
+    ...w,
+    spawns: w.spawns.map((s) =>
+      s.kind === "boss" ? s : { ...s, count: Math.max(1, Math.round(s.count * countScale)) },
+    ),
+  }));
 };
 
 // True if a given level actually defines content for the requested
@@ -344,6 +368,14 @@ const trickleStream = (
   modifiers?: { shielded?: boolean },
 ): BossTrickleStream => ({ pathIndex, kinds, minInterval, maxInterval, startDelay, ...modifiers });
 
+// Levels 1–14 carry deliberately high hpScale (2.0–4.6) plus a countScale
+// density bump — higher than several mid-game levels whose larger authored
+// rosters and tankier enemy kinds already supply the difficulty. The early
+// maps shipped with tiny rosters that a fully-upgraded tower shredded (the
+// feasibility script measured 26–58× headroom vs the game's own ~9× endgame
+// band), so gold never had to be spent, especially on Extinction. These
+// scales pull L1–14 down to ~10× — tight on Extinction, still clearable for
+// a fresh save on Easy/Medium. See scripts/wave-feasibility.ts to re-check.
 export const LEVELS: LevelConfig[] = [
   {
     id: 1,
@@ -351,6 +383,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, 0, 20, 0)],
     startGold: 220,
     nodePos: { x: -24, y: -13 },
+    hpScale: 2.8,
+    countScale: 1.8,
     waves: [
       intro(5),
       intro(7),
@@ -415,6 +449,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, -6, 4, -6, 4, 6, 20, 6)],
     startGold: 200,
     nodePos: { x: -14, y: -11 },
+    hpScale: 2.8,
+    countScale: 1.8,
     waves: [
       intro(8, 4),
       mixed({ raptor: 10, swarm: 6, allosaur: 1 }),
@@ -467,6 +503,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, 8, -6, 8, -6, -4, 6, -4, 6, 8, 20, 8)],
     startGold: 200,
     nodePos: { x: -3, y: -14 },
+    hpScale: 3.5,
+    countScale: 1.8,
     waves: [
       intro(10, 6),
       mixed({ raptor: 12, swarm: 8, allosaur: 2 }),
@@ -519,6 +557,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, -8, -12, -8, -12, 8, 12, 8, 12, -8, 20, -8)],
     startGold: 190,
     nodePos: { x: 9, y: -10 },
+    hpScale: 3.5,
+    countScale: 1.8,
     waves: [
       intro(12, 6),
       mixed({ raptor: 14, swarm: 10, allosaur: 3 }),
@@ -571,6 +611,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, -10, -14, -10, -9, -4, -1, -3, 3, 2, 10, 3, 15, 8, 20, 8)],
     startGold: 180,
     nodePos: { x: 24, y: -12 },
+    hpScale: 2.6,
+    countScale: 1.8,
     waves: [
       intro(14, 8),
       mixed({ raptor: 14, swarm: 10, allosaur: 3 }),
@@ -647,7 +689,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, 8, -12, 8, -12, -6, -4, -6, -4, 8, 4, 8, 4, -6, 12, -6, 12, 8, 20, 8)],
     startGold: 180,
     nodePos: { x: 21, y: -5 },
-    hpScale: 1.05,
+    hpScale: 3.7,
+    countScale: 1.8,
     waves: [
       intro(16, 10),
       mixed({ raptor: 14, swarm: 12, allosaur: 3 }),
@@ -705,7 +748,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, -8, -14, -8, -8, -4, -2, 0, 4, 4, 10, 6, 16, 8, 20, 8)],
     startGold: 170,
     nodePos: { x: 13, y: -3 },
-    hpScale: 1.08,
+    hpScale: 2.5,
+    countScale: 1.8,
     waves: [
       intro(14, 10),
       mixed({ raptor: 12, swarm: 10, allosaur: 2 }),
@@ -767,7 +811,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     startGold: 200,
     nodePos: { x: 2, y: -8 },
-    hpScale: 1.1,
+    hpScale: 4.6,
+    countScale: 1.8,
     waves: [
       intro(12, 8, 0),
       split("intro", 0.85, [0, { raptor: 6, swarm: 2 }], [1, { raptor: 6, swarm: 2 }]),
@@ -879,7 +924,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, 8, -10, 8, -2, 0, 0, -6, 8, -8, 14, -4, 20, 2)],
     startGold: 160,
     nodePos: { x: -10, y: -2 },
-    hpScale: 1.12,
+    hpScale: 2.9,
+    countScale: 1.8,
     waves: [
       intro(14, 8),
       mixed({ raptor: 14, swarm: 10, allosaur: 3 }),
@@ -937,7 +983,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, 10, -16, 10, -16, -10, 14, -10, 14, 6, -10, 6, -10, -4, 8, -4, 8, 2, 20, 2)],
     startGold: 160,
     nodePos: { x: -20, y: -6 },
-    hpScale: 1.15,
+    hpScale: 4.4,
+    countScale: 1.8,
     waves: [
       intro(16, 10),
       mixed({ raptor: 14, swarm: 10, allosaur: 3 }),
@@ -1039,7 +1086,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, -10, -12, -10, -12, 0, -4, 0, -4, 8, 6, 8, 6, -8, 14, -8, 14, 10, 20, 10)],
     startGold: 150,
     nodePos: { x: -23, y: 2 },
-    hpScale: 1.18,
+    hpScale: 2.9,
+    countScale: 1.5,
     waves: [
       intro(20, 14),
       // First taste of shields: denser raptor pack — the bubble breaks
@@ -1136,7 +1184,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     startGold: 210,
     nodePos: { x: -13, y: 5 },
-    hpScale: 1.2,
+    hpScale: 2.35,
+    countScale: 1.5,
     waves: [
       split("intro", 0.85, [0, { raptor: 12 }], [1, { raptor: 12 }]),
       split(
@@ -1340,7 +1389,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     startGold: 150,
     nodePos: { x: -3, y: 0 },
-    hpScale: 1.22,
+    hpScale: 2.4,
+    countScale: 1.5,
     waves: [
       mixed({ raptor: 22, swarm: 18, allosaur: 7, stego: 2 }),
       rush(115, 24),
@@ -1490,7 +1540,8 @@ export const LEVELS: LevelConfig[] = [
     paths: [p(-20, 0, -14, 6, -10, 2, -6, 8, -2, 2, 2, 8, 6, 2, 10, -4, 14, 2, 18, -4, 20, 0)],
     startGold: 140,
     nodePos: { x: 9, y: 4 },
-    hpScale: 1.25,
+    hpScale: 2.1,
+    countScale: 1.5,
     waves: [
       intro(22, 18),
       mixed({ raptor: 24, swarm: 18, allosaur: 8, stego: 3 }),

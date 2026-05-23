@@ -21,7 +21,7 @@ import {
   PATH_ENTRY_MARGIN_Y,
   PATH_WIDTH,
 } from "../level";
-import { type LevelConfig, resolveLevelMode } from "../levels";
+import { type LevelConfig, resolveLevelMode, scaleWaveCounts } from "../levels";
 import { DIFFICULTY_MULTIPLIERS, type DifficultyMultipliers, type LevelMode } from "../progress";
 import {
   COMPACT_TEMPLATE_IDS,
@@ -726,7 +726,9 @@ export const createWorld = (
   // spawner already respects spec.hpMul, so baking it once at creation
   // means the rest of the sim doesn't need to know about difficulty.
   const baseHpScale = (level.hpScale ?? 1) * difficulty.hp;
-  const modeWaves = modeConfig.waves;
+  // Roster-density scaling runs first so the immunity-coverage injection
+  // below sees the widened stream, then HP scaling bakes into hpMul.
+  const modeWaves = scaleWaveCounts(modeConfig.waves, level.countScale ?? 1);
   const scaledWaves =
     baseHpScale === 1
       ? modeWaves

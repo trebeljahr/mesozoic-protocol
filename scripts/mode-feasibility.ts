@@ -11,7 +11,7 @@
  * `lockedLoadout` are excluded from the candidate-config search so the
  * feasibility number reflects the actual restricted loadout.
  */
-import { LEVELS } from "../src/levels";
+import { LEVELS, scaleWaveCounts } from "../src/levels";
 import { pathLength } from "../src/sim/path";
 import { type AllRobotSkills, applyRobotSkillsToRobot } from "../src/sim/robotSkills";
 import { ROBOT_SPECS, type RobotVariantSpec } from "../src/sim/robotVariants";
@@ -530,6 +530,9 @@ const robotSkillBudget = robotSkillsArg
   : defaultRobotSkillBudget(level.id);
 
 const hpScale = level.hpScale ?? 1;
+// countScale is a top-level level field; createWorld scales every mode's
+// roster by it, so mirror that here before analyzing the mode block.
+const waves = scaleWaveCounts(mode.waves, level.countScale ?? 1);
 const longestPath = Math.max(...level.paths.map(pathLength));
 const allowed = new Set<TowerKind>(mode.lockedLoadout ?? ALL_TOWERS);
 if (mode.forbiddenTowers) {
@@ -554,8 +557,8 @@ let cumBounty = 0;
 let cumBonus = 0;
 let cleared = 0;
 let tightest = { f: Number.POSITIVE_INFINITY, wave: 0 };
-for (let i = 0; i < mode.waves.length; i++) {
-  const spec = mode.waves[i];
+for (let i = 0; i < waves.length; i++) {
+  const spec = waves[i];
   const waveNumber = i + 1;
   const wave = analyzeWave(spec, hpScale, longestPath);
   const dur = combatWindow(spec, waveNumber, wave, longestPath);
@@ -589,8 +592,7 @@ for (let i = 0; i < mode.waves.length; i++) {
   cumBounty += waveBounty(spec, longestPath);
   cumBonus += 5 + waveNumber;
 }
-const tailColor =
-  cleared === mode.waves.length ? C.green : cleared >= mode.waves.length - 1 ? C.cyan : C.red;
+const tailColor = cleared === waves.length ? C.green : cleared >= waves.length - 1 ? C.cyan : C.red;
 console.log(
   `${tailColor}  → ${cleared}/${mode.waves.length} waves clearable; tightest = wave ${tightest.wave} @ ${fmt(tightest.f, 2)}×${C.reset}`,
 );
