@@ -4729,9 +4729,54 @@
     z-index: 26;
     min-width: 232px;
   }
-  /* Click target on top half of the robot panel — opens the robot
-     overview overlay. Resets <button> chrome so it inherits the panel
-     layout; hover/active reads as a subtle highlight, not a full button. */
+  /* Selected-unit state — mirrors the gold field-mesh ring so the player
+     can see the robot is the active unit from the HUD alone. Uses the same
+     blue accent as the rest of the panel chrome. */
+  .robot-panel.selected {
+    border-color: rgba(159, 216, 255, 0.7);
+    box-shadow:
+      0 0 0 1px rgba(159, 216, 255, 0.45),
+      0 0 12px rgba(159, 216, 255, 0.22);
+  }
+  /* Small "i" badge, top-right of the panel — opens the read-only robot
+     overview overlay. Kept separate from the portrait button (which now
+     selects the robot) so the two actions don't collide. */
+  .robot-info-btn {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: rgba(159, 216, 255, 0.08);
+    border: 1px solid rgba(159, 216, 255, 0.35);
+    border-radius: 50%;
+    color: var(--color-blue);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    font-weight: 700;
+    font-style: italic;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 27;
+    transition:
+      background-color 0.12s,
+      border-color 0.12s;
+  }
+  .robot-info-btn:hover {
+    background: rgba(159, 216, 255, 0.18);
+    border-color: rgba(159, 216, 255, 0.6);
+  }
+  .robot-info-btn.active {
+    background: rgba(159, 216, 255, 0.25);
+    border-color: rgba(159, 216, 255, 0.7);
+  }
+  /* Click target on top half of the robot panel — selects the robot as the
+     active unit. Resets <button> chrome so it inherits the panel layout;
+     hover/active reads as a subtle highlight, not a full button. */
   .robot-portrait {
     display: block;
     width: 100%;
@@ -4762,6 +4807,8 @@
     letter-spacing: 0.08em;
     color: var(--color-blue);
     text-transform: uppercase;
+    /* Leave room for the absolutely-positioned "i" badge top-right. */
+    padding-right: 26px;
   }
   .robot-hp-row {
     display: flex;

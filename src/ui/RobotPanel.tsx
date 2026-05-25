@@ -4,7 +4,6 @@ import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
 import { fmtCompact } from "./format";
 import { useKeyboardHintsVisible } from "./useInputMode";
-import { useIsMobile } from "./useMediaQuery";
 
 // QWER hotkey map. Slot 3 (R) is always the ultimate so the climactic
 // move sits on the same key across pilots — League-style muscle memory.
@@ -16,9 +15,11 @@ const SLOT_KEYS: Array<{ slot: RobotAbilitySlot; key: "Q" | "W" | "E" | "R" }> =
 ];
 
 // In-game HUD strip: HP/XP bar plus the four ability buttons. Clicking
-// the portrait area (name / HP / XP / combat stats) opens the read-only
-// robot overview overlay. Clicking an ability triggers it the same way
-// the hotkey would.
+// the portrait area (name / HP / XP / combat stats) selects the robot as
+// the active unit (next ground tap is a move order) and the whole strip
+// gets a selected outline to mirror the field-mesh selection ring. The
+// small "i" badge opens the read-only robot overview overlay. Clicking an
+// ability triggers it the same way the hotkey would.
 export const RobotPanel = () => {
   const { t } = useTranslation();
   const showKeyboardHints = useKeyboardHintsVisible();
@@ -42,29 +43,30 @@ export const RobotPanel = () => {
   const panelOpen = useGame((s) => s.robotPanelOpen);
   const setRobotPanelOpen = useGame((s) => s.setRobotPanelOpen);
   const selectRobotUnit = useGame((s) => s.selectRobotUnit);
-  const isMobile = useIsMobile();
+  const selected = useGame((s) => s.ui.robotSelected);
 
   const hpPct = maxHp > 0 ? clamp01(hp / maxHp) : 0;
   const xpPct = xpNeed > 0 ? clamp01(xpInto / xpNeed) : 0;
 
   return (
-    <div className="robot-panel">
+    <div className={`robot-panel ${selected ? "selected" : ""}`}>
       <button
         type="button"
-        className={`robot-portrait ${panelOpen ? "active" : ""}`}
-        onClick={() => {
-          const next = !panelOpen;
-          setRobotPanelOpen(next);
-          // Mobile lacks an easy tap target on the field robot, so the
-          // portrait doubles as the hero selector: opening also selects it
-          // for movement (next ground tap is a move order), closing clears
-          // the selection. Desktop keeps portrait = stats-only; the field
-          // mesh handles selection there.
-          if (isMobile) selectRobotUnit(next);
-        }}
+        className={`robot-info-btn ${panelOpen ? "active" : ""}`}
+        onClick={() => setRobotPanelOpen(!panelOpen)}
         aria-pressed={panelOpen}
         aria-label={t("robotShop.toggleOverview")}
         title={t("robotShop.robotOverview")}
+      >
+        i
+      </button>
+      <button
+        type="button"
+        className={`robot-portrait ${selected ? "active" : ""}`}
+        onClick={() => selectRobotUnit(!selected)}
+        aria-pressed={selected}
+        aria-label={t("robotShop.selectRobot")}
+        title={t("robotShop.selectRobot")}
       >
         <div className="robot-name">
           {t("robotShop.mecha")} · {label.toUpperCase()}

@@ -333,6 +333,7 @@
     "roster": "Roster",
     "selStats": "DMG {{dmg}} · RATE {{rate}}/s · RNG {{rng}} · DPS {{dps}} · SPD {{spd}}",
     "selStatsSplash": " · SPL {{spl}}",
+    "selectRobot": "Select robot",
     "setActive": "Set Active",
     "singleTarget": "Single-target projectile",
     "splashPerShot": "Splash radius {{radius}} per shot",

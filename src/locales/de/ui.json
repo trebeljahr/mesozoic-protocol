@@ -333,6 +333,7 @@
     "roster": "Aufstellung",
     "selStats": "DMG {{dmg}} · RATE {{rate}}/s · RNG {{rng}} · DPS {{dps}} · SPD {{spd}}",
     "selStatsSplash": " · SPL {{spl}}",
+    "selectRobot": "Roboter auswählen",
     "setActive": "Aktivieren",
     "singleTarget": "Einzelziel-Projektil",
     "splashPerShot": "Flächenradius {{radius}} pro Schuss",
