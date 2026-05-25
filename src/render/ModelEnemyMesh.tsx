@@ -334,6 +334,15 @@ export const ModelEnemyMesh = ({
             if (m.isMesh) {
               m.castShadow = true;
               m.receiveShadow = true;
+              // Matriarch GLBs are huge with wide walk-cycle swings (neck +
+              // tail). three.js computes a skinned mesh's bounding sphere
+              // once from the bind pose, so once the boss is close and her
+              // animated silhouette extends past that stale sphere, the
+              // per-mesh frustum test culls the whole body the moment the
+              // sphere center drifts off-screen — she vanishes mid-fight.
+              // Disabling per-mesh culling on the (singleton) boss is cheap
+              // and keeps her body drawn for her full lifetime.
+              if (kind === "boss") m.frustumCulled = false;
               // SkeletonUtils.clone shares material references across
               // clones, so mutating .emissive for the hit-flash (and
               // .color for the frost tint) would light up every enemy of
