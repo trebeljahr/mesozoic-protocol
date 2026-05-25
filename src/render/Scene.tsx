@@ -87,9 +87,9 @@ export const PlayScene = () => {
       <ModelEnemyMesh kind="raptor" url="/models/Velociraptor.glb" targetSize={1.6} />
       <ModelEnemyMesh kind="swarm" url="/models/Velociraptor.glb" targetSize={0.8} />
       <ModelEnemyMesh kind="para" url="/models/Parasaurolophus.glb" targetSize={1.7} />
-      <ModelEnemyMesh kind="allosaur" url="/models/Trex.glb" targetSize={2.2} />
-      <ModelEnemyMesh kind="stego" url="/models/Stegosaurus.glb" targetSize={1.9} />
-      <ModelEnemyMesh kind="armored" url="/models/Triceratops.glb" targetSize={2.0} />
+      <ModelEnemyMesh kind="allosaur" url="/models/Trex.glb" targetSize={3.3} />
+      <ModelEnemyMesh kind="stego" url="/models/Stegosaurus.glb" targetSize={2.85} />
+      <ModelEnemyMesh kind="armored" url="/models/Triceratops.glb" targetSize={3.0} />
       <ModelEnemyMesh kind="titan" url="/models/Apatosaurus.glb" targetSize={11.0} clip="Walk" />
       {/* Biome-themed matriarchs — one mesh per variant so each loads
           its own GLB. The renderer dispatches by enemy.bossVariant, so a
@@ -98,35 +98,35 @@ export const PlayScene = () => {
         kind="boss"
         bossVariant="apex"
         url="/models/Apatosaurus.glb"
-        targetSize={18.0}
+        targetSize={27.0}
         clip="Walk"
       />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="raptor"
         url="/models/Velociraptor.glb"
-        targetSize={6.4}
+        targetSize={9.6}
         timeScale={0.62}
       />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="stego"
         url="/models/Stegosaurus.glb"
-        targetSize={5.0}
+        targetSize={7.5}
         clip="Walk"
       />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="para"
         url="/models/Parasaurolophus.glb"
-        targetSize={4.6}
+        targetSize={6.9}
       />
-      <ModelEnemyMesh kind="boss" bossVariant="allosaur" url="/models/Trex.glb" targetSize={5.5} />
+      <ModelEnemyMesh kind="boss" bossVariant="allosaur" url="/models/Trex.glb" targetSize={8.25} />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="armored"
         url="/models/Triceratops.glb"
-        targetSize={5.4}
+        targetSize={8.1}
         clip="Walk"
       />
 
