@@ -1392,6 +1392,7 @@ const suggestRobot = (level: (typeof LEVELS)[number], hpScale: number) => {
   const score: Record<DamageType, number> = {
     kinetic: 0,
     electric: 0,
+    cold: 0,
     flame: 0,
     explosive: 0,
   };
@@ -1413,6 +1414,10 @@ const suggestRobot = (level: (typeof LEVELS)[number], hpScale: number) => {
   const variantByDamage: Record<DamageType, RobotVariant> = {
     kinetic: "george",
     electric: "leela",
+    // No robot deals cold natively; on cold-vulnerable mixes (titan/boss)
+    // electric is the next-least-resisted lever, so the electric pilot is
+    // the best available hero pick.
+    cold: "leela",
     flame: "mike",
     explosive: "stan",
   };

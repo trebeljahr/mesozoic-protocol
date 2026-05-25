@@ -370,35 +370,17 @@ const robotAbilityRawDps = (
       damageType: ability.damageType,
     };
   }
-  if (ability.type === "barrage") {
-    const hits = splashHits(ability.splashRadius, enemiesOnScreen);
-    return {
-      dps: (ability.count * ability.damage * hits) / (ability.cooldown * cooldownMul),
-      damageType: ability.damageType,
-    };
-  }
-  if (ability.type === "mark") {
-    // Mark amplifies auto-attack DPS; treat as a multiplicative bonus
-    // averaged over the cooldown window. (dmgMul - 1) × duration / cd.
-    // Folded into auto-attack DPS at the call site, but we return a
-    // sentinel here so the caller knows to apply it separately.
+  if (ability.type === "buff") {
+    // Self-buff amplifies the robot's own auto-attack output for
+    // `duration`. Average the extra DPS over the cooldown window:
+    // base auto-DPS × (damageMul·fireRateMul − 1) × duration / cd.
     return {
       dps:
         variant.damage *
         variant.fireRate *
-        (ability.dmgMul - 1) *
+        (ability.damageMul * ability.fireRateMul - 1) *
         (ability.duration / (ability.cooldown * cooldownMul)),
       damageType: variant.damageType,
-    };
-  }
-  if (ability.type === "incinerate") {
-    // Incinerate is a damage-over-time AoE; total damage is dealt across
-    // duration to enemies within range. Hits estimated by range
-    // half-area enemy density (~3 typical) clamped to on-screen count.
-    const hits = Math.min(3, enemiesOnScreen);
-    return {
-      dps: (ability.totalDamage * hits) / (ability.cooldown * cooldownMul),
-      damageType: ability.damageType,
     };
   }
   return { dps: 0, damageType: "kinetic" };
