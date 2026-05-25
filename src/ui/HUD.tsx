@@ -9,6 +9,7 @@ import { BasePanel } from "./BasePanel";
 import { BossBanner } from "./BossBanner";
 import { DamageIcon } from "./DamageIcon";
 import { DifficultyButton } from "./DifficultyButton";
+import { DroneAssignNotice } from "./DroneAssignNotice";
 import { prewarmEnemyIcons } from "./EnemyIcon.specs";
 import { EnemyPanel } from "./EnemyPanel";
 import { IconCog } from "./MenuIcons";
@@ -468,6 +469,7 @@ export const HUD = () => {
       <RobotSelectionPanel />
       <RobotPanel />
       <BossBanner />
+      <DroneAssignNotice />
 
       {paused &&
         !compendiumOpen &&

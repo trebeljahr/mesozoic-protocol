@@ -2393,11 +2393,16 @@ export const useGame = create<GameStore>((set, get) => ({
       return;
     }
     const target = s.world.towerById.get(towerId);
-    // Refuse self-assignment + hive-to-hive — both would be no-ops sim
-    // side, but the visual "the drone went home to nothing" is worse
-    // than just rejecting.
-    if (!target || target.kind === "hive") {
+    if (!target) {
+      // Defensive: the clicked tower no longer exists. Drop the cursor.
       set({ assigningDroneSlot: null });
+      return;
+    }
+    // Refuse self-assignment + hive-to-hive: a hive can't host a drone.
+    // Reject audibly with a reason and keep the cursor armed so the
+    // player can retarget — never silently swallow the pick.
+    if (target.kind === "hive") {
+      emit(s.world, { type: "drone-assign-failed", reason: "unsupported" });
       return;
     }
     // Cap drones-per-target. The currently-picked slot may already
@@ -2411,7 +2416,7 @@ export const useGame = create<GameStore>((set, get) => ({
         // Target already at the per-tower drone cap. Reject audibly and
         // keep the pick cursor armed so the player can retarget — never
         // silently reroute the drone onto a different tower.
-        emit(s.world, { type: "drone-assign-failed" });
+        emit(s.world, { type: "drone-assign-failed", reason: "full" });
         return;
       }
     }

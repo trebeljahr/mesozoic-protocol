@@ -288,7 +288,9 @@
     "pick": "Wählen",
     "pickHint": "Klicke einen Turm auf der Karte zum Zuweisen",
     "clearHint": "Diese Drohne nach Hause schicken",
-    "assignHint": "Klicke einen Turm, um D{{n}} zuzuweisen · klicke leeren Boden zum Abbrechen"
+    "assignHint": "Klicke einen Turm, um D{{n}} zuzuweisen · klicke leeren Boden zum Abbrechen",
+    "failUnsupported": "Ein Hive kann keine Drohnen aufnehmen — wähle einen Kampfturm",
+    "failFull": "Dieser Turm hat bereits die maximalen {{max}} Drohnen"
   },
   "robotShop": {
     "abilities": "Fähigkeiten",

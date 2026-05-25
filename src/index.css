@@ -2209,6 +2209,61 @@
     }
   }
 
+  /* Drone-assignment rejection notice — small amber toast explaining why
+     a hive drone couldn't be assigned. Sits below the boss-banner slot. */
+  .drone-assign-notice-overlay {
+    position: absolute;
+    top: 120px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 30;
+  }
+
+  .drone-assign-notice-card {
+    max-width: 80vw;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-align: center;
+    color: #ffe7c2;
+    background: linear-gradient(
+      180deg,
+      rgba(60, 38, 8, 0.95) 0%,
+      rgba(34, 22, 6, 0.95) 100%
+    );
+    border: 1px solid rgba(255, 176, 48, 0.5);
+    box-shadow:
+      0 0 0 1px rgba(255, 176, 48, 0.12),
+      0 8px 26px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(6px);
+    animation:
+      droneNoticeIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.4) both,
+      droneNoticeOut 0.4s ease-in 2.4s both;
+  }
+
+  @keyframes droneNoticeIn {
+    from {
+      transform: translateY(-12px) scale(0.96);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes droneNoticeOut {
+    to {
+      transform: translateY(-8px) scale(0.98);
+      opacity: 0;
+    }
+  }
+
   /* Level-intro briefing overlay — shown once per level before waves start. */
   .level-intro-overlay {
     position: absolute;

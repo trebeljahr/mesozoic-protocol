@@ -288,7 +288,9 @@
     "pick": "Pick",
     "pickHint": "Click a tower on the map to assign",
     "clearHint": "Send this drone home",
-    "assignHint": "Click a tower to assign D{{n}} · click empty ground to cancel"
+    "assignHint": "Click a tower to assign D{{n}} · click empty ground to cancel",
+    "failUnsupported": "Hives can't host drones — pick a combat tower",
+    "failFull": "That tower already has the max {{max}} drones"
   },
   "robotShop": {
     "abilities": "Abilities",
