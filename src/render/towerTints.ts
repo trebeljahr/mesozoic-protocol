@@ -102,28 +102,30 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
     case "chain": {
       // Path A (Arc Reach) recolours the orb in TowerVfx (arcs hold a
       // fixed tint). Path B (Voltage) tints the body — electric stays cool and
-      // drifts toward a cool steel blue with each tier so the tower
+      // drifts toward a deep royal blue with each tier so the tower
       // reads as "more charged". Blue stays pinned while red drops hard
-      // and green settles mid, landing near steel blue (#4682B4) at the
-      // top tier; luminance holds high so the hue stays legible.
+      // and green is held LOW so the hue lands on a strong, dark royal
+      // blue (#4169E1, R≈0.29·B, G≈0.47·B) rather than the brighter,
+      // greener steel blue it used to read as.
       const voltageHue: [number, number, number] = [
         [1.0, 1.0, 1.0],
-        [0.78, 0.88, 1.0],
-        [0.55, 0.76, 1.0],
-        [0.36, 0.64, 1.0],
+        [0.72, 0.78, 1.0],
+        [0.5, 0.6, 1.0],
+        [0.32, 0.46, 1.0],
       ][b] as [number, number, number];
-      const voltageLum = [1.0, 0.97, 0.9, 0.82][b];
+      const voltageLum = [1.0, 0.95, 0.86, 0.78][b];
       // The Lighting Turret is a single atlas mesh and its base texels are
       // near-black (22,19,16) — multiplying the voltage hue onto black
       // stays black, so the multiply alone never lifts the base. Add a
-      // steel-blue emissive that ramps with Voltage so the dark base
-      // actually shifts toward #4682B4 as the tower upgrades. The ramp
-      // holds the steel-blue ratio (R≈0.39·B, G≈0.72·B) at every tier.
+      // royal-blue emissive that ramps with Voltage so the dark base
+      // actually shifts toward #4169E1 as the tower upgrades. The ramp
+      // holds the royal-blue ratio (R≈0.29·B, G≈0.46·B) at every tier so
+      // the lifted hue stays a dark royal blue, not a bright steel blue.
       const voltageGlow: [number, number, number] = [
         [0, 0, 0],
-        [0.04, 0.07, 0.1],
-        [0.07, 0.13, 0.18],
-        [0.1, 0.19, 0.26],
+        [0.03, 0.05, 0.11],
+        [0.055, 0.09, 0.19],
+        [0.08, 0.13, 0.28],
       ][b] as [number, number, number];
       return atlas(voltageHue, voltageLum, "PaletteMaterial001", voltageGlow);
     }
