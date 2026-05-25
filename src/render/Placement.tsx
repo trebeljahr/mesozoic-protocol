@@ -284,6 +284,9 @@ export const Placement = () => {
       const pos = eventPoint(e);
       setControllerActiveState(false);
       setHoverState(pos);
+      // If a dash is armed, snap the aim arrow to the finger on touchdown so
+      // the drag-to-aim gesture reads immediately, not only after a move.
+      updateDashAim(pos);
       return;
     }
     onPointerMove(e);
@@ -322,6 +325,15 @@ export const Placement = () => {
 
     const pos = eventPoint(e);
     suppressClickUntilRef.current = Date.now() + TOUCH_CLICK_SUPPRESS_MS;
+
+    // Dash aim armed: the whole touch was a dash-direction chooser — the
+    // arrow tracked the finger via onPointerMove, so lift commits the dash
+    // toward the release point. Never parks a tower-placement pill, whether
+    // the finger was dragged or tapped.
+    if (useGame.getState().world.robot.dashAim) {
+      handleGroundTap(pos);
+      return;
+    }
 
     // Drag → park preview at lift point and arm the Confirm pill so
     // the player can fine-tune before committing. Tap → run the same

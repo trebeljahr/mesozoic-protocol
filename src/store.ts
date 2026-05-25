@@ -195,6 +195,7 @@ type UiSnapshot = {
   robotVariant: RobotVariant;
   robotLabel: string;
   robotSelected: boolean;
+  robotDashAiming: boolean;
   robotHp: number;
   robotMaxHp: number;
   robotAlive: boolean;
@@ -299,6 +300,7 @@ const snapshot = (
     robotVariant: w.robot.variant,
     robotLabel: ROBOT_SPECS[w.robot.variant].label,
     robotSelected: w.robot.selected,
+    robotDashAiming: w.robot.dashAim !== null,
     robotHp: Math.max(0, Math.round(w.robot.hp)),
     robotMaxHp: w.robot.maxHp,
     robotAlive: w.robot.alive,
@@ -361,6 +363,7 @@ const uiEqual = (a: UiSnapshot, b: UiSnapshot) =>
   a.inspectedEnemyAdaptiveType === b.inspectedEnemyAdaptiveType &&
   a.robotVariant === b.robotVariant &&
   a.robotSelected === b.robotSelected &&
+  a.robotDashAiming === b.robotDashAiming &&
   a.robotHp === b.robotHp &&
   a.robotMaxHp === b.robotMaxHp &&
   a.robotAlive === b.robotAlive &&

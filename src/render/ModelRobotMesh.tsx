@@ -317,6 +317,9 @@ export const ModelRobotMesh = () => {
       const sel = state.world.towerById.get(selId);
       if (sel && sel.kind === "mortar" && sel.targetingMode === "spot") return;
     }
+    // An armed dash aim owns the next click: yield so it bubbles to the
+    // placement plane and commits the dash instead of toggling selection.
+    if (state.world.robot.dashAim) return;
     e.stopPropagation();
     // Selecting the robot cancels active tower placement (selectRobotUnit
     // nulls selectedKind), so a click on the robot mid-placement switches

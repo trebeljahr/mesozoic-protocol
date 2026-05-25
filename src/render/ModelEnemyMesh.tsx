@@ -626,6 +626,11 @@ export const ModelEnemyMesh = ({
       const sel = state.world.towerById.get(selId);
       if (sel && sel.kind === "mortar" && sel.targetingMode === "spot") return;
     }
+    // An armed dash aim owns the next ground click: yield so it bubbles to
+    // the placement plane, which commits the dash toward this spot. Without
+    // this, tapping a dino to set the dash direction would inspect it instead
+    // and leave the dash hanging — the reported "dash fights dino selection".
+    if (state.world.robot.dashAim) return;
     // Robot control outranks dino inspection. When the robot is selected,
     // left-click on a dino must NOT pop the enemy panel and must NOT
     // de-select the robot — instead, let the click bubble through to the
@@ -663,6 +668,10 @@ export const ModelEnemyMesh = ({
   const handleContextMenu = (e: ThreeEvent<MouseEvent>) => {
     const state = useGame.getState();
     if (state.selectedKind !== null) return;
+    // Right-click while a dash aim is armed cancels the aim (handled by the
+    // placement plane's contextmenu) rather than inspecting the dino —
+    // symmetric with Esc / desktop dash-aim cancel.
+    if (state.world.robot.dashAim) return;
     let obj: THREE.Object3D | null = e.object;
     while (obj && obj.userData.enemyId === undefined) obj = obj.parent;
     if (!obj) return;

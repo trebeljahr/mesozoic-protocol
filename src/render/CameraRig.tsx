@@ -96,6 +96,10 @@ export const CameraRig = () => {
   const levelId = useGame((s) => s.world.levelId);
   const selectedKind = useGame((s) => s.selectedKind);
   const status = useGame((s) => s.world.status);
+  // While a robot dash aim is armed, single-finger touch is reserved for
+  // dragging the dash direction (handled by the placement plane), so the
+  // camera must not pan or rotate under the gesture.
+  const robotDashAiming = useGame((s) => s.ui.robotDashAiming);
   const size = useThree((s) => s.size);
 
   // Local one-shot rumble triggered when the run flips to "lost". The
@@ -226,7 +230,7 @@ export const CameraRig = () => {
         panSpeed={1.4}
         zoomSpeed={0.9}
         reserveLeftClick
-        reserveTouchPlacement={selectedKind !== null}
+        reserveTouchPlacement={selectedKind !== null || robotDashAiming}
         // Yaw + small pitch hint that the playfield is 3D. Disabled while
         // a tower is armed because the placement gesture maps one-finger
         // touch to ROTATE as a no-op — leaving rotate enabled there would
@@ -234,7 +238,7 @@ export const CameraRig = () => {
         // lost so the HQ-death rumble doesn't get mistaken for a rotate
         // gesture and spin the whole map under the player. Right-mouse
         // drag on desktop only; touch remains pan + pinch/pan.
-        enableRotate={selectedKind === null && status !== "lost"}
+        enableRotate={selectedKind === null && status !== "lost" && !robotDashAiming}
         minPolarAngle={BATTLE_MIN_POLAR}
         maxPolarAngle={BATTLE_MAX_POLAR}
         rotateSpeed={0.6}
