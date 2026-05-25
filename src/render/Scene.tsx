@@ -26,6 +26,7 @@ import { PlannerOverlay } from "./PlannerOverlay";
 import { ProjectileMesh } from "./ProjectileMesh";
 import { RegenBadges } from "./RegenBadges";
 import { RobotHud } from "./RobotHud";
+import { RobotSelectionVfx } from "./RobotSelectionVfx";
 import { Rocks } from "./Rocks";
 import { SelectionRing } from "./SelectionRing";
 import { ShaderPrewarm } from "./ShaderPrewarm";
@@ -159,6 +160,7 @@ export const PlayScene = () => {
       <TowerVfx />
       <HealthBars />
       <SelectionRing />
+      <RobotSelectionVfx />
       <SpotTargetMarker />
       <ProjectileMesh />
       <Effects />
