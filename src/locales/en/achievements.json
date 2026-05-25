@@ -164,6 +164,11 @@
     "desc": "Shake a snowbound Parasaur free.",
     "hint": "Someone's stuck in the snow."
   },
+  "snowman": {
+    "name": "Lone Snowman",
+    "desc": "Find the last snowman in the snow.",
+    "hint": "Only one snowman remains."
+  },
   "ghost_trike": {
     "name": "Phantom Trike",
     "desc": "Catch a translucent Triceratops passing by.",

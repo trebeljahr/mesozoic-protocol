@@ -361,6 +361,25 @@ export const EASTER_EGG_DEFS: EasterEggDef[] = [
     clickRoll: { speed: 14, lifetime: 4, spinRate: 0 },
   },
   {
+    id: "snowman",
+    achievement: "snowman",
+    biomes: ["snow"],
+    // The lone snowman. Snow maps no longer scatter these (the decoration
+    // layer was pulled from biomes.ts), so this single easter-egg instance
+    // is the only snowman in the game — a rare find. Clicking bursts it
+    // into a snow puff.
+    model: "/models/biomes/snow/SnowmanA.glb",
+    targetSize: 1.5,
+    clickThreshold: 1,
+    goldReward: 10,
+    effect: burst(
+      { color: "#eaf4ff", count: 24, speed: [2, 4.5], life: 0.7 },
+      { color: "#c8e0f4", count: 14, speed: [1.5, 3], life: 0.5 },
+    ),
+    // Snappy pop so the snowman visibly bursts apart into snow.
+    reaction: { popIntensity: 0.45 },
+  },
+  {
     id: "ghost_trike",
     achievement: "ghost_trike",
     biomes: ["wasteland"],

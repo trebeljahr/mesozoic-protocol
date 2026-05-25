@@ -40,6 +40,7 @@ export type AchievementId =
   | "rover_roam"
   | "baby_raptor"
   | "buried_para"
+  | "snowman"
   | "ghost_trike"
   | "haunted_ruins";
 
@@ -101,6 +102,7 @@ const HINT_IDS: AchievementId[] = [
   "rover_roam",
   "baby_raptor",
   "buried_para",
+  "snowman",
   "ghost_trike",
   "haunted_ruins",
 ];
@@ -233,6 +235,7 @@ const satisfies = (id: AchievementId, p: ProgressData, w: World, ev: GameEvent |
     case "rover_roam":
     case "baby_raptor":
     case "buried_para":
+    case "snowman":
     case "ghost_trike":
     case "haunted_ruins":
       return false;

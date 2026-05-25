@@ -327,18 +327,10 @@ const SNOW_LAYERS: BiomeLayerSpec = [
   // Background scenery — non-blocking, non-removable decoration. Listed
   // before the dense ground-cover so the sparse, larger props claim their
   // spots first and the grass/brush carpet fills in around them.
-  {
-    // Snowmen — KayKit holiday-bits A/B as a rare, characterful landmark.
-    // Used very sparingly so they read as a surprise, not set-dressing.
-    seed: 9393,
-    urls: ["/models/biomes/snow/SnowmanA.glb", "/models/biomes/snow/SnowmanB.glb"],
-    count: 3,
-    clearance: PATH_WIDTH / 2 + 0.6,
-    minScale: 0.5,
-    maxScale: 0.62,
-    castShadow: true,
-    footprint: 0.5,
-  },
+  //
+  // Snowmen are no longer scattered here — a single one now appears as a
+  // hidden easter egg (EASTER_EGG_DEFS "snowman" in easterEggs.ts) so it
+  // reads as a rare find rather than set-dressing.
   {
     // Background conifers — birch + pine snow variants kept small (saplings/
     // young trees) so they read as backdrop scenery, distinct from the

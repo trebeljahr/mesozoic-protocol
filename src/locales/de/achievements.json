@@ -164,6 +164,11 @@
     "desc": "Schüttle einen eingeschneiten Parasaur frei.",
     "hint": "Jemand steckt im Schnee fest."
   },
+  "snowman": {
+    "name": "Einsamer Schneemann",
+    "desc": "Finde den letzten Schneemann im Schnee.",
+    "hint": "Nur ein Schneemann ist geblieben."
+  },
   "ghost_trike": {
     "name": "Phantom-Trike",
     "desc": "Erwische einen durchscheinenden Triceratops im Vorbeiziehen.",

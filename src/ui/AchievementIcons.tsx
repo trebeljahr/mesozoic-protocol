@@ -963,6 +963,45 @@ export const IconBuriedPara: FC<AchievementIconProps> = (p) => (
   </Svg>
 );
 
+export const IconSnowman: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Lone Snowman">
+    {/* Three stacked snowballs */}
+    <circle cx="12" cy="17.5" r="4.2" fill="currentColor" />
+    <circle cx="12" cy="11" r="3.2" fill="currentColor" />
+    <circle cx="12" cy="6" r="2.4" fill="currentColor" />
+    {/* top hat */}
+    <rect x="8.5" y="2.6" width="7" height="1.1" rx="0.3" fill="#000" opacity="0.65" />
+    <rect x="9.8" y="0.4" width="4.4" height="2.6" rx="0.3" fill="#000" opacity="0.65" />
+    {/* carrot nose */}
+    <path d="M12 6 L 16 6.6 L 12 7 Z" fill={HL} opacity="0.95" />
+    {/* eyes */}
+    <circle cx="11" cy="5.2" r="0.5" fill="#000" opacity="0.7" />
+    <circle cx="13" cy="5.2" r="0.5" fill="#000" opacity="0.7" />
+    {/* coal buttons */}
+    <circle cx="12" cy="10" r="0.55" fill="#000" opacity="0.55" />
+    <circle cx="12" cy="12" r="0.55" fill="#000" opacity="0.55" />
+    {/* stick arms */}
+    <line
+      x1="9"
+      y1="10.5"
+      x2="5.5"
+      y2="8.5"
+      stroke="currentColor"
+      strokeWidth="0.9"
+      strokeLinecap="round"
+    />
+    <line
+      x1="15"
+      y1="10.5"
+      x2="18.5"
+      y2="8.5"
+      stroke="currentColor"
+      strokeWidth="0.9"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
 export const IconGhostTrike: FC<AchievementIconProps> = (p) => (
   <Svg {...p} label="Phantom Trike">
     {/* Translucent trike head, three horns */}
@@ -1076,6 +1115,7 @@ export const ACHIEVEMENT_ICONS: Record<AchievementId, FC<AchievementIconProps>> 
   rover_roam: IconRoverRoam,
   baby_raptor: IconBabyRaptor,
   buried_para: IconBuriedPara,
+  snowman: IconSnowman,
   ghost_trike: IconGhostTrike,
   haunted_ruins: IconHauntedRuins,
 };
