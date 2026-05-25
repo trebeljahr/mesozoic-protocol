@@ -7,6 +7,17 @@ import { isLevelUnlocked } from "../progress";
 import { useGame } from "../store";
 import { STAR_STAGGER_MS, StarDisplay } from "./StarDisplay";
 
+// The result-cue stinger must fire exactly once per game-end. This component
+// remounts whenever a scene-blocking modal is toggled over the results screen
+// (App gates it on `!sceneBlockingModalOpen`) and StrictMode double-invokes
+// effects — both re-run the play effect. AudioManager's per-key cooldown only
+// collapses replays within 1s, so a remount seconds later double-plays the
+// horn. `lastResult` is a stable reference for one end-screen (engine.step
+// freezes on win, so it's set once and never re-spread), so tracking the
+// reference we last cued — at module scope, surviving remounts — guarantees a
+// single play per run.
+let cuedResult: unknown = null;
+
 export const ResultsScreen = () => {
   const { t } = useTranslation();
   const result = useGame((s) => s.lastResult);
@@ -40,6 +51,8 @@ export const ResultsScreen = () => {
   const won = result?.won ?? false;
   useEffect(() => {
     if (!result) return;
+    if (cuedResult === result) return;
+    cuedResult = result;
     const timers: ReturnType<typeof setTimeout>[] = [];
     // Stinger first; stars chime in on top so the moment lands as a single
     // beat rather than the per-star spray reading as the entire result cue.
