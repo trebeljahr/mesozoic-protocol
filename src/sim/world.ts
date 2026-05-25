@@ -860,6 +860,7 @@ export const createWorld = (
     lives: startingLives,
     startLives: startingLives,
     status: "running",
+    winHoldTimer: 0,
     killingPathIndex: null,
     nextEntityId: nextId + 1,
     robot,

@@ -803,6 +803,11 @@ export type World = {
   lives: number;
   startLives: number;
   status: RunStatus;
+  // Seconds elapsed in the post-final-kill grace window. The win trigger
+  // is held back this long so the last dino's death animation (render
+  // layer, gated on status === "running") finishes before the results
+  // screen covers the world. 0 until the final enemy is cleared.
+  winHoldTimer: number;
   // Path index of the HQ that took the killing blow. Used by HQTurret
   // so only that endpoint plays the death explosion + fracture; other
   // HQs on multi-path levels stay intact.

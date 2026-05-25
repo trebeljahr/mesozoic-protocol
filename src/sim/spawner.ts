@@ -345,11 +345,18 @@ export const spawnerTick = (world: World, dt: number) => {
   }
 };
 
-export const checkRunEnd = (world: World) => {
+// Grace window after the final enemy is cleared before the win fires.
+// Sized above the longest death clip (Triceratops, 1.79s) plus a frame
+// of render-start latency, so the last dino's death animation plays out
+// instead of being cut off the instant the enemy count hits zero.
+const WIN_DEATH_ANIM_HOLD_SEC = 2;
+
+export const checkRunEnd = (world: World, dt: number) => {
   if (world.status !== "running") return;
   if (world.lives <= 0) {
     world.status = "lost";
     world.shake.magnitude = 0;
+    world.winHoldTimer = 0;
     emit(world, { type: "game-over", won: false });
     return;
   }
@@ -360,6 +367,12 @@ export const checkRunEnd = (world: World) => {
     world.spawnQueue.length === 0 &&
     world.enemies.length === 0
   ) {
+    // Hold the win back so the final death animation completes. Status
+    // stays "running" through the window: that keeps world.time advancing
+    // and the render mixer unfrozen, so the corpse actually falls before
+    // the results screen appears.
+    world.winHoldTimer += dt;
+    if (world.winHoldTimer < WIN_DEATH_ANIM_HOLD_SEC) return;
     world.status = "won";
     world.shake.magnitude = 0;
     emit(world, { type: "game-over", won: true });

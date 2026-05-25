@@ -67,6 +67,6 @@ export class Engine {
     updatePuffs(world, TICK_DT);
     updateShake(world, TICK_DT);
     updateEasterEggs(world, TICK_DT);
-    checkRunEnd(world);
+    checkRunEnd(world, TICK_DT);
   }
 }
