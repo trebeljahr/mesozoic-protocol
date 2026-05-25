@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { AchievementId } from "./achievements";
 import { ACHIEVEMENT_BY_ID, checkAchievements } from "./achievements";
 import { track } from "./analytics";
-import { BIOME_LAYERS, BIOME_TREE_URLS } from "./biomes";
+import { BIOME_LAYERS, BIOME_TREE_URLS, classifyPropUrl, TARGET_SIZE_BY_ROLE } from "./biomes";
 import { isDebug } from "./debug";
 import { deriveSuggestedDebugLoadout, type PlannerTrace } from "./debugPlannerTrace";
 import { EASTER_EGG_BY_ID, EASTER_EGG_DEFS } from "./easterEggs";
@@ -418,6 +418,15 @@ const canPlaceAt = (world: World, pos: Vec2): boolean => {
   // poke a little into the playfield edge, so block on all of them).
   for (const o of world.outposts) {
     if (distSq(o.pos, pos) < o.radius * o.radius) return false;
+  }
+  // Hand-placed editor props flagged `blocks` occupy build slots too. The
+  // footprint is approximated from the prop's role target size × its scale
+  // (props render normalized to TARGET_SIZE_BY_ROLE). Empty in production.
+  for (const p of world.props) {
+    if (!p.blocks) continue;
+    const propR = TARGET_SIZE_BY_ROLE[classifyPropUrl(p.url)] * p.scale * 0.5;
+    const blockR = propR + TOWER_FOOTPRINT * 0.5;
+    if (distSq(p.pos, pos) < blockR * blockR) return false;
   }
   return true;
 };

@@ -462,6 +462,9 @@ const InstancedMarkers = ({ items, biome }: { items: WarningMarker[]; biome: Bio
 };
 
 export const BiomeCosmetics = () => {
+  // Dev level-editor "override procedural" blanks the auto cosmetics/story
+  // props so hand-placed props are the only set-dressing. Always false in prod.
+  const overrideActive = useGame((s) => s.world.overrideActive);
   const biome = useGame((s) => s.world.biome);
   const paths = useGame((s) => s.world.paths);
   const levelId = useGame((s) => s.world.levelId);
@@ -518,6 +521,10 @@ export const BiomeCosmetics = () => {
       markers: details.markers.filter((m) => !nearTower(m.pos, m.clearRadius)),
     };
   }, [details, towers, towerVersion]);
+
+  // Hooks above must run unconditionally; bail after them when the editor
+  // has suppressed procedural set-dressing for this level.
+  if (overrideActive) return null;
 
   return (
     <group>

@@ -8,6 +8,7 @@ import { BiomeCosmetics } from "./BiomeCosmetics";
 import { CameraRig } from "./CameraRig";
 import { CoalTrail } from "./CoalTrail";
 import { EasterEggs } from "./EasterEggs";
+import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
 import { FlowFeatures } from "./FlowFeatures";
 import { Ground } from "./Ground";
@@ -78,6 +79,7 @@ export const PlayScene = () => {
       <Rocks />
       <Trees />
       <BiomeCosmetics />
+      {import.meta.env.DEV && <EditorProps />}
       <EasterEggs />
       <Placement />
       <PlannerOverlay />

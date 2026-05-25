@@ -264,6 +264,20 @@ export type Outpost = {
   interior: boolean;
 };
 
+// Hand-placed environmental prop authored via the dev-only level editor
+// (src/editor). Persisted per level in localStorage and re-applied by
+// createWorld on load. `url` is any GLB from the biome asset catalog;
+// `scale` multiplies the prop's role-normalized target size (1 = nominal);
+// `blocks` opts the prop into tower-placement blocking (canPlaceAt).
+export type PlacedProp = {
+  id: string;
+  url: string;
+  pos: Vec2;
+  scale: number;
+  rot: number;
+  blocks: boolean;
+};
+
 export type RobotVariant = "george" | "leela" | "mike" | "stan";
 
 // Slot index used by the HUD + key bindings (Q/W/E/R). Semantic ability
@@ -784,6 +798,13 @@ export type World = {
   trees: Tree[];
   rocks: Rock[];
   outposts: Outpost[];
+  // Hand-placed props from the dev-only level editor. Empty in production
+  // (createWorld only reads the localStorage overrides under import.meta.env.DEV).
+  props: PlacedProp[];
+  // When the dev editor enabled "override procedural" for this level,
+  // createWorld blanks the procedural trees/rocks/outposts/cosmetics so the
+  // hand-placed props are the only set-dressing. Always false in production.
+  overrideActive: boolean;
   projectiles: Projectile[];
   beams: Beam[];
   explosions: Explosion[];

@@ -59,6 +59,7 @@ import type {
   Explosion,
   GameEvent,
   Outpost,
+  PlacedProp,
   Projectile,
   ProjectileKind,
   Robot,
@@ -755,6 +756,40 @@ export const createWorld = (
     level.id * 5471 + 3,
     triggeredEggsOnLevel,
   );
+  // Dev-only level-editor overrides. Hand-placed props are layered on top of
+  // the procedural set-dressing; when "override procedural" was enabled for
+  // this level, the procedural trees/rocks/outposts/eggs are blanked so the
+  // authored props are the only set-dressing. Gated on import.meta.env.DEV so
+  // the localStorage read and this whole branch dead-code out of production.
+  let editorProps: PlacedProp[] = [];
+  let overrideActive = false;
+  let finalTrees = trees;
+  let finalRocks = rocks;
+  let finalOutposts = outposts;
+  let finalEggs = eggs;
+  if (import.meta.env.DEV) {
+    // Read the editor overrides inline (rather than importing the editor's
+    // levelEdits module) so this whole branch — and any reference to the
+    // editor surface — is dead-code-eliminated from production. The storage
+    // shape mirrors src/editor/levelEdits.ts (key "mz:leveledits:v1").
+    try {
+      const raw =
+        typeof window !== "undefined" ? window.localStorage.getItem("mz:leveledits:v1") : null;
+      const edit = raw ? JSON.parse(raw)?.[String(level.id)] : null;
+      if (edit) {
+        editorProps = (Array.isArray(edit.props) ? edit.props : []) as PlacedProp[];
+        overrideActive = edit.override === true;
+        if (overrideActive) {
+          finalTrees = [];
+          finalRocks = [];
+          finalOutposts = [];
+          finalEggs = [];
+        }
+      }
+    } catch {
+      // Malformed/inaccessible storage — fall back to procedural placement.
+    }
+  }
   // Compose per-level hpScale × difficulty.hp into each wave's hpMul. The
   // spawner already respects spec.hpMul, so baking it once at creation
   // means the rest of the sim doesn't need to know about difficulty.
@@ -876,9 +911,11 @@ export const createWorld = (
     enemyById: new Map(),
     towers: [],
     towerById: new Map(),
-    trees,
-    rocks,
-    outposts,
+    trees: finalTrees,
+    rocks: finalRocks,
+    outposts: finalOutposts,
+    props: editorProps,
+    overrideActive,
     projectiles: [],
     beams: [],
     explosions: [],
@@ -922,7 +959,7 @@ export const createWorld = (
     },
     runEnemyKinds: {},
     runTowerKinds: {},
-    easterEggs: eggs,
+    easterEggs: finalEggs,
     easterEggSchedule,
     speedMul: difficulty.speed,
     goldKillMul: difficulty.goldKill,
