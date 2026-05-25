@@ -59,31 +59,36 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
   switch (kind) {
     case "pulse": {
       // Damage path (A) drives the body colour from the stock orange toward
-      // a solid palette blue; fire-rate path (B) darkens the barrel from
+      // a deep steel/navy blue; fire-rate path (B) darkens the barrel from
       // grey to near-black. Both bake into the single shared
-      // PaletteMaterial001.
+      // PaletteMaterial001 — this GLB is one mesh with one atlas material
+      // (the Gatling gun), so unlike cryo/flame/hive there are no separate
+      // part materials to recolour independently.
       //
       // The baked atlas is orange (205,97,0) for the body and greys for the
-      // barrels. Orange has a zero blue channel, so a multiply tint can only
-      // ever mud it toward brown — it can never reach blue (this is why the
-      // old cool tints read "muted"). The blue therefore has to come from an
-      // additive emissive, exactly like the chain tower lifts its near-black
-      // base toward steel blue. The multiply still pulls the orange's R/G
-      // down per tier so the emissive blue isn't fighting a warm albedo, and
-      // it tints the grey parts cool. Blue ratio sits near the palette's
-      // azure accent (#5ad6ff) — B pinned, G mid, R low — for a vivid,
-      // legibly-blue read rather than cyan.
+      // barrels. Orange has a zero blue channel, so a multiply tint can't
+      // reach blue on the body — a restrained additive emissive supplies the
+      // hue. The key is keeping that emissive *dark*: the old ramp pinned
+      // blue near 1.0 (azure #5ad6ff) which lit the whole silhouette like a
+      // generic glow overlay. Now the blue tops out as a deep navy (B≈0.34,
+      // same order as the chain tower's steel-blue lift) so the colour reads
+      // as the material darkening to blue, not a bright wash. The multiply
+      // does most of the work — it deepens the orange's R/G hard so the lit
+      // albedo itself goes dark and cool. Because multiply preserves each
+      // texel's luminance, the grey barrels (which have a blue channel) drift
+      // visibly bluer than the orange body, giving a per-part read for free
+      // despite the single shared material.
       const colorHue: [number, number, number] = [
         [1.0, 1.0, 1.0],
-        [0.72, 0.8, 1.0],
-        [0.44, 0.6, 1.0],
-        [0.18, 0.4, 1.0],
+        [0.62, 0.68, 0.82],
+        [0.4, 0.5, 0.72],
+        [0.22, 0.34, 0.6],
       ][a] as [number, number, number];
       const blueGlow: [number, number, number] = [
         [0, 0, 0],
-        [0.05, 0.11, 0.3],
-        [0.1, 0.22, 0.6],
-        [0.14, 0.34, 0.95],
+        [0.012, 0.03, 0.1],
+        [0.03, 0.07, 0.2],
+        [0.05, 0.12, 0.34],
       ][a] as [number, number, number];
       // Fire-rate darkening: 1.0 keeps the stock grey barrel, ramping toward
       // black. A single material means one emissive for the whole
