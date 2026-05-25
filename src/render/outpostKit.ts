@@ -78,20 +78,20 @@ const MINING_COLONY: OutpostTemplate = {
     ...stack("basemodule-a", "roofmodule-solarpanels", 0, 0),
     ...stack("basemodule-c", "roofmodule-base", 2.5, 0.4, Math.PI / 2),
     { model: "drill-structure", dx: -2.4, dz: 1.6 },
-    { model: "landingpad-large", dx: 2.8, dz: -2.8 },
-    { model: "lander-a", dx: 2.8, dz: -2.8, lift: 0.5, yaw: 0.6 },
+    // Quaternius hab building where the KayKit landing pad + lander used to sit.
+    { model: "building-l", dir: SPACEKIT_MODEL_DIR, dx: 2.8, dz: -2.8, scale: 0.33, yaw: 0.6 },
     { model: "solarpanel", dx: -3.1, dz: -1.2, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: -3.1, dz: -1.9, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: -3.1, dz: -2.6, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: -3.1, dz: -3.3, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: -3.3, dz: 2.6, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: -3.3, dz: 3.3, yaw: -Math.PI / 2 },
-    { model: "cargo-a-stacked", dx: 0.7, dz: -2.3, yaw: 0.3 },
-    { model: "cargo-a", dx: 1.5, dz: -2.6, yaw: 0.8 },
-    { model: "containers-a", dx: -0.9, dz: -2.2 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: 0.7, dz: -2.3, scale: 1.13, yaw: 0.3 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: 1.5, dz: -2.6, scale: 0.58, yaw: 0.8 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: -0.9, dz: -2.2, scale: 0.56 },
     { model: "spacetruck", dx: 1.2, dz: 2.1, yaw: 2.2 },
-    { model: "rocks-a", dx: 3.6, dz: 1.7, yaw: 1.0 },
-    { model: "rock-a", dx: -1.6, dz: -3.0 },
+    { model: "rock-large", dir: SPACEKIT_MODEL_DIR, dx: 3.6, dz: 1.7, scale: 0.21, yaw: 1.0 },
+    { model: "rock", dir: SPACEKIT_MODEL_DIR, dx: -1.6, dz: -3.0, scale: 0.18 },
     { model: "lights", dx: 1.4, dz: -0.9, scale: 0.9 },
   ],
 };
@@ -101,8 +101,9 @@ const LANDING_OUTPOST: OutpostTemplate = {
   id: "landing-outpost",
   footprint: 4.4,
   parts: [
-    { model: "landingpad-large", dx: 0, dz: 0 },
-    { model: "lander-a", dx: 0, dz: 0, lift: 0.5, yaw: 0.4 },
+    // Quaternius hab building as the centerpiece (was the KayKit landing
+    // pad + lander).
+    { model: "building-l", dir: SPACEKIT_MODEL_DIR, dx: 0, dz: 0, scale: 0.34, yaw: 0.4 },
     ...stack("basemodule-b", "roofmodule-cargo-a", -2.7, 0.3, -Math.PI / 2),
     { model: "solarpanel", dx: 2.7, dz: 1.6, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: 2.7, dz: 2.3, yaw: -Math.PI / 2 },
@@ -111,8 +112,8 @@ const LANDING_OUTPOST: OutpostTemplate = {
     { model: "solarpanel", dx: -1.2, dz: -2.0, yaw: 0 },
     { model: "spacetruck-large", dx: 1.8, dz: -2.2, yaw: 1.6 },
     { model: "spacetruck-trailer", dx: 2.5, dz: -2.4, yaw: 1.6 },
-    { model: "containers-b", dx: -2.3, dz: 2.2 },
-    { model: "rock-b", dx: 2.9, dz: -0.4 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: -2.3, dz: 2.2, scale: 0.56 },
+    { model: "rock", dir: SPACEKIT_MODEL_DIR, dx: 2.9, dz: -0.4, scale: 0.21 },
     { model: "lights", dx: 1.5, dz: 1.4, scale: 0.9 },
   ],
 };
@@ -129,9 +130,9 @@ const RELAY_STATION: OutpostTemplate = {
     { model: "solarpanel", dx: -2.3, dz: -1.7, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: 2.2, dz: -1.6, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: 2.9, dz: -1.6, yaw: -Math.PI / 2 },
-    { model: "cargo-b", dx: -1.8, dz: 1.8, yaw: 0.5 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: -1.8, dz: 1.8, scale: 0.58, yaw: 0.5 },
     { model: "lights", dx: 1.4, dz: -1.2, scale: 0.85 },
-    { model: "rock-a", dx: -2.6, dz: 1.9 },
+    { model: "rock", dir: SPACEKIT_MODEL_DIR, dx: -2.6, dz: 1.9, scale: 0.18 },
   ],
 };
 
@@ -140,12 +141,13 @@ const SUPPLY_DEPOT: OutpostTemplate = {
   id: "supply-depot",
   footprint: 4.1,
   parts: [
-    { model: "cargodepot-a", dx: 0, dz: 0 },
-    { model: "cargodepot-b", dx: 1.9, dz: 0.2, yaw: 0.2 },
+    // Quaternius storage structures replace the KayKit cargo depots.
+    { model: "base-large", dir: SPACEKIT_MODEL_DIR, dx: 0, dz: 0, scale: 0.21 },
+    { model: "building-l", dir: SPACEKIT_MODEL_DIR, dx: 1.9, dz: 0.2, scale: 0.24, yaw: 0.2 },
     ...stack("basemodule-c", "roofmodule-base", -2.6, 0.4, Math.PI / 2),
-    { model: "containers-c", dx: -0.4, dz: 2.0 },
-    { model: "containers-d", dx: 0.6, dz: 2.1 },
-    { model: "cargo-b-packed", dx: -1.6, dz: -1.9, yaw: 0.6 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: -0.4, dz: 2.0, scale: 0.56 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: 0.6, dz: 2.1, scale: 0.56, yaw: 0.5 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: -1.6, dz: -1.9, scale: 0.59, yaw: 0.6 },
     { model: "spacetruck", dx: 2.0, dz: -2.1, yaw: 2.0 },
     { model: "solarpanel", dx: 2.6, dz: 1.8, yaw: -Math.PI / 2 },
     { model: "lights", dx: 1.2, dz: -1.0, scale: 0.85 },
@@ -164,8 +166,8 @@ const SOLAR_POST: OutpostTemplate = {
     { model: "solarpanel", dx: 1.9, dz: 0.6, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: 1.9, dz: 1.3, yaw: -Math.PI / 2 },
     { model: "solarpanel", dx: 1.9, dz: 2.0, yaw: -Math.PI / 2 },
-    { model: "cargo-a", dx: 1.6, dz: -1.4, yaw: 0.5 },
-    { model: "rock-a", dx: -1.0, dz: 1.8 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: 1.6, dz: -1.4, scale: 0.58, yaw: 0.5 },
+    { model: "rock", dir: SPACEKIT_MODEL_DIR, dx: -1.0, dz: 1.8, scale: 0.18 },
   ],
 };
 
@@ -186,14 +188,13 @@ export const HQ_COMMAND_TEMPLATE: OutpostTemplate = {
     // flank is a second habitat stack rather than reusing that model.
     ...stack("basemodule-c", "roofmodule-solarpanels", -2.5, -0.6, Math.PI / 2),
     ...stack("basemodule-b", "roofmodule-cargo-a", 2.5, -1.4, -Math.PI / 2),
-    // Right-side landing pad with a parked lander.
-    { model: "landingpad-small", dx: 2.6, dz: 0.7 },
-    { model: "lander-a", dx: 2.6, dz: 0.7, lift: 0.5, yaw: 0.5 },
+    // Right-side Quaternius hab pod (was the KayKit landing pad + lander).
+    { model: "house-cylinder", dir: SPACEKIT_MODEL_DIR, dx: 2.6, dz: 0.7, scale: 0.28, yaw: 0.5 },
     // Back-row solar + supplies.
     { model: "solarpanel", dx: -1.0, dz: -2.5, yaw: 0 },
     { model: "solarpanel", dx: -0.3, dz: -2.5, yaw: 0 },
-    { model: "cargo-a-stacked", dx: 1.3, dz: -2.4, yaw: 0.3 },
-    { model: "containers-a", dx: -2.6, dz: 0.9 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: 1.3, dz: -2.4, scale: 1.13, yaw: 0.3 },
+    { model: "crate", dir: SPACEKIT_MODEL_DIR, dx: -2.6, dz: 0.9, scale: 0.56 },
     { model: "lights", dx: 1.5, dz: -0.4, scale: 0.85 },
   ],
 };

@@ -49,7 +49,7 @@ const SECTIONS: CreditSection[] = [
         url: "https://kaylousberg.itch.io/space-base-bits",
       },
       {
-        name: "Ultimate Space Kit — geodesic dome HQ command structure (spacekit/*)",
+        name: "Ultimate Space Kit — outpost structures: geodesic dome, hab buildings, storage domes, crates, rocks (spacekit/*)",
         creator: "Quaternius",
         license: "CC0 1.0",
         url: "https://quaternius.com/packs/ultimatespacekit.html",
