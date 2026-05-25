@@ -17,7 +17,9 @@ const StaticModel = ({ url }: { url: string }) => {
 // `treePanel.obstacle.<key>`) derived from the model filename.
 const obstacleKey = (url: string): string => {
   const file = url.split("/").pop() ?? "";
-  if (/^Tree|DeadTree/i.test(file)) return "tree";
+  // Substring match (not anchored) so PineTreeSnow / BirchTreeSnow / DeadTree
+  // all read as "tree", not just files that start with Tree.
+  if (/tree/i.test(file)) return "tree";
   if (/^Rock/i.test(file)) return "rock";
   if (/^Bush/i.test(file)) return "bush";
   if (/^Grass/i.test(file)) return "grass";

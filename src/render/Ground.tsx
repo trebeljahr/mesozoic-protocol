@@ -160,11 +160,13 @@ const NatureInstances = ({
   placements,
   castShadow,
   tint,
+  normalizeTo,
 }: {
   url: string;
   placements: Placement[];
   castShadow: boolean;
   tint?: [number, number, number];
+  normalizeTo?: number;
 }) => {
   const { scene } = useGLTF(url);
   const instRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
@@ -194,20 +196,34 @@ const NatureInstances = ({
       c.needsUpdate = true;
       return c;
     };
-    let minY = Number.POSITIVE_INFINITY;
+    const union = new THREE.Box3();
+    let unionSet = false;
     const parts = meshes.map((m) => {
       m.updateMatrixWorld(true);
       const geom = m.geometry.clone();
       geom.applyMatrix4(m.matrixWorld);
       geom.computeBoundingBox();
-      minY = Math.min(minY, geom.boundingBox?.min.y ?? 0);
+      if (geom.boundingBox) {
+        if (!unionSet) {
+          union.copy(geom.boundingBox);
+          unionSet = true;
+        } else union.union(geom.boundingBox);
+      }
       const material = Array.isArray(m.material)
         ? m.material.map(tintMat)
         : tintMat(m.material as THREE.Material);
       return { geom, material };
     });
-    return { parts, minY: Number.isFinite(minY) ? minY : 0 };
+    const size = unionSet ? union.getSize(new THREE.Vector3()) : new THREE.Vector3();
+    const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+    const minY = unionSet ? union.min.y : 0;
+    return { parts, minY: Number.isFinite(minY) ? minY : 0, maxDim };
   }, [scene, tint]);
+
+  // When the layer opts into size normalization, divide the target world size
+  // by the model's measured maxDim so every variant renders at ~normalizeTo
+  // before the per-instance scale band is applied. Otherwise raw GLTF scale.
+  const baseScale = source && normalizeTo ? normalizeTo / source.maxDim : 1;
 
   useEffect(() => {
     if (!source) return;
@@ -217,16 +233,17 @@ const NatureInstances = ({
       if (!im) return;
       for (let i = 0; i < placements.length; i++) {
         const p = placements[i];
-        dummy.position.set(p.x, -source.minY * p.scale, -p.y);
+        const s = baseScale * p.scale;
+        dummy.position.set(p.x, -source.minY * s, -p.y);
         dummy.rotation.set(0, p.rot, 0);
-        dummy.scale.setScalar(p.scale);
+        dummy.scale.setScalar(s);
         dummy.updateMatrix();
         im.setMatrixAt(i, dummy.matrix);
       }
       im.count = placements.length;
       im.instanceMatrix.needsUpdate = true;
     });
-  }, [placements, source]);
+  }, [placements, source, baseScale]);
 
   if (!source || placements.length === 0) return null;
 
@@ -336,6 +353,7 @@ export const Ground = () => {
             placements={placements}
             castShadow={spec.castShadow}
             tint={spec.tint}
+            normalizeTo={spec.normalizeTo}
           />
         )),
       )}

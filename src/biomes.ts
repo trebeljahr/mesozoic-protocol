@@ -52,6 +52,17 @@ export type BiomeLayer = {
   // the same GLB are unaffected). Lets a biome reuse a neutral model with a
   // climate wash — e.g. the snowfield tints the grassland grass tufts blue.
   tint?: [number, number, number];
+  // Per-variant size normalization, in world units. By default BIOME_LAYERS
+  // render at raw GLTF scale, so a layer that bundles several models with
+  // different authored max-dims (e.g. snow conifers span 2.7–5.1 units) gets
+  // a 2x rendered-size spread from a single minScale/maxScale band. When set,
+  // the renderers divide normalizeTo by each model's measured maxDim to get a
+  // per-URL base scale, so every variant's largest dimension renders at
+  // ~normalizeTo before the band is applied. minScale/maxScale then read as
+  // relative multipliers around that target (e.g. 0.85–1.2 for natural
+  // variation). Hit-disc + placement radii stay correct because the renderer
+  // publishes the normalized radius into meshXZRadii.
+  normalizeTo?: number;
 };
 
 export type BiomeStyle = {
@@ -179,10 +190,14 @@ const FOREST_LAYERS: BiomeLayerSpec = [
     urls: ["/models/nature/Bush1.glb", "/models/nature/Bush2.glb", "/models/nature/Bush3.glb"],
     // These read as build-slot blockers from above, so route them through
     // the clear/remove flow instead of leaving them as untouchable decor.
+    // Bushes are a *blocking obstacle* in every biome that has them (forest,
+    // desert, wasteland, alien); only small ground tufts stay decorative.
+    // normalizeTo pins the 1.0–1.5-unit variants to a uniform shrub size.
     count: 8,
     clearance: PATH_WIDTH / 2 + 0.7,
-    minScale: 0.52,
-    maxScale: 0.82,
+    normalizeTo: 0.9,
+    minScale: 0.7,
+    maxScale: 1.05,
     castShadow: true,
     blocks: true,
     footprint: 0.52,
@@ -255,18 +270,25 @@ const DEAD_TREE_LAYER = (
 
 const DESERT_LAYERS: BiomeLayerSpec = [
   {
+    // Desert shrubs — blocking obstacle (cleared via the remove flow), same
+    // role as the forest/alien bushes. Were decorative before, but the 0.9–
+    // 1.9-unit variants read as build-slot blockers, not auto-cull ground
+    // cover. normalizeTo unifies their size; count trimmed since blockers eat
+    // build space (the loose pebble layer below carries ground detail).
     seed: 9001,
     urls: [
       "/models/biomes/desert/Bush1.glb",
       "/models/biomes/desert/Bush2.glb",
       "/models/biomes/desert/Bush3.glb",
     ],
-    count: 16,
-    clearance: PATH_WIDTH / 2 + 0.5,
-    minScale: 0.45,
-    maxScale: 0.75,
-    castShadow: false,
-    footprint: 0.35,
+    count: 10,
+    clearance: PATH_WIDTH / 2 + 0.7,
+    normalizeTo: 0.95,
+    minScale: 0.75,
+    maxScale: 1.1,
+    castShadow: true,
+    blocks: true,
+    footprint: 0.45,
     cluster: { seeds: 4, sigma: 1.8 },
   },
   {
@@ -332,9 +354,13 @@ const SNOW_LAYERS: BiomeLayerSpec = [
   // hidden easter egg (EASTER_EGG_DEFS "snowman" in easterEggs.ts) so it
   // reads as a rare find rather than set-dressing.
   {
-    // Background conifers — birch + pine snow variants kept small (saplings/
-    // young trees) so they read as backdrop scenery, distinct from the
-    // larger clearable obstacle trees (BIOME_TREE_URLS). Sparse.
+    // Snow conifers — birch + pine snow variants. These read as tree-sized
+    // silhouettes, so they're a *blocking* obstacle layer (clearable via the
+    // remove flow) rather than untouchable decor that sits in build slots
+    // permanently — same treatment as DEAD_TREE_LAYER. Authored max-dims span
+    // 2.7–5.1 units across the 10 variants, so normalizeTo pins every one to a
+    // consistent ~2.2-unit young-tree size; the relative band adds variation.
+    // Kept a touch smaller than the clearable obstacle trees (BIOME_TREE_URLS).
     seed: 8181,
     urls: [
       "/models/biomes/snow/PineTreeSnow1.glb",
@@ -350,10 +376,13 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     ],
     count: 12,
     clearance: PATH_WIDTH / 2 + 1.0,
-    minScale: 0.28,
-    maxScale: 0.46,
+    normalizeTo: 2.2,
+    minScale: 0.85,
+    maxScale: 1.2,
     castShadow: true,
+    blocks: true,
     footprint: 0.6,
+    cluster: { seeds: 4, sigma: 2.0 },
   },
   {
     // Fallen snow-dusted log — sparse ground feature.
@@ -367,9 +396,11 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     footprint: 0.55,
   },
   {
-    // Surface rocks — the full snow rock set at mid scale, scattered as
-    // non-interactive ground stones (smaller than the clearable blocker
-    // boulders, larger than the ice-shard pebbles below).
+    // Surface rocks — the full snow rock set scattered as non-interactive
+    // ground stones (smaller than the clearable blocker boulders, larger than
+    // the ice-shard pebbles below). The 7 variants span 0.7–1.25 authored
+    // units, so normalizeTo pins them to a consistent ~0.7-unit stone before
+    // the band adds spread.
     seed: 4848,
     urls: [
       "/models/biomes/snow/RockSnow1.glb",
@@ -382,20 +413,24 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     ],
     count: 34,
     clearance: PATH_WIDTH / 2 + 0.4,
-    minScale: 0.32,
-    maxScale: 0.62,
+    normalizeTo: 0.7,
+    minScale: 0.6,
+    maxScale: 1.05,
     castShadow: true,
     footprint: 0.4,
   },
   {
     // Blue crystals — the alien-biome crystal pack making a sparse early
-    // cameo here, foreshadowing the later biomes. Very sparingly.
+    // cameo here, foreshadowing the later biomes. Very sparingly. The two
+    // variants are authored at 5.26/6.87 units, so normalizeTo pins both to a
+    // consistent ~0.5-unit shard instead of the raw-scale 0.3–0.65 spread.
     seed: 7878,
     urls: ["/models/biomes/alien/Crystal_Small_1.glb", "/models/biomes/alien/Crystal_Small_2.glb"],
     count: 6,
     clearance: PATH_WIDTH / 2 + 0.3,
-    minScale: 0.055,
-    maxScale: 0.095,
+    normalizeTo: 0.5,
+    minScale: 0.7,
+    maxScale: 1.1,
     castShadow: false,
     footprint: 0.22,
   },
@@ -446,17 +481,24 @@ const SNOW_LAYERS: BiomeLayerSpec = [
 
 const WASTELAND_LAYERS: BiomeLayerSpec = [
   {
+    // Charred remnant shrubs — blocking obstacle, matching forest/desert/alien
+    // bushes. Reuses the desert bush meshes; the muted silhouette reads in
+    // wasteland's brown ground. normalizeTo keeps a uniform shrub size (these
+    // rendered up to ~2 units before, larger than any other biome's bushes).
+    // The scrub-tuft groundcover layer below stays decorative.
     seed: 9001,
     urls: [
       "/models/biomes/desert/Bush1.glb",
       "/models/biomes/desert/Bush2.glb",
       "/models/biomes/desert/Bush3.glb",
     ],
-    count: 14,
-    clearance: PATH_WIDTH / 2 + 0.6,
-    minScale: 0.55,
+    count: 9,
+    clearance: PATH_WIDTH / 2 + 0.7,
+    normalizeTo: 1.1,
+    minScale: 0.72,
     maxScale: 1.05,
-    castShadow: false,
+    castShadow: true,
+    blocks: true,
     footprint: 0.5,
     cluster: { seeds: 3, sigma: 1.9 },
   },

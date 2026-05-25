@@ -20,12 +20,25 @@ const rockEffectiveRadius = (biome: Biome, rock: Rock): number => {
 // Pointer events go to the hit discs, not the model silhouette.
 const neverRaycast: THREE.Mesh["raycast"] = () => {};
 
-const RockGroup = ({ url, rocks }: { url: string; rocks: Rock[] }) => {
+const RockGroup = ({
+  url,
+  rocks,
+  normalizeTo,
+}: {
+  url: string;
+  rocks: Rock[];
+  normalizeTo?: number;
+}) => {
   const { scene } = useGLTF(url);
   const source = useMemo(() => collectMeshSource(scene), [scene]);
+  // When the layer opts into size normalization, divide the target world size
+  // by the measured maxDim so every variant renders at ~normalizeTo before the
+  // per-instance scale band. The same factor scales the published radius so
+  // hit discs + canPlaceAt blocking stay matched to the rendered silhouette.
+  const baseScale = source && normalizeTo ? normalizeTo / source.maxDim : 1;
   // Floor a measured zero (degenerate geometry) so hit discs and placement
   // blocking get a usable radius instead of a point.
-  const xzRadius = source ? source.xzRadius || 0.7 : 0.7;
+  const xzRadius = (source ? source.xzRadius || 0.7 : 0.7) * baseScale;
   useEffect(() => {
     if (source) meshXZRadii.set(url, xzRadius);
   }, [source, url, xzRadius]);
@@ -39,16 +52,17 @@ const RockGroup = ({ url, rocks }: { url: string; rocks: Rock[] }) => {
       if (!im) continue;
       for (let i = 0; i < rocks.length; i++) {
         const r = rocks[i];
-        dummy.position.set(r.pos.x, -source.minY * r.scale, -r.pos.y);
+        const s = baseScale * r.scale;
+        dummy.position.set(r.pos.x, -source.minY * s, -r.pos.y);
         dummy.rotation.set(0, r.rot, 0);
-        dummy.scale.setScalar(r.scale);
+        dummy.scale.setScalar(s);
         dummy.updateMatrix();
         im.setMatrixAt(i, dummy.matrix);
       }
       im.count = rocks.length;
       im.instanceMatrix.needsUpdate = true;
     }
-  }, [rocks, source]);
+  }, [rocks, source, baseScale]);
 
   if (!source || rocks.length === 0) return null;
 
@@ -150,7 +164,12 @@ export const Rocks = () => {
   return (
     <group>
       {buckets.map(([url, group]) => (
-        <RockGroup key={url} url={url} rocks={group} />
+        <RockGroup
+          key={url}
+          url={url}
+          rocks={group}
+          normalizeTo={BIOME_LAYERS[biome][group[0].layerIndex]?.normalizeTo}
+        />
       ))}
 
       <RockHitTargets

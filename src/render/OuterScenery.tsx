@@ -287,15 +287,24 @@ const buildInstances = (biome: Biome, levelId: number, flow: FlowFeatures | null
   return out;
 };
 
-// Two sizing conventions live in the outer band. URLs that double as
-// inner-area props (Trees/Rocks/Ground) render at raw GLTF scale so
-// they match. BIOME_COSMETICS-only URLs (BushFlowers etc.) normalize to
-// TARGET_SIZE_BY_ROLE so the outer-band size matches the inner cosmetic
-// size for those URLs too.
-const computeBaseScale = (source: MeshSource, url: string): number => {
-  if (!COSMETIC_ONLY_URLS.has(url)) return 1;
-  return TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] / source.maxDim;
-};
+// Three sizing conventions live in the outer band. (1) Layers that opt into
+// `normalizeTo` divide the target world size by the model's maxDim, mirroring
+// the inner Ground.tsx normalization so multi-model layers stay consistent.
+// (2) BIOME_COSMETICS-only URLs (BushFlowers etc.) normalize to
+// TARGET_SIZE_BY_ROLE so the outer-band size matches the inner cosmetic size.
+// (3) Everything else doubles as an inner-area prop and renders at raw GLTF
+// scale so the two regions match. The normalizeTo map is keyed per-biome
+// because a URL (e.g. Crystal_Small_1) can sit in a normalized layer in one
+// biome and a raw-scale layer in another.
+const makeComputeBaseScale =
+  (normalizeByUrl: Map<string, number>) =>
+  (source: MeshSource, url: string): number => {
+    const target = normalizeByUrl.get(url);
+    if (target) return target / source.maxDim;
+    if (COSMETIC_ONLY_URLS.has(url))
+      return TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] / source.maxDim;
+    return 1;
+  };
 
 const neverRaycast: THREE.Mesh["raycast"] = () => {};
 
@@ -316,6 +325,18 @@ export const OuterScenery = () => {
     return Array.from(byUrl.entries());
   }, [biome, levelId, paths]);
 
+  // Per-biome URL→normalizeTo from the non-blocking layers (blocking layers
+  // render via Rocks.tsx, not here). Only this biome's layers are consulted so
+  // a shared URL can normalize in one biome and not in another.
+  const baseScaleFor = useMemo(() => {
+    const normalizeByUrl = new Map<string, number>();
+    for (const layer of BIOME_LAYERS[biome]) {
+      if (layer.blocks || layer.normalizeTo == null) continue;
+      for (const u of layer.urls) normalizeByUrl.set(u, layer.normalizeTo);
+    }
+    return makeComputeBaseScale(normalizeByUrl);
+  }, [biome]);
+
   return (
     <group>
       {groups.map(([url, items]) => (
@@ -323,7 +344,7 @@ export const OuterScenery = () => {
           key={url}
           url={url}
           items={items}
-          baseScaleFor={computeBaseScale}
+          baseScaleFor={baseScaleFor}
           // The directional light's shadow camera spans the playable rect;
           // outer-band shadows would clip the shadow map edge anyway.
           castShadow={false}
