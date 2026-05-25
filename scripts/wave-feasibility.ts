@@ -37,8 +37,8 @@
  * Budget per wave = startGold + sum(bounties, waves 1..N-1) + sum(5+wave, 1..N-1).
  * Tower + HQ-upgrade costs both pull from this pool — the optimizer picks
  * the split that maximises end-of-wave damage. Does NOT include early-call
- * bonuses (variable) or assume surviving towers from earlier waves. Repeated
- * same-kind copies pay the live duplicate-build surcharge; upgrades do not.
+ * bonuses (variable) or assume surviving towers from earlier waves. Same-kind
+ * copies are flat-cost but capped at TOWER_BUILD_LIMIT; upgrades fixed-cost.
  *
  * Runtime spawn-time mutations modeled:
  *   - ensureImmunityCoverage (src/sim/immunityCoverage.ts) — replays the same
@@ -107,6 +107,7 @@ import {
   ENEMY_RESIST,
   ENEMY_STATS,
   ROBOT_RESPAWN_DELAY,
+  TOWER_BUILD_LIMIT,
   TOWER_DAMAGE_TYPE,
   TOWER_STATS,
   type TowerBaseStats,
@@ -229,17 +230,13 @@ const affordableCopies = (
   cfg: TowerConfig,
   budget: number,
 ): { count: number; totalCost: number } => {
-  const baseCost = effectiveTowerCost(cfg.kind, cfg.meta, 0);
-  const upgradeCost = cfg.cost - baseCost;
-  let count = 0;
-  let totalCost = 0;
-  while (true) {
-    const nextCost = effectiveTowerCost(cfg.kind, cfg.meta, count) + upgradeCost;
-    if (totalCost + nextCost > budget) break;
-    totalCost += nextCost;
-    count++;
-  }
-  return { count, totalCost };
+  // Every copy costs the same (cfg.cost already folds in meta discount +
+  // upgrade tiers). No duplicate surcharge — same-kind stacking is bounded
+  // by the flat TOWER_BUILD_LIMIT instead.
+  const perCopy = cfg.cost;
+  const maxByGold = perCopy > 0 ? Math.floor(budget / perCopy) : 0;
+  const count = Math.min(maxByGold, TOWER_BUILD_LIMIT);
+  return { count, totalCost: count * perCopy };
 };
 
 const summarizeMeta = (meta: AllMetaSkills, kind: TowerKind): string => {

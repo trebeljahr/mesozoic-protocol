@@ -740,7 +740,7 @@ export type GameEvent =
   | { type: "upgrade" }
   | { type: "tower-placed"; towerKind: TowerKind }
   | { type: "tower-sold" }
-  | { type: "place-failed"; reason: "gold" | "spot" }
+  | { type: "place-failed"; reason: "gold" | "spot" | "limit" }
   | { type: "drone-assign-failed"; reason: "unsupported" | "full" }
   | { type: "new-enemy" }
   | { type: "wave-called-early" }

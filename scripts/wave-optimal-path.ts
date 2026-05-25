@@ -23,8 +23,8 @@
  *   factor, modulated by per-enemy slow resist). Greedily pick the action
  *   (build kind K at placement-class P, or upgrade tower Y branch Z) with
  *   the best deficit-reducing score per gold, until every lane meets its
- *   reqDps or we run out of affordable actions. Repeated same-kind builds
- *   pay the live duplicate surcharge, while upgrades remain fixed-cost.
+ *   reqDps or we run out of affordable actions. Same-kind builds are flat-
+ *   cost but capped at TOWER_BUILD_LIMIT copies; upgrades are fixed-cost.
  *   Towers persist; leftover gold rolls forward. Bounty + wave-clear bonus
  *   credited only on full
  *   clear of every lane with enemies.
@@ -67,12 +67,12 @@ import type {
 } from "../src/sim/types";
 import { UPGRADES } from "../src/sim/upgrades";
 import {
-  duplicateTowerCostMultiplier,
   ENEMY_RESIST,
   ENEMY_SLOW_RESIST,
   ENEMY_STATS,
   MIN_SLOW_FACTOR,
   SHIELD_BY_KIND,
+  TOWER_BUILD_LIMIT,
   TOWER_COST,
   TOWER_DAMAGE_TYPE,
   TOWER_STATS,
@@ -416,18 +416,21 @@ const computePlacementOptions = (paths: Vec2[][]): PlacementOptions => {
   return out;
 };
 
-const buildCostForKind = (state: SimState, kind: TowerKind): number => {
-  let existingSameKind = 0;
+const towerCountForKind = (state: SimState, kind: TowerKind): number => {
+  let n = 0;
   for (const t of state.towers) {
-    if (t.kind === kind) existingSameKind++;
+    if (t.kind === kind) n++;
   }
-  return Math.ceil(TOWER_COST[kind] * duplicateTowerCostMultiplier(existingSameKind));
+  return n;
 };
 
 const enumerateActions = (state: SimState, placements: PlacementOptions): Action[] => {
   const out: Action[] = [];
   for (const kind of Object.keys(TOWER_STATS) as TowerKind[]) {
-    const cost = buildCostForKind(state, kind);
+    // Same-kind stacking is capped; once at the limit no more of this
+    // kind can be built. Cost is flat — no duplicate-build surcharge.
+    if (towerCountForKind(state, kind) >= TOWER_BUILD_LIMIT) continue;
+    const cost = TOWER_COST[kind];
     for (const slot of placements[kind]) {
       out.push({
         type: "build",
@@ -662,8 +665,9 @@ const prepAndClearWave = (
   const records: AppliedRecord[] = [];
 
   if (forceFirst) {
-    const cost = buildCostForKind(state, forceFirst.kind);
-    if (cost <= state.gold) {
+    const atLimit = towerCountForKind(state, forceFirst.kind) >= TOWER_BUILD_LIMIT;
+    const cost = TOWER_COST[forceFirst.kind];
+    if (!atLimit && cost <= state.gold) {
       const slot = placements[forceFirst.kind].find(
         (s) =>
           s.lanes.length === forceFirst.lanes.length &&
@@ -948,7 +952,8 @@ const simulateBeam = (
 
       // Forced (kind, placement) variants — one per (kind × valid placement).
       for (const kind of Object.keys(TOWER_STATS) as TowerKind[]) {
-        if (buildCostForKind(node.state, kind) > node.state.gold) continue;
+        if (towerCountForKind(node.state, kind) >= TOWER_BUILD_LIMIT) continue;
+        if (TOWER_COST[kind] > node.state.gold) continue;
         for (const slot of placements[kind]) {
           const r2 = prepAndClearWave(
             node.state,

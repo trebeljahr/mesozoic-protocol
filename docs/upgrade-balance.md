@@ -20,9 +20,10 @@ base tower and too few "save, buy the big thing, feel strong" moments.
 
 This pass uses the economy and upgrade-curve levers:
 
-- Repeated same-kind builds get a 12% current-run surcharge per existing copy.
-  The first tower stays cheap; the 10th copy is expensive enough that upgrades
-  become the efficient spend.
+- Same-kind builds are flat-cost (no escalating surcharge) but hard-capped at
+  `TOWER_BUILD_LIMIT` (8) copies per kind in a run. Caps mono-spam and forces
+  loadout breadth without taxing the early-game first copies the wave economy is
+  tuned around; past the cap, gold flows into upgrades or other kinds.
 - Chain Coil base bounce count drops to 4 nearby targets after the primary
   target, down from 7. Spam still works as a lesson tool but no longer covers
   every swarm role cheaply.

@@ -116,6 +116,7 @@ import {
   TOWER_FOOTPRINT,
   TREE_FOOTPRINT,
   TREE_REMOVE_COST,
+  towerKindAtBuildLimit,
 } from "./sim/world";
 
 export type Screen = "splash" | "slots" | "worldMap" | "playing" | "results";
@@ -1272,18 +1273,14 @@ export const useGame = create<GameStore>((set, get) => ({
     // Otherwise the picker would track a ghost the player can't drop —
     // every click would just play the "no gold" reject sound.
     let autoClosedSelection = false;
-    if (
-      s.selectedKind !== null &&
-      !s.freeTowers &&
-      s.world.gold <
-        effectiveTowerCost(
-          s.selectedKind,
-          s.progress.metaSkills,
-          s.world.towers.filter((t) => t.kind === s.selectedKind).length,
-        )
-    ) {
-      autoClosedSelection = true;
-      emit(s.world, { type: "place-failed", reason: "gold" });
+    if (s.selectedKind !== null) {
+      const atLimit = towerKindAtBuildLimit(s.world, s.selectedKind);
+      const cantAfford =
+        !s.freeTowers && s.world.gold < effectiveTowerCost(s.selectedKind, s.progress.metaSkills);
+      if (atLimit || cantAfford) {
+        autoClosedSelection = true;
+        emit(s.world, { type: "place-failed", reason: atLimit ? "limit" : "gold" });
+      }
     }
 
     let progress = s.progress;
@@ -2201,8 +2198,13 @@ export const useGame = create<GameStore>((set, get) => ({
       emit(w, { type: "place-failed", reason: "spot" });
       return;
     }
-    const existingSameKind = w.towers.filter((t) => t.kind === s.selectedKind).length;
-    const cost = effectiveTowerCost(s.selectedKind, s.progress.metaSkills, existingSameKind);
+    // Hard per-kind build cap — applies even in free-towers debug mode
+    // since it is a placement rule, not a gold gate.
+    if (towerKindAtBuildLimit(w, s.selectedKind)) {
+      emit(w, { type: "place-failed", reason: "limit" });
+      return;
+    }
+    const cost = effectiveTowerCost(s.selectedKind, s.progress.metaSkills);
     // Debug "free towers" mode skips both the affordability check and
     // the spend; lets a tester sanity-check matchups without grinding.
     const free = s.freeTowers;
@@ -2219,7 +2221,7 @@ export const useGame = create<GameStore>((set, get) => ({
     // Bake meta-skill ranks into the new tower's base stats. Done after
     // createTower (rather than inside it) so world.ts stays decoupled
     // from the progress system. totalSpent records the actual paid price,
-    // including meta discounts and duplicate-build surcharge.
+    // including any meta discount.
     applyMetaSkillsToTower(placed, s.progress.metaSkills);
     placed.totalSpent = cost;
     autoAssignDroneToNewTower(w, placed);
@@ -2232,14 +2234,14 @@ export const useGame = create<GameStore>((set, get) => ({
     // Don't auto-select the freshly dropped tower — being thrown into
     // the upgrade panel after every placement is noisy mid-wave.
     const newVersion = s.towerVersion + 1;
-    // Desktop/gamepad can keep placing while the tower remains affordable.
-    // Touch placement is one-shot so a stray follow-up tap does not spend
-    // another tower by accident.
-    const nextExistingSameKind = w.towers.filter((t) => t.kind === s.selectedKind).length;
-    const stillAffordable =
-      w.gold >= effectiveTowerCost(s.selectedKind, s.progress.metaSkills, nextExistingSameKind);
-    const keepSelectedAfterPlacement =
-      !options?.clearSelectionAfterPlacement && (free || stillAffordable);
+    // Desktop/gamepad can keep placing while the tower remains buildable —
+    // i.e. still affordable AND not at the per-kind cap (w already
+    // includes the tower just placed). Touch placement is one-shot so a
+    // stray follow-up tap does not spend another tower by accident.
+    const stillBuildable =
+      !towerKindAtBuildLimit(w, s.selectedKind) &&
+      (free || w.gold >= effectiveTowerCost(s.selectedKind, s.progress.metaSkills));
+    const keepSelectedAfterPlacement = !options?.clearSelectionAfterPlacement && stillBuildable;
     const nextSelectedKind = keepSelectedAfterPlacement ? s.selectedKind : null;
     const nextPendingTouch = nextSelectedKind === null ? null : s.pendingTouchPlacement;
     set({

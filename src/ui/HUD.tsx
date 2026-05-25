@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getLevelOrdinal } from "../levels";
 import { effectiveTowerCost } from "../sim/metaSkills";
 import type { TowerKind } from "../sim/types";
-import { TOWER_LABEL, towerPillInfo } from "../sim/world";
+import { TOWER_BUILD_LIMIT, TOWER_LABEL, towerPillInfo } from "../sim/world";
 import { useGame } from "../store";
 import { BasePanel } from "./BasePanel";
 import { BossBanner } from "./BossBanner";
@@ -416,8 +416,9 @@ export const HUD = () => {
               !forbidden.has(kind) && (lockedLoadout === null || lockedLoadout.includes(kind)),
           ).map((kind) => {
             const existingSameKind = towers.filter((t) => t.kind === kind).length;
-            const cost = effectiveTowerCost(kind, progress.metaSkills, existingSameKind);
-            const affordable = gold >= cost;
+            const atLimit = existingSameKind >= TOWER_BUILD_LIMIT;
+            const cost = effectiveTowerCost(kind, progress.metaSkills);
+            const affordable = !atLimit && gold >= cost;
             const active = selectedKind === kind;
             const pill = towerPillInfo(kind);
             return (
@@ -430,7 +431,7 @@ export const HUD = () => {
                   setSelectedKind(selectedKind === kind ? null : kind);
                   e.currentTarget.blur();
                 }}
-                title={`${TOWER_LABEL[kind]} · ${t(`damageTypes.${pill.type}`)} · ${cost}g${showKeyboardHints ? ` [${HOTKEYS[kind]}]` : ""}`}
+                title={`${TOWER_LABEL[kind]} · ${t(`damageTypes.${pill.type}`)} · ${atLimit ? `MAX (${TOWER_BUILD_LIMIT})` : `${cost}g`}${showKeyboardHints ? ` [${HOTKEYS[kind]}]` : ""}`}
               >
                 {active && (
                   <span className="card-cancel" aria-hidden>
@@ -450,7 +451,7 @@ export const HUD = () => {
                     <DamageIcon type={pill.type} size={13} title={pill.label} />
                   </span>
                   <span className="tower-cost text-[11px] font-bold tabular-nums text-gold">
-                    {cost}g
+                    {atLimit ? "MAX" : `${cost}g`}
                   </span>
                 </div>
                 <div className="tower-name text-[10px] font-semibold leading-tight whitespace-nowrap overflow-hidden text-ellipsis text-center">

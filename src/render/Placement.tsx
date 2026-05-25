@@ -6,7 +6,7 @@ import { GAMEPAD_STICK_DEADZONE, scaleGamepadAxis, useGamepadInput } from "../in
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { effectiveTowerCost } from "../sim/metaSkills";
 import type { TowerKind } from "../sim/types";
-import { TOWER_CLEAR_RADIUS, TOWER_STATS } from "../sim/world";
+import { TOWER_CLEAR_RADIUS, TOWER_STATS, towerKindAtBuildLimit } from "../sim/world";
 import { useGame } from "../store";
 import { GhostTower } from "./GhostTower";
 
@@ -457,14 +457,12 @@ export const Placement = () => {
   const selectedCost =
     selectedKind === null
       ? Infinity
-      : effectiveTowerCost(
-          selectedKind,
-          placementState.progress.metaSkills,
-          placementState.world.towers.filter((t) => t.kind === selectedKind).length,
-        );
+      : effectiveTowerCost(selectedKind, placementState.progress.metaSkills);
+  const atBuildLimit =
+    selectedKind !== null && towerKindAtBuildLimit(placementState.world, selectedKind);
 
   const canPlaceHere =
-    showPlacement && gold >= selectedCost && placementState.canPlace(activeHover!);
+    showPlacement && !atBuildLimit && gold >= selectedCost && placementState.canPlace(activeHover!);
 
   const placementColor = canPlaceHere ? "#3dff8a" : "#ff5a7a";
   const range = selectedKind ? TOWER_STATS[selectedKind].range : 0;

@@ -1959,15 +1959,26 @@ export const TOWER_COST: Record<TowerKind, number> = {
   hive: 150,
 };
 
-// Repeated same-kind builds get a small supply surcharge in the current
-// run. The first copy stays at list price; every existing copy of that
-// kind makes the next one cost 12% more. Upgrades do not surcharge, so
-// late-run gold naturally tilts toward improving an anchor tower instead
-// of dropping the 12th identical base tower.
-export const DUPLICATE_TOWER_COST_STEP = 0.12;
+// Hard per-kind build cap for the current run. Replaces the old
+// duplicate-cost surcharge: rather than taxing the Nth identical tower,
+// a kind simply can't be stacked past this many copies. This curbs
+// mono-spam without touching the price of the first copies, so the
+// early-wave gold economy (tuned in waves L1-14) is left intact, and it
+// pushes the loadout toward breadth — each kind keeps its niche because
+// you can't tunnel a single one. Generous enough that normal play rarely
+// hits it; low enough to kill degenerate one-tower builds. Applies to
+// every run mode (debug free-towers included) since it is a placement
+// rule, not an economy gate.
+export const TOWER_BUILD_LIMIT = 8;
 
-export const duplicateTowerCostMultiplier = (existingSameKind: number): number =>
-  1 + Math.max(0, existingSameKind) * DUPLICATE_TOWER_COST_STEP;
+export const towerCountForKind = (world: World, kind: TowerKind): number => {
+  let n = 0;
+  for (const t of world.towers) if (t.kind === kind) n++;
+  return n;
+};
+
+export const towerKindAtBuildLimit = (world: World, kind: TowerKind): boolean =>
+  towerCountForKind(world, kind) >= TOWER_BUILD_LIMIT;
 
 export const TOWER_LABEL: Record<TowerKind, string> = {
   pulse: "Pulse Rifle",
