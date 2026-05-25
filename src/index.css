@@ -2258,37 +2258,12 @@
   }
 
   .level-intro-text {
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.6;
     color: #d8e2ee;
-    margin: 0 0 14px;
+    margin: 0 0 16px;
     font-style: italic;
-  }
-
-  .level-intro-command-note {
-    margin: 4px 0 14px;
-    padding: 14px 16px 12px;
-    border-top: 1px solid rgba(120, 180, 220, 0.18);
-    border-bottom: 1px solid rgba(120, 180, 220, 0.12);
-    background: rgba(60, 110, 150, 0.08);
     text-align: left;
-  }
-
-  .level-intro-command-note-eyebrow {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: rgba(160, 210, 240, 0.7);
-    margin-bottom: 8px;
-  }
-
-  .level-intro-command-note-text {
-    font-size: 13px;
-    line-height: 1.55;
-    color: #c4d0dc;
-    margin: 0;
-    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
   }
 
   .level-intro-begin {

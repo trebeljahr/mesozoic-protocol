@@ -16,9 +16,11 @@ export const LevelIntro = () => {
   const exitingRef = useRef(false);
   const aliveRef = useRef(true);
 
+  // One field report per level: the long-form text. Levels without a long
+  // version fall back to the terse briefing (also used by the world-map tooltip).
+  const hasLong = levelId !== null && hasLevelInterstitial(levelId);
   const briefing = levelId !== null ? t(`levels:briefings.${levelId}`, { defaultValue: "" }) : "";
-  const commandNote =
-    levelId !== null && hasLevelInterstitial(levelId) ? t(`levels:interstitials.${levelId}`) : "";
+  const report = hasLong ? t(`levels:interstitials.${levelId}`) : briefing;
 
   const beginDefense = useCallback(() => {
     if (exitingRef.current) return;
@@ -43,7 +45,7 @@ export const LevelIntro = () => {
   // The "Begin defense" button starts the level from the card itself. A
   // scroll gesture does not fire `click`, so dragging to read is safe.
   useEffect(() => {
-    if (!briefing) return;
+    if (!report) return;
 
     const onKey = (e: KeyboardEvent) => {
       e.stopPropagation();
@@ -64,16 +66,16 @@ export const LevelIntro = () => {
       window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("click", onClick, true);
     };
-  }, [briefing, beginDefense]);
+  }, [report, beginDefense]);
 
-  if (!briefing) return null;
+  if (!report) return null;
 
   const hint =
     input.mode === "gamepad"
       ? t("levelIntro.hintGamepad")
       : input.mode === "keyboard" && !input.touchPrimary
         ? t("levelIntro.hintKeyboard")
-        : commandNote
+        : hasLong
           ? t("levelIntro.hintTouchScroll")
           : t("levelIntro.hintTouch");
 
@@ -81,13 +83,7 @@ export const LevelIntro = () => {
     <div className={`level-intro-overlay ${exiting ? "level-intro-exit" : ""}`}>
       <div className="level-intro-card">
         <div className="level-intro-eyebrow">{t("levelIntro.eyebrow", { id: levelId })}</div>
-        <p className="level-intro-text">{briefing}</p>
-        {commandNote && (
-          <div className="level-intro-command-note">
-            <div className="level-intro-command-note-eyebrow">{t("levelIntro.commandUpdate")}</div>
-            <p className="level-intro-command-note-text">{commandNote}</p>
-          </div>
-        )}
+        <p className="level-intro-text">{report}</p>
         <button
           type="button"
           className="level-intro-begin"

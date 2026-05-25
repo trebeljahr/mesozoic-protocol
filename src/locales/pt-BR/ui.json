@@ -418,7 +418,6 @@
   },
   "levelIntro": {
     "eyebrow": "Field Report · Outpost {{id}}",
-    "commandUpdate": "Command Update",
     "beginDefense": "Begin defense",
     "hintGamepad": "press a button to begin",
     "hintKeyboard": "press any key, or tap outside, to begin",

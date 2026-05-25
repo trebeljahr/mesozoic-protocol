@@ -418,7 +418,6 @@
   },
   "levelIntro": {
     "eyebrow": "Lagebericht · Außenposten {{id}}",
-    "commandUpdate": "Kommando-Update",
     "beginDefense": "Verteidigung beginnen",
     "hintGamepad": "Knopf drücken zum Beginnen",
     "hintKeyboard": "Beliebige Taste oder außerhalb tippen zum Beginnen",
