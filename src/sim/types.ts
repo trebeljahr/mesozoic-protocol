@@ -734,7 +734,7 @@ export type GameEvent =
   | { type: "wave-start"; wave: number }
   | { type: "wave-clear"; wave: number }
   | { type: "boss-wave-start"; wave: number }
-  | { type: "boss-defeated"; wave: number; bonus: number }
+  | { type: "boss-defeated"; wave: number; bonus: number; variant: BossVariant }
   | { type: "life-lost"; pathIndex: number }
   | { type: "game-over"; won: boolean }
   | { type: "upgrade" }

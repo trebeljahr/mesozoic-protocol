@@ -493,6 +493,250 @@ export const IconFullService: FC<AchievementIconProps> = (p) => (
   </Svg>
 );
 
+// ── Matriarch hunts ──────────────────────────────────────────────────
+
+// Shared three-point crown that marks every matriarch-takedown icon, so
+// the row reads as a set even though each variant gets its own accent.
+const Crown: FC = () => (
+  <path d="M4.5 9 L7.5 4.5 L12 7.5 L16.5 4.5 L19.5 9 L18 11 L6 11 Z" fill="currentColor" />
+);
+
+export const IconMatriarchRaptor: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Raptor Matriarch">
+    <Crown />
+    {/* sickle claw */}
+    <path
+      d="M7 13.5 C 9 20, 14 21.5, 18.5 18.5 C 14.5 19, 12 16.5, 11 12.8 Z"
+      fill="currentColor"
+    />
+    <circle cx="8.6" cy="14.3" r="1" fill={HL} opacity="0.7" />
+  </Svg>
+);
+
+export const IconMatriarchStego: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Stegosaur Matriarch">
+    <Crown />
+    {/* row of back plates */}
+    {[6, 10.5, 15].map((x) => (
+      <path key={x} d={`M${x} 20 L${x + 2.2} 13 L${x + 4.4} 20 Z`} fill="currentColor" />
+    ))}
+  </Svg>
+);
+
+export const IconMatriarchPara: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Parasaur Matriarch">
+    <Crown />
+    {/* swept-back crest */}
+    <path
+      d="M7 20 C 7 15, 12 12.5, 18.5 13"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+    />
+    <circle cx="7.2" cy="19" r="1.7" fill="currentColor" />
+  </Svg>
+);
+
+export const IconMatriarchAllosaur: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="T-Rex Matriarch">
+    <Crown />
+    {/* toothy jaw */}
+    <path d="M6 13 L18 13 L18 15 L6 15 Z" fill="currentColor" />
+    <path d="M6 15 L8 18 L10 15 L12 18 L14 15 L16 18 L18 15 Z" fill="currentColor" />
+  </Svg>
+);
+
+export const IconMatriarchArmored: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Triceratops Matriarch">
+    <Crown />
+    {/* three horns */}
+    <path d="M6.5 20 L8 13.5 L9.5 20 Z" fill="currentColor" />
+    <path d="M10.5 20.5 L12 12.5 L13.5 20.5 Z" fill="currentColor" />
+    <path d="M14.5 20 L16 13.5 L17.5 20 Z" fill="currentColor" />
+  </Svg>
+);
+
+export const IconMatriarchApex: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Apex Matriarch">
+    <Crown />
+    {/* apex star */}
+    {(() => {
+      const pts: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const r = i % 2 === 0 ? 5.2 : 2.1;
+        pts.push(`${12 + r * Math.cos(a)},${16.5 + r * Math.sin(a)}`);
+      }
+      return <polygon points={pts.join(" ")} fill="currentColor" />;
+    })()}
+  </Svg>
+);
+
+// ── Robot & lab mastery ──────────────────────────────────────────────
+
+// Compact robot head used across the roster/legion icons.
+const RobotHead: FC<{ x: number; star?: boolean }> = ({ x, star }) => (
+  <g>
+    <rect x={x} y="9" width="5" height="6" rx="1" fill="currentColor" />
+    <line x1={x + 2.5} y1="9" x2={x + 2.5} y2="6.5" stroke="currentColor" strokeWidth="1" />
+    <circle cx={x + 2.5} cy="6" r="1" fill="currentColor" />
+    {star ? (
+      <circle cx={x + 2.5} cy="12" r="1.2" fill={HL} />
+    ) : (
+      <>
+        <circle cx={x + 1.5} cy="12" r="0.8" fill="#000" opacity="0.6" />
+        <circle cx={x + 3.5} cy="12" r="0.8" fill="#000" opacity="0.6" />
+      </>
+    )}
+  </g>
+);
+
+export const IconRobotRoster: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Full Roster">
+    <RobotHead x={1.5} />
+    <RobotHead x={7} />
+    <RobotHead x={12.5} />
+    <RobotHead x={18} />
+  </Svg>
+);
+
+export const IconRobotAscendant: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Ascendant Pilot">
+    {/* single robot head, larger, with an up-chevron */}
+    <rect x="7" y="10" width="10" height="9" rx="1.5" fill="currentColor" />
+    <line x1="12" y1="10" x2="12" y2="6" stroke="currentColor" strokeWidth="1.4" />
+    <circle cx="12" cy="5" r="1.4" fill="currentColor" />
+    <circle cx="9.8" cy="14" r="1.2" fill="#000" opacity="0.6" />
+    <circle cx="14.2" cy="14" r="1.2" fill="#000" opacity="0.6" />
+    <path
+      d="M8.5 9 L12 6 L15.5 9"
+      fill="none"
+      stroke={HL}
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export const IconRobotLegion: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Robot Legion">
+    <RobotHead x={1.5} star />
+    <RobotHead x={7} star />
+    <RobotHead x={12.5} star />
+    <RobotHead x={18} star />
+  </Svg>
+);
+
+export const IconLabSpecialist: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Lab Specialist">
+    {/* beaker, filled to the top */}
+    <path
+      d="M9 3 L9 9 L5 19 C 4.5 20.5, 5.5 21.5, 7 21.5 L17 21.5 C 18.5 21.5, 19.5 20.5, 19 19 L15 9 L15 3 Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <line
+      x1="8"
+      y1="3"
+      x2="16"
+      y2="3"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+    <path
+      d="M7.2 12 L16.8 12 L18.4 16 C 18.8 17.5, 18 18.5, 16.5 18.5 L7.5 18.5 C 6 18.5, 5.2 17.5, 5.6 16 Z"
+      fill="currentColor"
+    />
+  </Svg>
+);
+
+export const IconLabOverlord: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Lab Overlord">
+    {/* filled beaker crowned */}
+    <path
+      d="M4.5 5 L6.5 2.5 L9.5 4.5 L12 2.5 L14.5 4.5 L17.5 2.5 L19.5 5 L18 6.5 L6 6.5 Z"
+      fill="currentColor"
+    />
+    <path
+      d="M9 7.5 L9 10 L5 19 C 4.5 20.5, 5.5 21.5, 7 21.5 L17 21.5 C 18.5 21.5, 19.5 20.5, 19 19 L15 10 L15 7.5 Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M6.6 12.5 L17.4 12.5 L18.4 16 C 18.8 17.5, 18 18.5, 16.5 18.5 L7.5 18.5 C 6 18.5, 5.2 17.5, 5.6 16 Z"
+      fill="currentColor"
+    />
+  </Svg>
+);
+
+// ── Modes & milestones ───────────────────────────────────────────────
+
+export const IconEndlessSurvivor: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Endless Survivor">
+    {/* infinity loop */}
+    <path
+      d="M8 12 C 8 9, 4.5 9, 4.5 12 C 4.5 15, 8 15, 9.5 12 C 11 9, 14.5 9, 14.5 12 C 14.5 15, 11 15, 9.5 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      transform="translate(4.5 0) scale(0.95 1.4) translate(-2 -4.8)"
+    />
+  </Svg>
+);
+
+export const IconHeroicEffort: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Heroic Effort">
+    {/* shield with laurel notch */}
+    <path
+      d="M12 2.5 L20 5.5 L20 12 C 20 17, 16.5 20.5, 12 22 C 7.5 20.5, 4 17, 4 12 L4 5.5 Z"
+      fill="currentColor"
+    />
+    <path
+      d="M9 12 L11 15 L15.5 8.5"
+      fill="none"
+      stroke={HL}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export const IconIronWill: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Iron Will">
+    {/* anvil */}
+    <path
+      d="M3 8 L14 8 L14 10 C 14 11.5, 12 12, 10.5 12 L10.5 13 L19 13 C 19 15.5, 16.5 16.5, 13 16.5 L11 16.5 L11 18 L15 18 L15 20 L7 20 L7 18 L9 18 L9 12.5 C 6 12, 3 10.5, 3 8 Z"
+      fill="currentColor"
+    />
+  </Svg>
+);
+
+export const IconMassProduction: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Mass Production">
+    {/* three stacked identical towers */}
+    {[
+      [4, 14],
+      [10, 11],
+      [16, 8],
+    ].map(([x, y]) => (
+      <g key={x}>
+        <rect x={x} y={y} width="4" height={21 - y} fill="currentColor" />
+        <rect x={x - 0.7} y={y - 1.6} width="5.4" height="2" rx="0.4" fill="currentColor" />
+        <circle cx={x + 2} cy={y + 1.4} r="0.8" fill={HL} opacity="0.75" />
+      </g>
+    ))}
+  </Svg>
+);
+
 // ── Secret cosmetics: nature ─────────────────────────────────────────
 
 export const IconTreeHugger: FC<AchievementIconProps> = (p) => (
@@ -1097,6 +1341,21 @@ export const ACHIEVEMENT_ICONS: Record<AchievementId, FC<AchievementIconProps>> 
   campaign: IconCampaign,
   perfect_run: IconPerfectRun,
   full_service: IconFullService,
+  matriarch_raptor: IconMatriarchRaptor,
+  matriarch_stego: IconMatriarchStego,
+  matriarch_para: IconMatriarchPara,
+  matriarch_allosaur: IconMatriarchAllosaur,
+  matriarch_armored: IconMatriarchArmored,
+  matriarch_apex: IconMatriarchApex,
+  robot_roster: IconRobotRoster,
+  robot_ascendant: IconRobotAscendant,
+  robot_legion: IconRobotLegion,
+  lab_specialist: IconLabSpecialist,
+  lab_overlord: IconLabOverlord,
+  endless_survivor: IconEndlessSurvivor,
+  heroic_effort: IconHeroicEffort,
+  iron_will: IconIronWill,
+  mass_production: IconMassProduction,
   tree_hugger: IconTreeHugger,
   diamond_in_the_rough: IconDiamondInTheRough,
   whispering_skull: IconWhisperingSkull,

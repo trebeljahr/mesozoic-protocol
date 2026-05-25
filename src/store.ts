@@ -750,6 +750,25 @@ const tryUnlockEasterEgg = (
   };
 };
 
+// Re-run achievement checks after a between-run meta change (robot
+// unlock, robot skill rank, lab tower tier). These milestones read only
+// ProgressData, so the tick's per-event loop would otherwise not notice
+// them until the next mission started — check here so the toast fires the
+// instant the player crosses the threshold in the panel. Mirrors the
+// assignDroneSlot path. World/event args are unused by these checks, so
+// the current world + a null event are fine to pass.
+const checkMetaAchievements = (
+  progress: ProgressData,
+  world: World,
+  toasts: AchievementToast[],
+): { progress: ProgressData; achievementToasts: AchievementToast[] } => {
+  const res = checkAchievements(progress, world, null);
+  if (res.unlocked.length === 0) return { progress, achievementToasts: toasts };
+  for (const id of res.unlocked) track("achievement_unlocked", { achievement_id: id });
+  const newToasts = res.unlocked.map((id) => ({ id, key: nextToastKey++ }));
+  return { progress: res.progress, achievementToasts: [...toasts, ...newToasts] };
+};
+
 const buildWorldForLevel = (
   level: LevelConfig,
   mode: LevelMode,
@@ -1151,8 +1170,9 @@ export const useGame = create<GameStore>((set, get) => ({
     if (next === s.progress.metaSkills) return;
     if (spentMetaStars(next) > earned) return;
     const progress = { ...s.progress, metaSkills: next };
-    persistProgress(s.activeSlot, progress);
-    set({ progress });
+    const updated = checkMetaAchievements(progress, s.world, s.achievementToasts);
+    persistProgress(s.activeSlot, updated.progress);
+    set(updated);
   },
 
   resetMetaSkillsForKind: (kind) => {
@@ -1692,8 +1712,9 @@ export const useGame = create<GameStore>((set, get) => ({
       bolts: isDebug ? s.progress.bolts : s.progress.bolts - cost,
       robotUnlocks: { ...s.progress.robotUnlocks, [variant]: true },
     };
-    persistProgress(s.activeSlot, progress);
-    set({ progress });
+    const updated = checkMetaAchievements(progress, s.world, s.achievementToasts);
+    persistProgress(s.activeSlot, updated.progress);
+    set(updated);
   },
 
   setActiveRobot: (variant) => {
@@ -1735,8 +1756,9 @@ export const useGame = create<GameStore>((set, get) => ({
       bolts: isDebug ? s.progress.bolts : Math.max(0, s.progress.bolts - boltDelta),
       robotSkills: next,
     };
-    persistProgress(s.activeSlot, progress);
-    set({ progress });
+    const updated = checkMetaAchievements(progress, s.world, s.achievementToasts);
+    persistProgress(s.activeSlot, updated.progress);
+    set(updated);
   },
 
   resetRobotSkills: (variant) => {

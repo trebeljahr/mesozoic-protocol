@@ -1718,7 +1718,12 @@ export const applyDamage = (
       // Bigger crimson burst on top of the standard death particles —
       // sells the takedown without needing a new VFX subsystem.
       spawnParticles(world, enemy.pos, 32, "#ff2a55", [4, 9], 0.7);
-      emit(world, { type: "boss-defeated", wave: world.wave, bonus });
+      emit(world, {
+        type: "boss-defeated",
+        wave: world.wave,
+        bonus,
+        variant: enemy.bossVariant ?? "apex",
+      });
     }
   }
 };

@@ -3,7 +3,18 @@ import { LEVELS } from "./levels";
 import enAchievements from "./locales/en/achievements.json";
 import type { ProgressData } from "./progress";
 import { getStars, starsForLives } from "./progress";
-import type { EnemyKind, GameEvent, TowerKind, World } from "./sim/types";
+import { BRANCH_IDS, getTier, MAX_TIER } from "./sim/metaSkills";
+import { ROBOT_TREE_TOTAL_POINTS, spentRobotPoints } from "./sim/robotSkills";
+import { ROBOT_VARIANTS } from "./sim/robotVariants";
+import type {
+  BossVariant,
+  EnemyKind,
+  GameEvent,
+  RobotVariant,
+  TowerKind,
+  World,
+} from "./sim/types";
+import { TOWER_BUILD_LIMIT } from "./sim/world";
 import { ACHIEVEMENT_ICONS, type AchievementIconProps } from "./ui/AchievementIcons";
 
 export type AchievementId =
@@ -22,6 +33,21 @@ export type AchievementId =
   | "campaign"
   | "perfect_run"
   | "full_service"
+  | "matriarch_raptor"
+  | "matriarch_stego"
+  | "matriarch_para"
+  | "matriarch_allosaur"
+  | "matriarch_armored"
+  | "matriarch_apex"
+  | "robot_roster"
+  | "robot_ascendant"
+  | "robot_legion"
+  | "lab_specialist"
+  | "lab_overlord"
+  | "endless_survivor"
+  | "heroic_effort"
+  | "iron_will"
+  | "mass_production"
   | "tree_hugger"
   | "diamond_in_the_rough"
   | "whispering_skull"
@@ -81,6 +107,21 @@ const VISIBLE_IDS: AchievementId[] = [
   "campaign",
   "perfect_run",
   "full_service",
+  "matriarch_raptor",
+  "matriarch_stego",
+  "matriarch_para",
+  "matriarch_allosaur",
+  "matriarch_armored",
+  "matriarch_apex",
+  "robot_roster",
+  "robot_ascendant",
+  "robot_legion",
+  "lab_specialist",
+  "lab_overlord",
+  "endless_survivor",
+  "heroic_effort",
+  "iron_will",
+  "mass_production",
 ];
 
 const HINT_IDS: AchievementId[] = [
@@ -141,6 +182,26 @@ const ALL_ENEMY_KINDS: EnemyKind[] = [
   "armored",
   "titan",
 ];
+
+// One robot is "fully upgraded" when every node in its skill tree sits
+// at max rank — i.e. the player has spent the tree's whole point pool on
+// that variant. Reads the persistent skill ranks, not the live run.
+const robotFullyUpgraded = (p: ProgressData, v: RobotVariant): boolean =>
+  spentRobotPoints(p.robotSkills, v) >= ROBOT_TREE_TOTAL_POINTS;
+
+// One tower kind is "fully upgraded in the lab" when all three meta
+// branches are at the top tier. This is the persistent between-run tree
+// (metaSkills), distinct from the per-run upgrades that fully_armed /
+// master_engineer grade.
+const towerKindLabMaxed = (p: ProgressData, k: TowerKind): boolean =>
+  BRANCH_IDS.every((b) => getTier(p.metaSkills, k, b) === MAX_TIER);
+
+const matriarchDefeated = (ev: GameEvent | null, v: BossVariant): boolean =>
+  ev !== null && ev.type === "boss-defeated" && ev.variant === v;
+
+// Endless milestone wave for endless_survivor. Reaching it (alive or on
+// the wave-start tick) is enough; the run doesn't have to end there.
+const ENDLESS_SURVIVOR_WAVE = 20;
 
 export const isAchievementUnlocked = (p: ProgressData, id: AchievementId): boolean =>
   p.unlocked[id] !== undefined;
@@ -216,6 +277,41 @@ const satisfies = (id: AchievementId, p: ProgressData, w: World, ev: GameEvent |
         }
       }
       return nonHive.every((t) => serviced.has(t.id));
+    }
+    case "matriarch_raptor":
+      return matriarchDefeated(ev, "raptor");
+    case "matriarch_stego":
+      return matriarchDefeated(ev, "stego");
+    case "matriarch_para":
+      return matriarchDefeated(ev, "para");
+    case "matriarch_allosaur":
+      return matriarchDefeated(ev, "allosaur");
+    case "matriarch_armored":
+      return matriarchDefeated(ev, "armored");
+    case "matriarch_apex":
+      return matriarchDefeated(ev, "apex");
+    case "robot_roster":
+      // George is implicitly unlocked, so a fresh save only needs the
+      // three purchasable pilots flagged.
+      return ROBOT_VARIANTS.every((v) => v === "george" || p.robotUnlocks[v] === true);
+    case "robot_ascendant":
+      return ROBOT_VARIANTS.some((v) => robotFullyUpgraded(p, v));
+    case "robot_legion":
+      return ROBOT_VARIANTS.every((v) => robotFullyUpgraded(p, v));
+    case "lab_specialist":
+      return ALL_TOWER_KINDS.some((k) => towerKindLabMaxed(p, k));
+    case "lab_overlord":
+      return ALL_TOWER_KINDS.every((k) => towerKindLabMaxed(p, k));
+    case "endless_survivor":
+      return w.endless !== null && w.wave >= ENDLESS_SURVIVOR_WAVE;
+    case "heroic_effort":
+      return ev !== null && ev.type === "game-over" && ev.won && w.mode === "heroic";
+    case "iron_will":
+      return ev !== null && ev.type === "game-over" && ev.won && w.mode === "iron";
+    case "mass_production": {
+      const counts: Partial<Record<TowerKind, number>> = {};
+      for (const t of w.towers) counts[t.kind] = (counts[t.kind] ?? 0) + 1;
+      return ALL_TOWER_KINDS.some((k) => (counts[k] ?? 0) >= TOWER_BUILD_LIMIT);
     }
     case "tree_hugger":
     case "diamond_in_the_rough":

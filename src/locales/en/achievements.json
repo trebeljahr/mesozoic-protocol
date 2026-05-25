@@ -74,6 +74,81 @@
     "desc": "Have every tower on the map serviced by a Hive drone.",
     "hint": "Every non-hive tower needs at least one drone assigned."
   },
+  "matriarch_raptor": {
+    "name": "Pack Leader Down",
+    "desc": "Defeat the Raptor Matriarch.",
+    "hint": "Bring down the forest queen."
+  },
+  "matriarch_stego": {
+    "name": "Plates Cracked",
+    "desc": "Defeat the Stegosaur Matriarch.",
+    "hint": "Bring down the armored grazer queen."
+  },
+  "matriarch_para": {
+    "name": "Silenced Crest",
+    "desc": "Defeat the Parasaur Matriarch.",
+    "hint": "Bring down the resonant queen."
+  },
+  "matriarch_allosaur": {
+    "name": "Apex Predator Felled",
+    "desc": "Defeat the T-Rex Matriarch.",
+    "hint": "Bring down the largest hunter queen."
+  },
+  "matriarch_armored": {
+    "name": "Horns Broken",
+    "desc": "Defeat the Triceratops Matriarch.",
+    "hint": "Bring down the chrome-plated queen."
+  },
+  "matriarch_apex": {
+    "name": "Origin Ended",
+    "desc": "Defeat the Apex Matriarch.",
+    "hint": "Bring down the original matriarch."
+  },
+  "robot_roster": {
+    "name": "Full Roster",
+    "desc": "Unlock every robot pilot.",
+    "hint": "Buy Leela, Mike, and Stan."
+  },
+  "robot_ascendant": {
+    "name": "Ascendant Pilot",
+    "desc": "Max out a single robot's skill tree.",
+    "hint": "Every node on one robot at top rank."
+  },
+  "robot_legion": {
+    "name": "Robot Legion",
+    "desc": "Max out the skill tree of every robot.",
+    "hint": "All four robots fully ranked."
+  },
+  "lab_specialist": {
+    "name": "Lab Specialist",
+    "desc": "Fully upgrade a single tower in the lab.",
+    "hint": "All three meta branches maxed on one tower."
+  },
+  "lab_overlord": {
+    "name": "Lab Overlord",
+    "desc": "Fully upgrade every tower in the lab.",
+    "hint": "All three meta branches maxed on all six towers."
+  },
+  "endless_survivor": {
+    "name": "Endless Survivor",
+    "desc": "Reach wave 20 in an Endless arena.",
+    "hint": "Survive deep into Endless mode."
+  },
+  "heroic_effort": {
+    "name": "Heroic Effort",
+    "desc": "Clear any mission on Heroic mode.",
+    "hint": "Win a handcrafted Heroic run."
+  },
+  "iron_will": {
+    "name": "Iron Will",
+    "desc": "Clear any mission on Iron mode.",
+    "hint": "Win a one-life Iron run."
+  },
+  "mass_production": {
+    "name": "Mass Production",
+    "desc": "Field the maximum of a single tower type in one mission.",
+    "hint": "Build eight of one kind."
+  },
   "tree_hugger": {
     "name": "Tree Hugger",
     "desc": "Click the same tree ten times.",

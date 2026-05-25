@@ -74,6 +74,81 @@
     "desc": "Lass jeden Turm auf der Karte von einer Hive-Drohne versorgen.",
     "hint": "Jeder Nicht-Hive-Turm braucht mindestens eine zugewiesene Drohne."
   },
+  "matriarch_raptor": {
+    "name": "Rudelführerin erlegt",
+    "desc": "Besiege die Raptor-Matriarchin.",
+    "hint": "Strecke die Königin des Waldes nieder."
+  },
+  "matriarch_stego": {
+    "name": "Panzer geknackt",
+    "desc": "Besiege die Stegosaurus-Matriarchin.",
+    "hint": "Strecke die gepanzerte Königin nieder."
+  },
+  "matriarch_para": {
+    "name": "Verstummter Kamm",
+    "desc": "Besiege die Parasaurus-Matriarchin.",
+    "hint": "Strecke die resonante Königin nieder."
+  },
+  "matriarch_allosaur": {
+    "name": "Apex-Jägerin gefällt",
+    "desc": "Besiege die T-Rex-Matriarchin.",
+    "hint": "Strecke die größte Jägerin nieder."
+  },
+  "matriarch_armored": {
+    "name": "Hörner gebrochen",
+    "desc": "Besiege die Triceratops-Matriarchin.",
+    "hint": "Strecke die verchromte Königin nieder."
+  },
+  "matriarch_apex": {
+    "name": "Ursprung beendet",
+    "desc": "Besiege die Apex-Matriarchin.",
+    "hint": "Strecke die ursprüngliche Matriarchin nieder."
+  },
+  "robot_roster": {
+    "name": "Volle Besatzung",
+    "desc": "Schalte jeden Roboterpiloten frei.",
+    "hint": "Kaufe Leela, Mike und Stan."
+  },
+  "robot_ascendant": {
+    "name": "Aufgestiegener Pilot",
+    "desc": "Maximiere den Fähigkeitenbaum eines einzelnen Roboters.",
+    "hint": "Jeder Knoten eines Roboters auf höchster Stufe."
+  },
+  "robot_legion": {
+    "name": "Roboterlegion",
+    "desc": "Maximiere den Fähigkeitenbaum jedes Roboters.",
+    "hint": "Alle vier Roboter voll ausgebaut."
+  },
+  "lab_specialist": {
+    "name": "Laborspezialist",
+    "desc": "Verbessere einen einzelnen Turm im Labor vollständig.",
+    "hint": "Alle drei Meta-Zweige eines Turms maximiert."
+  },
+  "lab_overlord": {
+    "name": "Laborgebieter",
+    "desc": "Verbessere jeden Turm im Labor vollständig.",
+    "hint": "Alle drei Meta-Zweige aller sechs Türme maximiert."
+  },
+  "endless_survivor": {
+    "name": "Endlos-Überleben",
+    "desc": "Erreiche Welle 20 in einer Endlos-Arena.",
+    "hint": "Überlebe tief im Endlos-Modus."
+  },
+  "heroic_effort": {
+    "name": "Heldenhafter Einsatz",
+    "desc": "Schließe eine Mission im Ausbruch-Modus ab.",
+    "hint": "Gewinne einen handgebauten Ausbruch-Lauf."
+  },
+  "iron_will": {
+    "name": "Eiserner Wille",
+    "desc": "Schließe eine Mission im Sperrzone-Modus ab.",
+    "hint": "Gewinne einen Ein-Leben-Lauf in der Sperrzone."
+  },
+  "mass_production": {
+    "name": "Massenproduktion",
+    "desc": "Stelle das Maximum eines einzelnen Turmtyps in einer Mission auf.",
+    "hint": "Baue acht eines Typs."
+  },
   "tree_hugger": {
     "name": "Baumumarmer",
     "desc": "Klicke zehnmal auf denselben Baum.",
