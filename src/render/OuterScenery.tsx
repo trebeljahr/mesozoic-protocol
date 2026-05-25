@@ -9,6 +9,12 @@ import {
   classifyPropUrl,
   TARGET_SIZE_BY_ROLE,
 } from "../biomes";
+import {
+  buildFlowFeatures,
+  type FlowFeatures,
+  hasFlowFeatures,
+  isOnFlowSurface,
+} from "../flowGeometry";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { evenSpreadSpacing, poissonDiskSample } from "../sim/poisson";
 import { mulberry32 } from "../sim/random";
@@ -136,6 +142,7 @@ const placeLayerInBand = (
   layer: BiomeLayer,
   levelId: number,
   layerIndex: number,
+  flow: FlowFeatures | null,
 ): void => {
   // Buildings are robot focal points; don't sprinkle them in the corners.
   if (layer.urls.every((u) => classifyPropUrl(u) === "building")) return;
@@ -155,6 +162,9 @@ const placeLayerInBand = (
 
   const isValid = (x: number, y: number): boolean => {
     if (insideInner(x, y)) return false;
+    // Rivers/lakes run off the play rect into the band; keep band decor off
+    // the water tails just like the inner placement does.
+    if (isOnFlowSurface(flow, x, y, candidateR + 0.2)) return false;
     for (const o of out) {
       const dx = o.pos.x - x;
       const dy = o.pos.y - y;
@@ -199,6 +209,8 @@ const placeUniformInBand = (
   count: number,
   scaleFn: (rng: () => number) => number,
   minSep: number,
+  flow: FlowFeatures | null,
+  flowFootprint: number,
 ): void => {
   if (count === 0 || pool.length === 0) return;
 
@@ -208,6 +220,7 @@ const placeUniformInBand = (
 
   const isValid = (x: number, y: number): boolean => {
     if (insideInner(x, y)) return false;
+    if (isOnFlowSurface(flow, x, y, flowFootprint)) return false;
     for (const o of out) {
       const dx = o.pos.x - x;
       const dy = o.pos.y - y;
@@ -242,7 +255,7 @@ const placeUniformInBand = (
   }
 };
 
-const buildInstances = (biome: Biome, levelId: number): Instance[] => {
+const buildInstances = (biome: Biome, levelId: number, flow: FlowFeatures | null): Instance[] => {
   const out: Instance[] = [];
 
   // Non-blocking ground layers (grass, etc.) in the outer band. Blocking
@@ -252,7 +265,7 @@ const buildInstances = (biome: Biome, levelId: number): Instance[] => {
   const layers = BIOME_LAYERS[biome];
   for (let li = 0; li < layers.length; li++) {
     if (layers[li].blocks) continue;
-    placeLayerInBand(out, layers[li], levelId, li);
+    placeLayerInBand(out, layers[li], levelId, li, flow);
   }
 
   // Cosmetics (forest BushFlowers etc.) rendered separately on the
@@ -266,6 +279,8 @@ const buildInstances = (biome: Biome, levelId: number): Instance[] => {
       Math.round(INNER_COSMETIC_COUNT * BAND_RATIO),
       cosmeticScale,
       1.1,
+      flow,
+      0.5,
     );
   }
 
@@ -287,9 +302,11 @@ const neverRaycast: THREE.Mesh["raycast"] = () => {};
 export const OuterScenery = () => {
   const biome = useGame((s) => s.world.biome);
   const levelId = useGame((s) => s.world.levelId);
+  const paths = useGame((s) => s.world.paths);
 
   const groups = useMemo(() => {
-    const instances = buildInstances(biome, levelId);
+    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, levelId, biome) : null;
+    const instances = buildInstances(biome, levelId, flow);
     const byUrl = new Map<string, Instance[]>();
     for (const inst of instances) {
       const list = byUrl.get(inst.url) ?? [];
@@ -297,7 +314,7 @@ export const OuterScenery = () => {
       byUrl.set(inst.url, list);
     }
     return Array.from(byUrl.entries());
-  }, [biome, levelId]);
+  }, [biome, levelId, paths]);
 
   return (
     <group>
