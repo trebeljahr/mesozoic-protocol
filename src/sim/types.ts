@@ -588,6 +588,11 @@ export type CryoWave = {
   maxRadius: number;
   expiresAt: number;
   maxLife: number;
+  // Tower that emitted this wave — looked up at hit time for effect params
+  // and kill attribution. Effect lands as the front sweeps over an enemy.
+  towerId: EntityId;
+  // Enemies already hit by this wave's front, so each is affected once.
+  hitIds: Set<EntityId>;
 };
 
 export type Particle = {

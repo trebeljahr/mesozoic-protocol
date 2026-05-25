@@ -241,34 +241,27 @@ const fireChain = (world: World, t: Tower, primary: Enemy) => {
   }
 };
 
-// Cryo damage/slow application — gated by cooldown so DPS stays tunable.
-// Per-enemy hit particles intentionally absent: the freeze rings (below)
-// carry the visual, and a tiny per-enemy puff just added clutter.
-const applyCryoFreeze = (world: World, t: Tower): boolean => {
-  const rangeSq = t.range * t.range;
-  let hit = false;
-  const dmg = effectiveDamage(t);
-  const canFreeze = t.freezeChance > 0 && t.freezeDuration > 0;
-  for (const e of world.enemies) {
-    if (!isEnemyTargetable(e)) continue;
-    if (distSq(e.pos, t.pos) > rangeSq) continue;
-    hit = true;
-    applySlow(e, world, t.slowFactor, t.slowDuration);
-    // Subzero meta roll — chance to fully freeze the enemy for the
-    // configured duration. Freeze pins effective speed to 0 in the
-    // enemy update; baseline slow still applies once freeze elapses.
-    if (canFreeze && Math.random() < t.freezeChance) {
-      e.freezeUntil = Math.max(e.freezeUntil, world.time + t.freezeDuration);
-    }
-    // Cryo T3 (Cryo Lock) — push regen pause out to end-of-slow so the
-    // enemy can't tick HP back up while frozen.
-    if (t.freezeBlocksRegen && e.regen) {
-      e.regenPausedUntil = Math.max(e.regenPausedUntil, e.slowUntil);
-    }
-    e.flashUntil = world.time + 0.06;
-    if (dmg > 0) applyDamage(world, e, dmg, "cold", "#bfe9ff", 6, false, towerHitOpts(t));
+// Cryo damage/slow application — applied to a single enemy the moment a
+// freeze wave's expanding front reaches it (see updateCryoWaveHits), so the
+// effect is in lockstep with the visible ring instead of a bulk AoE pulse.
+// Per-enemy hit particles intentionally absent: the freeze rings carry the
+// visual, and a tiny per-enemy puff just added clutter.
+const applyCryoHit = (world: World, t: Tower, e: Enemy) => {
+  applySlow(e, world, t.slowFactor, t.slowDuration);
+  // Subzero meta roll — chance to fully freeze the enemy for the
+  // configured duration. Freeze pins effective speed to 0 in the
+  // enemy update; baseline slow still applies once freeze elapses.
+  if (t.freezeChance > 0 && t.freezeDuration > 0 && Math.random() < t.freezeChance) {
+    e.freezeUntil = Math.max(e.freezeUntil, world.time + t.freezeDuration);
   }
-  return hit;
+  // Cryo T3 (Cryo Lock) — push regen pause out to end-of-slow so the
+  // enemy can't tick HP back up while frozen.
+  if (t.freezeBlocksRegen && e.regen) {
+    e.regenPausedUntil = Math.max(e.regenPausedUntil, e.slowUntil);
+  }
+  e.flashUntil = world.time + 0.06;
+  const dmg = effectiveDamage(t);
+  if (dmg > 0) applyDamage(world, e, dmg, "cold", "#bfe9ff", 6, false, towerHitOpts(t));
 };
 
 // True if any live enemy is inside the tower's aura — used to gate the
@@ -282,15 +275,37 @@ const enemyInRange = (world: World, t: Tower): boolean => {
   return false;
 };
 
-// Steady freezing-wave cadence — a fresh ring leaves the tower roughly
-// every CRYO_WAVE_PERIOD seconds while a target's in range. Tuned for a
-// rhythmic beat: 0.8 s between waves with each wave living 1.2 s means
-// roughly two are in flight at once with a clear gap as the older one
-// fades. Decoupled from fireRate so the rhythm stays steady.
+// A freeze wave lives 1.2 s as its front expands from the tower out to the
+// aura edge. Each wave is both the visual and the attack: it's spawned on
+// the fireRate cadence (so a base 1.5/s tower emits one every ~0.67 s, two
+// in flight) and its front carries the slow/freeze/damage to each enemy it
+// sweeps over (see updateCryoWaveHits).
 const CRYO_WAVE_LIFE = 1.2;
-const CRYO_WAVE_PERIOD_TICKS = 48; // 0.8 s @ 60Hz
 const spawnCryoWave = (world: World, t: Tower) => {
-  createCryoWave(world, t.pos, t.range, CRYO_WAVE_LIFE);
+  createCryoWave(world, t.pos, t.range, CRYO_WAVE_LIFE, t.id);
+};
+
+// Drive the freeze effect off the visible animation: each tick, advance
+// every wave's leading edge to the same radius the renderer draws, then hit
+// any in-range enemy the front has newly reached. hitIds gates one
+// application per enemy per wave, so overlapping waves don't double-dip and
+// the per-enemy cadence settles to the wave-spawn cadence.
+const updateCryoWaveHits = (world: World) => {
+  for (const w of world.cryoWaves) {
+    const tower = world.towers.find((t) => t.id === w.towerId);
+    if (!tower) continue;
+    const progress = 1 - (w.expiresAt - world.time) / w.maxLife;
+    const front = w.maxRadius * progress;
+    if (front <= 0) continue;
+    const frontSq = front * front;
+    for (const e of world.enemies) {
+      if (w.hitIds.has(e.id)) continue;
+      if (!isEnemyTargetable(e)) continue;
+      if (distSq(e.pos, w.pos) > frontSq) continue;
+      w.hitIds.add(e.id);
+      applyCryoHit(world, tower, e);
+    }
+  }
 };
 
 const fireMortar = (world: World, t: Tower, target: Enemy) => {
@@ -525,25 +540,15 @@ export const updateTowers = (world: World, dt: number) => {
     if (t.kind === "hive") continue;
 
     if (t.kind === "cryo") {
-      // Damage/slow is cooldown-gated; the visual is a steady cadence of
-      // expanding rings ("freezing waves") that emanate from the tower
-      // while any enemy is in range. The cadence is intentionally
-      // decoupled from fireRate — extra rings on each freeze tick made
-      // the rhythm feel frantic.
-      const inRange = enemyInRange(world, t);
-      if (inRange && world.tickCount % CRYO_WAVE_PERIOD_TICKS === 0) {
+      // The freeze wave IS the attack. On the fireRate cadence (so hive
+      // service buffs still speed it up) a fresh ring leaves the tower
+      // while any enemy is in range; its expanding front applies the
+      // slow/freeze/damage as it sweeps over each enemy in updateCryoWaveHits,
+      // keeping the visual and the effect in lockstep.
+      if (t.cooldown === 0 && enemyInRange(world, t)) {
         spawnCryoWave(world, t);
-      }
-      if (inRange && t.cooldown === 0) {
-        const didHit = applyCryoFreeze(world, t);
-        if (didHit) {
-          // Effective fire rate so the per-freeze cadence picks up any
-          // hive service buff. Cryo's wave-spawn cadence stays decoupled
-          // from fireRate (see CRYO_WAVE_PERIOD_TICKS) — only the damage
-          // tick is gated.
-          t.cooldown = 1 / effectiveFireRate(t);
-          emit(world, { type: "shoot", towerId: t.id, towerKind: t.kind, pos: t.pos });
-        }
+        t.cooldown = 1 / effectiveFireRate(t);
+        emit(world, { type: "shoot", towerId: t.id, towerKind: t.kind, pos: t.pos });
       }
       continue;
     }
@@ -597,6 +602,10 @@ export const updateTowers = (world: World, dt: number) => {
       emit(world, { type: "shoot", towerId: t.id, towerKind: t.kind, pos: t.pos });
     }
   }
+
+  // Resolve freeze-wave fronts after all towers have (maybe) spawned this
+  // tick's waves, so a wave is hit-tested the same tick it appears.
+  updateCryoWaveHits(world);
 };
 
 // --- Hive support drones ----------------------------------------------

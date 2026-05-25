@@ -2272,7 +2272,8 @@ export const createCryoWave = (
   world: World,
   pos: Vec2,
   maxRadius: number,
-  lifeSec = 0.55,
+  lifeSec: number,
+  towerId: EntityId,
 ): CryoWave => {
   const w: CryoWave = {
     id: world.nextEntityId++,
@@ -2280,6 +2281,8 @@ export const createCryoWave = (
     maxRadius,
     expiresAt: world.time + lifeSec,
     maxLife: lifeSec,
+    towerId,
+    hitIds: new Set(),
   };
   world.cryoWaves.push(w);
   return w;
