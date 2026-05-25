@@ -1,4 +1,4 @@
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
 import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -294,6 +294,316 @@ const chimneyLocal = (
   z: (offset.z - shiftZ) * scale,
 });
 
+// Persistent flame that ignites on the snow torch the first time it's lit
+// (clicked). Three pools share two camera-facing billboard meshes:
+//   - fire + embers ride one additive whitepuff mesh — hot core fading
+//     white→orange→deep-red as it rises, plus a few tiny twinkling sparks.
+//     Additive means "fade out" is a colour ramp toward black, no per-
+//     instance alpha needed.
+//   - smoke rides a separate alpha-blended whitepuff mesh above the flame.
+//     Additive smoke is invisible against the bright snow ground, so this
+//     one carries real per-instance opacity via the same onBeforeCompile
+//     `aOpacity` hook SmokePuffs uses.
+// Offsets live in the egg's outer-group local space (like the chimney
+// column), so the flame rotates with egg.rotY; billboards are counter-
+// rotated by the group's world rotation so they still face the camera.
+const FIRE_COUNT = 22;
+const EMBER_COUNT = 12;
+const SMOKE_COUNT = 12;
+const FLAME_MESH_COUNT = FIRE_COUNT + EMBER_COUNT;
+
+type FlameParticle = {
+  age: number;
+  life: number;
+  offX: number;
+  offY: number;
+  offZ: number;
+  velX: number;
+  velY: number;
+  velZ: number;
+  seed: number;
+};
+
+const newFlameParticle = (): FlameParticle => ({
+  age: 0,
+  life: 1,
+  offX: 0,
+  offY: 0,
+  offZ: 0,
+  velX: 0,
+  velY: 0,
+  velZ: 0,
+  seed: 0,
+});
+
+const respawnFire = (p: FlameParticle) => {
+  p.age = 0;
+  p.life = 0.42 + Math.random() * 0.3;
+  const ang = Math.random() * Math.PI * 2;
+  const rad = Math.random() * 0.05;
+  p.offX = Math.cos(ang) * rad;
+  p.offZ = Math.sin(ang) * rad;
+  p.offY = 0;
+  p.velX = Math.cos(ang) * 0.12;
+  p.velZ = Math.sin(ang) * 0.12;
+  p.velY = 1.7 + Math.random() * 0.9;
+  p.seed = Math.random() * 10;
+};
+
+const respawnEmber = (p: FlameParticle) => {
+  p.age = 0;
+  p.life = 0.55 + Math.random() * 0.7;
+  const ang = Math.random() * Math.PI * 2;
+  p.offX = Math.cos(ang) * 0.04;
+  p.offZ = Math.sin(ang) * 0.04;
+  p.offY = 0.05;
+  const drift = 0.25 + Math.random() * 0.3;
+  p.velX = Math.cos(ang) * drift;
+  p.velZ = Math.sin(ang) * drift;
+  p.velY = 2.2 + Math.random() * 1.5;
+  p.seed = Math.random() * 10;
+};
+
+const respawnFlameSmoke = (p: FlameParticle) => {
+  p.age = 0;
+  p.life = 1.2 + Math.random() * 1.0;
+  p.offX = (Math.random() - 0.5) * 0.1;
+  p.offZ = (Math.random() - 0.5) * 0.1;
+  p.offY = 0.18;
+  const ang = Math.random() * Math.PI * 2;
+  const drift = 0.14 + Math.random() * 0.16;
+  p.velX = Math.cos(ang) * drift;
+  p.velZ = Math.sin(ang) * drift;
+  p.velY = 0.55 + Math.random() * 0.4;
+  p.seed = Math.random() * 10;
+};
+
+const TorchFlame = ({
+  egg,
+  anchor,
+}: {
+  egg: EasterEgg;
+  anchor: { x: number; y: number; z: number };
+}) => {
+  const tex = useTexture("/textures/fx/whitepuff15.png");
+  const groupRef = useRef<THREE.Group>(null);
+  const fireRef = useRef<THREE.InstancedMesh>(null);
+  const smokeRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const color = useMemo(() => new THREE.Color(), []);
+  const hot = useMemo(() => new THREE.Color("#fff1c0"), []);
+  const mid = useMemo(() => new THREE.Color("#ff8a2c"), []);
+  const cool = useMemo(() => new THREE.Color("#cc2a10"), []);
+  const billboard = useMemo(() => new THREE.Quaternion(), []);
+  const parentQuat = useMemo(() => new THREE.Quaternion(), []);
+
+  // Per-instance opacity for the alpha-blended smoke, injected the same way
+  // SmokePuffs does (MeshBasicMaterial has no per-instance alpha otherwise).
+  const smokeOpacity = useMemo(
+    () => new THREE.InstancedBufferAttribute(new Float32Array(SMOKE_COUNT), 1),
+    [],
+  );
+  const smokeMat = useMemo(() => {
+    const m = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    m.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          "#include <common>\nattribute float aOpacity;\nvarying float vOpacity;",
+        )
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvOpacity = aOpacity;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying float vOpacity;")
+        .replace(
+          "#include <dithering_fragment>",
+          "gl_FragColor.a *= vOpacity;\n#include <dithering_fragment>",
+        );
+    };
+    return m;
+  }, [tex]);
+
+  const fire = useMemo<FlameParticle[]>(() => {
+    const arr: FlameParticle[] = [];
+    for (let i = 0; i < FIRE_COUNT; i++) {
+      const p = newFlameParticle();
+      respawnFire(p);
+      p.age = -Math.random() * p.life; // stagger so the column doesn't pop in
+      arr.push(p);
+    }
+    return arr;
+  }, []);
+  const embers = useMemo<FlameParticle[]>(() => {
+    const arr: FlameParticle[] = [];
+    for (let i = 0; i < EMBER_COUNT; i++) {
+      const p = newFlameParticle();
+      respawnEmber(p);
+      p.age = -Math.random() * p.life;
+      arr.push(p);
+    }
+    return arr;
+  }, []);
+  const smoke = useMemo<FlameParticle[]>(() => {
+    const arr: FlameParticle[] = [];
+    for (let i = 0; i < SMOKE_COUNT; i++) {
+      const p = newFlameParticle();
+      respawnFlameSmoke(p);
+      p.age = -Math.random() * p.life;
+      arr.push(p);
+    }
+    return arr;
+  }, []);
+
+  useEffect(() => {
+    const m = smokeRef.current;
+    if (m) m.geometry.setAttribute("aOpacity", smokeOpacity);
+  }, [smokeOpacity]);
+
+  useFrame((state, dt) => {
+    const fireMesh = fireRef.current;
+    const smokeMesh = smokeRef.current;
+    const grp = groupRef.current;
+    if (!fireMesh || !smokeMesh || !grp) return;
+
+    // Unlit until clicked — mounted unconditionally (like the chimney) so we
+    // catch the very first click even when it doesn't re-render React.
+    if (egg.clickCount === 0) {
+      fireMesh.count = 0;
+      smokeMesh.count = 0;
+      fireMesh.instanceMatrix.needsUpdate = true;
+      smokeMesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
+
+    const step = Math.min(dt, 0.05);
+    // Counter-rotate billboards by the group's world rotation so they face
+    // the camera even though the egg group spins them by egg.rotY.
+    grp.getWorldQuaternion(parentQuat);
+    billboard.copy(parentQuat).invert().multiply(state.camera.quaternion);
+
+    // --- Fire + embers (additive) ---
+    let n = 0;
+    for (const p of fire) {
+      p.age += step;
+      if (p.age > p.life) respawnFire(p);
+      if (p.age < 0) continue;
+      p.offX += p.velX * step;
+      p.offY += p.velY * step;
+      p.offZ += p.velZ * step;
+      p.velY *= 1 - 0.6 * step; // buoyancy bleeds off so flames lick and curl
+      const t = p.age / p.life;
+      const fadeIn = Math.min(1, p.age / 0.05);
+      const fadeOut = t < 0.65 ? 1 : 1 - (t - 0.65) / 0.35;
+      const flick = Math.sin(p.age * 30 + p.seed) * 0.03;
+      const size = (0.27 - 0.16 * t) * fadeIn;
+      if (size <= 0.001) continue;
+      if (t < 0.5) color.copy(hot).lerp(mid, t / 0.5);
+      else color.copy(mid).lerp(cool, (t - 0.5) / 0.5);
+      color.multiplyScalar((0.5 + 0.9 * (1 - t)) * fadeIn * fadeOut);
+      dummy.position.set(anchor.x + p.offX + flick, anchor.y + p.offY, anchor.z + p.offZ);
+      dummy.quaternion.copy(billboard);
+      dummy.scale.setScalar(size);
+      dummy.updateMatrix();
+      fireMesh.setMatrixAt(n, dummy.matrix);
+      fireMesh.setColorAt(n, color);
+      n++;
+    }
+    for (const p of embers) {
+      p.age += step;
+      if (p.age > p.life) respawnEmber(p);
+      if (p.age < 0) continue;
+      p.offX += p.velX * step;
+      p.offY += p.velY * step;
+      p.offZ += p.velZ * step;
+      p.velY *= 1 - 0.25 * step;
+      const t = p.age / p.life;
+      const fadeOut = 1 - t;
+      const twinkle = 0.55 + 0.45 * Math.sin(p.age * 34 + p.seed);
+      const size = (0.07 - 0.04 * t) * Math.min(1, p.age / 0.04);
+      if (size <= 0.001) continue;
+      color.setRGB(1, 0.8, 0.38).multiplyScalar(twinkle * fadeOut * 1.9);
+      dummy.position.set(anchor.x + p.offX, anchor.y + p.offY, anchor.z + p.offZ);
+      dummy.quaternion.copy(billboard);
+      dummy.scale.setScalar(size);
+      dummy.updateMatrix();
+      fireMesh.setMatrixAt(n, dummy.matrix);
+      fireMesh.setColorAt(n, color);
+      n++;
+    }
+    fireMesh.count = n;
+    fireMesh.instanceMatrix.needsUpdate = true;
+    if (fireMesh.instanceColor) fireMesh.instanceColor.needsUpdate = true;
+
+    // --- Smoke (alpha) ---
+    let s = 0;
+    for (const p of smoke) {
+      p.age += step;
+      if (p.age > p.life) respawnFlameSmoke(p);
+      if (p.age < 0) continue;
+      p.offX += p.velX * step;
+      p.offY += p.velY * step;
+      p.offZ += p.velZ * step;
+      p.velX *= 1 - 0.4 * step;
+      p.velZ *= 1 - 0.4 * step;
+      const t = p.age / p.life;
+      const fadeIn = Math.min(1, p.age / 0.18);
+      const fadeOut = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+      const size = 0.12 + t * 0.42;
+      // Sooty grey lifting toward pale so the column reads against snow.
+      const grey = 0.22 + t * 0.32;
+      color.setRGB(grey, grey, grey);
+      dummy.position.set(anchor.x + p.offX, anchor.y + p.offY, anchor.z + p.offZ);
+      dummy.quaternion.copy(billboard);
+      dummy.scale.setScalar(size);
+      dummy.updateMatrix();
+      smokeMesh.setMatrixAt(s, dummy.matrix);
+      smokeMesh.setColorAt(s, color);
+      smokeOpacity.array[s] = 0.5 * fadeIn * fadeOut;
+      s++;
+    }
+    smokeMesh.count = s;
+    smokeMesh.instanceMatrix.needsUpdate = true;
+    if (smokeMesh.instanceColor) smokeMesh.instanceColor.needsUpdate = true;
+    smokeOpacity.needsUpdate = true;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <instancedMesh
+        ref={smokeRef}
+        args={[undefined, undefined, SMOKE_COUNT]}
+        material={smokeMat}
+        renderOrder={2}
+        frustumCulled={false}
+      >
+        <planeGeometry args={[1, 1]} />
+      </instancedMesh>
+      <instancedMesh
+        ref={fireRef}
+        args={[undefined, undefined, FLAME_MESH_COUNT]}
+        renderOrder={3}
+        frustumCulled={false}
+      >
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial
+          map={tex}
+          toneMapped={false}
+          transparent
+          opacity={0.9}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </instancedMesh>
+    </group>
+  );
+};
+
 // Eggs must out-priority every other clickable (dinos, rocks, trees, the
 // placement plane) even when they sit *behind* one in screen space. R3F
 // dispatches pointer events in ascending intersection.distance order and
@@ -499,6 +809,16 @@ const EasterEggMesh = ({ egg, def }: { egg: EasterEgg; def: EasterEggDef }) => {
         <ChimneySmokeColumn
           egg={egg}
           chimney={chimneyLocal(def.chimneyOffset, scale, yModel, centerX, centerZ)}
+        />
+      ) : null}
+      {def.flameOffset ? (
+        <TorchFlame
+          egg={egg}
+          anchor={{
+            x: (def.flameOffset.x ?? 0) * scale,
+            y: yModel + def.flameOffset.y * scale,
+            z: (def.flameOffset.z ?? 0) * scale,
+          }}
         />
       ) : null}
       <mesh position={[0, hitY, 0]} raycast={eggPriorityRaycast}>

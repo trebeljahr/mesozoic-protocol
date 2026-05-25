@@ -73,6 +73,14 @@ export type EasterEggReaction = {
 // handler to suppress the default ground-level puff.
 export type ChimneyOffset = { x: number; y: number; z: number };
 
+// Position in raw model space where a fire + smoke + ember column should
+// burn from once the egg has been lit (clicked). `y` is the raw model
+// height of the flame source; `x`/`z` are extra horizontal nudges off the
+// model's recentered axis (default 0, since props that carry a flame are
+// authored with the head over their vertical centerline). Used by the snow
+// torch so its flame sits on the tinder head rather than the whole mesh.
+export type FlameOffset = { x?: number; y: number; z?: number };
+
 export type EasterEggDef = {
   id: string;
   achievement: AchievementId;
@@ -92,6 +100,9 @@ export type EasterEggDef = {
   clickRoll?: EasterEggClickRoll;
   reaction?: EasterEggReaction;
   chimneyOffset?: ChimneyOffset;
+  // When set, a persistent fire + smoke + ember flame ignites on the model
+  // (at this raw-model-space height) the first time the egg is clicked.
+  flameOffset?: FlameOffset;
   goldReward?: number;
   // Relative pick weight when multiple eggs match a biome. Default 1.
   // Set <1 to make an egg rarer (skull is intentionally rare).
@@ -160,8 +171,12 @@ export const EASTER_EGG_DEFS: EasterEggDef[] = [
   {
     id: "torch",
     achievement: "torch_lit",
-    biomes: ["snow"],
+    // Quaternius survival-pack wooden torch: dark-wood handle, grey ferrule,
+    // tan tinder head — an unlit firebrand with no baked flame, so the
+    // fire/smoke/ember particle column (lit on first click via flameOffset)
+    // becomes the actual flame on the tinder head.
     model: "/models/landmarks/snow/Torch.glb",
+    biomes: ["snow"],
     targetSize: 1.2,
     clickThreshold: 1,
     effect: burst(
@@ -170,6 +185,9 @@ export const EASTER_EGG_DEFS: EasterEggDef[] = [
     ),
     // Torch flares — bigger pop reads as the flame whooshing up.
     reaction: { popIntensity: 0.45 },
+    // Tinder head sits near the model top (raw bbox y 1.7–2.1); ignite the
+    // flame just inside it.
+    flameOffset: { y: 1.85 },
   },
   {
     id: "barrel",
