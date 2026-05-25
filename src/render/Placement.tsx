@@ -370,8 +370,8 @@ export const Placement = () => {
       return;
     }
     // Click-after-select: while the robot is selected, a ground click is a
-    // move order (snapped to the path inside orderRobotMove) — UNLESS it
-    // landed on a tower or the HQ. A valid entity click runs that entity's
+    // free-roam move order (the robot walks straight across terrain) —
+    // UNLESS it landed on a tower or the HQ. A valid entity click runs that entity's
     // normal select action and deselects the robot, so the player can go
     // straight from commanding the robot to inspecting a tower. Dinos bubble
     // through here (their mesh handler yields while the robot is selected)
@@ -380,10 +380,10 @@ export const Placement = () => {
     if (state.world.robot.selected && state.selectedKind === null) {
       if (!state.towerAtPos(pos) && !state.hqAtPos(pos)) {
         if (!state.orderRobotMove(pos)) {
-          // Tap landed off the path. On touch there's no right-click/Esc to
-          // back out of robot command mode, so a tap away from a valid path
-          // means "I'm done driving the robot" — deselect it. Desktop keeps
-          // the rejection cue since a stray left-click shouldn't drop it.
+          // Tap landed well outside the playfield. On touch there's no
+          // right-click/Esc to back out of robot command mode, so a tap off
+          // the field means "I'm done driving the robot" — deselect it.
+          // Desktop keeps the rejection cue since a stray left-click shouldn't drop it.
           if (opts.deselectRobotOnInvalidMove) {
             state.selectRobotUnit(false);
           } else {

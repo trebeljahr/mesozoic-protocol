@@ -1,8 +1,7 @@
 import { isOnFlowSurface } from "../flowGeometry";
-import { MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "../level";
+import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { dampFactor, shortAngleDelta } from "./angle";
 import { isEnemyTargetable } from "./enemyState";
-import { pathProgress, projectOnPath, smoothDirection } from "./path";
 import { type DashSpec, ROBOT_SPECS, type RobotVariantSpec } from "./robotVariants";
 import type {
   BeamPoint,
@@ -59,12 +58,6 @@ const ROBOT_FOOTSTEP_STRIDE = 1.45;
 // Visual hover offset (world units) while over a liquid surface.
 const ROBOT_HOVER_HEIGHT = 0.55;
 const ROBOT_HOVER_HALFLIFE = 0.12;
-// How far off the path centerline the player can park the robot. Roughly
-// half of the painted lane so the robot never visually drifts off-road.
-export const ROBOT_LANE_HALF = 0.7;
-// Lateral offset eases toward the target value at this rate (units/sec)
-// so swapping sides feels smooth, not snappy.
-const ROBOT_LATERAL_LERP_PER_SEC = 2.2;
 // Skirmish: how far the robot will reach to "engage" the closest dino
 // in melee. Engaged dinos halt forward path movement until the robot
 // either dies, dashes free, or walks out of this range.
@@ -75,14 +68,11 @@ const ROBOT_ENGAGE_RANGE = 1.6;
 const MAX_ENGAGED_DINOS = 5;
 // Window in which a pre-dash aim stays valid before auto-clearing.
 const DASH_AIM_LIFETIME = 4.0;
-// Max distance a move-order click can land from the painted path before
-// the order is rejected as off-path. Matches the visible lane half-width
-// so any click on the painted lane is accepted.
-const ROBOT_MOVE_ON_PATH_TOLERANCE = PATH_WIDTH / 2;
-// Once the robot ends up beyond this lateral distance from the nearest
-// path (typically after a dash overshoot), an auto-return move-order is
-// issued so they walk back to the lane.
-const ROBOT_OFF_PATH_RETURN_THRESHOLD = ROBOT_LANE_HALF + 0.15;
+// Free-roam move orders: a click up to this far past the map edge still
+// registers (the target is clamped back inside). Clicks beyond it — the
+// camera margin / spawn aprons — are rejected so the touch "tap away to
+// deselect" gesture still has dead space to land on.
+const ROBOT_MOVE_BOUNDS_PAD = 1.0;
 // Mike dash coal-trail tuning.
 const COAL_DROP_INTERVAL = 0.045; // ~9 embers per default 0.4s dash
 const COAL_TICK_DAMAGE = 16;
@@ -445,49 +435,6 @@ const respawnRobot = (world: World, robot: Robot) => {
   spawnParticles(world, robot.pos, 24, ROBOT_SPECS[robot.variant].tint, [2, 5], 0.5);
 };
 
-// Forward-corridor blocker bypass. When a tower/tree/rock sits in the
-// robot's near-future path corridor, return a lateral target that steps
-// around it on the side closest to the original `defaultLateral`. May
-// exceed ROBOT_LANE_HALF — the lane clamp is intentionally overridden
-// here so the robot can route around obstacles that intrude on the lane
-// envelope (notably towers placed at the lane edge). Iterates blockers
-// sequentially; each pass refines `lateral` against any blocker still
-// within the corridor at the updated lateral.
-const BLOCKER_BYPASS_LOOKAHEAD = 3.0;
-const BLOCKER_BYPASS_BEHIND = 0.4;
-const BLOCKER_BYPASS_CLEARANCE = 0.18;
-const BLOCKER_BYPASS_MAX_LATERAL = 2.2;
-
-const lateralBypassForBlockers = (
-  world: World,
-  path: Vec2[],
-  robotProgress: number,
-  defaultLateral: number,
-  forwardSign: number,
-): number => {
-  let lateral = defaultLateral;
-  const dir = forwardSign >= 0 ? 1 : -1;
-  const consider = (cx: number, cy: number, br: number) => {
-    const proj = projectOnPath(path, { x: cx, y: cy });
-    const bProg = pathProgress(path, proj.segment, proj.segmentT);
-    const along = (bProg - robotProgress) * dir;
-    if (along < -BLOCKER_BYPASS_BEHIND || along > BLOCKER_BYPASS_LOOKAHEAD) return;
-    const minGap = br + ROBOT_RADIUS + BLOCKER_BYPASS_CLEARANCE;
-    if (Math.abs(proj.lateralOffset - lateral) >= minGap) return;
-    const lowSide = proj.lateralOffset - minGap;
-    const highSide = proj.lateralOffset + minGap;
-    const distLow = Math.abs(defaultLateral - lowSide);
-    const distHigh = Math.abs(defaultLateral - highSide);
-    lateral = distLow <= distHigh ? lowSide : highSide;
-  };
-  for (const t of world.towers) consider(t.pos.x, t.pos.y, TOWER_FOOTPRINT * 0.6);
-  for (const tr of world.trees) consider(tr.pos.x, tr.pos.y, TREE_FOOTPRINT * tr.scale);
-  for (const rk of world.rocks) consider(rk.pos.x, rk.pos.y, ROCK_FOOTPRINT * rk.scale);
-  if (lateral > BLOCKER_BYPASS_MAX_LATERAL) lateral = BLOCKER_BYPASS_MAX_LATERAL;
-  if (lateral < -BLOCKER_BYPASS_MAX_LATERAL) lateral = -BLOCKER_BYPASS_MAX_LATERAL;
-  return lateral;
-};
-
 // Local steering: nudge desired velocity sideways around any blocker
 // the robot is heading at. Skips obstacles behind the robot or outside
 // the look-ahead cone. Multiple obstacles sum so a cluster (grove)
@@ -754,113 +701,30 @@ export const updateRobot = (world: World, dt: number) => {
   // seconds shouldn't trap the cursor in commit-on-click mode.
   if (robot.dashAim && world.time >= robot.dashAim.expiresAt) robot.dashAim = null;
 
-  // Auto-return to the path if a dash (or any other forced displacement)
-  // left the robot too far off-road. Skipped while a dash is still active
-  // so the dash motion plays out fully, and only fires when the player
-  // has no pending move-order — manual orders always win.
-  if (!dashing && !robot.moveTarget) {
-    const { pathIndex: nearestIdx, distSq: nearestD2 } = nearestPathFor(
-      world,
-      robot.pos,
-      robot.pathIndex,
-    );
-    if (nearestD2 > ROBOT_OFF_PATH_RETURN_THRESHOLD * ROBOT_OFF_PATH_RETURN_THRESHOLD) {
-      const proj = projectOnPath(world.paths[nearestIdx], robot.pos);
-      robot.moveTarget = { x: proj.pos.x, y: proj.pos.y };
-      robot.pathIndex = nearestIdx;
-    }
-  }
-
   let desiredX = 0;
   let desiredY = 0;
   let walking = false;
-  // Path-bound move follow. The straight-line direct-aim used to slide
-  // the robot into trees/rocks/towers because they sit alongside the
-  // painted lane; instead, decompose desired velocity into a tangent
-  // component (walk along the path toward the target's progress) plus a
-  // lateral correction (slide across the lane width toward the target
-  // side). Robot never leaves the lane that way so the existing
-  // resolveOverlap is mostly a safety net for dash overshoot.
+  // Free-roam move follow: steer straight at the target, cutting across
+  // terrain between the enemy lanes instead of snapping to a painted
+  // path. avoidObstacles arcs the robot around trees/rocks/towers in its
+  // look-ahead cone; resolveOverlap + the map-bounds clamp are the hard
+  // backstop that keep it out of blockers and inside the playfield.
   if (robot.moveTarget) {
-    const dxStraight = robot.moveTarget.x - robot.pos.x;
-    const dyStraight = robot.moveTarget.y - robot.pos.y;
-    const dStraight = Math.hypot(dxStraight, dyStraight);
-    if (dStraight <= ROBOT_ARRIVE_RADIUS) {
+    const dx = robot.moveTarget.x - robot.pos.x;
+    const dy = robot.moveTarget.y - robot.pos.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= ROBOT_ARRIVE_RADIUS) {
       robot.moveTarget = null;
     } else {
-      const paths = world.paths;
-      const pi = Math.max(0, Math.min(paths.length - 1, robot.pathIndex));
-      const path = paths[pi];
-      const robotProj = projectOnPath(path, robot.pos);
-      const targetProj = projectOnPath(path, robot.moveTarget);
-      const robotProgress = pathProgress(path, robotProj.segment, robotProj.segmentT);
-      const targetProgress = pathProgress(path, targetProj.segment, targetProj.segmentT);
-      const progressDelta = targetProgress - robotProgress;
-      // Clamp the desired-lateral to the lane half-width so the robot
-      // can't stand on top of a tree even if the click landed off-road.
-      const baseTargetLateral = Math.max(
-        -ROBOT_LANE_HALF,
-        Math.min(ROBOT_LANE_HALF, targetProj.lateralOffset),
-      );
-      // Bypass-override: if a tower/tree/rock sits in the forward
-      // corridor, step around it. May exceed ROBOT_LANE_HALF; the
-      // override drives the robot past the obstacle then the next-tick
-      // re-evaluation lets them rejoin the lane.
-      const targetLateral = lateralBypassForBlockers(
-        world,
-        path,
-        robotProgress,
-        baseTargetLateral,
-        Math.sign(targetProgress - robotProgress),
-      );
-      const dir = smoothDirection(path, robotProj.segment, robotProj.segmentT);
-      const tangentLen = Math.hypot(dir.x, dir.y);
-      if (tangentLen > 1e-6) {
-        const tx = dir.x / tangentLen;
-        const ty = dir.y / tangentLen;
-        // Right-hand normal — matches projectOnPath's lateral sign.
-        const nx = -ty;
-        const ny = tx;
-        const forwardSign = Math.sign(progressDelta);
-        const distAlong = Math.abs(progressDelta);
-        // Slow into the target so the robot doesn't oscillate around the
-        // arrive point. Same shape as the old straight-line slow-down.
-        const slowAlong = distAlong < 1.2 ? distAlong / 1.2 : 1;
-        // Lateral correction: drag robot across the lane toward the
-        // clicked side over ROBOT_LATERAL_LERP_PER_SEC seconds.
-        const lateralDelta = targetLateral - robotProj.lateralOffset;
-        const lateralVel =
-          Math.sign(lateralDelta) *
-          Math.min(Math.abs(lateralDelta) * ROBOT_LATERAL_LERP_PER_SEC, speed * 0.8);
-        const forwardVel = forwardSign * speed * slowAlong;
-        desiredX = tx * forwardVel + nx * lateralVel;
-        desiredY = ty * forwardVel + ny * lateralVel;
-        walking = distAlong > 0.04 || Math.abs(lateralDelta) > 0.05;
-        robot.pathIndex = pi;
-        robot.lateralOffset = robotProj.lateralOffset;
-        // Path-bound follow has converged but straight-line distance to
-        // moveTarget still exceeds ROBOT_ARRIVE_RADIUS — clicked point
-        // sits past the path end or off-lane. Clear the order so the
-        // path marker disappears instead of hanging on the map.
-        if (!walking) {
-          robot.moveTarget = null;
-        }
-      } else {
-        // Degenerate path segment — fall back to straight-line aim so
-        // we don't freeze the robot.
-        desiredX = (dxStraight / dStraight) * speed;
-        desiredY = (dyStraight / dStraight) * speed;
-        walking = true;
-      }
-      // Safety net: nudge desired velocity sideways if a tree/rock/tower
-      // sits in the immediate look-ahead cone. Path-bound walking should
-      // already avoid them, but dash overshoot or a click off-lane can
-      // still drop the robot into one.
-      if (walking) {
-        const steered = avoidObstacles(world, robot, desiredX, desiredY);
-        desiredX = steered.x;
-        desiredY = steered.y;
-      }
+      const inv = 1 / d;
+      // Ease into the arrive point so the robot doesn't oscillate around it.
+      const slow = d < 1.2 ? d / 1.2 : 1;
+      desiredX = dx * inv * speed * slow;
+      desiredY = dy * inv * speed * slow;
+      walking = true;
+      const steered = avoidObstacles(world, robot, desiredX, desiredY);
+      desiredX = steered.x;
+      desiredY = steered.y;
     }
   }
 
@@ -1032,47 +896,26 @@ export const updateRobot = (world: World, dt: number) => {
 
 // --- Player-issued actions ---------------------------------------------
 
-// Picks the nearest path lane for `pos` and returns its index plus the
-// squared distance from `pos` to the closest point on that lane.
-const nearestPathFor = (
-  world: World,
-  pos: Vec2,
-  fallbackIdx: number,
-): { pathIndex: number; distSq: number } => {
-  let bestIdx = fallbackIdx;
-  let bestD2 = Number.POSITIVE_INFINITY;
-  for (let i = 0; i < world.paths.length; i++) {
-    const proj = projectOnPath(world.paths[i], pos);
-    const d2 = (proj.pos.x - pos.x) ** 2 + (proj.pos.y - pos.y) ** 2;
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      bestIdx = i;
-    }
-  }
-  return { pathIndex: bestIdx, distSq: bestD2 };
-};
-
-// Returns true if `pos` falls within the painted lane of any path. Used
-// by the move-order gate so clicks that land off-road are rejected
-// outright instead of silently snapping the robot to the nearest lane.
-export const isPointOnAnyPath = (world: World, pos: Vec2): boolean => {
-  const { distSq } = nearestPathFor(world, pos, 0);
-  return distSq <= ROBOT_MOVE_ON_PATH_TOLERANCE * ROBOT_MOVE_ON_PATH_TOLERANCE;
-};
-
-// Returns true if the order was accepted. Off-path clicks are rejected
-// — the robot stays put and the caller (store/UI) can surface feedback.
+// Returns true if the order was accepted. Free-roam: any click inside the
+// playfield (plus a small pad past the edge) is taken; the robot walks
+// straight there, cutting across terrain between lanes. The target is
+// clamped to the reachable rect so it always arrives instead of grinding
+// the wall. Clicks well outside the field are rejected so the caller
+// (store/UI) can surface feedback or drop robot command mode.
 export const orderRobotMove = (world: World, pos: Vec2): boolean => {
   const robot = world.robot;
   if (!robot.alive) return false;
-  const { pathIndex, distSq } = nearestPathFor(world, pos, robot.pathIndex);
-  if (distSq > ROBOT_MOVE_ON_PATH_TOLERANCE * ROBOT_MOVE_ON_PATH_TOLERANCE) {
+  const acceptHalfW = MAP_WIDTH / 2 + ROBOT_MOVE_BOUNDS_PAD;
+  const acceptHalfH = MAP_HEIGHT / 2 + ROBOT_MOVE_BOUNDS_PAD;
+  if (pos.x < -acceptHalfW || pos.x > acceptHalfW || pos.y < -acceptHalfH || pos.y > acceptHalfH) {
     return false;
   }
-  robot.moveTarget = { x: pos.x, y: pos.y };
-  // Re-bind to whichever path lane the click landed nearest. Single-path
-  // levels are a no-op; multi-path levels swap lanes on the move order.
-  robot.pathIndex = pathIndex;
+  const reachHalfW = MAP_WIDTH / 2 - ROBOT_RADIUS;
+  const reachHalfH = MAP_HEIGHT / 2 - ROBOT_RADIUS;
+  robot.moveTarget = {
+    x: Math.max(-reachHalfW, Math.min(reachHalfW, pos.x)),
+    y: Math.max(-reachHalfH, Math.min(reachHalfH, pos.y)),
+  };
   return true;
 };
 

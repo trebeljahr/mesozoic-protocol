@@ -1606,11 +1606,9 @@ export const useGame = create<GameStore>((set, get) => ({
   orderRobotMove: (pos) => {
     const s = get();
     if (s.world.status !== "running") return false;
-    // Forward the raw click — simOrderRobotMove projects to the path
-    // each tick and derives a lane-clamped lateral offset, so clicking
-    // near the edge of the painted lane parks the robot on that side.
-    // Returns false if the click landed off-road so callers can play a
-    // rejection cue.
+    // Free-roam: the robot walks straight to any in-field click, cutting
+    // across terrain between lanes. Returns false only when the click
+    // lands well outside the playfield so callers can play a rejection cue.
     return simOrderRobotMove(s.world, pos);
   },
 
