@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_TREE_URLS } from "../biomes";
 import type { Tree } from "../sim/types";
-import { meshXZRadii, TREE_REMOVE_COST, TREE_VARIANTS } from "../sim/world";
+import { meshXZRadii, TREE_REMOVE_COST, TREE_TARGET_HEIGHT, TREE_VARIANTS } from "../sim/world";
 import { useGame } from "../store";
 import { collectMeshSource, type MeshPart } from "./meshSource";
 
@@ -12,6 +12,11 @@ type VariantSource = {
   parts: MeshPart[];
   minY: number;
   xzRadius: number;
+  // Uniform scale that brings this variant's native GLB height to
+  // TREE_TARGET_HEIGHT. Applied on top of the per-instance sapling↔elder
+  // variety so every biome's trees share one real-world height band instead
+  // of inheriting whatever scale the asset pack happened to export at.
+  heightScale: number;
   // Trunk radius from the very bottom slice: keeps single-trunk trees from
   // feeling grabby when their canopy spreads far beyond the stem.
   trunkXzRadius: number;
@@ -47,7 +52,15 @@ const buildVariantSource = (scene: THREE.Object3D): VariantSource | null => {
   const footprintRaw = computeSliceXzRadius(source.parts, source.minY, source.height, 0.22);
   const trunkXzRadius = trunkRaw || xzRadius * 0.16;
   const footprintXzRadius = footprintRaw || trunkXzRadius;
-  return { parts: source.parts, minY: source.minY, xzRadius, trunkXzRadius, footprintXzRadius };
+  const heightScale = TREE_TARGET_HEIGHT / (source.height || TREE_TARGET_HEIGHT);
+  return {
+    parts: source.parts,
+    minY: source.minY,
+    xzRadius,
+    heightScale,
+    trunkXzRadius,
+    footprintXzRadius,
+  };
 };
 
 const treeSelectionRadius = (source: VariantSource | null, scale: number): number => {
@@ -55,7 +68,9 @@ const treeSelectionRadius = (source: VariantSource | null, scale: number): numbe
   const trunk = source.trunkXzRadius || source.xzRadius * 0.18;
   const footprint = Math.max(trunk, source.footprintXzRadius || 0);
   const radius = Math.min(source.xzRadius, Math.max(footprint, trunk * 3));
-  return Math.max(0.22, radius * scale);
+  // Native radii × the same height-normalisation the mesh renders at, so the
+  // hit disc tracks the on-screen silhouette instead of the raw GLB size.
+  return Math.max(0.22, radius * scale * source.heightScale);
 };
 
 const useVariantSources = (urls: string[]): (VariantSource | null)[] => {
@@ -77,7 +92,9 @@ const useVariantSources = (urls: string[]): (VariantSource | null)[] => {
       const src = sources[i];
       if (!src) continue;
       const block = Math.max(src.trunkXzRadius, src.footprintXzRadius) || src.xzRadius;
-      meshXZRadii.set(urls[i], block);
+      // Publish the height-normalised block radius (canPlaceAt multiplies this
+      // by the per-instance tree scale), matching the rendered footprint.
+      meshXZRadii.set(urls[i], block * src.heightScale);
     }
   }, [sources, urls]);
 
@@ -221,9 +238,12 @@ const VariantGroup = ({ bucket, source }: { bucket: Tree[]; source: VariantSourc
       if (!im) continue;
       for (let i = 0; i < bucket.length; i++) {
         const t = bucket[i];
-        dummy.position.set(t.pos.x, -source.minY * t.scale, -t.pos.y);
+        // Height-normalised scale: the per-instance variety rides on top of the
+        // variant's native→TREE_TARGET_HEIGHT factor so trees sit in one band.
+        const eff = t.scale * source.heightScale;
+        dummy.position.set(t.pos.x, -source.minY * eff, -t.pos.y);
         dummy.rotation.set(0, t.rot, 0);
-        dummy.scale.setScalar(t.scale);
+        dummy.scale.setScalar(eff);
         dummy.updateMatrix();
         im.setMatrixAt(i, dummy.matrix);
       }

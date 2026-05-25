@@ -825,17 +825,17 @@ export const BIOME_TREE_URLS: Record<Biome, string[]> = {
   ],
 };
 
-// Per-biome scale multiplier applied to clearable trees at world build time.
-// Wasteland's clearable Tree1–4 are the "dead/skeletal" set (also used as
-// inspiration for the brown-oak and white-birch silhouettes); they read too
-// small at the global 0.5–1.1 range, so wasteland alone gets bumped 1.5x.
-// Lava/alien reuse the same wasteland Tree URLs but stay at 1.0 — those
-// biomes already tune their feel separately.
+// Per-biome size nudge applied to clearable trees at world build time, on top
+// of the per-instance variety. Trees.tsx now height-normalises every variant
+// to TREE_TARGET_HEIGHT, so this no longer has to paper over packs that export
+// small/large — it is purely an intentional "this biome's trees run a touch
+// taller/shorter" knob. All 1.0 = every biome shares the same height band
+// (wasteland used to bump 1.5x only to compensate the tiny native GLBs).
 export const BIOME_TREE_SCALE_MUL: Record<Biome, number> = {
   forest: 1,
   desert: 1,
   snow: 1,
-  wasteland: 1.5,
+  wasteland: 1,
   lava: 1,
   alien: 1,
 };

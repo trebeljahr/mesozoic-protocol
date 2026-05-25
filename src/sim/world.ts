@@ -190,6 +190,24 @@ export const TREE_MIN_SPACING = 2.9;
 export const TREE_FOOTPRINT = 0.85;
 export const TREE_REMOVE_COST = 10;
 
+// ── On-field size anchor (world units ≈ metres) ─────────────────────────────
+// Asset packs export at wildly different native scales (a desert tree GLB is
+// ~1 unit tall, a snow pine ~4), so the old raw per-instance multipliers made
+// trees "all over the place" next to dinos and towers. To keep the field
+// readable every on-field thing is sized off one real-ish anchor of roughly
+// 1 world unit ≈ 3 metres:
+//   • large dinos (allosaur…)   → ~2–3.3 max-dim, i.e. a ~9 m body (Scene.tsx)
+//   • turrets / HQ              → 1.55–1.9 max-dim ≈ a ~5 m emplacement
+//   • clearable obstacle trees  → TREE_TARGET_HEIGHT height (this constant)
+//   • biome-layer scenery       → BiomeLayer.normalizeTo / TARGET_SIZE_BY_ROLE
+// A typical grown tree (TREE_TARGET_HEIGHT × the ~0.8 mean of the per-instance
+// variety) lands a bit above a turret and level with a big dino's head-reach,
+// and a touch taller than the background conifer layers, so dino ≈ tree ≈ tower
+// reads consistently instead of one family dwarfing the rest.
+// Trees.tsx divides this by each variant's measured native height to get the
+// per-variant scale, then applies the per-instance sapling↔elder variety on top.
+export const TREE_TARGET_HEIGHT = 3.0;
+
 // Rock footprint radius (before per-instance scale multiplier).
 export const ROCK_FOOTPRINT = 0.65;
 export const ROCK_MIN_SPACING = 1.85;
