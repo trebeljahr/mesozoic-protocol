@@ -12,6 +12,7 @@
  *   npx tsx scripts/wave-feasibility.ts --no-adapt        # disable adaptive-resistance penalty
  *   npx tsx scripts/wave-feasibility.ts --no-immunity-coverage # skip 0× injection pass
  *   npx tsx scripts/wave-feasibility.ts --soft           # flag easy waves only
+ *   npx tsx scripts/wave-feasibility.ts --difficulty=extinction # model a difficulty's mults
  *
  * For each wave, the tool compares two numbers:
  *
@@ -65,7 +66,13 @@
  */
 
 import { LEVELS, levelHasMode, resolveLevelMode, scaleWaveCounts } from "../src/levels";
-import { LEVEL_MODES, type LevelMode } from "../src/progress";
+import {
+  DIFFICULTY_MULTIPLIERS,
+  type Difficulty,
+  type DifficultyMultipliers,
+  LEVEL_MODES,
+  type LevelMode,
+} from "../src/progress";
 import { availableDamageTypes, ensureImmunityCoverage } from "../src/sim/immunityCoverage";
 import {
   type AllMetaSkills,
@@ -106,6 +113,7 @@ import {
   BOSS_VARIANT_STATS,
   ENEMY_RESIST,
   ENEMY_STATS,
+  lateWaveHpFactor,
   ROBOT_RESPAWN_DELAY,
   TOWER_BUILD_LIMIT,
   TOWER_DAMAGE_TYPE,
@@ -638,15 +646,19 @@ const waveBounty = (spec: WaveSpec, longestPath: number): number =>
 const spawnSpacing = (spec: WaveSpec, waveNumber: number): number =>
   spec.spacing ?? Math.max(0.35, 0.75 - waveNumber * 0.03);
 
-// Combat window: first spawn to last enemy clearing the longest path
+// Combat window: first spawn to last enemy clearing the longest path.
+// speedMul folds in the difficulty speed multiplier — faster enemies cross
+// sooner, shrinking the window and raising requiredDps (a real Extinction
+// pressure the medium-only model used to miss).
 const combatWindow = (
   spec: WaveSpec,
   waveNumber: number,
   wave: WaveBreakdown,
   longestPath: number,
+  speedMul: number,
 ): number => {
   const spawnSpan = Math.max(0, (wave.totalEnemies - 1) * spawnSpacing(spec, waveNumber));
-  const crossTime = longestPath / wave.slowestSpeed;
+  const crossTime = longestPath / (wave.slowestSpeed * speedMul);
   return spawnSpan + crossTime;
 };
 
@@ -737,6 +749,13 @@ type AnalysisOpts = {
   applyImmunityCoverage: boolean;
   /** False to skip the adaptive-resistance dominant-type penalty. */
   applyAdaptivePenalty: boolean;
+  /**
+   * Difficulty multipliers folded into the model exactly as createWorld
+   * does: hp scales totalHp, speed shrinks the combat window, startGold and
+   * goldKill scale the gold budget. Defaults to medium (all identity) so the
+   * historical numbers are unchanged unless --difficulty is passed.
+   */
+  diff: DifficultyMultipliers;
 };
 
 /**
@@ -839,7 +858,9 @@ const bestSetup = (
 const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "normal") => {
   const level = LEVELS[levelIdx];
   const cfg = resolveLevelMode(level, mode);
-  const hpScale = level.hpScale ?? 1;
+  // Fold difficulty HP into the per-level scale, mirroring createWorld's
+  // baseHpScale = (level.hpScale ?? 1) × difficulty.hp.
+  const hpScale = (level.hpScale ?? 1) * opts.diff.hp;
   // Mirror createWorld: widen the roster by countScale before any other
   // pass so totalHp, combat window, bounty, and coverage all see the same
   // stream the live game spawns.
@@ -871,9 +892,16 @@ const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "n
   for (let i = 0; i < waves.length; i++) {
     const spec = waves[i];
     const waveNumber = i + 1;
-    const wave = analyzeWave(spec, hpScale, longestPath);
-    const dur = combatWindow(spec, waveNumber, wave, longestPath);
-    const budget = cfg.startGold + cumulativeBounty + cumulativeBonus;
+    // Per-wave HP ramp mirrors createWorld's lateWaveHpFactor so the
+    // analyzer sees the same back-loaded HP the live game spawns.
+    const wave = analyzeWave(
+      spec,
+      hpScale * lateWaveHpFactor(i, waves.length, opts.diff.lateWaveHpRamp),
+      longestPath,
+    );
+    const dur = combatWindow(spec, waveNumber, wave, longestPath, opts.diff.speed);
+    const budget =
+      Math.floor(cfg.startGold * opts.diff.startGold) + cumulativeBounty + cumulativeBonus;
     const requiredDps = wave.totalHp / dur;
     const robotDps =
       opts.robotVariant !== null
@@ -914,7 +942,9 @@ const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "n
       top3: top,
     });
 
-    cumulativeBounty += waveBounty(spec, longestPath);
+    // Kill bounties scale with difficulty.goldKill (world.ts:1761); the
+    // flat per-wave income bonus does not.
+    cumulativeBounty += waveBounty(spec, longestPath) * opts.diff.goldKill;
     cumulativeBonus += 5 + waveNumber;
   }
 
@@ -985,6 +1015,7 @@ const printLevel = (
       `${level.hpScale ? ` ${C.dim}(hpScale ${level.hpScale}×)${C.reset}` : ""}` +
       `${level.countScale ? ` ${C.dim}(countScale ${level.countScale}×)${C.reset}` : ""}` +
       ` ${C.dim}startGold=${cfg.startGold}, paths=${level.paths.length}, longestPath=${fmt(longestPath, 1)}u, ` +
+      `diff=${difficulty}(hp${opts.diff.hp}×,spd${opts.diff.speed}×), ` +
       `robot=${robotLabel}, towerStars=${towerStarBudget}, base=${baseLabel}, ${adaptLabel}, ${immunityLabel}${C.reset}`,
   );
   console.log(
@@ -1154,6 +1185,17 @@ const ratioArg = args.find((a: string) => a.startsWith("--ratio="));
 const starsArg = args.find((a: string) => a.startsWith("--stars="));
 const robotSkillsArg = args.find((a: string) => a.startsWith("--robot-skills="));
 const robotArg = args.find((a: string) => a.startsWith("--robot="));
+// --difficulty=easy|medium|hard|extinction — folds the real DIFFICULTY_MULTIPLIERS
+// into the model. Default medium = identity, so omitting it reproduces the
+// historical medium-only numbers exactly.
+const difficultyArg = args.find((a: string) => a.startsWith("--difficulty="));
+const parseDifficulty = (value: string | undefined): Difficulty => {
+  const v = value ?? "medium";
+  if (v === "easy" || v === "medium" || v === "hard" || v === "extinction") return v;
+  console.error(`--difficulty must be one of: easy, medium, hard, extinction (got "${v}")`);
+  process.exit(1);
+};
+const difficulty = parseDifficulty(difficultyArg?.split("=")[1]);
 // --mode=normal|heroic|iron|all — pick which modes the report iterates.
 // Default is "all" so authors get feasibility for every defined variant
 // in one pass, with normal always shown first per level.
@@ -1186,6 +1228,7 @@ const baseOpts: AnalysisOpts = {
   searchBaseUpgrades: !noBaseUpgrades,
   applyImmunityCoverage: !noImmunity,
   applyAdaptivePenalty: !noAdapt,
+  diff: DIFFICULTY_MULTIPLIERS[difficulty],
 };
 
 if (softMode) {

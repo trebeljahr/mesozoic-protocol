@@ -57,15 +57,55 @@ export type DifficultyMultipliers = {
   // (harder); >1 = sparser drip (easier). The trickle gives the player
   // gold-generating targets while the matriarch lumbers in.
   bossTrickleIntervalMul: number;
+  // HP escalation across a level, indexed by the wave's POSITION: the first
+  // wave is unchanged and the final wave gets (1 + lateWaveHpRamp)× HP, with
+  // waves in between interpolated linearly (see lateWaveHpFactor in
+  // world.ts). 0 = flat HP across the level (legacy behaviour). The flat
+  // curve let a fully-upgraded board trivialize the back half of every level
+  // — accumulated gold outpaced the static roster, so feasibility ballooned
+  // from ~4× on wave 1 to 20–40× by wave 10. This ramp keeps the late waves
+  // threatening without turning early waves into sponges. Position-relative
+  // so long late-campaign levels (20 waves) don't get over-tanked mid-list.
+  // Currently non-zero only on extinction (the tier this targets); 0
+  // elsewhere preserves existing balance and the fresh-save clear guarantee.
+  lateWaveHpRamp: number;
 };
 
 export const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard", "extinction"];
 
 export const DIFFICULTY_MULTIPLIERS: Record<Difficulty, DifficultyMultipliers> = {
-  easy: { hp: 0.7, startGold: 1.3, goldKill: 1.2, speed: 1.0, bossTrickleIntervalMul: 1.5 },
-  medium: { hp: 1.0, startGold: 1.0, goldKill: 1.0, speed: 1.0, bossTrickleIntervalMul: 1.15 },
-  hard: { hp: 1.4, startGold: 0.9, goldKill: 0.95, speed: 1.0, bossTrickleIntervalMul: 0.85 },
-  extinction: { hp: 1.8, startGold: 0.85, goldKill: 0.85, speed: 1.2, bossTrickleIntervalMul: 0.7 },
+  easy: {
+    hp: 0.7,
+    startGold: 1.3,
+    goldKill: 1.2,
+    speed: 1.0,
+    bossTrickleIntervalMul: 1.5,
+    lateWaveHpRamp: 0,
+  },
+  medium: {
+    hp: 1.0,
+    startGold: 1.0,
+    goldKill: 1.0,
+    speed: 1.0,
+    bossTrickleIntervalMul: 1.15,
+    lateWaveHpRamp: 0,
+  },
+  hard: {
+    hp: 1.4,
+    startGold: 0.9,
+    goldKill: 0.95,
+    speed: 1.0,
+    bossTrickleIntervalMul: 0.85,
+    lateWaveHpRamp: 0,
+  },
+  extinction: {
+    hp: 1.8,
+    startGold: 0.8,
+    goldKill: 0.7,
+    speed: 1.2,
+    bossTrickleIntervalMul: 0.7,
+    lateWaveHpRamp: 1.0,
+  },
 };
 
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = enModes.difficulty.label;

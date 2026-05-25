@@ -375,7 +375,15 @@ const trickleStream = (
 // feasibility script measured 26–58× headroom vs the game's own ~9× endgame
 // band), so gold never had to be spent, especially on Extinction. These
 // scales pull L1–14 down to ~10× — tight on Extinction, still clearable for
-// a fresh save on Easy/Medium. See scripts/wave-feasibility.ts to re-check.
+// a fresh save on Easy/Medium. See scripts/wave-feasibility.ts to re-check
+// (pass --difficulty=extinction to model the hardest tier).
+//
+// Note: these per-level static scales are difficulty-agnostic. Extinction
+// gets two further layers on top, in DIFFICULTY_MULTIPLIERS (src/progress.ts):
+// a tighter gold economy that self-targets the gold-rich early levels, and a
+// per-wave HP ramp (lateWaveHpFactor) that keeps the BACK half of every level
+// threatening once the board is fully upgraded — the static hpScale alone is
+// flat across a level, so accumulated gold used to make late waves trivial.
 export const LEVELS: LevelConfig[] = [
   {
     id: 1,

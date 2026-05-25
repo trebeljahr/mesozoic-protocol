@@ -84,6 +84,21 @@ export const BASE_RANGE = 4.8;
 export const BASE_DAMAGE = 8;
 export const BASE_FIRE_RATE = 1.0;
 
+// Per-wave HP multiplier within a level, ramped by the wave's POSITION in
+// the level (not its absolute index): the first wave is unchanged and the
+// final wave is scaled by (1 + rampMax). Folded into hpMul at world creation
+// alongside difficulty.hp so the back half of a level stays threatening once
+// the player's board is fully upgraded. Position-relative on purpose — a
+// 20-wave level's wave 8 is still early and must not inherit a 10-wave
+// level's wave-8 (near-end) escalation, which would over-tank long late
+// campaign levels. `rampMax` comes from DifficultyMultipliers.lateWaveHpRamp
+// (0 on easy/medium). Exported so the feasibility analyzer applies the same
+// curve.
+export const lateWaveHpFactor = (waveIndex: number, waveCount: number, rampMax: number): number => {
+  if (rampMax === 0 || waveCount <= 1) return 1;
+  return 1 + rampMax * (waveIndex / (waveCount - 1));
+};
+
 // Robot unit — single controllable mecha that walks the field, auto-shoots
 // dinos in range, and fires three activated abilities. Stats now ship
 // from robotVariants.ROBOT_SPECS so per-mech balance lives there; this
@@ -729,10 +744,18 @@ export const createWorld = (
   // Roster-density scaling runs first so the immunity-coverage injection
   // below sees the widened stream, then HP scaling bakes into hpMul.
   const modeWaves = scaleWaveCounts(modeConfig.waves, level.countScale ?? 1);
+  // Per-wave HP = baseHpScale × lateWaveHpFactor(waveIndex). The ramp keeps
+  // the back half of the level tense once the board is maxed; on
+  // easy/medium ramp=0 so this collapses to the flat baseHpScale curve.
+  const ramp = difficulty.lateWaveHpRamp;
+  const waveCount = modeWaves.length;
   const scaledWaves =
-    baseHpScale === 1
+    baseHpScale === 1 && ramp === 0
       ? modeWaves
-      : modeWaves.map((w) => ({ ...w, hpMul: (w.hpMul ?? 1) * baseHpScale }));
+      : modeWaves.map((w, i) => ({
+          ...w,
+          hpMul: (w.hpMul ?? 1) * baseHpScale * lateWaveHpFactor(i, waveCount, ramp),
+        }));
   const modeForbidden = new Set<TowerKind>(modeConfig.forbiddenTowers ?? []);
   const modeLocked = modeConfig.lockedLoadout ?? null;
   const plannedWaves = ensureImmunityCoverage(
