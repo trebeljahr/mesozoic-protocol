@@ -45,9 +45,9 @@ const ROBOT_REGEN_PER_SEC = 38;
 // Look-ahead steering — distance the robot "sees" ahead of their motion
 // for trees/rocks/towers. Anything inside the lateral clearance band
 // applies a sideways nudge so the robot arcs around it instead of
-// hitting + sliding off via resolveOverlap. Mostly redundant now that
-// move orders are path-bound, but kept as a safety net for dash
-// overshoot and forced re-pathing.
+// hitting + sliding off via resolveOverlap. Primary obstacle avoidance
+// now that move orders are free-roam straight-line across terrain;
+// resolveOverlap + the map clamp are the hard backstop.
 const ROBOT_AVOID_LOOKAHEAD = 2.6;
 const ROBOT_AVOID_CLEARANCE = 0.25;
 const ROBOT_AVOID_STRENGTH = 2.4;
