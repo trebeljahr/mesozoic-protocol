@@ -473,8 +473,7 @@
     "supportTitle": "Support tower — boosts other towers' fire rate",
     "dronesBuff": "Drones {{drones}} · Buff +{{buff}}%/drone",
     "hiveBlurb": "Each drone adds <hl>+{{pct}}% fire rate</hl> to its assigned tower. Up to {{max}} drones can stack on one tower. Click \"Pick\" on a slot, then click a tower on the map to assign.",
-    "info": "Info",
-    "statsResist": "stats + resist",
+    "matchups": "Matchups",
     "vs": "vs {{enemy}}: {{mul}}×",
     "target": "Target",
     "targeting": {

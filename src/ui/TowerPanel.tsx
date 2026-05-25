@@ -141,11 +141,9 @@ export const TowerPanel = () => {
               {dmgLabel}
             </span>
           </div>
-          {!isMobile && (
-            <div className="panel-stats">
-              <TowerStatsText tower={tower} />
-            </div>
-          )}
+          <div className="panel-stats">
+            <TowerStatsText tower={tower} />
+          </div>
         </div>
         <button
           type="button"
@@ -165,15 +163,11 @@ export const TowerPanel = () => {
             aria-expanded={infoOpen}
             onClick={() => setInfoOpen((open) => !open)}
           >
-            <span>{t("towerPanel.info")}</span>
-            <span className="mobile-fold-status">{t("towerPanel.statsResist")}</span>
+            <span>{t("towerPanel.matchups")}</span>
             <span className="mobile-fold-toggle" aria-hidden />
           </button>
           {infoOpen && (
             <div className="mobile-fold-body">
-              <div className="panel-stats panel-stats-mobile">
-                <TowerStatsText tower={tower} />
-              </div>
               <ResistRow damageType={damageType} />
             </div>
           )}

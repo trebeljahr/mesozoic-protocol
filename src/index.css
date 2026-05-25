@@ -820,7 +820,7 @@
     flex-shrink: 0;
   }
   .tower-info-fold.open {
-    min-height: 260px;
+    min-height: 200px;
   }
   .targeting-fold.open {
     min-height: 180px;
@@ -3392,10 +3392,6 @@
     }
     .panel-stats {
       font-size: var(--fs-xs);
-    }
-    .panel-stats-mobile {
-      margin: 0 0 10px;
-      line-height: 1.45;
     }
     .tower-panel .resist-row {
       grid-template-columns: repeat(2, minmax(0, 1fr));

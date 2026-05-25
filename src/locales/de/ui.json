@@ -473,8 +473,7 @@
     "supportTitle": "Supportturm — erhöht die Feuerrate anderer Türme",
     "dronesBuff": "Drohnen {{drones}} · Buff +{{buff}}%/Drohne",
     "hiveBlurb": "Jede Drohne gibt ihrem zugewiesenen Turm <hl>+{{pct}}% Feuerrate</hl>. Bis zu {{max}} Drohnen können sich auf einem Turm stapeln. Auf einem Slot „Pick“ klicken, dann einen Turm auf der Karte anklicken, um ihn zuzuweisen.",
-    "info": "Info",
-    "statsResist": "Werte + Resistenz",
+    "matchups": "Resistenzen",
     "vs": "vs {{enemy}}: {{mul}}×",
     "target": "Ziel",
     "targeting": {
