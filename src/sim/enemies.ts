@@ -20,11 +20,13 @@ const LEAK_TRIGGER_MAX_DISTANCE = 0.75;
 
 // Heavy kinds that thud as they walk. `stride` = world units between
 // footfalls (longer = sparser steps); `weight` 0..1 scales the synth's depth
-// and loudness. Scoped to the slow giants — titan and the matriarch bosses.
-// Every other kind is omitted: lighter/faster dinos' patter just clutters.
+// and loudness. Distance-based so cryo slow/freeze thins the steps in lockstep
+// with the slowed walk. The matriarch (`boss`) is intentionally absent: her
+// footsteps are phase-locked to the actual walk clip in the render layer
+// (BOSS_VARIANT_FOOTSTEP) so each variant's thuds land on her own foot plants
+// instead of a shared fixed stride. Lighter/faster kinds are omitted entirely.
 const FOOTSTEP_PROFILE: Partial<Record<EnemyKind, { stride: number; weight: number }>> = {
   titan: { stride: 1.2, weight: 1.0 },
-  boss: { stride: 1.1, weight: 0.9 },
 };
 const remainingPathDistance = (path: Vec2[], segment: number, segmentT: number): number => {
   if (path.length < 2) return 0;

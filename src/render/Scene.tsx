@@ -1,6 +1,7 @@
 import { Environment } from "@react-three/drei";
 import { BIOME_STYLE } from "../biomes";
 import { MAP_HEIGHT } from "../level";
+import { BOSS_VARIANT_MODEL } from "../sim/world";
 import { useGame } from "../store";
 import { BiomeAmbientVfx } from "./BiomeAmbientVfx";
 import { BiomeCosmetics } from "./BiomeCosmetics";
@@ -100,13 +101,14 @@ export const PlayScene = () => {
         url="/models/Apatosaurus.glb"
         targetSize={27.0}
         clip="Walk"
+        timeScale={BOSS_VARIANT_MODEL.apex.timeScale}
       />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="raptor"
         url="/models/Velociraptor.glb"
         targetSize={9.6}
-        timeScale={0.62}
+        timeScale={BOSS_VARIANT_MODEL.raptor.timeScale}
       />
       <ModelEnemyMesh
         kind="boss"
@@ -114,20 +116,29 @@ export const PlayScene = () => {
         url="/models/Stegosaurus.glb"
         targetSize={7.5}
         clip="Walk"
+        timeScale={BOSS_VARIANT_MODEL.stego.timeScale}
       />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="para"
         url="/models/Parasaurolophus.glb"
         targetSize={6.9}
+        timeScale={BOSS_VARIANT_MODEL.para.timeScale}
       />
-      <ModelEnemyMesh kind="boss" bossVariant="allosaur" url="/models/Trex.glb" targetSize={8.25} />
+      <ModelEnemyMesh
+        kind="boss"
+        bossVariant="allosaur"
+        url="/models/Trex.glb"
+        targetSize={8.25}
+        timeScale={BOSS_VARIANT_MODEL.allosaur.timeScale}
+      />
       <ModelEnemyMesh
         kind="boss"
         bossVariant="armored"
         url="/models/Triceratops.glb"
         targetSize={8.1}
         clip="Walk"
+        timeScale={BOSS_VARIANT_MODEL.armored.timeScale}
       />
 
       <ModelTowerMesh kind="pulse" url="/models/tower_pulse.glb" targetSize={1.6} />

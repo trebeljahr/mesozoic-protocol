@@ -1484,16 +1484,37 @@ export const BOSS_VARIANT_SLOW_RESIST: Record<BossVariant, number> = {
   apex: 0.6,
 };
 
+// `timeScale` slows the walk clip so each queen reads as a towering giant
+// instead of scurrying — the slow movers (stego/armored/apex) animated at
+// 1.0 looked frantic. Single source for the gameplay mesh (Scene.tsx) AND
+// the compendium preview (EnemyPreview), so animation speed can't drift
+// between the two. Footsteps phase-lock to whatever this resolves to.
 export const BOSS_VARIANT_MODEL: Record<
   BossVariant,
   { url: string; targetSize: number; clip?: string; timeScale?: number }
 > = {
   raptor: { url: "/models/Velociraptor.glb", targetSize: 9.0, timeScale: 0.62 },
-  stego: { url: "/models/Stegosaurus.glb", targetSize: 7.2 },
-  para: { url: "/models/Parasaurolophus.glb", targetSize: 10.0 },
-  allosaur: { url: "/models/Trex.glb", targetSize: 6.4 },
-  armored: { url: "/models/Triceratops.glb", targetSize: 6.3 },
-  apex: { url: "/models/Apatosaurus.glb", targetSize: 20.0, clip: "Walk" },
+  stego: { url: "/models/Stegosaurus.glb", targetSize: 7.2, timeScale: 0.5 },
+  para: { url: "/models/Parasaurolophus.glb", targetSize: 10.0, timeScale: 0.7 },
+  allosaur: { url: "/models/Trex.glb", targetSize: 6.4, timeScale: 0.55 },
+  armored: { url: "/models/Triceratops.glb", targetSize: 6.3, timeScale: 0.5 },
+  apex: { url: "/models/Apatosaurus.glb", targetSize: 20.0, clip: "Walk", timeScale: 0.45 },
+};
+
+// Per-variant footstep cadence, phase-locked to the walk clip. `phases` are
+// normalized positions in the walk loop [0,1) where a foot plants; the
+// render layer reads the live mixer time and thuds as playback crosses each
+// one, so steps stay synced to THAT matriarch's animation and slow/speed in
+// lockstep with timeScale + cryo (no fixed wall-clock interval). Biped queens
+// plant twice per cycle, quadrupeds four times. `weight` scales the synth's
+// depth/loudness — heavier giant = deeper, louder thud.
+export const BOSS_VARIANT_FOOTSTEP: Record<BossVariant, { phases: number[]; weight: number }> = {
+  raptor: { phases: [0.0, 0.5], weight: 0.8 },
+  stego: { phases: [0.0, 0.25, 0.5, 0.75], weight: 0.95 },
+  para: { phases: [0.0, 0.5], weight: 0.85 },
+  allosaur: { phases: [0.0, 0.5], weight: 0.95 },
+  armored: { phases: [0.0, 0.25, 0.5, 0.75], weight: 1.0 },
+  apex: { phases: [0.0, 0.25, 0.5, 0.75], weight: 1.0 },
 };
 
 // Per-variant body tint. Applied permanently to matriarch meshes so

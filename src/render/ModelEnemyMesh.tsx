@@ -3,6 +3,7 @@ import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { audio } from "../audio/AudioManager";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { smoothDirection } from "../sim/path";
 import type { BossVariant, DamageType, EnemyKind, World } from "../sim/types";
@@ -10,6 +11,7 @@ import { clamp01 } from "../sim/vec2";
 import {
   ADAPTIVE_EMISSIVE_BY_TYPE,
   ADAPTIVE_TINT_BY_TYPE,
+  BOSS_VARIANT_FOOTSTEP,
   BOSS_VARIANT_MATERIAL,
   BOSS_VARIANT_TINT,
 } from "../sim/world";
@@ -62,6 +64,10 @@ type Item = {
   dyingDuration: number;
   dyingBaseRotX: number;
   dyingBaseY: number;
+  // Normalized walk-clip phase [0,1) sampled last frame, for matriarch
+  // footstep crossing detection. -1 = unprimed (don't emit until the next
+  // frame seeds a baseline, so a clip (re)start can't burst a step).
+  lastStepPhase: number;
 };
 
 // Exp-damp half-life (seconds). Lower = snappier, higher = floatier.
@@ -107,6 +113,7 @@ export const ModelEnemyMesh = ({
     [bossVariant],
   );
   const matriarchMaterial = bossVariant !== undefined ? BOSS_VARIANT_MATERIAL[bossVariant] : null;
+  const footstepProfile = bossVariant !== undefined ? BOSS_VARIANT_FOOTSTEP[bossVariant] : null;
   // Adaptive-resistance tint palette — one stable THREE.Color per damage
   // type so the per-frame body lerp doesn't allocate. Built once and
   // shared by every enemy in this mesh; the per-enemy snapshot
@@ -314,6 +321,7 @@ export const ModelEnemyMesh = ({
           recycled.dyingDuration = 0;
           recycled.dyingBaseRotX = 0;
           recycled.dyingBaseY = 0;
+          recycled.lastStepPhase = -1;
           recycled.obj.rotation.x = 0;
           recycled.obj.rotation.z = 0;
           item = recycled;
@@ -383,6 +391,7 @@ export const ModelEnemyMesh = ({
             dyingDuration: 0,
             dyingBaseRotX: 0,
             dyingBaseY: 0,
+            lastStepPhase: -1,
           };
         }
         itemsRef.current.set(e.id, item);
@@ -409,6 +418,29 @@ export const ModelEnemyMesh = ({
       const slowed = world.time < e.slowUntil;
       item.mixer.timeScale = (leak && !attackClip ? 0.45 : slowed ? e.slowFactor : 1) * timeScale;
       if (!frozen) item.mixer.update(delta);
+
+      // Matriarch footsteps — phase-locked to the live walk clip so each
+      // queen's thuds land on HER foot plants and slow/speed in lockstep with
+      // timeScale + cryo. Only fires while the walk clip is the one actually
+      // playing (not mid-bite/leak) and the sim is live; otherwise the phase
+      // is unprimed so resuming doesn't burst a step.
+      if (footstepProfile && !frozen && activeClip?.duration && item.clip === activeClip) {
+        const phase =
+          (item.mixer.clipAction(activeClip).time % activeClip.duration) / activeClip.duration;
+        const prev = item.lastStepPhase;
+        if (prev >= 0) {
+          for (const p of footstepProfile.phases) {
+            const crossed = prev <= phase ? p > prev && p <= phase : p > prev || p <= phase;
+            if (crossed) {
+              audio.playFootstep("dino", footstepProfile.weight);
+              break;
+            }
+          }
+        }
+        item.lastStepPhase = phase;
+      } else if (footstepProfile) {
+        item.lastStepPhase = -1;
+      }
 
       const path = world.paths[e.pathIndex] ?? world.paths[0];
       const dir = smoothDirection(path, e.segment, e.segmentT);
