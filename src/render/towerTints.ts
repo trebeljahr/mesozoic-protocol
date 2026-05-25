@@ -136,16 +136,35 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
     }
 
     case "mortar": {
-      // Payload (A) drifts warmer/amber (more explosive), Breach (B)
-      // darkens for a heavier-shell read.
+      // Mirrors the Flamethrower's warm palette + per-tier scheme, adapted
+      // to the mortar's single atlas material (the Missile Turret GLB is one
+      // baked PaletteMaterial001, not the flame's three untextured panels).
+      // Payload (A) drives the body from stock toward a vivid orange→deep
+      // red (more explosive payload) — the flame gets that vividness from a
+      // baseColor replace on its red panel, but multiplying it onto a baked
+      // atlas only muddies it, so (exactly like pulse/chain) a warm emissive
+      // ramp supplies the orange→red the multiply can't reach. Breach (B)
+      // darkens the shell toward a heavy near-black read (mirrors the flame
+      // nozzle's gray→black) and attenuates the warm glow so heavy-breach
+      // mortars read dark and weighty.
       const payloadHue: [number, number, number] = [
         [1.0, 1.0, 1.0],
-        [1.0, 0.88, 0.74],
-        [1.0, 0.74, 0.55],
-        [1.0, 0.62, 0.42],
+        [1.0, 0.78, 0.5],
+        [1.0, 0.6, 0.28],
+        [1.0, 0.44, 0.14],
+      ][a] as [number, number, number];
+      const warmGlow: [number, number, number] = [
+        [0, 0, 0],
+        [0.3, 0.12, 0.02],
+        [0.5, 0.13, 0.015],
+        [0.7, 0.1, 0.01],
       ][a] as [number, number, number];
       const breachLum = [1.0, 0.85, 0.72, 0.6][b];
-      return atlas(payloadHue, breachLum, "PaletteMaterial001");
+      return atlas(payloadHue, breachLum, "PaletteMaterial001", [
+        warmGlow[0] * breachLum,
+        warmGlow[1] * breachLum,
+        warmGlow[2] * breachLum,
+      ]);
     }
 
     case "cryo": {
