@@ -1,4 +1,4 @@
-import type { ThreeEvent } from "@react-three/fiber";
+import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
@@ -28,6 +28,10 @@ export const WorldMapEditorProps = () => {
   const placingUrl = useWorldMapEditor((s) => s.placingUrl);
   const selectedId = useWorldMapEditor((s) => s.selectedId);
   const props = useWorldMapEditor((s) => s.props);
+  const brushActive = useWorldMapEditor((s) => s.brush.active);
+  const brushPresetId = useWorldMapEditor((s) => s.brush.presetId);
+  const brushRadius = useWorldMapEditor((s) => s.brush.radius);
+  const brushMode = brushActive && brushPresetId !== null;
   void version;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version drives the refresh
@@ -55,10 +59,10 @@ export const WorldMapEditorProps = () => {
         />
       ))}
 
-      {active && <EditorGroundPlane />}
-      {active && !placingUrl && <PropHitTargets props={props} version={version} />}
+      {active && <EditorGroundPlane brushMode={brushMode} brushRadius={brushRadius} />}
+      {active && !placingUrl && !brushMode && <PropHitTargets props={props} version={version} />}
 
-      {active && selected && (
+      {active && !brushMode && selected && (
         <group position={[selected.pos.x, 0.1, -selected.pos.y]}>
           <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={20}>
             <ringGeometry
@@ -89,18 +93,69 @@ export const WorldMapEditorProps = () => {
 // handlers below never fire while editing.
 const PLANE_PAD = 12;
 
-const EditorGroundPlane = () => {
+const PAINT_INTERVAL_MS = 80;
+
+const EditorGroundPlane = ({
+  brushMode,
+  brushRadius,
+}: {
+  brushMode: boolean;
+  brushRadius: number;
+}) => {
   const geom = useMemo(
     () => new THREE.PlaneGeometry(PAN_LIMIT_X * 2 + PLANE_PAD * 2, PAN_LIMIT_Z * 2 + PLANE_PAD * 2),
     [],
   );
   useEffect(() => () => geom.dispose(), [geom]);
 
+  const planeRef = useRef<THREE.Mesh | null>(null);
+  const ringRef = useRef<THREE.Mesh | null>(null);
+  const isDownRef = useRef(false);
+  const lastPaintRef = useRef(0);
+
+  const ringGeom = useMemo(
+    () => new THREE.RingGeometry(brushRadius - 0.06, brushRadius + 0.06, 64),
+    [brushRadius],
+  );
+  useEffect(() => () => ringGeom.dispose(), [ringGeom]);
+
+  useEffect(() => {
+    if (!brushMode) return;
+    const onUp = () => {
+      if (isDownRef.current) {
+        useWorldMapEditor.getState().endStroke();
+        isDownRef.current = false;
+      }
+    };
+    window.addEventListener("pointerup", onUp);
+    return () => window.removeEventListener("pointerup", onUp);
+  }, [brushMode]);
+
+  useFrame((state) => {
+    const ring = ringRef.current;
+    const plane = planeRef.current;
+    if (!ring) return;
+    if (!brushMode || !plane) {
+      ring.visible = false;
+      return;
+    }
+    state.raycaster.setFromCamera(state.pointer, state.camera);
+    const hits = state.raycaster.intersectObject(plane, false);
+    if (hits.length === 0) {
+      ring.visible = false;
+      return;
+    }
+    const p = hits[0].point;
+    ring.position.set(p.x, 0.11, p.z);
+    ring.visible = true;
+  });
+
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    const ed = useWorldMapEditor.getState();
+    if (ed.brush.active && ed.brush.presetId) return;
     const x = e.point.x;
     const y = -e.point.z;
-    const ed = useWorldMapEditor.getState();
     if (ed.moving && ed.selectedId !== null) {
       ed.moveSelectedTo(x, y);
     } else if (ed.placingUrl) {
@@ -110,17 +165,73 @@ const EditorGroundPlane = () => {
     }
   };
 
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    if (!brushMode) return;
+    const ed = useWorldMapEditor.getState();
+    ed.beginStroke();
+    ed.paintAt(e.point.x, -e.point.z);
+    isDownRef.current = true;
+    lastPaintRef.current = performance.now();
+    const t = e.target as Element | null;
+    if (t && "setPointerCapture" in t) {
+      try {
+        (t as Element & { setPointerCapture: (id: number) => void }).setPointerCapture(e.pointerId);
+      } catch {
+        // Best-effort capture; window-level pointerup still closes stroke.
+      }
+    }
+  };
+
+  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    if (!brushMode || !isDownRef.current) return;
+    const now = performance.now();
+    if (now - lastPaintRef.current < PAINT_INTERVAL_MS) return;
+    lastPaintRef.current = now;
+    useWorldMapEditor.getState().paintAt(e.point.x, -e.point.z);
+  };
+
+  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    if (!brushMode) return;
+    if (isDownRef.current) {
+      useWorldMapEditor.getState().endStroke();
+      isDownRef.current = false;
+    }
+  };
+
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: r3f canvas mesh, not a DOM element
-    <mesh
-      geometry={geom}
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0.05, 0]}
-      visible={false}
-      onClick={onClick}
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerUp={(e) => e.stopPropagation()}
-    />
+    <group>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: r3f canvas mesh, not a DOM element */}
+      <mesh
+        ref={planeRef}
+        geometry={geom}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.05, 0]}
+        visible={false}
+        onClick={onClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      />
+      <mesh
+        ref={ringRef}
+        geometry={ringGeom}
+        rotation={[-Math.PI / 2, 0, 0]}
+        visible={false}
+        renderOrder={21}
+        raycast={noRaycast}
+      >
+        <meshBasicMaterial
+          color="#6aa9ff"
+          transparent
+          opacity={0.85}
+          side={THREE.DoubleSide}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
   );
 };
 

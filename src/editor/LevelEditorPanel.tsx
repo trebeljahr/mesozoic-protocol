@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PropRole } from "../biomes";
 import { useGame } from "../store";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
+import { BUILTIN_BRUSH_PRESETS } from "./brush";
 import { useEditor } from "./editorStore";
 
 // Dev-only level-editor UI. Floating toggle + a side panel: asset palette
@@ -78,6 +79,7 @@ export const LevelEditorPanel = () => {
   const placingUrl = useEditor((s) => s.placingUrl);
   const selectedId = useEditor((s) => s.selectedId);
   const moving = useEditor((s) => s.moving);
+  const brush = useEditor((s) => s.brush);
   const toggleActive = useEditor((s) => s.toggleActive);
   // Subscribe to history so Undo/Redo button enabled state refreshes on push.
   const history = useEditor((s) => s.history);
@@ -205,7 +207,13 @@ export const LevelEditorPanel = () => {
         <span style={{ color: "#8b93a3" }}>(reloads)</span>
       </label>
 
-      {selected ? (
+      <BrushSection brush={brush} />
+
+      {brush.active ? (
+        <div style={{ color: "#8b93a3" }}>
+          Brush active — click-drag the map to scatter. Tap the preset again to disarm.
+        </div>
+      ) : selected ? (
         <div
           style={{
             display: "flex",
@@ -297,10 +305,20 @@ export const LevelEditorPanel = () => {
           border: "1px solid #3a4150",
           background: "#11151d",
           color: "#e6e9ef",
+          opacity: brush.active ? 0.5 : 1,
         }}
       />
 
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          opacity: brush.active ? 0.5 : 1,
+        }}
+      >
         {filtered.map(([role, items]) => (
           <div key={role}>
             <div
@@ -354,6 +372,108 @@ export const LevelEditorPanel = () => {
             Clear
           </button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Brush palette: preset buttons + radius/density/min-spacing sliders. Active
+// preset is highlighted; tapping it again disarms brush mode. Shared layout
+// with WorldMapEditorPanel — re-declared per panel to keep each editor's
+// store binding explicit at the call site.
+type BrushSnapshot = {
+  active: boolean;
+  presetId: string | null;
+  radius: number;
+  density: number;
+  minSpacing: number;
+};
+
+const sliderRow: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "70px 1fr 36px",
+  alignItems: "center",
+  gap: 6,
+};
+
+const BrushSection = ({ brush }: { brush: BrushSnapshot }) => {
+  const setBrushPreset = useEditor((s) => s.setBrushPreset);
+  const setBrushParams = useEditor((s) => s.setBrushParams);
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: 8,
+        background: brush.active ? "#142036" : "#11151d",
+        border: `1px solid ${brush.active ? "#3a6aa0" : "#2a313d"}`,
+        borderRadius: 6,
+      }}
+    >
+      <div
+        style={{
+          color: "#8b93a3",
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          fontSize: 10,
+        }}
+      >
+        Brush
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {BUILTIN_BRUSH_PRESETS.map((p) => {
+          const empty = p.urls.length === 0;
+          const on = brush.active && brush.presetId === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              title={empty ? `${p.label} (no assets)` : `${p.label} · ${p.urls.length} variants`}
+              disabled={empty}
+              style={{ ...btn(on), opacity: empty ? 0.4 : 1 }}
+              onClick={() => setBrushPreset(p.id)}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={sliderRow}>
+        <span style={{ color: "#8b93a3" }}>Radius</span>
+        <input
+          type="range"
+          min={1}
+          max={12}
+          step={0.5}
+          value={brush.radius}
+          onChange={(e) => setBrushParams({ radius: Number(e.target.value) })}
+        />
+        <span>{brush.radius.toFixed(1)}</span>
+      </div>
+      <div style={sliderRow}>
+        <span style={{ color: "#8b93a3" }}>Density</span>
+        <input
+          type="range"
+          min={1}
+          max={30}
+          step={1}
+          value={brush.density}
+          onChange={(e) => setBrushParams({ density: Number(e.target.value) })}
+        />
+        <span>{brush.density}</span>
+      </div>
+      <div style={sliderRow}>
+        <span style={{ color: "#8b93a3" }}>Spacing</span>
+        <input
+          type="range"
+          min={0.3}
+          max={3}
+          step={0.1}
+          value={brush.minSpacing}
+          onChange={(e) => setBrushParams({ minSpacing: Number(e.target.value) })}
+        />
+        <span>{brush.minSpacing.toFixed(1)}</span>
       </div>
     </div>
   );

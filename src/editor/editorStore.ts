@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
 import type { PlacedProp } from "../sim/types";
 import { useGame } from "../store";
+import { getBrushPreset, pickWeighted, randRange, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
   canUndo as canUndoH,
@@ -70,6 +71,14 @@ const reloadLevel = (): void => {
   if (endlessMapId) g.startEndless(endlessMapId);
 };
 
+type BrushState = {
+  active: boolean;
+  presetId: string | null;
+  radius: number;
+  density: number;
+  minSpacing: number;
+};
+
 type EditorState = {
   active: boolean;
   // Asset url armed for placement — each map click drops one. null = select mode.
@@ -77,6 +86,14 @@ type EditorState = {
   selectedId: string | null;
   // When true the next map click relocates the selected prop.
   moving: boolean;
+  brush: BrushState;
+  // Stroke gate so a click-drag scatter stroke produces a single undo entry.
+  // strokeAnchor is captured pre-stroke and pushed onto the undo stack on the
+  // first paintAt that actually places props; subsequent paints during the
+  // same stroke skip the history push.
+  strokeAnchor: Snapshot | null;
+  strokeOpen: boolean;
+  strokePushed: boolean;
   history: History;
   toggleActive: () => void;
   setPlacing: (url: string | null) => void;
@@ -90,11 +107,24 @@ type EditorState = {
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
   clearLevel: () => void;
+  setBrushPreset: (id: string | null) => void;
+  setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
+  beginStroke: () => void;
+  paintAt: (x: number, y: number) => void;
+  endStroke: () => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
   exportJson: () => string;
+};
+
+const DEFAULT_BRUSH: BrushState = {
+  active: false,
+  presetId: null,
+  radius: 4,
+  density: 8,
+  minSpacing: 1.0,
 };
 
 // PURE annotation: the create() call has no observable side effects, so when
@@ -112,6 +142,10 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
     placingUrl: null,
     selectedId: null,
     moving: false,
+    brush: DEFAULT_BRUSH,
+    strokeAnchor: null,
+    strokeOpen: false,
+    strokePushed: false,
     history: { past: [], future: [] },
 
     toggleActive: () => {
@@ -121,15 +155,27 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
         // editor, not tower placement / robot move orders.
         useGame.getState().clearSelection();
       }
-      set({ active: next, placingUrl: null, selectedId: null, moving: false });
+      set({
+        active: next,
+        placingUrl: null,
+        selectedId: null,
+        moving: false,
+        brush: { ...get().brush, active: false },
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
+      });
     },
 
     setPlacing: (url) =>
       set((s) => ({
-        // Clicking the armed asset again disarms back to select mode.
+        // Clicking the armed asset again disarms back to select mode. Brush
+        // mode is mutually exclusive with placement, so arming a url drops
+        // any active brush.
         placingUrl: s.placingUrl === url ? null : url,
         selectedId: null,
         moving: false,
+        brush: { ...s.brush, active: false },
       })),
 
     placeAt: (x, y) => {
@@ -227,9 +273,85 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
         moving: false,
         placingUrl: null,
         history: { past: [], future: [] },
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
       });
       bumpGeometry();
       reloadLevel();
+    },
+
+    setBrushPreset: (id) => {
+      const cur = get().brush;
+      // Tap the active preset to disarm; tap any other preset to switch /
+      // arm. Switching brush on disarms placingUrl + moving + selection.
+      if (id !== null && cur.presetId === id && cur.active) {
+        set({ brush: { ...cur, active: false } });
+        return;
+      }
+      set((s) => ({
+        brush: { ...s.brush, presetId: id, active: id !== null },
+        placingUrl: null,
+        selectedId: null,
+        moving: false,
+      }));
+    },
+
+    setBrushParams: (p) =>
+      set((s) => ({
+        brush: {
+          ...s.brush,
+          radius: p.radius ?? s.brush.radius,
+          density: p.density ?? s.brush.density,
+          minSpacing: p.minSpacing ?? s.brush.minSpacing,
+        },
+      })),
+
+    beginStroke: () => {
+      // Stash a snapshot but don't push yet — only paintAt that actually
+      // produces props during the stroke commits the history entry, so a
+      // mis-click drag with zero scattered props leaves the undo stack
+      // untouched.
+      set({ strokeAnchor: currentSnapshot(), strokeOpen: true, strokePushed: false });
+    },
+
+    paintAt: (x, y) => {
+      const s = get();
+      const preset = getBrushPreset(s.brush.presetId);
+      if (!preset || preset.urls.length === 0) return;
+      if (!s.brush.active) return;
+      const world = useGame.getState().world;
+      const existing = world.props.map((p) => p.pos);
+      const points = samplePoints(
+        { x, y },
+        s.brush.radius,
+        s.brush.density,
+        s.brush.minSpacing,
+        existing,
+      );
+      if (points.length === 0) return;
+      if (s.strokeOpen) {
+        if (!s.strokePushed && s.strokeAnchor) {
+          const anchor = s.strokeAnchor;
+          set((ss) => ({ history: pushHistory(ss.history, anchor), strokePushed: true }));
+        }
+      } else {
+        // Out-of-stroke paint (defensive) — push a single history entry.
+        set((ss) => ({ history: pushHistory(ss.history, currentSnapshot()) }));
+      }
+      const additions: PlacedProp[] = points.map((pt) => ({
+        id: nanoid(8),
+        url: pickWeighted(preset),
+        pos: pt,
+        scale: randRange(preset.scaleJitter[0], preset.scaleJitter[1]),
+        rot: randRange(preset.rotateRange[0], preset.rotateRange[1]),
+        blocks: preset.defaultBlocks,
+      }));
+      commitProps([...world.props, ...additions]);
+    },
+
+    endStroke: () => {
+      set({ strokeAnchor: null, strokeOpen: false, strokePushed: false });
     },
 
     undo: () => {
@@ -240,8 +362,15 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       w.overrideActive = result.restored.override;
       bumpGeometry();
       persist();
-      // Restored selection may no longer exist.
-      set({ history: result.next, selectedId: null, moving: false });
+      // Restored selection may no longer exist. Drop any open stroke too.
+      set({
+        history: result.next,
+        selectedId: null,
+        moving: false,
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
+      });
     },
 
     redo: () => {
@@ -252,7 +381,14 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       w.overrideActive = result.restored.override;
       bumpGeometry();
       persist();
-      set({ history: result.next, selectedId: null, moving: false });
+      set({
+        history: result.next,
+        selectedId: null,
+        moving: false,
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
+      });
     },
 
     canUndo: () => canUndoH(get().history),

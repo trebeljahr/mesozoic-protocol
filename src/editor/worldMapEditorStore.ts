@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
 import type { PlacedProp } from "../sim/types";
+import { getBrushPreset, pickWeighted, randRange, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
   canUndo as canUndoH,
@@ -30,6 +31,14 @@ const MIN_SCALE = 0.15;
 const MAX_SCALE = 6;
 const clampScale = (s: number): number => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
 
+type BrushState = {
+  active: boolean;
+  presetId: string | null;
+  radius: number;
+  density: number;
+  minSpacing: number;
+};
+
 type WorldMapEditorState = {
   active: boolean;
   placingUrl: string | null;
@@ -40,6 +49,10 @@ type WorldMapEditorState = {
   // Static-geometry invalidation key. Bumped on every mutation so the
   // render layer can re-derive its instanced groups.
   version: number;
+  brush: BrushState;
+  strokeAnchor: Snapshot | null;
+  strokeOpen: boolean;
+  strokePushed: boolean;
   history: History;
   toggleActive: () => void;
   setPlacing: (url: string | null) => void;
@@ -53,11 +66,24 @@ type WorldMapEditorState = {
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
   clearAll: () => void;
+  setBrushPreset: (id: string | null) => void;
+  setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
+  beginStroke: () => void;
+  paintAt: (x: number, y: number) => void;
+  endStroke: () => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
   exportJson: () => string;
+};
+
+const DEFAULT_BRUSH: BrushState = {
+  active: false,
+  presetId: null,
+  radius: 4,
+  density: 8,
+  minSpacing: 1.0,
 };
 
 const persist = (props: PlacedProp[], override: boolean): void => {
@@ -88,6 +114,10 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     props: seed?.props ?? [],
     override: seed?.override ?? false,
     version: 0,
+    brush: DEFAULT_BRUSH,
+    strokeAnchor: null,
+    strokeOpen: false,
+    strokePushed: false,
     history: { past: [], future: [] },
 
     toggleActive: () => {
@@ -96,6 +126,10 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         placingUrl: null,
         selectedId: null,
         moving: false,
+        brush: { ...s.brush, active: false },
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
       }));
     },
 
@@ -104,6 +138,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         placingUrl: s.placingUrl === url ? null : url,
         selectedId: null,
         moving: false,
+        brush: { ...s.brush, active: false },
       })),
 
     placeAt: (x, y) => {
@@ -199,7 +234,77 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         placingUrl: null,
         version: s.version + 1,
         history: { past: [], future: [] },
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
       }));
+    },
+
+    setBrushPreset: (id) => {
+      const cur = get().brush;
+      if (id !== null && cur.presetId === id && cur.active) {
+        set({ brush: { ...cur, active: false } });
+        return;
+      }
+      set((s) => ({
+        brush: { ...s.brush, presetId: id, active: id !== null },
+        placingUrl: null,
+        selectedId: null,
+        moving: false,
+      }));
+    },
+
+    setBrushParams: (p) =>
+      set((s) => ({
+        brush: {
+          ...s.brush,
+          radius: p.radius ?? s.brush.radius,
+          density: p.density ?? s.brush.density,
+          minSpacing: p.minSpacing ?? s.brush.minSpacing,
+        },
+      })),
+
+    beginStroke: () => {
+      set({ strokeAnchor: snapshot(), strokeOpen: true, strokePushed: false });
+    },
+
+    paintAt: (x, y) => {
+      const s = get();
+      const preset = getBrushPreset(s.brush.presetId);
+      if (!preset || preset.urls.length === 0) return;
+      if (!s.brush.active) return;
+      const existing = s.props.map((p) => p.pos);
+      const points = samplePoints(
+        { x, y },
+        s.brush.radius,
+        s.brush.density,
+        s.brush.minSpacing,
+        existing,
+      );
+      if (points.length === 0) return;
+      if (s.strokeOpen) {
+        if (!s.strokePushed && s.strokeAnchor) {
+          const anchor = s.strokeAnchor;
+          set((ss) => ({ history: pushHistory(ss.history, anchor), strokePushed: true }));
+        }
+      } else {
+        set((ss) => ({ history: pushHistory(ss.history, snapshot()) }));
+      }
+      const additions: PlacedProp[] = points.map((pt) => ({
+        id: nanoid(8),
+        url: pickWeighted(preset),
+        pos: pt,
+        scale: randRange(preset.scaleJitter[0], preset.scaleJitter[1]),
+        rot: randRange(preset.rotateRange[0], preset.rotateRange[1]),
+        blocks: preset.defaultBlocks,
+      }));
+      const next = [...s.props, ...additions];
+      persist(next, s.override);
+      set((ss) => ({ props: next, version: ss.version + 1 }));
+    },
+
+    endStroke: () => {
+      set({ strokeAnchor: null, strokeOpen: false, strokePushed: false });
     },
 
     undo: () => {
@@ -213,6 +318,9 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         selectedId: null,
         moving: false,
         version: s.version + 1,
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
       }));
     },
 
@@ -227,6 +335,9 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         selectedId: null,
         moving: false,
         version: s.version + 1,
+        strokeAnchor: null,
+        strokeOpen: false,
+        strokePushed: false,
       }));
     },
 
