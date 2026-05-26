@@ -1,3 +1,12 @@
+// Selective-bloom opt-in convention: emissive sub-meshes added by the
+// unit material pipeline (ModelEnemyMesh / ModelTowerMesh /
+// ModelRobotMesh via src/render/materialTunables.ts) set
+// `mesh.userData.bloom = true` (and `material.userData.bloom = true`
+// on the cloned material). When the post-FX selective-bloom pass is
+// wired into this file, it should walk the scene and add objects with
+// that flag to its bloom layer. Until then, the flag is harmless
+// metadata — readers without bloom support ignore it.
+
 import { useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";

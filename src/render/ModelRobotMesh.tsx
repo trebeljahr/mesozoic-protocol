@@ -8,6 +8,14 @@ import { ROBOT_SPECS } from "../sim/robotVariants";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
+import { ROBOT_EMISSIVE_PATTERNS, ROBOT_VENT_PATTERNS } from "./emissiveRegistry";
+import {
+  applyEmissiveSpec,
+  applyToonRimPatch,
+  biomeRimColor,
+  RIM_COLOR_ALLY,
+  RIM_INTENSITY_ALLY,
+} from "./materialTunables";
 import { measureVisibleBox } from "./measureModel";
 
 const ROBOT_URL: Record<string, string> = {
@@ -102,6 +110,8 @@ export const ModelRobotMesh = () => {
     const obj = cloneSkinned(scene);
     obj.scale.setScalar(normalizedScale);
     const mats: THREE.MeshStandardMaterial[] = [];
+    const world = useGame.getState().world;
+    const rimTinted = biomeRimColor(RIM_COLOR_ALLY, world.biome);
     obj.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
@@ -122,6 +132,46 @@ export const ModelRobotMesh = () => {
             mats.push(c as THREE.MeshStandardMaterial);
           }
         }
+        // Rim + toon shader patch on every cloned material. Hit-flash
+        // and muzzle-flash code below already restores baseEmissive on
+        // each frame, so the registry visor/vent glows survive the
+        // flash dip via the emissiveOverride flag.
+        const mlist = Array.isArray(m.material) ? m.material : [m.material];
+        const meshNameLc = (m.name || "").toLowerCase();
+        let anyEmissive = false;
+        for (const mm of mlist) {
+          if (!mm) continue;
+          applyToonRimPatch(mm, {
+            rim: { color: rimTinted, intensity: RIM_INTENSITY_ALLY },
+          });
+          const matName = (mm.name || "").toLowerCase();
+          const visorPattern = ROBOT_EMISSIVE_PATTERNS.find(
+            (p) =>
+              (meshNameLc.includes(p.match) || matName.includes(p.match)) && p.intensityMul > 0,
+          );
+          if (visorPattern) {
+            applyEmissiveSpec(mm, {
+              color: jetColor,
+              intensity: visorPattern.intensityMul,
+              bloom: true,
+            });
+            anyEmissive = true;
+            continue;
+          }
+          const ventPattern = ROBOT_VENT_PATTERNS.find(
+            (p) =>
+              (meshNameLc.includes(p.match) || matName.includes(p.match)) && p.intensityMul > 0,
+          );
+          if (ventPattern) {
+            applyEmissiveSpec(mm, {
+              color: jetColor,
+              intensity: ventPattern.intensityMul,
+              bloom: true,
+            });
+            anyEmissive = true;
+          }
+        }
+        if (anyEmissive) m.userData.bloom = true;
       }
     });
     muzzleAnchorRef.current =
@@ -146,7 +196,7 @@ export const ModelRobotMesh = () => {
       matsRef.current = [];
       currentClipRef.current = null;
     };
-  }, [scene, normalizedScale]);
+  }, [scene, normalizedScale, jetColor]);
 
   useFrame((_, delta) => {
     const obj = objRef.current;

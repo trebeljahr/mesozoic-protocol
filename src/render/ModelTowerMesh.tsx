@@ -4,6 +4,16 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
+import { TOWER_EMISSIVE } from "./emissiveRegistry";
+import {
+  applyEmissiveSpec,
+  applyToonRimPatch,
+  biomeRimColor,
+  RIM_COLOR_ALLY,
+  RIM_COLOR_CRYO,
+  RIM_COLOR_FLAME,
+  RIM_INTENSITY_ALLY,
+} from "./materialTunables";
 import { type AtlasSwatch, computeTowerTints, tierKey } from "./towerTints";
 
 type AtlasState = {
@@ -66,6 +76,17 @@ const repaintAtlas = (state: AtlasState, swatches: AtlasSwatch[]) => {
     ctx.fillRect(sw.x, 0, 4, canvas.height);
   }
   state.tex.needsUpdate = true;
+};
+
+// Per-kind rim base. Most kinds use the cyan-white ally rim; flame
+// pulls warm orange, cryo pulls cool blue-white.
+const TOWER_RIM_BASE: Record<TowerKind, string> = {
+  pulse: RIM_COLOR_ALLY,
+  chain: RIM_COLOR_ALLY,
+  cryo: RIM_COLOR_CRYO,
+  mortar: RIM_COLOR_ALLY,
+  flame: RIM_COLOR_FLAME,
+  hive: RIM_COLOR_ALLY,
 };
 
 const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrades) => {
@@ -165,6 +186,9 @@ export const ModelTowerMesh = ({
     const parent = groupRef.current;
     if (!parent) return;
     const { world } = useGame.getState();
+    const rimBase = TOWER_RIM_BASE[kind];
+    const rimTinted = biomeRimColor(rimBase, world.biome);
+    const emissivePatterns = TOWER_EMISSIVE[kind] ?? [];
 
     const live = new Set<number>();
     for (const t of world.towers) {
@@ -185,6 +209,25 @@ export const ModelTowerMesh = ({
           const m = mesh.material;
           if (Array.isArray(m)) mesh.material = m.map((sub) => sub.clone());
           else if (m) mesh.material = m.clone();
+          // Rim + toon patch on every cloned material. Emissive accents
+          // are applied below by matching material-name patterns from
+          // the registry; matches set userData.bloom so the post-FX
+          // selective-bloom pass can pick them up.
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          let anyEmissive = false;
+          for (const mm of mats) {
+            if (!mm) continue;
+            applyToonRimPatch(mm, {
+              rim: { color: rimTinted, intensity: RIM_INTENSITY_ALLY },
+            });
+            const nameLc = (mm.name || "").toLowerCase();
+            for (const pat of emissivePatterns) {
+              if (!pat.spec.intensity || !nameLc.includes(pat.match.toLowerCase())) continue;
+              applyEmissiveSpec(mm, pat.spec);
+              anyEmissive = true;
+            }
+          }
+          if (anyEmissive) mesh.userData.bloom = true;
         });
         parent.add(item);
         itemsRef.current.set(t.id, item);

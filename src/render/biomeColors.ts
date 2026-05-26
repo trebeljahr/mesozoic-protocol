@@ -15,3 +15,9 @@ export const BIOME_STORY_TRACE_STYLE: Record<Biome, BiomeStoryTraceStyle> = {
   lava: { trace: "#120b08", traceOpacity: 0.36, marker: "#ff7a3d", markerAccent: "#32130d" },
   alien: { trace: "#46ffd2", traceOpacity: 0.22, marker: "#8dffdc", markerAccent: "#32205a" },
 };
+
+// Per-biome rim color bias used by the unit material pipeline. Stored
+// here so future biome-specific tinting (lights, ambient VFX, etc.) can
+// reuse the same source of truth. See materialTunables.ts for the live
+// values — kept canonical there to avoid two copies of the same table.
+export { BIOME_MATRIARCH_RIM, BIOME_RIM_BIAS } from "./materialTunables";

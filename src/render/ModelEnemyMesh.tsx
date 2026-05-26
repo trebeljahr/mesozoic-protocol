@@ -17,7 +17,21 @@ import {
 } from "../sim/world";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
+import { ENEMY_EMISSIVE, EYE_FALLBACK_NAMES, MATRIARCH_CONDUIT_PATTERNS } from "./emissiveRegistry";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
+import {
+  applyEmissiveSpec,
+  applyToonRimPatch,
+  BIOME_MATRIARCH_RIM,
+  biomeRimColor,
+  MATRIARCH_CONDUIT_COLOR,
+  MATRIARCH_VARIANT_BIOME,
+  RIM_COLOR_ENEMY,
+  RIM_INTENSITY_BOSS,
+  RIM_INTENSITY_ENEMY,
+  setRimColor,
+  setRimIntensity,
+} from "./materialTunables";
 import { measureVisibleBox } from "./measureModel";
 
 type Props = {
@@ -39,6 +53,9 @@ type Props = {
 // toward this as e.frost climbs from 0 → 1.
 const FROST_COLOR = new THREE.Color("#cfe6ff");
 const FROST_EMISSIVE = new THREE.Color("#3a6aa0");
+// Frost rim handoff: as frost climbs, the rim hue drifts toward this so
+// frozen enemies read with a cold halo, not the bio-green one.
+const FROST_RIM_COLOR = new THREE.Color("#cfe6ff");
 
 type Item = {
   obj: THREE.Object3D;
@@ -362,6 +379,48 @@ export const ModelEnemyMesh = ({
               } else if (m.material) {
                 m.material = cloneAndCaptureBase(m.material as THREE.Material);
               }
+              // Rim + toon shader patch on the cloned materials. Stock
+              // PBR maps + tint code paths (frost / matriarch tint /
+              // adaptive resist) keep working because the patch only
+              // adds to outgoingLight before gl_FragColor. Per-frame
+              // code refreshes the rim uniform from world.biome so the
+              // same recycled clone reads correctly across biomes.
+              const matriarchBiome =
+                bossVariant !== undefined ? MATRIARCH_VARIANT_BIOME[bossVariant] : null;
+              const rimIntensity =
+                bossVariant !== undefined ? RIM_INTENSITY_BOSS : RIM_INTENSITY_ENEMY;
+              const mats = Array.isArray(m.material) ? m.material : [m.material];
+              const meshName = (m.name || "").toLowerCase();
+              const isEye = EYE_FALLBACK_NAMES.some((p) => meshName.includes(p));
+              const isConduit =
+                matriarchBiome !== null &&
+                MATRIARCH_CONDUIT_PATTERNS.some((p) => meshName.includes(p));
+              for (const mm of mats) {
+                if (!mm) continue;
+                applyToonRimPatch(mm, {
+                  rim: { color: RIM_COLOR_ENEMY, intensity: rimIntensity },
+                });
+                const matName = (mm.name || "").toLowerCase();
+                const matIsEye = EYE_FALLBACK_NAMES.some((p) => matName.includes(p));
+                const matIsConduit =
+                  matriarchBiome !== null &&
+                  MATRIARCH_CONDUIT_PATTERNS.some((p) => matName.includes(p));
+                // Eye glow: registry-matched material name or fallback
+                // mesh/material-name pattern.
+                if (isEye || matIsEye) {
+                  const eyeSpec = ENEMY_EMISSIVE[kind]?.[0]?.spec;
+                  if (eyeSpec) applyEmissiveSpec(mm, eyeSpec);
+                }
+                // Matriarch spine / bio-conduit strip.
+                if ((isConduit || matIsConduit) && matriarchBiome) {
+                  applyEmissiveSpec(mm, {
+                    color: MATRIARCH_CONDUIT_COLOR[matriarchBiome],
+                    intensity: 1.4,
+                    bloom: true,
+                  });
+                }
+              }
+              if (isEye || isConduit) m.userData.bloom = true;
             }
           });
           const mixer = new THREE.AnimationMixer(obj);
@@ -535,6 +594,20 @@ export const ModelEnemyMesh = ({
       const adaptiveAmount = e.adaptiveResistAmount ?? 0;
       const adaptiveTint = adaptiveType ? adaptiveTintByType[adaptiveType] : null;
       const adaptiveEmissive = adaptiveType ? adaptiveEmissiveByType[adaptiveType] : null;
+      // Rim hue/intensity handoff. Frost drifts every enemy's rim toward
+      // the cool frost color; matriarchs hold their variant biome accent
+      // regardless of which biome they walk through, ordinary enemies
+      // pick up the biome bias.
+      const rimLerp = clamp01(frost * 1.2);
+      const rimBoost = flashing ? 1.5 : 1.0;
+      const matriarchBiomeForRim =
+        bossVariant !== undefined ? MATRIARCH_VARIANT_BIOME[bossVariant] : null;
+      const teamRimBase = matriarchBiomeForRim
+        ? BIOME_MATRIARCH_RIM[matriarchBiomeForRim]
+        : RIM_COLOR_ENEMY;
+      const rimAccentBiome = matriarchBiomeForRim ?? world.biome;
+      const currentRim = biomeRimColor(teamRimBase, rimAccentBiome);
+      const rimScratch = currentRim.clone();
       item.obj.traverse((o) => {
         const m = o as THREE.Mesh;
         if (!m.isMesh) return;
@@ -557,7 +630,27 @@ export const ModelEnemyMesh = ({
             mm.metalness = matriarchMaterial.metalness;
             mm.roughness = matriarchMaterial.roughness;
           }
+          // Rim drifts toward frost as the enemy freezes, and brightens
+          // briefly on hit. currentRim was composed once per enemy from
+          // the team base + biome bias; scratch holds the per-frame
+          // tinted value so the inner callback never allocates.
+          if (mm.userData.rimColorBase) {
+            rimScratch.copy(currentRim);
+            if (rimLerp > 0.001) rimScratch.lerp(FROST_RIM_COLOR, rimLerp);
+            setRimColor(mm, rimScratch);
+            const rimBaseIntensity =
+              (mm.userData.rimIntensityBase as number | undefined) ??
+              (matriarch ? RIM_INTENSITY_BOSS : RIM_INTENSITY_ENEMY);
+            setRimIntensity(mm, rimBaseIntensity * rimBoost);
+          }
           if (!mm.emissive) return;
+          // Registry-applied emissive overrides (eyes, matriarch
+          // conduits) live as the material's `baseEmissive`. The per-
+          // frame loop preserves them in the no-override branch, and
+          // matriarch/adaptive body washes skip these materials so the
+          // eye/conduit glow isn't clobbered.
+          const baseEmissive = mm.userData.baseEmissive as THREE.Color | undefined;
+          const hasOverride = mm.userData.emissiveOverride === true;
           if (flashing) {
             // Warm-tinted, dimmed flash instead of pure white at full
             // intensity — reads as "got hit" without the harsh clinical
@@ -567,15 +660,22 @@ export const ModelEnemyMesh = ({
             // Cool inner glow when heavily frosted — sells the "frozen
             // solid" read at high frost without a halo at low frost.
             mm.emissive.copy(FROST_EMISSIVE).multiplyScalar(frost * 0.5);
-          } else if (matriarch && matriarchMaterial) {
+          } else if (matriarch && matriarchMaterial && !hasOverride) {
             // Variant-specific charge: early species queens stay material
-            // first, later queens carry more supernatural light.
+            // first, later queens carry more supernatural light. Skips
+            // conduit/eye materials so their registry glow survives.
             mm.emissive.copy(variantTint).multiplyScalar(matriarchMaterial.emissiveAmount);
-          } else if (adaptiveEmissive && adaptiveAmount > 0) {
+          } else if (adaptiveEmissive && adaptiveAmount > 0 && !hasOverride) {
             // Subtle adaptive inner glow scaled to the body tint
             // amount so heavy late-game / high-streak adaptation pops
             // visibly without ever competing with frost/matriarch tint.
             mm.emissive.copy(adaptiveEmissive).multiplyScalar(adaptiveAmount * 0.6);
+          } else if (baseEmissive) {
+            // Restore captured baseEmissive — preserves registry eye /
+            // conduit glow across frames. cloneAndCaptureBase populates
+            // baseEmissive at clone time; applyEmissiveSpec overwrites
+            // it when the material was tagged with an override.
+            mm.emissive.copy(baseEmissive);
           } else {
             mm.emissive.setRGB(0, 0, 0);
           }
