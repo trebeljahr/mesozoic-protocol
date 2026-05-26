@@ -38,6 +38,12 @@ export const ProjectileMesh = () => {
           splash.setMatrixAt(s++, dummy.matrix);
         }
       } else {
+        // Pulse Rifle bolts are rendered by PulseTracerFx as a cyan ribbon;
+        // skip them here so we don't draw a yellow sphere on top.
+        if (p.ownerTowerId !== null) {
+          const owner = world.towerById.get(p.ownerTowerId);
+          if (owner && owner.kind === "pulse") continue;
+        }
         if (d < MAX_PROJECTILES) {
           dummy.position.set(p.pos.x, 0.8, -p.pos.y);
           dummy.rotation.set(0, 0, 0);

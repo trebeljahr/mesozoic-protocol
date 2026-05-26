@@ -14,6 +14,13 @@ import * as THREE from "three";
 import { useGame } from "../store";
 import { BLOOM_LAYER } from "./PaintedPostFx";
 
+// Beams emitted by the Chain Coil tower use this exact color string as a
+// render-side tag — ChainArcsFx renders them as forked branching lightning
+// and Effects.tsx skips them so they don't render twice. Robot lightning
+// arcs use distinct cyan hexes (#7ee0ff, #cfe8ff, #9beaff) and stay on the
+// generic jagged-polyline path below.
+export const CHAIN_BEAM_COLOR = "#9fd8ff";
+
 const MAX_PARTICLES = 1024;
 const MAX_EXPLOSIONS = 32;
 const MAX_CRYO_WAVES = 16;
@@ -274,6 +281,9 @@ export const Effects = () => {
       if (b.points.length < 2 || b.points.length > MAX_BEAM_POINTS) {
         continue;
       }
+      // Chain Coil shots are owned by ChainArcsFx — skip them here so the
+      // forked-lightning pass isn't shadowed by the plainer polyline below.
+      if (b.color === CHAIN_BEAM_COLOR) continue;
 
       const pair = beamPairs[idx];
       const coreArr = pair.core.line.geometry.attributes.position.array as Float32Array;

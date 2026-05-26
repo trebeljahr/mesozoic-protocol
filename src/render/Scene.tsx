@@ -7,6 +7,7 @@ import { AmbientHaze } from "./AmbientHaze";
 import { BiomeAmbientVfx } from "./BiomeAmbientVfx";
 import { BiomeCosmetics } from "./BiomeCosmetics";
 import { CameraRig } from "./CameraRig";
+import { ChainArcsFx } from "./ChainArcsFx";
 import { CoalTrail } from "./CoalTrail";
 import { EasterEggs } from "./EasterEggs";
 import { EditorProps } from "./EditorProps";
@@ -27,6 +28,7 @@ import { PathLine } from "./PathLine";
 import { Placement } from "./Placement";
 import { PlannerOverlay } from "./PlannerOverlay";
 import { ProjectileMesh } from "./ProjectileMesh";
+import { PulseTracerFx } from "./PulseTracerFx";
 import { RegenBadges } from "./RegenBadges";
 import { RobotHud } from "./RobotHud";
 import { RobotSelectionVfx } from "./RobotSelectionVfx";
@@ -167,6 +169,8 @@ export const PlayScene = () => {
       <RobotSelectionVfx />
       <SpotTargetMarker />
       <ProjectileMesh />
+      <PulseTracerFx />
+      <ChainArcsFx />
       <Effects />
       <SmokePuffs />
       <BiomeAmbientVfx />
