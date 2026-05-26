@@ -26,6 +26,12 @@ import {
   makeConduitUniforms,
   resolveEnemyTier,
 } from "./enemyGrafts";
+import {
+  buildEyePositions,
+  clearEnemyEyeProfile,
+  eyeColorFor,
+  setEnemyEyeProfile,
+} from "./enemyEyeProfiles";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
 import {
   applyEmissiveSpec,
@@ -194,6 +200,14 @@ export const ModelEnemyMesh = ({
     };
   }, [scene, targetSize]);
 
+  // Pre-resolved eye anchors (world-unit offsets relative to the obj root,
+  // in body-local frame) and the per-enemy eye color. Computed once per
+  // mount and pushed to the enemyEyes registry for every enemy that
+  // initializes on this mesh; the global EnemyEyes renderer reads from
+  // there each frame.
+  const eyePositions = useMemo(() => buildEyePositions(url, targetSize), [url, targetSize]);
+  const eyeBaseColor = useMemo(() => eyeColorFor(kind, bossVariant), [kind, bossVariant]);
+
   const activeClip = useMemo(
     () => findClip(animations, clip) ?? findClip(animations, "Walk") ?? animations[0] ?? null,
     [animations, clip],
@@ -281,7 +295,10 @@ export const ModelEnemyMesh = ({
     item.obj.rotation.x = 0;
     item.obj.rotation.z = 0;
     const recycledId = item.obj.userData.enemyId;
-    if (typeof recycledId === "number") clearEnemyRender(recycledId);
+    if (typeof recycledId === "number") {
+      clearEnemyRender(recycledId);
+      clearEnemyEyeProfile(recycledId);
+    }
     if (poolRef.current.length < POOL_LIMIT) {
       item.obj.visible = false;
       item.obj.userData.enemyId = undefined;
@@ -529,6 +546,17 @@ export const ModelEnemyMesh = ({
           };
         }
         itemsRef.current.set(e.id, item);
+        // Register the per-enemy eye profile for the global EnemyEyes pass.
+        // Fires on first mount and on every recycle so each enemy id gets a
+        // fresh pulseSeed; cleared in recycleOrDispose so a pooled slot
+        // doesn't keep emitting for a stale id.
+        if (eyePositions.length > 0) {
+          setEnemyEyeProfile(e.id, {
+            positions: eyePositions,
+            baseColor: eyeBaseColor,
+            pulseSeed: (e.id * 0.137) % (Math.PI * 2),
+          });
+        }
       }
 
       const leak = e.leak;
@@ -651,7 +679,13 @@ export const ModelEnemyMesh = ({
       // Publish smoothed body-center XZ + bob so any decoration renderers
       // ride the same animated pose as the skeleton instead of snapping
       // to the raw sim position.
-      setEnemyRender(e.id, { x: item.visX, z: item.visZ, bobY: bobY - attackPose * 0.08 });
+      setEnemyRender(e.id, {
+        x: item.visX,
+        z: item.visZ,
+        y: item.obj.position.y,
+        bobY: bobY - attackPose * 0.08,
+        yaw: baseRotY + item.visYaw,
+      });
 
       // Plate scaffolding rides the smoothed pose as a sibling group —
       // its local plate offsets are in target-size-unit world space, so

@@ -12,6 +12,7 @@ import { CoalTrail } from "./CoalTrail";
 import { EasterEggs } from "./EasterEggs";
 import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
+import { EnemyEyes } from "./EnemyEyes";
 import { FlowFeatures } from "./FlowFeatures";
 import { Ground } from "./Ground";
 import { HealAuras } from "./HealAuras";
@@ -158,6 +159,7 @@ export const PlayScene = () => {
       <ShieldBubbles />
       <HealAuras />
       <RegenBadges />
+      <EnemyEyes />
 
       <ModelRobotMesh />
       <RobotHud />
