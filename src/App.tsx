@@ -4,6 +4,7 @@ import { KernelSize } from "postprocessing";
 import { lazy, Suspense, useEffect } from "react";
 import { useAudioBridge } from "./audio/useAudioBridge";
 import { LevelEditorPanel } from "./editor/LevelEditorPanel";
+import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
 import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
 import { PlayScene } from "./render/Scene";
 import { useGame } from "./store";
@@ -262,6 +263,9 @@ export const App = () => {
       <AchievementToast />
       <LandscapeNudge />
       {import.meta.env.DEV && screen === "playing" && !modalOpen && <LevelEditorPanel />}
+      {import.meta.env.DEV && screen === "worldMap" && !sceneBlockingModalOpen && (
+        <WorldMapEditorPanel />
+      )}
     </>
   );
 };

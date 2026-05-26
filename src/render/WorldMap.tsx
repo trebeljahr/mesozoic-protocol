@@ -13,25 +13,22 @@ import { BiomeProps } from "./BiomeProps";
 import { LevelNode } from "./LevelNode";
 import { MapRoute } from "./MapRoute";
 import { MapOrbitControls } from "./useMapGestures";
+import { WorldMapEditorProps } from "./WorldMapEditorProps";
 import { WorldMapOutposts } from "./WorldMapOutposts";
 import { WorldMapPrewarm } from "./WorldMapPrewarm";
+import {
+  CONTENT_H,
+  CONTENT_W,
+  GROUND_H,
+  GROUND_W,
+  PAN_LIMIT_X,
+  PAN_LIMIT_Z,
+} from "./worldMapBounds";
 
 // Level node bounds span x: [-24, 22], y: [-14, 26] — content grew taller
 // after the 6-biome-band layout (alien band tops out at y=26).
-const CONTENT_W = 80;
-const CONTENT_H = 64;
-
-// Rendered ground — oversized so the plane edge is always off-screen at
-// any valid pan/zoom combination. Bumped up with content height so the
-// south edge never appears, even on tall (portrait-ish) viewports where
-// the bottom ray reaches several hundred world units past the cluster.
-const GROUND_W = 1200;
-const GROUND_H = 1000;
-
-// How far the camera target can drift from origin before being clamped.
-// Tight enough that the user can't pan the biome cluster off-screen.
-const PAN_LIMIT_X = CONTENT_W / 2 - 14;
-const PAN_LIMIT_Z = CONTENT_H / 2 - 8;
+// CONTENT_*/GROUND_*/PAN_LIMIT_* live in worldMapBounds.ts so the dev-only
+// world-map editor can re-use them without importing this whole module.
 
 // Camera tilt: forward = (0, -0.935, -0.354) → the screen-up axis
 // projects onto the ground plane stretched by 1/0.935. So the visible
@@ -257,6 +254,8 @@ export const WorldMapScene = () => {
       <WorldMapOutposts />
 
       <MapRoute />
+
+      {import.meta.env.DEV && <WorldMapEditorProps />}
 
       {LEVELS.map((level) => (
         <LevelNode key={level.id} level={level} />

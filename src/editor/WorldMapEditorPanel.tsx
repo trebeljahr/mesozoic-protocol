@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PropRole } from "../biomes";
-import { useGame } from "../store";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
-import { useEditor } from "./editorStore";
+import { useWorldMapEditor } from "./worldMapEditorStore";
 
-// Dev-only level-editor UI. Floating toggle + a side panel: asset palette
-// (place), per-selection controls (move / delete / rotate / scale / blocks),
-// and the per-level "override procedural" switch. Mounted in App.tsx behind
-// import.meta.env.DEV so it never ships to production.
+// Dev-only world-map editor UI. Same layout as LevelEditorPanel but writes
+// to the global world-map edit store (single persistence shape, no
+// per-level keying, no "override procedural" toggle yet). Mounted in
+// App.tsx behind import.meta.env.DEV && screen === "worldMap".
 
 const panel: React.CSSProperties = {
   position: "fixed",
@@ -73,30 +72,26 @@ const PencilIcon = () => (
   </svg>
 );
 
-export const LevelEditorPanel = () => {
-  const active = useEditor((s) => s.active);
-  const placingUrl = useEditor((s) => s.placingUrl);
-  const selectedId = useEditor((s) => s.selectedId);
-  const moving = useEditor((s) => s.moving);
-  const toggleActive = useEditor((s) => s.toggleActive);
-
-  const version = useGame((s) => s.ui.treeVersion);
-  const levelId = useGame((s) => s.world.levelId);
-  const overrideActive = useGame((s) => s.world.overrideActive);
+export const WorldMapEditorPanel = () => {
+  const active = useWorldMapEditor((s) => s.active);
+  const placingUrl = useWorldMapEditor((s) => s.placingUrl);
+  const selectedId = useWorldMapEditor((s) => s.selectedId);
+  const moving = useWorldMapEditor((s) => s.moving);
+  const version = useWorldMapEditor((s) => s.version);
+  const toggleActive = useWorldMapEditor((s) => s.toggleActive);
 
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Re-read live props each render; `version` (subscribed above) drives the refresh.
   void version;
-  const propsArr = useGame.getState().world.props;
+  const propsArr = useWorldMapEditor.getState().props;
   const selected = selectedId !== null ? (propsArr.find((p) => p.id === selectedId) ?? null) : null;
 
   // Keyboard: Esc steps back (disarm → deselect → close); Delete removes.
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      const ed = useEditor.getState();
+      const ed = useWorldMapEditor.getState();
       if (e.key === "Escape") {
         if (ed.placingUrl) ed.setPlacing(ed.placingUrl);
         else if (ed.selectedId !== null) ed.select(null);
@@ -126,15 +121,20 @@ export const LevelEditorPanel = () => {
 
   if (!active) {
     return (
-      <button type="button" style={fab} onClick={toggleActive} title="Open level editor (dev only)">
+      <button
+        type="button"
+        style={fab}
+        onClick={toggleActive}
+        title="Open world-map editor (dev only)"
+      >
         <PencilIcon />
-        Edit Level
+        Edit Map
       </button>
     );
   }
 
   const onExport = () => {
-    const json = useEditor.getState().exportJson();
+    const json = useWorldMapEditor.getState().exportJson();
     void navigator.clipboard?.writeText(json).then(
       () => {
         setCopied(true);
@@ -142,28 +142,17 @@ export const LevelEditorPanel = () => {
       },
       () => {},
     );
-    // Also log so it's recoverable if clipboard is blocked.
-    console.log("[level-editor] export L%d:\n%s", levelId, json);
+    console.log("[worldmap-editor] export:\n%s", json);
   };
 
   return (
     <div style={panel}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <strong style={{ fontSize: 13 }}>Level Editor · L{levelId}</strong>
+        <strong style={{ fontSize: 13 }}>World Map Editor</strong>
         <button type="button" style={btn()} onClick={toggleActive}>
           Close
         </button>
       </div>
-
-      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-        <input
-          type="checkbox"
-          checked={overrideActive}
-          onChange={(e) => useEditor.getState().setOverride(e.target.checked)}
-        />
-        Override procedural placement
-        <span style={{ color: "#8b93a3" }}>(reloads)</span>
-      </label>
 
       {selected ? (
         <div
@@ -185,14 +174,14 @@ export const LevelEditorPanel = () => {
             <button
               type="button"
               style={btn(moving)}
-              onClick={() => useEditor.getState().beginMove()}
+              onClick={() => useWorldMapEditor.getState().beginMove()}
             >
               {moving ? "Click map…" : "Move"}
             </button>
             <button
               type="button"
               style={{ ...btn(), borderColor: "#7a3a3a", background: "#3a1c1c" }}
-              onClick={() => useEditor.getState().deleteSelected()}
+              onClick={() => useWorldMapEditor.getState().deleteSelected()}
             >
               Delete
             </button>
@@ -201,14 +190,14 @@ export const LevelEditorPanel = () => {
             <button
               type="button"
               style={btn()}
-              onClick={() => useEditor.getState().rotateSelected(-Math.PI / 12)}
+              onClick={() => useWorldMapEditor.getState().rotateSelected(-Math.PI / 12)}
             >
               Rotate ⟲
             </button>
             <button
               type="button"
               style={btn()}
-              onClick={() => useEditor.getState().rotateSelected(Math.PI / 12)}
+              onClick={() => useWorldMapEditor.getState().rotateSelected(Math.PI / 12)}
             >
               Rotate ⟳
             </button>
@@ -217,14 +206,14 @@ export const LevelEditorPanel = () => {
             <button
               type="button"
               style={btn()}
-              onClick={() => useEditor.getState().scaleSelected(1 / 1.15)}
+              onClick={() => useWorldMapEditor.getState().scaleSelected(1 / 1.15)}
             >
               Scale −
             </button>
             <button
               type="button"
               style={btn()}
-              onClick={() => useEditor.getState().scaleSelected(1.15)}
+              onClick={() => useWorldMapEditor.getState().scaleSelected(1.15)}
             >
               Scale +
             </button>
@@ -233,7 +222,7 @@ export const LevelEditorPanel = () => {
             <input
               type="checkbox"
               checked={selected.blocks}
-              onChange={() => useEditor.getState().toggleSelectedBlocks()}
+              onChange={() => useWorldMapEditor.getState().toggleSelectedBlocks()}
             />
             Blocks tower placement
           </label>
@@ -281,7 +270,7 @@ export const LevelEditorPanel = () => {
                   type="button"
                   title={c.url}
                   style={btn(placingUrl === c.url)}
-                  onClick={() => useEditor.getState().setPlacing(c.url)}
+                  onClick={() => useWorldMapEditor.getState().setPlacing(c.url)}
                 >
                   {c.label}
                 </button>
@@ -309,7 +298,7 @@ export const LevelEditorPanel = () => {
           <button
             type="button"
             style={{ ...btn(), borderColor: "#7a3a3a", background: "#3a1c1c" }}
-            onClick={() => useEditor.getState().clearLevel()}
+            onClick={() => useWorldMapEditor.getState().clearAll()}
           >
             Clear
           </button>
