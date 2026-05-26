@@ -190,12 +190,139 @@ const yieldToBrowser = (): Promise<void> =>
 // to trip the WebGL watchdog even though each task individually yields.
 let fractureQueue: Promise<unknown> = Promise.resolve();
 
-// Chunked async fracture. Same output as `fractureGeometry` but yields a
-// macrotask between every CSG op so individual tasks stay <50ms and the
-// renderer keeps painting while the queue drains. Accepts an optional
-// AbortSignal so unmount can cancel an in-flight fracture rather than
-// throwing away a finished chunk list at the very end.
-export const fractureGeometryAsync = (
+// Public async fracture. Routes through the dedicated CSG worker when the
+// host supports `Worker` (every modern browser), and falls back to the
+// in-process chunked path below for SSR / test runners / any environment
+// where the worker fails to spawn. The worker variant moves the entire
+// N×N CSG batch off the main thread, eliminating the renderer stalls that
+// the chunked fallback only mitigates.
+export const fractureGeometryAsync = async (
+  source: THREE.BufferGeometry,
+  numSeeds = 14,
+  seed = 1,
+  signal?: AbortSignal,
+): Promise<FractureChunk[]> => {
+  if (typeof Worker !== "undefined") {
+    try {
+      return await fractureViaWorker(source, numSeeds, seed, signal);
+    } catch {
+      // Worker failed (e.g. module load error in an unusual host). Fall
+      // through to the chunked in-process path so the HQ still shatters.
+    }
+  }
+  return fractureGeometryAsyncInProcess(source, numSeeds, seed, signal);
+};
+
+// Worker-backed fracture path. Bakes the source geometry's position+index
+// buffers into transferables, posts them to a singleton worker, and
+// reconstructs the returned chunks as `BufferGeometry` on the main thread.
+let fractureWorker: Worker | null = null;
+let nextJobId = 0;
+type PendingJob = {
+  resolve: (chunks: FractureChunk[]) => void;
+  reject: (err: Error) => void;
+  signal?: AbortSignal;
+  onAbort?: () => void;
+};
+const pendingJobs = new Map<number, PendingJob>();
+
+const ensureWorker = (): Worker => {
+  if (fractureWorker) return fractureWorker;
+  const w = new Worker(new URL("./fractureWorker.ts", import.meta.url), { type: "module" });
+  w.addEventListener("message", (ev: MessageEvent) => {
+    const msg = ev.data as {
+      jobId: number;
+      ok: boolean;
+      chunks?: Array<{
+        positions: Float32Array;
+        normals: Float32Array;
+        indices: Uint32Array | Uint16Array;
+        origin: [number, number, number];
+        radius: number;
+      }>;
+      error?: string;
+    };
+    const job = pendingJobs.get(msg.jobId);
+    if (!job) return;
+    pendingJobs.delete(msg.jobId);
+    if (job.signal && job.onAbort) job.signal.removeEventListener("abort", job.onAbort);
+    if (!msg.ok || !msg.chunks) {
+      job.reject(new Error(msg.error ?? "fracture worker failed"));
+      return;
+    }
+    const chunks: FractureChunk[] = msg.chunks.map((c) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(c.positions, 3));
+      g.setAttribute("normal", new THREE.BufferAttribute(c.normals, 3));
+      g.setIndex(new THREE.BufferAttribute(c.indices, 1));
+      return {
+        geometry: g,
+        origin: new THREE.Vector3(c.origin[0], c.origin[1], c.origin[2]),
+        radius: c.radius,
+      };
+    });
+    job.resolve(chunks);
+  });
+  w.addEventListener("error", (e) => {
+    // A worker-level error invalidates all in-flight jobs — reject them
+    // and dispose the worker so the next call respawns cleanly.
+    for (const job of pendingJobs.values()) job.reject(new Error(e.message || "worker error"));
+    pendingJobs.clear();
+    fractureWorker?.terminate();
+    fractureWorker = null;
+  });
+  fractureWorker = w;
+  return w;
+};
+
+const fractureViaWorker = (
+  source: THREE.BufferGeometry,
+  numSeeds: number,
+  seed: number,
+  signal?: AbortSignal,
+): Promise<FractureChunk[]> => {
+  if (signal?.aborted) return Promise.resolve([]);
+  const indexed = ensureIndexedPositionOnly(source);
+  const posAttr = indexed.getAttribute("position") as THREE.BufferAttribute | undefined;
+  const idxAttr = indexed.getIndex();
+  if (!posAttr || posAttr.count === 0 || !idxAttr) return Promise.resolve([]);
+
+  // Clone buffers so we can hand ownership to the worker via transferables
+  // without detaching the caller's source geometry.
+  const positions = new Float32Array(posAttr.array as ArrayLike<number>);
+  const indicesSrc = idxAttr.array;
+  const indices: Uint32Array | Uint16Array =
+    indicesSrc instanceof Uint16Array
+      ? new Uint16Array(indicesSrc)
+      : new Uint32Array(indicesSrc as ArrayLike<number>);
+
+  const w = ensureWorker();
+  const jobId = ++nextJobId;
+  return new Promise<FractureChunk[]>((resolve, reject) => {
+    const job: PendingJob = { resolve, reject, signal };
+    if (signal) {
+      job.onAbort = () => {
+        // Drop the result on resolve; we can't cancel mid-flight CSG, but
+        // we can stop the main thread from doing anything with it.
+        pendingJobs.delete(jobId);
+        resolve([]);
+      };
+      signal.addEventListener("abort", job.onAbort);
+    }
+    pendingJobs.set(jobId, job);
+    w.postMessage({ jobId, positions, indices, numSeeds, seed }, [
+      positions.buffer,
+      indices.buffer,
+    ]);
+  });
+};
+
+// Chunked in-process fracture. Kept as a fallback for environments where
+// the dedicated worker can't spawn, and as a reference for the algorithm
+// the worker mirrors. Yields a macrotask between every CSG op so
+// individual tasks stay <50ms and the renderer keeps painting while the
+// queue drains.
+const fractureGeometryAsyncInProcess = (
   source: THREE.BufferGeometry,
   numSeeds = 14,
   seed = 1,
