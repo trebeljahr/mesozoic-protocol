@@ -344,9 +344,22 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     canUndo: () => canUndoH(get().history),
     canRedo: () => canRedoH(get().history),
 
+    // Export adds metadata (scope/generatedAt) on top of the persisted
+    // shape so a downloaded file is self-describing. The localStorage
+    // shape stays minimal — extra fields are ignored by the loader.
     exportJson: () => {
       const s = get();
-      return JSON.stringify({ v: 1, override: s.override, props: s.props }, null, 2);
+      return JSON.stringify(
+        {
+          v: 1,
+          scope: "worldMap",
+          generatedAt: new Date().toISOString(),
+          override: s.override,
+          props: s.props,
+        },
+        null,
+        2,
+      );
     },
   };
 });

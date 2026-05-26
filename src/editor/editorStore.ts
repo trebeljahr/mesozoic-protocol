@@ -13,7 +13,7 @@ import {
   type Snapshot,
   undoHistory,
 } from "./history";
-import { clearLevelEdit, saveLevelEdit } from "./levelEdits";
+import { clearAllLevelEdits, clearLevelEdit, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
 
 // Dev-only editor state. Kept in its own store so the giant game store stays
 // untouched and the whole editor surface (this module + its UI/render
@@ -107,6 +107,7 @@ type EditorState = {
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
   clearLevel: () => void;
+  clearAllLevels: () => void;
   setBrushPreset: (id: string | null) => void;
   setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
   beginStroke: () => void;
@@ -117,6 +118,7 @@ type EditorState = {
   canUndo: () => boolean;
   canRedo: () => boolean;
   exportJson: () => string;
+  exportAllJson: () => string;
 };
 
 const DEFAULT_BRUSH: BrushState = {
@@ -281,6 +283,25 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       reloadLevel();
     },
 
+    // Wipe every authored level layout in one shot. Bypasses the per-level
+    // history (the undo stack only spans one level's edits anyway) and
+    // rebuilds the current level so the in-memory world reflects the wipe.
+    // Caller MUST gate this on a user confirm — it's irreversible.
+    clearAllLevels: () => {
+      clearAllLevelEdits();
+      const w = useGame.getState().world;
+      w.props = [];
+      w.overrideActive = false;
+      set({
+        selectedId: null,
+        moving: false,
+        placingUrl: null,
+        history: { past: [], future: [] },
+      });
+      bumpGeometry();
+      reloadLevel();
+    },
+
     setBrushPreset: (id) => {
       const cur = get().brush;
       // Tap the active preset to disarm; tap any other preset to switch /
@@ -394,9 +415,41 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
     canUndo: () => canUndoH(get().history),
     canRedo: () => canRedoH(get().history),
 
+    // Export adds export-only metadata (scope/levelId/generatedAt) on top
+    // of the persisted shape so a downloaded file is self-describing. The
+    // persistence shape in localStorage stays minimal — extra fields are
+    // ignored by loaders that only look for `v`, `override`, `props`.
     exportJson: () => {
       const w = useGame.getState().world;
-      return JSON.stringify({ v: 1, override: w.overrideActive, props: w.props }, null, 2);
+      return JSON.stringify(
+        {
+          v: 1,
+          scope: "level",
+          levelId: w.levelId,
+          generatedAt: new Date().toISOString(),
+          override: w.overrideActive,
+          props: w.props,
+        },
+        null,
+        2,
+      );
+    },
+
+    // Bundle every authored level into one JSON. Skips the in-memory
+    // mutation of the currently-playing level — uses the persisted store
+    // directly so the dump is a faithful snapshot of disk-state.
+    exportAllJson: () => {
+      const all = readAllLevelEdits();
+      return JSON.stringify(
+        {
+          v: 1,
+          scope: "all-levels",
+          generatedAt: new Date().toISOString(),
+          levels: all,
+        },
+        null,
+        2,
+      );
     },
   };
 });

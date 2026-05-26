@@ -58,3 +58,20 @@ export const clearLevelEdit = (levelId: number): void => {
   delete map[String(levelId)];
   writeAll(map);
 };
+
+// Wipe every level's stored edits in one shot. Used by the editor's
+// "Clear All Levels" affordance; the caller is responsible for any user
+// confirmation, since this is irreversible.
+export const clearAllLevelEdits = (): void => {
+  if (!isBrowser) return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Same fallback as writeAll — non-fatal for a dev tool.
+  }
+};
+
+// Dump every level's edits, keyed by level id. Used by the editor's
+// "Download All Levels" export so a single JSON file captures the full
+// authored set.
+export const readAllLevelEdits = (): EditMap => readAll();

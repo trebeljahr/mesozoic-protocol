@@ -3,7 +3,9 @@ import type { PropRole } from "../biomes";
 import { useGame } from "../store";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
 import { BUILTIN_BRUSH_PRESETS } from "./brush";
+import { downloadJson } from "./download";
 import { useEditor } from "./editorStore";
+import { PropPreview } from "./PropPreview";
 
 // Dev-only level-editor UI. Floating toggle + a side panel: asset palette
 // (place), per-selection controls (move / delete / rotate / scale / blocks),
@@ -15,7 +17,7 @@ const panel: React.CSSProperties = {
   top: 8,
   right: 8,
   bottom: 8,
-  width: 290,
+  width: 340,
   zIndex: 10000,
   display: "flex",
   flexDirection: "column",
@@ -27,6 +29,32 @@ const panel: React.CSSProperties = {
   color: "#e6e9ef",
   font: "12px/1.4 system-ui, sans-serif",
   boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+};
+
+// Compact swatch button — preview thumbnail above a truncated label. Fixed
+// width so the palette grid wraps cleanly across role groups.
+const swatchBtn = (on = false): React.CSSProperties => ({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 3,
+  padding: 4,
+  width: 64,
+  borderRadius: 5,
+  border: `1px solid ${on ? "#6aa9ff" : "#3a4150"}`,
+  background: on ? "#1d3a66" : "#1a1f29",
+  color: "#e6e9ef",
+  cursor: "pointer",
+  fontSize: 9,
+  lineHeight: 1.15,
+});
+
+const swatchLabel: React.CSSProperties = {
+  width: "100%",
+  textAlign: "center",
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
 };
 
 const btn = (on = false): React.CSSProperties => ({
@@ -166,6 +194,27 @@ export const LevelEditorPanel = () => {
     );
     // Also log so it's recoverable if clipboard is blocked.
     console.log("[level-editor] export L%d:\n%s", levelId, json);
+  };
+
+  const onDownload = () => {
+    const json = useEditor.getState().exportJson();
+    downloadJson(`mz-level-${levelId}.json`, json);
+  };
+
+  const onDownloadAll = () => {
+    const json = useEditor.getState().exportAllJson();
+    downloadJson("mz-all-levels.json", json);
+  };
+
+  const onClearAll = () => {
+    if (
+      !window.confirm(
+        "Clear hand-placed props for EVERY level? This is irreversible (history is per-session).",
+      )
+    ) {
+      return;
+    }
+    useEditor.getState().clearAllLevels();
   };
 
   return (
@@ -337,11 +386,12 @@ export const LevelEditorPanel = () => {
                 <button
                   key={c.url}
                   type="button"
-                  title={c.url}
-                  style={btn(placingUrl === c.url)}
+                  title={`${c.label}\n${c.url}`}
+                  style={swatchBtn(placingUrl === c.url)}
                   onClick={() => useEditor.getState().setPlacing(c.url)}
                 >
-                  {c.label}
+                  <PropPreview url={c.url} size={42} />
+                  <span style={swatchLabel}>{c.label}</span>
                 </button>
               ))}
             </div>
@@ -352,24 +402,54 @@ export const LevelEditorPanel = () => {
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           gap: 6,
-          alignItems: "center",
-          justifyContent: "space-between",
           borderTop: "1px solid #2a313d",
           paddingTop: 8,
         }}
       >
-        <span style={{ color: "#8b93a3" }}>{propsArr.length} props</span>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" style={btn()} onClick={onExport}>
-            {copied ? "Copied!" : "Export"}
-          </button>
+        <div
+          style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "space-between" }}
+        >
+          <span style={{ color: "#8b93a3" }}>{propsArr.length} props</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button type="button" style={btn()} onClick={onExport} title="Copy JSON to clipboard">
+              {copied ? "Copied!" : "Copy"}
+            </button>
+            <button
+              type="button"
+              style={btn()}
+              onClick={onDownload}
+              title={`Download mz-level-${levelId}.json`}
+            >
+              Download
+            </button>
+            <button
+              type="button"
+              style={btn()}
+              onClick={onDownloadAll}
+              title="Download every level's edits in one file"
+            >
+              Download all
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
           <button
             type="button"
             style={{ ...btn(), borderColor: "#7a3a3a", background: "#3a1c1c" }}
             onClick={() => useEditor.getState().clearLevel()}
+            title={`Clear hand-placed props on L${levelId}`}
           >
-            Clear
+            Clear level
+          </button>
+          <button
+            type="button"
+            style={{ ...btn(), borderColor: "#7a3a3a", background: "#3a1c1c" }}
+            onClick={onClearAll}
+            title="Wipe authored props on EVERY level (irreversible)"
+          >
+            Clear all
           </button>
         </div>
       </div>
