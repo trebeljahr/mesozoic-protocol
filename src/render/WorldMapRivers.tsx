@@ -43,8 +43,13 @@ export const WorldMapRivers = () => {
 
 // Dev path: live preview from the editor store. Only reached in DEV builds,
 // so the editor-store subscription is gated behind the build-time flag.
+// The store's version counter bumps on every commit; we subscribe to it and
+// pull the live rivers array via getCurrent() — same invalidation pattern as
+// the editor's render layer.
 const DevWorldMapRivers = () => {
-  const rivers = useWorldMapEditor((s) => s.rivers);
+  const version = useWorldMapEditor((s) => s.version);
+  void version;
+  const { rivers } = useWorldMapEditor.getState().getCurrent();
   return <Rivers rivers={rivers} />;
 };
 
