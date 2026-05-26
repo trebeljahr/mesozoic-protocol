@@ -6,7 +6,12 @@ import * as THREE from "three";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
-import { bakeObjectToGeometry, type FractureChunk, fractureGeometry } from "./fractureMesh";
+import {
+  bakeObjectToGeometry,
+  type FractureChunk,
+  fractureGeometry,
+  fractureGeometryAsync,
+} from "./fractureMesh";
 import { measureVisibleBox } from "./measureModel";
 
 // The Plasma Turret is the robot model from the title-screen diorama. It
@@ -180,24 +185,30 @@ const HQOne = ({ pose }: { pose: Pose }) => {
   } | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const ctrl = new AbortController();
     // 1.2s delay so the first paint + GLTF load + biome init have all
-    // settled. Using setTimeout (not requestIdleCallback) because the
-    // game loop runs useFrame at 60fps and the browser may never report
-    // an "idle" period long enough for idle-callback to fire.
-    const handle = setTimeout(() => {
-      if (cancelled) return;
+    // settled. The fracture work itself is chunked by `fractureGeometryAsync`
+    // (yields between every CSG op + serialised across HQs via a module
+    // queue) so it can no longer monopolise the main thread long enough to
+    // trip the WebGL context-loss watchdog.
+    const handle = setTimeout(async () => {
+      if (ctrl.signal.aborted) return;
       const baked = bakeObjectToGeometry(scaledClone);
-      const chunkList = fractureGeometry(baked, FRACTURE_CHUNKS, pose.pathIndex + 7);
       const bakedBox = new THREE.Box3().setFromBufferAttribute(
         baked.getAttribute("position") as THREE.BufferAttribute,
       );
       const center = bakedBox.getCenter(new THREE.Vector3());
-      if (cancelled) return;
+      const chunkList = await fractureGeometryAsync(
+        baked,
+        FRACTURE_CHUNKS,
+        pose.pathIndex + 7,
+        ctrl.signal,
+      );
+      if (ctrl.signal.aborted) return;
       setFracture({ chunks: chunkList, center });
     }, 1200);
     return () => {
-      cancelled = true;
+      ctrl.abort();
       clearTimeout(handle);
     };
   }, [scaledClone, pose.pathIndex]);

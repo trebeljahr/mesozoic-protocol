@@ -175,3 +175,122 @@ export const fractureGeometry = (
   }
   return chunks;
 };
+
+// Macrotask yield. `setTimeout(0)` returns to the event loop so the browser
+// can paint a frame and the WebGL driver can poll the context, instead of
+// the CSG batch monopolising the main thread for seconds at a time.
+const yieldToBrowser = (): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
+// Serialise fracture work across all callers. Without this, every HQOne
+// fires its 1.2s setTimeout near-simultaneously on a multi-path level and
+// the CSG work runs back-to-back in adjacent tasks — still enough wall-time
+// to trip the WebGL watchdog even though each task individually yields.
+let fractureQueue: Promise<unknown> = Promise.resolve();
+
+// Chunked async fracture. Same output as `fractureGeometry` but yields a
+// macrotask between every CSG op so individual tasks stay <50ms and the
+// renderer keeps painting while the queue drains. Accepts an optional
+// AbortSignal so unmount can cancel an in-flight fracture rather than
+// throwing away a finished chunk list at the very end.
+export const fractureGeometryAsync = (
+  source: THREE.BufferGeometry,
+  numSeeds = 14,
+  seed = 1,
+  signal?: AbortSignal,
+): Promise<FractureChunk[]> => {
+  const task = fractureQueue.then(async () => {
+    if (signal?.aborted) return [] as FractureChunk[];
+    if (!source.getAttribute("position") || source.getAttribute("position").count === 0) {
+      return [] as FractureChunk[];
+    }
+
+    const rng = mkRng(seed);
+    const indexed = ensureIndexedPositionOnly(source);
+    const bbox = new THREE.Box3().setFromBufferAttribute(
+      indexed.getAttribute("position") as THREE.BufferAttribute,
+    );
+    const size = bbox.getSize(new THREE.Vector3());
+    const big = Math.max(size.x, size.y, size.z, 0.01) * 12;
+
+    const seeds: THREE.Vector3[] = [];
+    for (let i = 0; i < numSeeds; i++) {
+      const fx = (rng() + rng()) * 0.5;
+      const fy = (rng() + rng()) * 0.5;
+      const fz = (rng() + rng()) * 0.5;
+      seeds.push(
+        new THREE.Vector3(
+          bbox.min.x + fx * size.x,
+          bbox.min.y + fy * size.y,
+          bbox.min.z + fz * size.z,
+        ),
+      );
+    }
+
+    const evaluator = new Evaluator();
+    evaluator.useGroups = false;
+    evaluator.attributes = ["position", "normal"];
+
+    const sourceBrush = new Brush(indexed);
+    sourceBrush.updateMatrixWorld();
+
+    const chunks: FractureChunk[] = [];
+    for (let i = 0; i < seeds.length; i++) {
+      if (signal?.aborted) return chunks;
+      const s = seeds[i];
+      let cell: Brush = sourceBrush;
+      let aborted = false;
+      for (let j = 0; j < seeds.length; j++) {
+        if (j === i) continue;
+        const s2 = seeds[j];
+        const normal = s.clone().sub(s2);
+        const nlen = normal.length();
+        if (nlen < 1e-6) continue;
+        normal.multiplyScalar(1 / nlen);
+        const point = s.clone().add(s2).multiplyScalar(0.5);
+        const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, point);
+        const hs = halfspaceBrush(plane, big);
+        const out = new Brush(new THREE.BufferGeometry());
+        try {
+          evaluator.evaluate(cell, hs, INTERSECTION, out);
+        } catch (_e) {
+          aborted = true;
+          break;
+        }
+        const pos = out.geometry.getAttribute("position");
+        if (!pos || pos.count === 0) {
+          aborted = true;
+          break;
+        }
+        cell = out;
+        // Yield after every CSG op — this is the only place in the loop
+        // that does meaningful work, and `evaluator.evaluate` on the later
+        // cells (with high triangle counts) is what blows past frame budget.
+        await yieldToBrowser();
+        if (signal?.aborted) return chunks;
+      }
+      if (aborted) continue;
+
+      const g = cell.geometry;
+      const pos = g.getAttribute("position");
+      if (!pos || pos.count === 0) continue;
+
+      const cbox = new THREE.Box3().setFromBufferAttribute(pos as THREE.BufferAttribute);
+      const cCenter = cbox.getCenter(new THREE.Vector3());
+      const cSize = cbox.getSize(new THREE.Vector3());
+      g.translate(-cCenter.x, -cCenter.y, -cCenter.z);
+      g.computeVertexNormals();
+
+      chunks.push({
+        geometry: g,
+        origin: cCenter,
+        radius: Math.max(cSize.x, cSize.y, cSize.z) * 0.5 || 0.05,
+      });
+    }
+    return chunks;
+  });
+  fractureQueue = task.catch(() => {});
+  return task;
+};
