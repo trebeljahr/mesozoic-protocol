@@ -18,6 +18,14 @@ import {
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
 import { ENEMY_EMISSIVE, EYE_FALLBACK_NAMES, MATRIARCH_CONDUIT_PATTERNS } from "./emissiveRegistry";
+import {
+  buildPlateGroup,
+  type ConduitUniforms,
+  getConduitColor,
+  installConduitOnBody,
+  makeConduitUniforms,
+  resolveEnemyTier,
+} from "./enemyGrafts";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
 import {
   applyEmissiveSpec,
@@ -86,6 +94,14 @@ type Item = {
   // footstep crossing detection. -1 = unprimed (don't emit until the next
   // frame seeds a baseline, so a clip (re)start can't burst a step).
   lastStepPhase: number;
+  // Bone-grafted plate scaffolding mounted as a sibling of obj so its
+  // transform tracks the smoothed pose without depending on the skinned
+  // skeleton. Null on the very first frame before installGrafts runs.
+  plateGroup: THREE.Group | null;
+  // Shared bio-conduit shader uniforms — same object referenced by every
+  // submesh in this body so the stripes stay phase-locked. Mutated each
+  // frame to drive idle pulse + aggression / hit-flash / death.
+  conduitUniforms: ConduitUniforms | null;
 };
 
 // Exp-damp half-life (seconds). Lower = snappier, higher = floatier.
@@ -244,12 +260,14 @@ export const ModelEnemyMesh = ({
         item.mixer.stopAllAction();
         parent.remove(item.obj);
         if (item.proxy) parent.remove(item.proxy);
+        if (item.plateGroup) parent.remove(item.plateGroup);
       }
       itemsRef.current.clear();
       for (const item of poolRef.current) {
         item.mixer.stopAllAction();
         parent.remove(item.obj);
         if (item.proxy) parent.remove(item.proxy);
+        if (item.plateGroup) parent.remove(item.plateGroup);
       }
       poolRef.current.length = 0;
     },
@@ -277,6 +295,7 @@ export const ModelEnemyMesh = ({
         item.proxy.visible = false;
         item.proxy.userData.enemyId = undefined;
       }
+      if (item.plateGroup) item.plateGroup.visible = false;
       poolRef.current.push(item);
     } else {
       item.obj.traverse((o) => {
@@ -287,6 +306,16 @@ export const ModelEnemyMesh = ({
       });
       parent.remove(item.obj);
       if (item.proxy) parent.remove(item.proxy);
+      if (item.plateGroup) {
+        parent.remove(item.plateGroup);
+        item.plateGroup.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh && m.geometry) {
+            // Plate geometry is the shared singleton from getPlateGeometry;
+            // don't dispose it. Material is also shared.
+          }
+        });
+      }
     }
   }, []);
 
@@ -329,6 +358,14 @@ export const ModelEnemyMesh = ({
             recycled.proxy.visible = true;
             recycled.proxy.userData.enemyId = e.id;
             recycled.proxy.userData.enemyMaxHp = e.maxHp;
+          }
+          if (recycled.plateGroup) {
+            recycled.plateGroup.visible = true;
+          }
+          // Reset conduit pulse so the next life starts at idle intensity.
+          if (recycled.conduitUniforms) {
+            recycled.conduitUniforms.uIntensity.value = 1.0;
+            recycled.conduitUniforms.uPhaseOffset.value = (e.id * 0.6173) % (Math.PI * 2);
           }
           recycled.visInit = false;
           // Pool may have stashed a corpse mid-fall; reset transient
@@ -443,6 +480,34 @@ export const ModelEnemyMesh = ({
             parent.add(proxy);
           }
 
+          // Bone-grafted alloy plates + bio-conduit shader install.
+          // Both layers piggy-back on the smoothed pose computed below —
+          // plates ride a sibling group, conduit shader patches the
+          // body materials in place. Quality::low skips the conduit
+          // patch (plates still draw), Quality::medium halves the stripe
+          // frequency.
+          const matriarch = bossVariant !== undefined;
+          const effectiveTier = resolveEnemyTier(kind, matriarch);
+          const conduitColor = getConduitColor(bossVariant);
+          // Per-enemy phase offset desyncs the idle pulse across the
+          // pack so a row of raptors doesn't strobe in unison.
+          const phaseOffset = (e.id * 0.6173) % (Math.PI * 2);
+          const conduitUniforms = makeConduitUniforms(
+            conduitColor,
+            effectiveTier,
+            phaseOffset,
+            matriarch,
+          );
+          installConduitOnBody(obj, conduitUniforms);
+          const plateGroup = buildPlateGroup(kind, bossVariant, effectiveTier, targetSize);
+          // Plates join the painted-look outline pass so they read as
+          // part of the silhouette rather than pasted 3D shapes; they
+          // skip BLOOM_LAYER because steel has no emissive.
+          plateGroup.traverse((o) => {
+            o.layers.enable(OUTLINE_LAYER);
+          });
+          parent.add(plateGroup);
+
           item = {
             obj,
             proxy,
@@ -459,6 +524,8 @@ export const ModelEnemyMesh = ({
             dyingBaseRotX: 0,
             dyingBaseY: 0,
             lastStepPhase: -1,
+            plateGroup,
+            conduitUniforms,
           };
         }
         itemsRef.current.set(e.id, item);
@@ -586,6 +653,15 @@ export const ModelEnemyMesh = ({
       // to the raw sim position.
       setEnemyRender(e.id, { x: item.visX, z: item.visZ, bobY: bobY - attackPose * 0.08 });
 
+      // Plate scaffolding rides the smoothed pose as a sibling group —
+      // its local plate offsets are in target-size-unit world space, so
+      // matching the obj's position/rotation/yaw is all it takes for the
+      // plates to track the body without any normalizedScale gymnastics.
+      if (item.plateGroup) {
+        item.plateGroup.position.copy(item.obj.position);
+        item.plateGroup.rotation.copy(item.obj.rotation);
+      }
+
       const flashing = world.time < e.flashUntil;
       const frost = e.frost;
       // Matriarchs always wear their variant tint — they're a distinct
@@ -691,6 +767,23 @@ export const ModelEnemyMesh = ({
         if (Array.isArray(mat)) mat.forEach(apply);
         else apply(mat as THREE.MeshStandardMaterial);
       });
+
+      // Bio-conduit pulse — idle wave runs continuously, aggression
+      // (engaged with robot or leak attack at HQ) lifts the base
+      // intensity, the existing hit-flash window spikes it, and the
+      // body fades emissive while frozen so cryo doesn't keep the
+      // conduits blazing through a stasis. Death fade is handled in
+      // the dying branch below.
+      if (item.conduitUniforms) {
+        const u = item.conduitUniforms;
+        u.uTime.value = world.time;
+        let intensity = 1.0;
+        const aggression = leak !== undefined || engagingRobot;
+        if (aggression) intensity *= 1.5;
+        if (flashing) intensity *= 3.0;
+        if (frost > 0.5) intensity *= Math.max(0.15, 1 - frost);
+        u.uIntensity.value = intensity;
+      }
     }
 
     for (const [id, item] of itemsRef.current) {
@@ -712,6 +805,17 @@ export const ModelEnemyMesh = ({
         // the rest-pose bbox dip as the skeleton flattens. Eased so the
         // first frame doesn't pop and the held-final-pose stays lifted.
         item.obj.position.y = item.dyingBaseY + deathGroundLift * eased;
+        // Plates ride the corpse pose so they topple with the body.
+        if (item.plateGroup) {
+          item.plateGroup.position.copy(item.obj.position);
+          item.plateGroup.rotation.copy(item.obj.rotation);
+        }
+        // Bio-conduit fade — smooth ramp to dark over the death anim
+        // so the grafts cool as the body goes still.
+        if (item.conduitUniforms) {
+          item.conduitUniforms.uTime.value = world.time;
+          item.conduitUniforms.uIntensity.value = (1 - t) * 0.8;
+        }
         if (t >= 1) {
           recycleOrDispose(item);
           itemsRef.current.delete(id);
