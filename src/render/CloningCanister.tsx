@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { CanisterPalette } from "./biomeColors";
@@ -19,19 +19,6 @@ const SPECIMEN_URL = "/models/Velociraptor.glb";
 // const GLB_URL = "/models/cloning-canister.glb";
 
 useGLTF.preload(SPECIMEN_URL);
-
-// Mirrors App.tsx's lowEnd detection — no project-wide quality store, so
-// the heavy MeshPhysicalMaterial gets swapped for a standard translucent
-// material on mobile-class devices to keep the transmission pass off the
-// hot path.
-const isLowEndDevice = (): boolean => {
-  if (typeof navigator === "undefined") return false;
-  const cores = navigator.hardwareConcurrency ?? 8;
-  if (cores <= 4) return true;
-  if (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) return true;
-  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-};
-const LOW_END = isLowEndDevice();
 
 // Shared geometries — one tank is ~1.7m tall: 0.22 base + 1.4 glass + 0.1 cap.
 const GEOMS = {
@@ -69,6 +56,83 @@ const SPECIMEN_TARGET = 0.55;
 
 const noRaycast: THREE.Mesh["raycast"] = () => {};
 
+// Palette-keyed material caches. Every canister in one biome reuses the
+// same glass + per-submesh specimen materials so the scene doesn't end up
+// with N copies of the same MeshStandardMaterial (each carrying its own
+// uniforms + shader handle) when CloningVats places ~10 tanks around the
+// HQs. Per-canister state (fluid pulse, indicator phases) still gets its
+// own material instances below — those genuinely vary frame-to-frame.
+const glassMatCache = new Map<string, THREE.MeshStandardMaterial>();
+const getGlassMat = (palette: CanisterPalette): THREE.MeshStandardMaterial => {
+  const key = `${palette.glass}|${palette.fluid}`;
+  const cached = glassMatCache.get(key);
+  if (cached) return cached;
+  // MeshPhysicalMaterial with transmission gave true refraction but
+  // forced an extra full framebuffer pass per frame and ate
+  // disproportionate budget for a background prop. The translucent
+  // MeshStandardMaterial reads as glass at gameplay camera distance
+  // for a fraction of the cost.
+  const m = new THREE.MeshStandardMaterial({
+    color: palette.glass,
+    transparent: true,
+    opacity: 0.32,
+    roughness: 0.2,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  glassMatCache.set(key, m);
+  return m;
+};
+
+type SpecimenSource = {
+  source: THREE.Object3D;
+  centerOffset: THREE.Vector3;
+  uniformScale: number;
+};
+const specimenSourceCache = new Map<string, SpecimenSource>();
+const getSpecimenSource = (scene: THREE.Object3D, palette: CanisterPalette): SpecimenSource => {
+  // Cache a single "tinted-for-this-fluid-color" specimen tree per palette
+  // so we don't re-clone materials per canister. We still cloneSkinned()
+  // the cached source per canister so each tank has its own Object3D
+  // wrapper (and skeleton instance), but SkeletonUtils.clone shares the
+  // material refs between clones — so all canisters in one biome point at
+  // the same 5-or-so MeshStandardMaterials instead of 5 × N copies.
+  const key = palette.fluid;
+  const cached = specimenSourceCache.get(key);
+  if (cached) return cached;
+  const sourceClone = cloneSkinned(scene);
+  const fluidCol = new THREE.Color(palette.fluid);
+  sourceClone.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || !obj.material) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    const remapped = mats.map((m) => {
+      if (!(m instanceof THREE.MeshStandardMaterial)) return m;
+      const c = m.clone();
+      c.color.lerp(fluidCol, 0.5);
+      c.emissive = fluidCol.clone().multiplyScalar(0.35);
+      c.transparent = true;
+      c.opacity = 0.92;
+      return c;
+    });
+    obj.material = Array.isArray(obj.material) ? remapped : remapped[0];
+    obj.castShadow = false;
+    obj.receiveShadow = false;
+  });
+  const box = measureVisibleBox(sourceClone);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 0.001);
+  const uniformScale = SPECIMEN_TARGET / maxDim;
+  const entry: SpecimenSource = {
+    source: sourceClone,
+    centerOffset: center.multiplyScalar(uniformScale).negate(),
+    uniformScale,
+  };
+  specimenSourceCache.set(key, entry);
+  return entry;
+};
+
 type Props = {
   worldX: number;
   worldZ: number;
@@ -80,39 +144,20 @@ type Props = {
 export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) => {
   const { scene } = useGLTF(SPECIMEN_URL);
 
-  // Per-canister specimen clone. We measure the visible bbox so the body
-  // centers inside the tank regardless of how the GLB's pivot is authored.
-  // Material is cloned + washed toward the fluid colour so it reads as
-  // submerged rather than dry-lit.
+  // Per-canister specimen wrapper. SkeletonUtils.clone gives this tank its
+  // own Object3D + skeleton without re-cloning the (already palette-tinted)
+  // materials hanging off the cached source; all canisters in one biome
+  // therefore share ~5 specimen mats instead of 5 × N copies.
   const specimen = useMemo(() => {
-    const cloneObj = cloneSkinned(scene);
-    const box = measureVisibleBox(cloneObj);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-    const s = SPECIMEN_TARGET / maxDim;
-    cloneObj.scale.setScalar(s);
-    cloneObj.position.set(-center.x * s, -center.y * s, -center.z * s);
-    const fluidCol = new THREE.Color(palette.fluid);
-    cloneObj.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh) || !obj.material) return;
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      const remapped = mats.map((m) => {
-        if (!(m instanceof THREE.MeshStandardMaterial)) return m;
-        const c = m.clone();
-        c.color.lerp(fluidCol, 0.5);
-        c.emissive = fluidCol.clone().multiplyScalar(0.35);
-        c.transparent = true;
-        c.opacity = 0.92;
-        return c;
-      });
-      obj.material = Array.isArray(obj.material) ? remapped : remapped[0];
-      obj.castShadow = false;
-      obj.receiveShadow = false;
-    });
+    const src = getSpecimenSource(scene, palette);
+    const cloneObj = cloneSkinned(src.source);
+    cloneObj.scale.setScalar(src.uniformScale);
+    cloneObj.position.copy(src.centerOffset);
     return cloneObj;
-  }, [scene, palette.fluid]);
+  }, [scene, palette]);
 
+  // Fluid pulses opacity per-canister-seed, so the material must be per
+  // instance — dispose it on unmount to avoid leaking on every level swap.
   const fluidMat = useMemo(() => {
     return new THREE.MeshBasicMaterial({
       color: new THREE.Color(palette.fluid),
@@ -123,42 +168,17 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
       toneMapped: false,
     });
   }, [palette.fluid]);
+  useEffect(() => () => fluidMat.dispose(), [fluidMat]);
 
-  // Glass tube. MeshPhysicalMaterial+transmission gives real refraction but
-  // the second render pass costs enough that a few stacked tanks tank fps on
-  // low-end hardware; for a cosmetic prop at gameplay camera distance, a
-  // translucent standard material reads just as readable. High-end path
-  // opts back into transmission for the refractive look-through.
-  const glassMat = useMemo(() => {
-    if (LOW_END) {
-      return new THREE.MeshStandardMaterial({
-        color: palette.glass,
-        transparent: true,
-        opacity: 0.32,
-        roughness: 0.2,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      });
-    }
-    return new THREE.MeshPhysicalMaterial({
-      color: palette.glass,
-      transmission: 0.92,
-      thickness: 0.1,
-      roughness: 0.06,
-      metalness: 0,
-      ior: 1.45,
-      transparent: true,
-      opacity: 1,
-      side: THREE.DoubleSide,
-      attenuationDistance: 3,
-      attenuationColor: new THREE.Color(palette.fluid).multiplyScalar(0.4),
-    });
-  }, [palette.glass, palette.fluid]);
+  // Glass tube material is identical across canisters of one biome —
+  // pull from the palette-keyed cache so the renderer compiles + uploads
+  // it once per biome rather than once per tank.
+  const glassMat = getGlassMat(palette);
 
   // One material per indicator so each light can pulse on its own phase.
   // Base colours alternate so neighbouring tanks don't look like they're
-  // pulsing in lockstep.
+  // pulsing in lockstep. Per-canister mats need explicit disposal on
+  // unmount so a level transition doesn't leak 3 mats per tank.
   const indicatorMats = useMemo(
     () =>
       [0, 1, 2].map((i) => {
@@ -166,6 +186,12 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
         return new THREE.MeshBasicMaterial({ color: new THREE.Color(base), toneMapped: false });
       }),
     [palette.indicator, palette.indicatorAlt],
+  );
+  useEffect(
+    () => () => {
+      for (const m of indicatorMats) m.dispose();
+    },
+    [indicatorMats],
   );
   const indicatorBaseColors = useMemo(
     () => [0, 1, 2].map((i) => new THREE.Color(i === 1 ? palette.indicator : palette.indicatorAlt)),

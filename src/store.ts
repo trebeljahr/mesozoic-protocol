@@ -497,6 +497,12 @@ type GameStore = {
   inspectedEnemy: InspectState;
   eventListeners: ((e: GameEvent) => void)[];
 
+  // Bumped whenever the WebGL context is lost or restored. The Canvas
+  // keys SceneRoot on this counter so a context drop tears down every
+  // R3F-owned object and rebuilds it from scratch on restore, instead
+  // of leaving the page black with stale GL handles.
+  glContextEpoch: number;
+
   screen: Screen;
   // null until the user picks a save slot from the SaveSlots screen.
   // All progress writes route through this — saveSlot is a no-op when
@@ -886,6 +892,7 @@ export const useGame = create<GameStore>((set, get) => ({
   assigningDroneSlot: null,
   spotSelecting: false,
   eventListeners: [],
+  glContextEpoch: 0,
 
   screen: "splash",
   activeSlot: null,

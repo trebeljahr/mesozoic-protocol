@@ -92,6 +92,7 @@ const composerMultisampling = 4;
 
 export const App = () => {
   const screen = useGame((s) => s.screen);
+  const glContextEpoch = useGame((s) => s.glContextEpoch);
   const levelIntroVisible = useGame((s) => s.levelIntroVisible);
   const compendiumOpen = useGame((s) => s.compendiumOpen);
   const achievementsOpen = useGame((s) => s.achievementsOpen);
@@ -199,9 +200,33 @@ export const App = () => {
     <>
       {!sceneBlockingModalOpen && (
         <ErrorBoundary fallback={(error, reset) => <CanvasFailure error={error} reset={reset} />}>
-          <Canvas shadows dpr={dprCap} gl={{ antialias: true }}>
-            <SceneRoot />
-            <EffectComposer multisampling={composerMultisampling}>
+          <Canvas
+            shadows
+            dpr={dprCap}
+            gl={{ antialias: true, powerPreference: "high-performance" }}
+            onCreated={({ gl }) => {
+              // WebGL context-loss safety net. Without preventDefault on the
+              // lost event the browser refuses to restore, leaving the canvas
+              // permanently black. On restore the renderer rebuilds programs
+              // and uploads on demand, but the EffectComposer's internal
+              // render targets need a remount — bump the scene key so the
+              // whole SceneRoot tears down and re-creates.
+              const canvas = gl.domElement;
+              const onLost = (e: Event) => {
+                e.preventDefault();
+                console.warn("[gl] context lost — preventing default so it can be restored");
+                useGame.setState({ glContextEpoch: useGame.getState().glContextEpoch + 1 });
+              };
+              const onRestored = () => {
+                console.warn("[gl] context restored — bumping scene epoch");
+                useGame.setState({ glContextEpoch: useGame.getState().glContextEpoch + 1 });
+              };
+              canvas.addEventListener("webglcontextlost", onLost as EventListener, false);
+              canvas.addEventListener("webglcontextrestored", onRestored, false);
+            }}
+          >
+            <SceneRoot key={`scene-${glContextEpoch}`} />
+            <EffectComposer key={`fx-${glContextEpoch}`} multisampling={composerMultisampling}>
               {screen === "playing" ? (
                 <PaintedPostFx />
               ) : (
