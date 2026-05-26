@@ -3,6 +3,15 @@ import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
 import type { PlacedProp } from "../sim/types";
 import { useGame } from "../store";
+import {
+  canRedo as canRedoH,
+  canUndo as canUndoH,
+  type History,
+  pushHistory,
+  redoHistory,
+  type Snapshot,
+  undoHistory,
+} from "./history";
 import { clearLevelEdit, saveLevelEdit } from "./levelEdits";
 
 // Dev-only editor state. Kept in its own store so the giant game store stays
@@ -37,6 +46,11 @@ const persist = (): void => {
   saveLevelEdit(w.levelId, { v: 1, override: w.overrideActive, props: w.props });
 };
 
+const currentSnapshot = (): Snapshot => {
+  const w = useGame.getState().world;
+  return { props: [...w.props], override: w.overrideActive };
+};
+
 // Replace world.props with a fresh array, invalidate render, and persist.
 const commitProps = (next: PlacedProp[]): void => {
   useGame.getState().world.props = next;
@@ -63,6 +77,7 @@ type EditorState = {
   selectedId: string | null;
   // When true the next map click relocates the selected prop.
   moving: boolean;
+  history: History;
   toggleActive: () => void;
   setPlacing: (url: string | null) => void;
   placeAt: (x: number, y: number) => void;
@@ -75,125 +90,177 @@ type EditorState = {
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
   clearLevel: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
   exportJson: () => string;
 };
 
 // PURE annotation: the create() call has no observable side effects, so when
 // the editor's only consumers (EditorProps / LevelEditorPanel) are dead-coded
 // in production, Rollup drops this store — and levelEdits — entirely.
-export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => ({
-  active: false,
-  placingUrl: null,
-  selectedId: null,
-  moving: false,
+export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
+  // snapshotAndPush: capture pre-mutation state and push it onto the undo
+  // stack. Call BEFORE applying any mutation. Resets the redo stack.
+  const snapshotAndPush = (): void => {
+    set((s) => ({ history: pushHistory(s.history, currentSnapshot()) }));
+  };
 
-  toggleActive: () => {
-    const next = !get().active;
-    if (next) {
-      // Drop any in-flight gameplay selection so map clicks belong to the
-      // editor, not tower placement / robot move orders.
-      useGame.getState().clearSelection();
-    }
-    set({ active: next, placingUrl: null, selectedId: null, moving: false });
-  },
+  return {
+    active: false,
+    placingUrl: null,
+    selectedId: null,
+    moving: false,
+    history: { past: [], future: [] },
 
-  setPlacing: (url) =>
-    set((s) => ({
-      // Clicking the armed asset again disarms back to select mode.
-      placingUrl: s.placingUrl === url ? null : url,
-      selectedId: null,
-      moving: false,
-    })),
+    toggleActive: () => {
+      const next = !get().active;
+      if (next) {
+        // Drop any in-flight gameplay selection so map clicks belong to the
+        // editor, not tower placement / robot move orders.
+        useGame.getState().clearSelection();
+      }
+      set({ active: next, placingUrl: null, selectedId: null, moving: false });
+    },
 
-  placeAt: (x, y) => {
-    const url = get().placingUrl;
-    if (!url) return;
-    const prop: PlacedProp = {
-      id: nanoid(8),
-      url,
-      pos: { x, y },
-      scale: 1,
-      rot: 0,
-      blocks: defaultBlocks(url),
-    };
-    commitProps([...useGame.getState().world.props, prop]);
-    // Keep the asset armed for rapid placement; surface the new prop as
-    // selected so its controls are one disarm away.
-    set({ selectedId: prop.id });
-  },
+    setPlacing: (url) =>
+      set((s) => ({
+        // Clicking the armed asset again disarms back to select mode.
+        placingUrl: s.placingUrl === url ? null : url,
+        selectedId: null,
+        moving: false,
+      })),
 
-  select: (id) => set({ selectedId: id, moving: false }),
+    placeAt: (x, y) => {
+      const url = get().placingUrl;
+      if (!url) return;
+      const prop: PlacedProp = {
+        id: nanoid(8),
+        url,
+        pos: { x, y },
+        scale: 1,
+        rot: 0,
+        blocks: defaultBlocks(url),
+      };
+      snapshotAndPush();
+      commitProps([...useGame.getState().world.props, prop]);
+      // Keep the asset armed for rapid placement; surface the new prop as
+      // selected so its controls are one disarm away.
+      set({ selectedId: prop.id });
+    },
 
-  beginMove: () => {
-    if (get().selectedId === null) return;
-    set({ moving: true });
-  },
+    select: (id) => set({ selectedId: id, moving: false }),
 
-  moveSelectedTo: (x, y) => {
-    const id = get().selectedId;
-    if (id === null) return;
-    commitProps(
-      useGame.getState().world.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)),
-    );
-    set({ moving: false });
-  },
+    beginMove: () => {
+      if (get().selectedId === null) return;
+      set({ moving: true });
+    },
 
-  deleteSelected: () => {
-    const id = get().selectedId;
-    if (id === null) return;
-    commitProps(useGame.getState().world.props.filter((p) => p.id !== id));
-    set({ selectedId: null, moving: false });
-  },
+    moveSelectedTo: (x, y) => {
+      const id = get().selectedId;
+      if (id === null) return;
+      snapshotAndPush();
+      commitProps(
+        useGame.getState().world.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)),
+      );
+      set({ moving: false });
+    },
 
-  rotateSelected: (deltaRad) => {
-    const id = get().selectedId;
-    if (id === null) return;
-    commitProps(
-      useGame
-        .getState()
-        .world.props.map((p) => (p.id === id ? { ...p, rot: p.rot + deltaRad } : p)),
-    );
-  },
+    deleteSelected: () => {
+      const id = get().selectedId;
+      if (id === null) return;
+      snapshotAndPush();
+      commitProps(useGame.getState().world.props.filter((p) => p.id !== id));
+      set({ selectedId: null, moving: false });
+    },
 
-  scaleSelected: (mul) => {
-    const id = get().selectedId;
-    if (id === null) return;
-    commitProps(
-      useGame
-        .getState()
-        .world.props.map((p) => (p.id === id ? { ...p, scale: clampScale(p.scale * mul) } : p)),
-    );
-  },
+    rotateSelected: (deltaRad) => {
+      const id = get().selectedId;
+      if (id === null) return;
+      snapshotAndPush();
+      commitProps(
+        useGame
+          .getState()
+          .world.props.map((p) => (p.id === id ? { ...p, rot: p.rot + deltaRad } : p)),
+      );
+    },
 
-  toggleSelectedBlocks: () => {
-    const id = get().selectedId;
-    if (id === null) return;
-    commitProps(
-      useGame.getState().world.props.map((p) => (p.id === id ? { ...p, blocks: !p.blocks } : p)),
-    );
-  },
+    scaleSelected: (mul) => {
+      const id = get().selectedId;
+      if (id === null) return;
+      snapshotAndPush();
+      commitProps(
+        useGame
+          .getState()
+          .world.props.map((p) => (p.id === id ? { ...p, scale: clampScale(p.scale * mul) } : p)),
+      );
+    },
 
-  setOverride: (on) => {
-    const w = useGame.getState().world;
-    w.overrideActive = on;
-    persist();
-    set({ selectedId: null, moving: false, placingUrl: null });
-    // Rebuild so procedural set-dressing is suppressed (or restored).
-    reloadLevel();
-  },
+    toggleSelectedBlocks: () => {
+      const id = get().selectedId;
+      if (id === null) return;
+      snapshotAndPush();
+      commitProps(
+        useGame.getState().world.props.map((p) => (p.id === id ? { ...p, blocks: !p.blocks } : p)),
+      );
+    },
 
-  clearLevel: () => {
-    const w = useGame.getState().world;
-    clearLevelEdit(w.levelId);
-    w.props = [];
-    w.overrideActive = false;
-    set({ selectedId: null, moving: false, placingUrl: null });
-    bumpGeometry();
-    reloadLevel();
-  },
+    setOverride: (on) => {
+      const w = useGame.getState().world;
+      snapshotAndPush();
+      w.overrideActive = on;
+      persist();
+      set({ selectedId: null, moving: false, placingUrl: null });
+      // Rebuild so procedural set-dressing is suppressed (or restored).
+      reloadLevel();
+    },
 
-  exportJson: () => {
-    const w = useGame.getState().world;
-    return JSON.stringify({ v: 1, override: w.overrideActive, props: w.props }, null, 2);
-  },
-}));
+    clearLevel: () => {
+      const w = useGame.getState().world;
+      clearLevelEdit(w.levelId);
+      w.props = [];
+      w.overrideActive = false;
+      // Fresh state is the new baseline — drop history.
+      set({
+        selectedId: null,
+        moving: false,
+        placingUrl: null,
+        history: { past: [], future: [] },
+      });
+      bumpGeometry();
+      reloadLevel();
+    },
+
+    undo: () => {
+      const result = undoHistory(get().history, currentSnapshot());
+      if (!result) return;
+      const w = useGame.getState().world;
+      w.props = result.restored.props;
+      w.overrideActive = result.restored.override;
+      bumpGeometry();
+      persist();
+      // Restored selection may no longer exist.
+      set({ history: result.next, selectedId: null, moving: false });
+    },
+
+    redo: () => {
+      const result = redoHistory(get().history, currentSnapshot());
+      if (!result) return;
+      const w = useGame.getState().world;
+      w.props = result.restored.props;
+      w.overrideActive = result.restored.override;
+      bumpGeometry();
+      persist();
+      set({ history: result.next, selectedId: null, moving: false });
+    },
+
+    canUndo: () => canUndoH(get().history),
+    canRedo: () => canRedoH(get().history),
+
+    exportJson: () => {
+      const w = useGame.getState().world;
+      return JSON.stringify({ v: 1, override: w.overrideActive, props: w.props }, null, 2);
+    },
+  };
+});

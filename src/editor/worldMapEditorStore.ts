@@ -3,6 +3,15 @@ import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
 import type { PlacedProp } from "../sim/types";
 import {
+  canRedo as canRedoH,
+  canUndo as canUndoH,
+  type History,
+  pushHistory,
+  redoHistory,
+  type Snapshot,
+  undoHistory,
+} from "./history";
+import {
   clearWorldMapEdit,
   loadWorldMapEdit,
   saveWorldMapEdit,
@@ -31,6 +40,7 @@ type WorldMapEditorState = {
   // Static-geometry invalidation key. Bumped on every mutation so the
   // render layer can re-derive its instanced groups.
   version: number;
+  history: History;
   toggleActive: () => void;
   setPlacing: (url: string | null) => void;
   placeAt: (x: number, y: number) => void;
@@ -43,6 +53,10 @@ type WorldMapEditorState = {
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
   clearAll: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
   exportJson: () => string;
 };
 
@@ -58,6 +72,14 @@ const persist = (props: PlacedProp[], override: boolean): void => {
 // actually executes (i.e. when a DEV consumer subscribes).
 export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((set, get) => {
   const seed = loadWorldMapEdit();
+
+  const snapshot = (): Snapshot => ({ props: [...get().props], override: get().override });
+
+  // Capture pre-mutation state onto the undo stack. Resets redo stack.
+  const snapshotAndPush = (): void => {
+    set((s) => ({ history: pushHistory(s.history, snapshot()) }));
+  };
+
   return {
     active: false,
     placingUrl: null,
@@ -66,6 +88,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     props: seed?.props ?? [],
     override: seed?.override ?? false,
     version: 0,
+    history: { past: [], future: [] },
 
     toggleActive: () => {
       set((s) => ({
@@ -94,6 +117,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         rot: 0,
         blocks: defaultBlocks(url),
       };
+      snapshotAndPush();
       const next = [...get().props, prop];
       persist(next, get().override);
       set((s) => ({ props: next, selectedId: prop.id, version: s.version + 1 }));
@@ -109,6 +133,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     moveSelectedTo: (x, y) => {
       const id = get().selectedId;
       if (id === null) return;
+      snapshotAndPush();
       const next = get().props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p));
       persist(next, get().override);
       set((s) => ({ props: next, moving: false, version: s.version + 1 }));
@@ -117,6 +142,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     deleteSelected: () => {
       const id = get().selectedId;
       if (id === null) return;
+      snapshotAndPush();
       const next = get().props.filter((p) => p.id !== id);
       persist(next, get().override);
       set((s) => ({
@@ -130,6 +156,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     rotateSelected: (deltaRad) => {
       const id = get().selectedId;
       if (id === null) return;
+      snapshotAndPush();
       const next = get().props.map((p) => (p.id === id ? { ...p, rot: p.rot + deltaRad } : p));
       persist(next, get().override);
       set((s) => ({ props: next, version: s.version + 1 }));
@@ -138,6 +165,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     scaleSelected: (mul) => {
       const id = get().selectedId;
       if (id === null) return;
+      snapshotAndPush();
       const next = get().props.map((p) =>
         p.id === id ? { ...p, scale: clampScale(p.scale * mul) } : p,
       );
@@ -148,18 +176,21 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     toggleSelectedBlocks: () => {
       const id = get().selectedId;
       if (id === null) return;
+      snapshotAndPush();
       const next = get().props.map((p) => (p.id === id ? { ...p, blocks: !p.blocks } : p));
       persist(next, get().override);
       set((s) => ({ props: next, version: s.version + 1 }));
     },
 
     setOverride: (on) => {
+      snapshotAndPush();
       persist(get().props, on);
       set((s) => ({ override: on, version: s.version + 1 }));
     },
 
     clearAll: () => {
       clearWorldMapEdit();
+      // Fresh state is the new baseline — drop history.
       set((s) => ({
         props: [],
         override: false,
@@ -167,8 +198,40 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         moving: false,
         placingUrl: null,
         version: s.version + 1,
+        history: { past: [], future: [] },
       }));
     },
+
+    undo: () => {
+      const result = undoHistory(get().history, snapshot());
+      if (!result) return;
+      persist(result.restored.props, result.restored.override);
+      set((s) => ({
+        props: result.restored.props,
+        override: result.restored.override,
+        history: result.next,
+        selectedId: null,
+        moving: false,
+        version: s.version + 1,
+      }));
+    },
+
+    redo: () => {
+      const result = redoHistory(get().history, snapshot());
+      if (!result) return;
+      persist(result.restored.props, result.restored.override);
+      set((s) => ({
+        props: result.restored.props,
+        override: result.restored.override,
+        history: result.next,
+        selectedId: null,
+        moving: false,
+        version: s.version + 1,
+      }));
+    },
+
+    canUndo: () => canUndoH(get().history),
+    canRedo: () => canRedoH(get().history),
 
     exportJson: () => {
       const s = get();

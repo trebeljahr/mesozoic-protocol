@@ -79,6 +79,10 @@ export const WorldMapEditorPanel = () => {
   const moving = useWorldMapEditor((s) => s.moving);
   const version = useWorldMapEditor((s) => s.version);
   const toggleActive = useWorldMapEditor((s) => s.toggleActive);
+  // Subscribe to history so Undo/Redo button enabled state refreshes on push.
+  const history = useWorldMapEditor((s) => s.history);
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
 
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
@@ -87,11 +91,27 @@ export const WorldMapEditorPanel = () => {
   const propsArr = useWorldMapEditor.getState().props;
   const selected = selectedId !== null ? (propsArr.find((p) => p.id === selectedId) ?? null) : null;
 
-  // Keyboard: Esc steps back (disarm → deselect → close); Delete removes.
+  // Keyboard: Esc steps back (disarm → deselect → close); Delete removes;
+  // Ctrl/Meta+Z undoes, Ctrl+Shift+Z / Ctrl+Y redoes. Skip undo/redo
+  // shortcuts when typing in an input/textarea so native field undo wins.
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       const ed = useWorldMapEditor.getState();
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const inField = tag === "INPUT" || tag === "TEXTAREA";
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !inField && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        if (e.shiftKey) ed.redo();
+        else ed.undo();
+        return;
+      }
+      if (mod && !inField && (e.key === "y" || e.key === "Y")) {
+        e.preventDefault();
+        ed.redo();
+        return;
+      }
       if (e.key === "Escape") {
         if (ed.placingUrl) ed.setPlacing(ed.placingUrl);
         else if (ed.selectedId !== null) ed.select(null);
@@ -149,9 +169,29 @@ export const WorldMapEditorPanel = () => {
     <div style={panel}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <strong style={{ fontSize: 13 }}>World Map Editor</strong>
-        <button type="button" style={btn()} onClick={toggleActive}>
-          Close
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            type="button"
+            style={{ ...btn(), opacity: canUndo ? 1 : 0.4 }}
+            disabled={!canUndo}
+            onClick={() => useWorldMapEditor.getState().undo()}
+            title="Undo (Ctrl/Cmd+Z)"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            style={{ ...btn(), opacity: canRedo ? 1 : 0.4 }}
+            disabled={!canRedo}
+            onClick={() => useWorldMapEditor.getState().redo()}
+            title="Redo (Ctrl/Cmd+Shift+Z or Ctrl+Y)"
+          >
+            Redo
+          </button>
+          <button type="button" style={btn()} onClick={toggleActive}>
+            Close
+          </button>
+        </div>
       </div>
 
       {selected ? (
