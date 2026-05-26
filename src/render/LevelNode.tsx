@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { audio } from "../audio/AudioManager";
 import { isDebug } from "../debug";
+import { EditLevelButton } from "../editor/EditLevelButton";
 import { type LevelConfig, levelHasMode } from "../levels";
 import {
   getModeStars,
@@ -277,6 +278,7 @@ export const LevelNode = ({ level }: Props) => {
       )}
 
       {isDebug && <DebugLevelControl levelId={level.id} levelName={level.name} />}
+      {import.meta.env.DEV && unlocked && <EditLevelButton levelId={level.id} />}
     </group>
   );
 };
