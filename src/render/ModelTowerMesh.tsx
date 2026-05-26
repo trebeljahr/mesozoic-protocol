@@ -4,7 +4,69 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
-import { computeTowerTints, tierKey } from "./towerTints";
+import { type AtlasSwatch, computeTowerTints, tierKey } from "./towerTints";
+
+type AtlasState = {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  tex: THREE.CanvasTexture;
+  source: TexImageSource;
+};
+
+type AtlasMaterial = THREE.MeshStandardMaterial & {
+  __atlasState?: AtlasState;
+};
+
+const setupAtlasState = (mat: AtlasMaterial): AtlasState | null => {
+  if (mat.__atlasState) return mat.__atlasState;
+  const origMap = mat.map;
+  const src = origMap?.image as TexImageSource | undefined;
+  if (!origMap || !src) return null;
+  const w = (src as HTMLImageElement | HTMLCanvasElement).width;
+  const h = (src as HTMLImageElement | HTMLCanvasElement).height;
+  if (!w || !h) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = origMap.magFilter;
+  tex.minFilter = origMap.minFilter;
+  tex.wrapS = origMap.wrapS;
+  tex.wrapT = origMap.wrapT;
+  tex.colorSpace = origMap.colorSpace;
+  tex.flipY = origMap.flipY;
+  tex.generateMipmaps = false;
+  mat.map = tex;
+  // Atlas materials previously relied on `mat.color` / `mat.emissive` to
+  // multiply the shared texture. Now the texture itself carries the
+  // per-part colours, so neutralise both factors.
+  mat.color.setRGB(1, 1, 1);
+  mat.emissive.setRGB(0, 0, 0);
+  mat.emissiveIntensity = 0;
+  mat.needsUpdate = true;
+  const state: AtlasState = { canvas, ctx, tex, source: src };
+  mat.__atlasState = state;
+  return state;
+};
+
+const repaintAtlas = (state: AtlasState, swatches: AtlasSwatch[]) => {
+  const { ctx, canvas, source } = state;
+  // Reset to the pristine baked atlas, then stamp the per-tier swatches.
+  // Starting from the source on every tier change keeps swatches that the
+  // current tier doesn't override at their original baked colours.
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(source as CanvasImageSource, 0, 0);
+  for (const sw of swatches) {
+    const r = Math.round(Math.min(1, Math.max(0, sw.rgb[0])) * 255);
+    const g = Math.round(Math.min(1, Math.max(0, sw.rgb[1])) * 255);
+    const b = Math.round(Math.min(1, Math.max(0, sw.rgb[2])) * 255);
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    ctx.fillRect(sw.x, 0, 4, canvas.height);
+  }
+  state.tex.needsUpdate = true;
+};
 
 const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrades) => {
   const tints = computeTowerTints(kind, upgrades);
@@ -14,23 +76,23 @@ const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrad
     if (!mesh.isMesh) return;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     for (const raw of mats) {
-      const mat = raw as THREE.MeshStandardMaterial;
+      const mat = raw as AtlasMaterial;
       if (!mat) continue;
       const tint = tints.find((tn) => mat.name.includes(tn.match));
       if (!tint) continue;
-      // For atlas materials the texture provides the actual hue and
-      // `color` multiplies it; for untextured baseColorFactor materials
-      // `color` *is* the base colour. setRGB does the right thing in
-      // both cases — see towerTints.ts for the multiply vs replace split.
-      mat.color.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]);
-      // Emissive lifts near-black texels toward a hue that multiply alone
-      // can't reach (e.g. the chain tower's black base shifting steel
-      // blue per Voltage tier). Always written so tier 0 resets to none.
-      if (tint.emissive) {
-        mat.emissive.setRGB(tint.emissive[0], tint.emissive[1], tint.emissive[2]);
-        mat.emissiveIntensity = 1;
+      if (tint.kind === "material") {
+        // Untextured baseColorFactor part — set its colour directly.
+        mat.color.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]);
+        if (tint.emissive) {
+          mat.emissive.setRGB(tint.emissive[0], tint.emissive[1], tint.emissive[2]);
+          mat.emissiveIntensity = 1;
+        }
+        mat.needsUpdate = true;
+      } else {
+        // Atlas part — repaint the per-instance cloned PaletteBaseColor.
+        const state = setupAtlasState(mat);
+        if (state) repaintAtlas(state, tint.swatches);
       }
-      mat.needsUpdate = true;
     }
   });
 };
