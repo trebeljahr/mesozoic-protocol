@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Biome, PropRole } from "../biomes";
 import type { River } from "../sim/types";
 import { useGame } from "../store";
+import { useBackNavigation } from "../ui/useBackNavigation";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
 import {
   BIOME_LABEL,
@@ -200,6 +201,15 @@ export const LevelEditorPanel = () => {
   const version = useGame((s) => s.ui.treeVersion);
   const levelId = useGame((s) => s.world.levelId);
   const overrideActive = useGame((s) => s.world.overrideActive);
+  // Back gesture closes the editor (same behavior as the panel close button).
+  useBackNavigation(active, () => {
+    useEditor.setState({
+      active: false,
+      placingUrl: null,
+      selectedId: null,
+      moving: false,
+    });
+  });
 
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);

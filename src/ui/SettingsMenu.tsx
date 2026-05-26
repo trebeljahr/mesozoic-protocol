@@ -7,6 +7,7 @@ import { LanguageControls } from "./LanguageControls";
 import { IconCog } from "./MenuIcons";
 import { MenuOverlay } from "./MenuOverlay";
 import { SoundControls } from "./SoundControls";
+import { useBackNavigation } from "./useBackNavigation";
 
 // Floating top-right settings button + overlay shared by screens that
 // don't have a full menu of their own (splash, save-slots). World-map
@@ -14,6 +15,7 @@ import { SoundControls } from "./SoundControls";
 export const SettingsMenu = () => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  useBackNavigation(open, () => setOpen(false));
   return (
     <>
       <button

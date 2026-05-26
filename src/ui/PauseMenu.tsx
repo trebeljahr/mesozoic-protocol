@@ -13,6 +13,7 @@ import { LanguageControls } from "./LanguageControls";
 import { IconBook, IconMap, IconRefresh, IconTrophy } from "./MenuIcons";
 import { MenuOverlay } from "./MenuOverlay";
 import { SoundControls } from "./SoundControls";
+import { useBackNavigation } from "./useBackNavigation";
 import { useKeyboardHintsVisible } from "./useInputMode";
 
 type Props = {
@@ -28,6 +29,9 @@ export const PauseMenu = ({ onResume }: Props) => {
   const setAchievementsOpen = useGame((s) => s.setAchievementsOpen);
   const [confirming, setConfirming] = useState<null | "worldMap" | "restart">(null);
   const showKeyboardHints = useKeyboardHintsVisible();
+  // Confirmation dialog stacks on top of the pause overlay — back gesture
+  // should cancel it (and stay paused), not slip through to resume.
+  useBackNavigation(confirming !== null, () => setConfirming(null));
 
   const levelName = selectedLevelId
     ? t(`levels:names.${selectedLevelId}`, { defaultValue: getLevel(selectedLevelId).name })

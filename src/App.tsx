@@ -21,6 +21,7 @@ import { PlannerHud } from "./ui/PlannerHud";
 import { ResultsScreen } from "./ui/ResultsScreen";
 import { SaveSlots } from "./ui/SaveSlots";
 import { Splash } from "./ui/Splash";
+import { useBackNavigation } from "./ui/useBackNavigation";
 import { enterFullscreen, isFullscreen, loadFullscreenPref } from "./ui/useFullscreen";
 import { useInputModeSignal } from "./ui/useInputMode";
 import { useLevelLoadProgress } from "./ui/useLevelLoadProgress";
@@ -102,6 +103,7 @@ export const App = () => {
   const endlessPickerOpen = useGame((s) => s.endlessPickerOpen);
   const skillTreeOpen = useGame((s) => s.skillTreeOpen);
   const robotShopOpen = useGame((s) => s.robotShopOpen);
+  const robotPanelOpen = useGame((s) => s.robotPanelOpen);
   const selectedKind = useGame((s) => s.selectedKind);
   const paused = useGame((s) => s.ui.status === "paused");
   const newEnemyAlertVisible = useGame((s) => s.newEnemyQueue.length > 0);
@@ -134,6 +136,31 @@ export const App = () => {
       newEnemyAlertVisible,
     { confirmAsKeyboard: levelIntroVisible || newEnemyAlertVisible },
   );
+
+  // Browser/OS back routing. Stack order matches React useEffect order —
+  // later hooks push later → land on top of the stack → pop first. Screen-
+  // level transitions sit at the base; modals layer above. Each handler
+  // does the same thing the UI close path does, so the back gesture stays
+  // consistent with the explicit close button.
+  useBackNavigation(screen === "worldMap", () => useGame.getState().goToSlots());
+  useBackNavigation(screen === "results", () => useGame.getState().goToWorldMap());
+  // Two separate hooks so each is single-fire: back while running pauses;
+  // back while paused resumes. One combined hook would leave the stack
+  // out of sync after firing because `active` would stay true.
+  useBackNavigation(screen === "playing" && !paused, () => useGame.getState().togglePause());
+  useBackNavigation(screen === "playing" && paused, () => useGame.getState().togglePause());
+  // Modals — usually mutually exclusive at the visible layer, so stack
+  // ordering between them rarely matters. Listed roughly bottom-to-top by
+  // typical depth (pickers under reference panels under compendium).
+  useBackNavigation(difficultyPickerOpen, () => useGame.getState().setDifficultyPickerOpen(false));
+  useBackNavigation(modePickerOpen, () => useGame.getState().closeModePicker());
+  useBackNavigation(endlessPickerOpen, () => useGame.getState().setEndlessPickerOpen(false));
+  useBackNavigation(skillTreeOpen, () => useGame.getState().setSkillTreeOpen(false));
+  useBackNavigation(robotShopOpen, () => useGame.getState().setRobotShopOpen(false));
+  useBackNavigation(robotPanelOpen, () => useGame.getState().setRobotPanelOpen(false));
+  useBackNavigation(achievementsOpen, () => useGame.getState().setAchievementsOpen(false));
+  useBackNavigation(creditsOpen, () => useGame.getState().setCreditsOpen(false));
+  useBackNavigation(compendiumOpen, () => useGame.getState().setCompendiumOpen(false));
 
   // Drive the cursor from gameplay state. Crosshair on the canvas
   // while a tower kind is selected, default everywhere else. Buttons

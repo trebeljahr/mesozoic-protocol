@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Biome, PropRole } from "../biomes";
 import type { River } from "../sim/types";
+import { useBackNavigation } from "../ui/useBackNavigation";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
 import {
   BIOME_LABEL,
@@ -197,6 +198,15 @@ export const WorldMapEditorPanel = () => {
 
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
+  // Back gesture closes the editor.
+  useBackNavigation(active, () => {
+    useWorldMapEditor.setState({
+      active: false,
+      placingUrl: null,
+      selectedId: null,
+      moving: false,
+    });
+  });
 
   void version;
   const propsArr = useWorldMapEditor.getState().props;
