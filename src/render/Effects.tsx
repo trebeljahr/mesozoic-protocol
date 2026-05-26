@@ -12,6 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
+import { BLOOM_LAYER } from "./PaintedPostFx";
 
 const MAX_PARTICLES = 1024;
 const MAX_EXPLOSIONS = 32;
@@ -42,6 +43,9 @@ const makeBeamPair = (): { core: BeamPass; halo: BeamPass } => {
     });
     const line = new THREE.Line(geom, mat);
     line.visible = false;
+    // Beam lines are HDR additive — opt them into selective bloom so the
+    // chain-lightning / ult arcs paint a halo instead of a hard 1px line.
+    line.layers.enable(BLOOM_LAYER);
     return { line, mat };
   };
   return {
@@ -114,6 +118,10 @@ export const Effects = () => {
       if (!m) continue;
       m.boundingSphere = big.clone();
       m.geometry.boundingSphere = big.clone();
+      // Combat VFX are HDR (toneMapped=false additive); opt into the
+      // selective bloom pass so explosions / muzzle flashes / cryo rings
+      // carry a soft halo instead of reading as flat sprites.
+      m.layers.enable(BLOOM_LAYER);
     }
   }, []);
 

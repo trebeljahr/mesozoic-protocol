@@ -78,6 +78,85 @@ export type BiomeStyle = {
   endRing: string;
 };
 
+// Per-biome painted-look post-processing palette. Consumed by
+// src/render/PaintedPostFx.tsx (color grade + god-rays + bloom bias) and
+// src/render/AmbientHaze.tsx (dust / ember color + density). All entries are
+// optional tuning knobs — the global baseline in effectsTunables.ts decides
+// the shape of each pass; this just biases it per environment so a lava run
+// reads ember-warm and an alien run reads cool / glowing.
+export type BiomePainted = {
+  // Multiplied into shadow tones during the color grade (≤1 darkens). Tuned
+  // cool teal for forest/snow/alien, warm for desert/wasteland, deep red for
+  // lava — pushes the split-tone away from grey toward the biome's mood.
+  shadowTint: [number, number, number];
+  // Multiplied into highlight tones (≥1 brightens). Warm orange/ember for
+  // lava/wasteland; soft cyan-white for snow/alien; warm peach for forest.
+  highlightTint: [number, number, number];
+  // Ember / dust particle color in the AmbientHaze scene layer.
+  dustColor: string;
+  // 0..1 scalar on the haze pool. 0 hides the layer entirely (no fog of
+  // particulates in clear biomes); 1 fills the budget for that quality tier.
+  dustDensity: number;
+  // Multiplier on the selective-bloom intensity. Volcanic / alien biomes
+  // bias up so emissive surfaces (magma rivers, crystal veins) blow brighter
+  // than in mundane biomes.
+  bloomBias: number;
+  // God-rays sun tint. Warm gold for forest/desert/wasteland, ember red for
+  // lava, pale cyan for snow, sickly green for alien.
+  godRaysColor: string;
+};
+
+export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
+  forest: {
+    shadowTint: [0.82, 0.92, 1.0],
+    highlightTint: [1.04, 0.98, 0.88],
+    dustColor: "#cae7b5",
+    dustDensity: 0.35,
+    bloomBias: 0.85,
+    godRaysColor: "#ffe2a8",
+  },
+  desert: {
+    shadowTint: [0.92, 0.86, 0.78],
+    highlightTint: [1.08, 0.98, 0.82],
+    dustColor: "#e8c890",
+    dustDensity: 0.5,
+    bloomBias: 0.9,
+    godRaysColor: "#ffd87a",
+  },
+  snow: {
+    shadowTint: [0.78, 0.9, 1.04],
+    highlightTint: [1.0, 1.0, 1.06],
+    dustColor: "#dceaff",
+    dustDensity: 0.4,
+    bloomBias: 0.8,
+    godRaysColor: "#cfe6ff",
+  },
+  wasteland: {
+    shadowTint: [0.88, 0.82, 0.8],
+    highlightTint: [1.12, 0.96, 0.78],
+    dustColor: "#caa078",
+    dustDensity: 0.55,
+    bloomBias: 1.0,
+    godRaysColor: "#ffb070",
+  },
+  lava: {
+    shadowTint: [0.7, 0.55, 0.55],
+    highlightTint: [1.2, 0.85, 0.6],
+    dustColor: "#ff8a32",
+    dustDensity: 0.95,
+    bloomBias: 1.35,
+    godRaysColor: "#ff9050",
+  },
+  alien: {
+    shadowTint: [0.78, 0.78, 1.0],
+    highlightTint: [1.02, 0.95, 1.1],
+    dustColor: "#7effe0",
+    dustDensity: 0.7,
+    bloomBias: 1.2,
+    godRaysColor: "#9fffe2",
+  },
+};
+
 export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
   forest: {
     groundColor: "#5c7848",

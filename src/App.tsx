@@ -6,6 +6,7 @@ import { useAudioBridge } from "./audio/useAudioBridge";
 import { LevelEditorPanel } from "./editor/LevelEditorPanel";
 import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
 import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
+import { PaintedPostFx } from "./render/PaintedPostFx";
 import { PlayScene } from "./render/Scene";
 import { useGame } from "./store";
 import { AchievementToast } from "./ui/AchievementToast";
@@ -201,13 +202,17 @@ export const App = () => {
           <Canvas shadows dpr={dprCap} gl={{ antialias: true }}>
             <SceneRoot />
             <EffectComposer multisampling={composerMultisampling}>
-              <Bloom
-                intensity={0.28}
-                luminanceThreshold={bloomThreshold}
-                luminanceSmoothing={bloomSmoothing}
-                mipmapBlur
-                kernelSize={bloomKernel}
-              />
+              {screen === "playing" ? (
+                <PaintedPostFx />
+              ) : (
+                <Bloom
+                  intensity={0.28}
+                  luminanceThreshold={bloomThreshold}
+                  luminanceSmoothing={bloomSmoothing}
+                  mipmapBlur
+                  kernelSize={bloomKernel}
+                />
+              )}
             </EffectComposer>
           </Canvas>
         </ErrorBoundary>

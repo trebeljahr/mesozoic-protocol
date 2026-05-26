@@ -14,6 +14,7 @@ import {
   RIM_COLOR_FLAME,
   RIM_INTENSITY_ALLY,
 } from "./materialTunables";
+import { BLOOM_LAYER } from "./PaintedPostFx";
 import { type AtlasSwatch, computeTowerTints, tierKey } from "./towerTints";
 
 type AtlasState = {
@@ -203,6 +204,12 @@ export const ModelTowerMesh = ({
         // would tint them all. Clone here so each tower's upgrade
         // colours are independent.
         item.traverse((o) => {
+          // Tower meshes opt into selective bloom — muzzle / indicator
+          // emissive (set by computeTowerTints) crosses the bloom threshold,
+          // chassis stays under. Outline is intentionally NOT applied to
+          // towers — they're scenery once placed, and dark silhouette lines
+          // around every tower at every tier would crowd the playfield.
+          o.layers.enable(BLOOM_LAYER);
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
           mesh.frustumCulled = false;

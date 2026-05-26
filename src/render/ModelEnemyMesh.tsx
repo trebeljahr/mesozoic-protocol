@@ -33,6 +33,7 @@ import {
   setRimIntensity,
 } from "./materialTunables";
 import { measureVisibleBox } from "./measureModel";
+import { BLOOM_LAYER, OUTLINE_LAYER } from "./PaintedPostFx";
 
 type Props = {
   kind: EnemyKind;
@@ -355,6 +356,13 @@ export const ModelEnemyMesh = ({
             o.userData.enemyId = e.id;
             o.userData.enemyMaxHp = e.maxHp;
             if (bossOnTop) o.renderOrder = 10;
+            // Painted-look passes opt enemies into selective bloom (emissive
+            // eyes / variant tints / hit flash) and outline (dark silhouette
+            // pop at thumbnail scale). Layer membership is per-Object3D so
+            // every descendant — including bones and attachments — joins
+            // both layers; non-mesh nodes are harmless extras.
+            o.layers.enable(BLOOM_LAYER);
+            o.layers.enable(OUTLINE_LAYER);
             const m = o as THREE.Mesh;
             if (m.isMesh) {
               m.castShadow = true;

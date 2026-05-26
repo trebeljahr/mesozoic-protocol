@@ -1,7 +1,8 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
+import { BLOOM_LAYER } from "./PaintedPostFx";
 
 const MAX_PROJECTILES = 512;
 
@@ -9,6 +10,14 @@ export const ProjectileMesh = () => {
   const directRef = useRef<THREE.InstancedMesh>(null);
   const splashRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  // Projectiles are inherently HDR (toneMapped=false hot colors); opt them
+  // into the selective bloom pass so the tracers carry a halo. Done once
+  // on mount — InstancedMesh layer membership covers every instance.
+  useEffect(() => {
+    directRef.current?.layers.enable(BLOOM_LAYER);
+    splashRef.current?.layers.enable(BLOOM_LAYER);
+  }, []);
 
   useFrame(() => {
     const { world } = useGame.getState();

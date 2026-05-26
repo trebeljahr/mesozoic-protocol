@@ -3,6 +3,7 @@ import { BIOME_STYLE } from "../biomes";
 import { MAP_HEIGHT } from "../level";
 import { BOSS_VARIANT_MODEL } from "../sim/world";
 import { useGame } from "../store";
+import { AmbientHaze } from "./AmbientHaze";
 import { BiomeAmbientVfx } from "./BiomeAmbientVfx";
 import { BiomeCosmetics } from "./BiomeCosmetics";
 import { CameraRig } from "./CameraRig";
@@ -21,6 +22,7 @@ import { ModelEnemyMesh } from "./ModelEnemyMesh";
 import { ModelRobotMesh } from "./ModelRobotMesh";
 import { ModelTowerMesh } from "./ModelTowerMesh";
 import { OuterScenery } from "./OuterScenery";
+import { SunProxy } from "./PaintedPostFx";
 import { PathLine } from "./PathLine";
 import { Placement } from "./Placement";
 import { PlannerOverlay } from "./PlannerOverlay";
@@ -168,6 +170,8 @@ export const PlayScene = () => {
       <Effects />
       <SmokePuffs />
       <BiomeAmbientVfx />
+      <AmbientHaze />
+      <SunProxy biome={biome} />
     </>
   );
 };

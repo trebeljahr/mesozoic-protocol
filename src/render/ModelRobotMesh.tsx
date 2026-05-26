@@ -17,6 +17,7 @@ import {
   RIM_INTENSITY_ALLY,
 } from "./materialTunables";
 import { measureVisibleBox } from "./measureModel";
+import { BLOOM_LAYER, OUTLINE_LAYER } from "./PaintedPostFx";
 
 const ROBOT_URL: Record<string, string> = {
   george: "/models/robots/George.glb",
@@ -113,6 +114,12 @@ export const ModelRobotMesh = () => {
     const world = useGame.getState().world;
     const rimTinted = biomeRimColor(RIM_COLOR_ALLY, world.biome);
     obj.traverse((o) => {
+      // Robot opts into selective bloom (canopy / vents / shoot flash) and
+      // outline (silhouette pop at thumbnail scale). Layer membership is
+      // per-Object3D, so applying on every descendant covers the skinned
+      // skeleton plus any attached props.
+      o.layers.enable(BLOOM_LAYER);
+      o.layers.enable(OUTLINE_LAYER);
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.castShadow = true;
