@@ -13,7 +13,7 @@
 // doesn't get clobbered by the compile pass on slow devices.
 import { useGLTF } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useGame } from "../store";
@@ -39,9 +39,18 @@ const PREWARM_URLS = [
 // the module-top calls in ModelEnemyMesh / HQTurret / etc.) is safe.
 for (const url of PREWARM_URLS) useGLTF.preload(url);
 
-const PrewarmModel = ({ url }: { url: string }) => {
+const PrewarmModel = ({
+  url,
+  registerRoot,
+}: {
+  url: string;
+  registerRoot: (root: THREE.Object3D) => void;
+}) => {
   const { scene } = useGLTF(url);
   const cloned = useMemo(() => cloneSkinned(scene) as THREE.Object3D, [scene]);
+  useEffect(() => {
+    registerRoot(cloned);
+  }, [cloned, registerRoot]);
   return <primitive object={cloned} />;
 };
 
@@ -63,11 +72,12 @@ const cancelIdle = (id: IdleHandle): void => {
 
 export const WorldMapPrewarm = () => {
   const gl = useThree((s) => s.gl);
-  const sceneRoot = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const alreadyDone = useGame((s) => s.assetsPrewarmed);
   const markDone = useGame((s) => s.markAssetsPrewarmed);
   const [phase, setPhase] = useState<"wait" | "mount" | "done">(alreadyDone ? "done" : "wait");
+  const [mountedCount, setMountedCount] = useState(0);
+  const compiledRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (alreadyDone || phase !== "wait") return;
@@ -75,21 +85,43 @@ export const WorldMapPrewarm = () => {
     return () => cancelIdle(id);
   }, [alreadyDone, phase]);
 
+  // Chunk mount + compile across frames so the world-map intro
+  // animation can't get stalled long enough for the WebGL context-loss
+  // watchdog to trip. One GLB per frame; final tick marks the player as
+  // warmed and unmounts the helper subtree.
   useEffect(() => {
     if (phase !== "mount") return;
-    gl.compile(sceneRoot, camera);
-    const raf = requestAnimationFrame(() => {
-      markDone();
-      setPhase("done");
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [phase, gl, sceneRoot, camera, markDone]);
+    if (mountedCount === 0) {
+      const id = requestAnimationFrame(() => setMountedCount(1));
+      return () => cancelAnimationFrame(id);
+    }
+    if (mountedCount >= PREWARM_URLS.length) {
+      const id = requestAnimationFrame(() => {
+        markDone();
+        setPhase("done");
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    const id = requestAnimationFrame(() => setMountedCount((n) => n + 1));
+    return () => cancelAnimationFrame(id);
+  }, [phase, mountedCount, markDone]);
+
+  const registerRoot = useMemo(
+    () => (root: THREE.Object3D) => {
+      const key = root.uuid;
+      if (compiledRef.current.has(key)) return;
+      compiledRef.current.add(key);
+      gl.compile(root, camera);
+    },
+    [gl, camera],
+  );
 
   if (phase !== "mount") return null;
+  const visible = PREWARM_URLS.slice(0, mountedCount);
   return (
     <group position={[0, -1000, 0]}>
-      {PREWARM_URLS.map((url) => (
-        <PrewarmModel key={url} url={url} />
+      {visible.map((url) => (
+        <PrewarmModel key={url} url={url} registerRoot={registerRoot} />
       ))}
     </group>
   );
