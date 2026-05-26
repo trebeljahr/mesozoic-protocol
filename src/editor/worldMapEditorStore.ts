@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
 import type { PlacedProp, River, RiverPoint } from "../sim/types";
-import { getBrushPreset, pickWeighted, randRange, samplePoints } from "./brush";
+import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
   canUndo as canUndoH,
@@ -37,6 +37,7 @@ type BrushState = {
   radius: number;
   density: number;
   minSpacing: number;
+  customUrls: string[] | null;
 };
 
 // River width clamp — mirrors editorStore.ts. Kept duplicated rather than
@@ -88,6 +89,8 @@ type WorldMapEditorState = {
   clearAll: () => void;
   setBrushPreset: (id: string | null) => void;
   setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
+  toggleBrushUrl: (url: string) => void;
+  resetBrushUrls: () => void;
   beginStroke: () => void;
   paintAt: (x: number, y: number) => void;
   endStroke: () => void;
@@ -116,6 +119,7 @@ const DEFAULT_BRUSH: BrushState = {
   radius: 4,
   density: 8,
   minSpacing: 1.0,
+  customUrls: null,
 };
 
 const persist = (props: PlacedProp[], override: boolean, rivers: River[]): void => {
@@ -296,11 +300,11 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     setBrushPreset: (id) => {
       const cur = get().brush;
       if (id !== null && cur.presetId === id && cur.active) {
-        set({ brush: { ...cur, active: false } });
+        set({ brush: { ...cur, active: false, customUrls: null } });
         return;
       }
       set((s) => ({
-        brush: { ...s.brush, presetId: id, active: id !== null },
+        brush: { ...s.brush, presetId: id, active: id !== null, customUrls: null },
         placingUrl: null,
         selectedId: null,
         moving: false,
@@ -319,6 +323,25 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         },
       })),
 
+    toggleBrushUrl: (url) => {
+      const cur = get().brush;
+      const preset = getBrushPreset(cur.presetId);
+      if (!preset) return;
+      const effective = new Set(cur.customUrls ?? preset.urls);
+      if (effective.has(url)) {
+        if (effective.size <= 1) return;
+        effective.delete(url);
+      } else {
+        if (!preset.urls.includes(url)) return;
+        effective.add(url);
+      }
+      const next = preset.urls.filter((u) => effective.has(u));
+      const allOn = next.length === preset.urls.length;
+      set({ brush: { ...cur, customUrls: allOn ? null : next } });
+    },
+
+    resetBrushUrls: () => set((s) => ({ brush: { ...s.brush, customUrls: null } })),
+
     beginStroke: () => {
       set({ strokeAnchor: snapshot(), strokeOpen: true, strokePushed: false });
     },
@@ -326,8 +349,10 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     paintAt: (x, y) => {
       const s = get();
       const preset = getBrushPreset(s.brush.presetId);
-      if (!preset || preset.urls.length === 0) return;
+      if (!preset) return;
       if (!s.brush.active) return;
+      const urls = resolveBrushUrls(preset, s.brush.customUrls);
+      if (urls.length === 0) return;
       const existing = s.props.map((p) => p.pos);
       const points = samplePoints(
         { x, y },
@@ -347,7 +372,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       }
       const additions: PlacedProp[] = points.map((pt) => ({
         id: nanoid(8),
-        url: pickWeighted(preset),
+        url: pickFromUrls(urls),
         pos: pt,
         scale: randRange(preset.scaleJitter[0], preset.scaleJitter[1]),
         rot: randRange(preset.rotateRange[0], preset.rotateRange[1]),

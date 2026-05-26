@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
 import type { PlacedProp, River, RiverPoint } from "../sim/types";
 import { useGame } from "../store";
-import { getBrushPreset, pickWeighted, randRange, samplePoints } from "./brush";
+import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
   canUndo as canUndoH,
@@ -101,6 +101,10 @@ type BrushState = {
   radius: number;
   density: number;
   minSpacing: number;
+  // Url filter: null = use every url in the active preset; an array =
+  // restrict the brush to this subset. Reset to null whenever the preset
+  // changes — the subset is meaningless against a different roster.
+  customUrls: string[] | null;
 };
 
 // River-tool state. `active` flips the editor into river-painting mode
@@ -149,6 +153,8 @@ type EditorState = {
   clearAllLevels: () => void;
   setBrushPreset: (id: string | null) => void;
   setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
+  toggleBrushUrl: (url: string) => void;
+  resetBrushUrls: () => void;
   beginStroke: () => void;
   paintAt: (x: number, y: number) => void;
   endStroke: () => void;
@@ -178,6 +184,7 @@ const DEFAULT_BRUSH: BrushState = {
   radius: 4,
   density: 8,
   minSpacing: 1.0,
+  customUrls: null,
 };
 
 // PURE annotation: the create() call has no observable side effects, so when
@@ -380,12 +387,14 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       const cur = get().brush;
       // Tap the active preset to disarm; tap any other preset to switch /
       // arm. Switching brush on disarms placingUrl + moving + selection.
+      // The url filter is preset-scoped — drop it on every switch (incl.
+      // disarm) so a re-arm of the same preset starts with the full roster.
       if (id !== null && cur.presetId === id && cur.active) {
-        set({ brush: { ...cur, active: false } });
+        set({ brush: { ...cur, active: false, customUrls: null } });
         return;
       }
       set((s) => ({
-        brush: { ...s.brush, presetId: id, active: id !== null },
+        brush: { ...s.brush, presetId: id, active: id !== null, customUrls: null },
         placingUrl: null,
         selectedId: null,
         moving: false,
@@ -404,6 +413,30 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
         },
       })),
 
+    toggleBrushUrl: (url) => {
+      const cur = get().brush;
+      const preset = getBrushPreset(cur.presetId);
+      if (!preset) return;
+      // Materialise the effective set, flip the url, then collapse back to
+      // null when the result matches the full roster — canonical "all on".
+      const effective = new Set(cur.customUrls ?? preset.urls);
+      if (effective.has(url)) {
+        // Refuse to drop the last url — an empty filter makes the brush a
+        // silent no-op. Keeping the checkbox checked surfaces the floor.
+        if (effective.size <= 1) return;
+        effective.delete(url);
+      } else {
+        if (!preset.urls.includes(url)) return;
+        effective.add(url);
+      }
+      // Re-order to follow preset.urls so the stored subset matches panel order.
+      const next = preset.urls.filter((u) => effective.has(u));
+      const allOn = next.length === preset.urls.length;
+      set({ brush: { ...cur, customUrls: allOn ? null : next } });
+    },
+
+    resetBrushUrls: () => set((s) => ({ brush: { ...s.brush, customUrls: null } })),
+
     beginStroke: () => {
       // Stash a snapshot but don't push yet — only paintAt that actually
       // produces props during the stroke commits the history entry, so a
@@ -415,8 +448,13 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
     paintAt: (x, y) => {
       const s = get();
       const preset = getBrushPreset(s.brush.presetId);
-      if (!preset || preset.urls.length === 0) return;
+      if (!preset) return;
       if (!s.brush.active) return;
+      // Resolve the active url roster: customUrls narrows the preset to a
+      // user-selected subset. Bail if the subset is empty (defensive — the
+      // toggle action refuses to empty it, but a stale presetId could).
+      const urls = resolveBrushUrls(preset, s.brush.customUrls);
+      if (urls.length === 0) return;
       const world = useGame.getState().world;
       const existing = world.props.map((p) => p.pos);
       const points = samplePoints(
@@ -438,7 +476,7 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       }
       const additions: PlacedProp[] = points.map((pt) => ({
         id: nanoid(8),
-        url: pickWeighted(preset),
+        url: pickFromUrls(urls),
         pos: pt,
         scale: randRange(preset.scaleJitter[0], preset.scaleJitter[1]),
         rot: randRange(preset.rotateRange[0], preset.rotateRange[1]),

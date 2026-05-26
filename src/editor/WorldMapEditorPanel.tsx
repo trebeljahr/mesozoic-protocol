@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import type { PropRole } from "../biomes";
+import type { Biome, PropRole } from "../biomes";
 import type { River } from "../sim/types";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
-import { BUILTIN_BRUSH_PRESETS } from "./brush";
+import {
+  BIOME_LABEL,
+  BIOME_ORDER,
+  type BrushPreset,
+  BUILTIN_BRUSH_PRESETS,
+  getBrushPreset,
+} from "./brush";
 import { downloadJson } from "./download";
 import { PropPreview } from "./PropPreview";
 import { useWorldMapEditor } from "./worldMapEditorStore";
@@ -547,6 +553,7 @@ type BrushSnapshot = {
   radius: number;
   density: number;
   minSpacing: number;
+  customUrls: string[] | null;
 };
 
 const sliderRow: React.CSSProperties = {
@@ -556,9 +563,25 @@ const sliderRow: React.CSSProperties = {
   gap: 6,
 };
 
+const PRESET_GROUPS: { biome: Biome | "any"; label: string; presets: BrushPreset[] }[] = [
+  {
+    biome: "any",
+    label: "Any biome",
+    presets: BUILTIN_BRUSH_PRESETS.filter((p) => p.biome === undefined),
+  },
+  ...BIOME_ORDER.map((biome) => ({
+    biome,
+    label: BIOME_LABEL[biome],
+    presets: BUILTIN_BRUSH_PRESETS.filter((p) => p.biome === biome),
+  })).filter((g) => g.presets.length > 0),
+];
+
 const BrushSection = ({ brush }: { brush: BrushSnapshot }) => {
   const setBrushPreset = useWorldMapEditor((s) => s.setBrushPreset);
   const setBrushParams = useWorldMapEditor((s) => s.setBrushParams);
+  const toggleBrushUrl = useWorldMapEditor((s) => s.toggleBrushUrl);
+  const resetBrushUrls = useWorldMapEditor((s) => s.resetBrushUrls);
+  const activePreset = getBrushPreset(brush.presetId);
   return (
     <div
       style={{
@@ -581,24 +604,31 @@ const BrushSection = ({ brush }: { brush: BrushSnapshot }) => {
       >
         Brush
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-        {BUILTIN_BRUSH_PRESETS.map((p) => {
-          const empty = p.urls.length === 0;
-          const on = brush.active && brush.presetId === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              title={empty ? `${p.label} (no assets)` : `${p.label} · ${p.urls.length} variants`}
-              disabled={empty}
-              style={{ ...btn(on), opacity: empty ? 0.4 : 1 }}
-              onClick={() => setBrushPreset(p.id)}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
+      {PRESET_GROUPS.map((group) => (
+        <div key={group.biome} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ color: "#8b93a3", fontSize: 10 }}>{group.label}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {group.presets.map((p) => {
+              const empty = p.urls.length === 0;
+              const on = brush.active && brush.presetId === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  title={
+                    empty ? `${p.label} (no assets)` : `${p.label} · ${p.urls.length} variants`
+                  }
+                  disabled={empty}
+                  style={{ ...btn(on), opacity: empty ? 0.4 : 1 }}
+                  onClick={() => setBrushPreset(p.id)}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
       <div style={sliderRow}>
         <span style={{ color: "#8b93a3" }}>Radius</span>
         <input
@@ -635,6 +665,90 @@ const BrushSection = ({ brush }: { brush: BrushSnapshot }) => {
         />
         <span>{brush.minSpacing.toFixed(1)}</span>
       </div>
+      {activePreset && (
+        <BrushVariants
+          preset={activePreset}
+          customUrls={brush.customUrls}
+          onToggle={toggleBrushUrl}
+          onReset={resetBrushUrls}
+        />
+      )}
+    </div>
+  );
+};
+
+const BrushVariants = ({
+  preset,
+  customUrls,
+  onToggle,
+  onReset,
+}: {
+  preset: BrushPreset;
+  customUrls: string[] | null;
+  onToggle: (url: string) => void;
+  onReset: () => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const enabled = useMemo(() => new Set(customUrls ?? preset.urls), [customUrls, preset]);
+  const filtered = customUrls !== null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <button
+          type="button"
+          style={{ ...btn(), padding: "3px 7px", fontSize: 11, flex: 1, textAlign: "left" }}
+          onClick={() => setOpen((s) => !s)}
+          title="Toggle which variants the brush draws from"
+        >
+          {open ? "▾" : "▸"} Variants ({enabled.size}/{preset.urls.length})
+          {filtered ? " · filtered" : ""}
+        </button>
+        {filtered && (
+          <button
+            type="button"
+            style={{ ...btn(), padding: "3px 7px", fontSize: 11 }}
+            onClick={onReset}
+            title="Re-enable every variant"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+      {open && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))",
+            gap: 4,
+            maxHeight: 220,
+            overflowY: "auto",
+            padding: 4,
+            background: "#0d1118",
+            border: "1px solid #2a313d",
+            borderRadius: 4,
+          }}
+        >
+          {preset.urls.map((url) => {
+            const on = enabled.has(url);
+            return (
+              <button
+                key={url}
+                type="button"
+                style={{
+                  ...swatchBtn(on),
+                  width: "auto",
+                  opacity: on ? 1 : 0.45,
+                }}
+                onClick={() => onToggle(url)}
+                title={`${labelFor(url)}\n${url}`}
+              >
+                <PropPreview url={url} size={42} />
+                <span style={swatchLabel}>{labelFor(url)}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
