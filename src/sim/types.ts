@@ -278,6 +278,25 @@ export type PlacedProp = {
   blocks: boolean;
 };
 
+// Control point of a hand-painted river spline. Authored via the dev-only
+// river tool; the renderer fits a Catmull-Rom curve through the points and
+// extrudes a flat water ribbon of `width` along it on the XZ ground plane.
+export type RiverPoint = { x: number; y: number };
+
+// Hand-painted river. Persisted alongside props in the same per-level (or
+// world-map) edit blob. Visual-only today — rivers do NOT affect tower
+// placement or pathing; gameplay reactivity is a follow-up.
+export type River = {
+  id: string;
+  // Spline control points, ≥2. The renderer fits a Catmull-Rom curve
+  // through these points and extrudes a flat ribbon along the curve.
+  points: RiverPoint[];
+  // Ribbon thickness in world units.
+  width: number;
+  // Optional water color override (defaults to a soft editor-preview blue).
+  color?: string;
+};
+
 export type RobotVariant = "george" | "leela" | "mike" | "stan";
 
 // Slot index used by the HUD + key bindings (Q/W/E/R). Semantic ability
@@ -805,6 +824,10 @@ export type World = {
   // createWorld blanks the procedural trees/rocks/outposts/cosmetics so the
   // hand-placed props are the only set-dressing. Always false in production.
   overrideActive: boolean;
+  // Hand-painted rivers from the dev-only river tool. Persisted alongside
+  // props in the same per-level edit blob. Empty in production unless the
+  // saved blob ships rivers. Visual-only today.
+  rivers: River[];
   projectiles: Projectile[];
   beams: Beam[];
   explosions: Explosion[];

@@ -1,9 +1,9 @@
 import { type ThreeEvent, useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River } from "../sim/types";
 import { InstancedGroup } from "./InstancedGroup";
 import type { MeshSource } from "./meshSource";
 import { PAN_LIMIT_X, PAN_LIMIT_Z } from "./worldMapBounds";
@@ -27,7 +27,9 @@ export const WorldMapEditorProps = () => {
   const active = useWorldMapEditor((s) => s.active);
   const placingUrl = useWorldMapEditor((s) => s.placingUrl);
   const selectedId = useWorldMapEditor((s) => s.selectedId);
+  const riverTool = useWorldMapEditor((s) => s.riverTool);
   const props = useWorldMapEditor((s) => s.props);
+  const rivers = useWorldMapEditor((s) => s.rivers);
   const brushActive = useWorldMapEditor((s) => s.brush.active);
   const brushPresetId = useWorldMapEditor((s) => s.brush.presetId);
   const brushRadius = useWorldMapEditor((s) => s.brush.radius);
@@ -60,7 +62,9 @@ export const WorldMapEditorProps = () => {
       ))}
 
       {active && <EditorGroundPlane brushMode={brushMode} brushRadius={brushRadius} />}
-      {active && !placingUrl && !brushMode && <PropHitTargets props={props} version={version} />}
+      {active && !placingUrl && !brushMode && !riverTool.active && (
+        <PropHitTargets props={props} version={version} />
+      )}
 
       {active && !brushMode && selected && (
         <group position={[selected.pos.x, 0.1, -selected.pos.y]}>
@@ -82,6 +86,14 @@ export const WorldMapEditorProps = () => {
             />
           </mesh>
         </group>
+      )}
+
+      {active && riverTool.active && (
+        <RiverEditOverlay
+          rivers={rivers}
+          editingRiverId={riverTool.editingRiverId}
+          selectedRiverId={riverTool.selectedRiverId}
+        />
       )}
     </group>
   );
@@ -150,12 +162,27 @@ const EditorGroundPlane = ({
     ring.visible = true;
   });
 
+  // Cursor tracking for the "next segment" preview while painting a river.
+  // forceUpdate fires only while a river is being drawn, so non-river hover
+  // movement stays free.
+  const [, forceUpdate] = useState({});
+  const cursorRef = useRef<{ x: number; y: number } | null>(null);
+
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     const ed = useWorldMapEditor.getState();
     if (ed.brush.active && ed.brush.presetId) return;
     const x = e.point.x;
     const y = -e.point.z;
+    // River tool wins over prop placement/move/select while active.
+    if (ed.riverTool.active) {
+      if (ed.riverTool.editingRiverId === null) {
+        ed.beginRiver(x, y);
+      } else {
+        ed.addRiverPoint(x, y);
+      }
+      return;
+    }
     if (ed.moving && ed.selectedId !== null) {
       ed.moveSelectedTo(x, y);
     } else if (ed.placingUrl) {
@@ -184,11 +211,21 @@ const EditorGroundPlane = ({
   };
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
-    if (!brushMode || !isDownRef.current) return;
-    const now = performance.now();
-    if (now - lastPaintRef.current < PAINT_INTERVAL_MS) return;
-    lastPaintRef.current = now;
-    useWorldMapEditor.getState().paintAt(e.point.x, -e.point.z);
+    // Brush takes the pointer while a stroke is open.
+    if (brushMode && isDownRef.current) {
+      const now = performance.now();
+      if (now - lastPaintRef.current >= PAINT_INTERVAL_MS) {
+        lastPaintRef.current = now;
+        useWorldMapEditor.getState().paintAt(e.point.x, -e.point.z);
+      }
+      return;
+    }
+    // River-tool preview cursor — only meaningful while mid-stroke.
+    const ed = useWorldMapEditor.getState();
+    if (ed.riverTool.active && ed.riverTool.editingRiverId !== null) {
+      cursorRef.current = { x: e.point.x, y: -e.point.z };
+      forceUpdate({});
+    }
   };
 
   const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
@@ -231,7 +268,155 @@ const EditorGroundPlane = ({
           depthWrite={false}
         />
       </mesh>
+      <RiverPreviewSegment cursorRef={cursorRef} />
     </group>
+  );
+};
+
+// Dashed preview line from the last in-progress point to the cursor. Mirrors
+// the per-level RiverPreviewSegment but reads from the world-map editor store.
+const RiverPreviewSegment = ({
+  cursorRef,
+}: {
+  cursorRef: React.MutableRefObject<{ x: number; y: number } | null>;
+}) => {
+  const riverTool = useWorldMapEditor((s) => s.riverTool);
+  const version = useWorldMapEditor((s) => s.version);
+  void version;
+  if (!riverTool.active || riverTool.editingRiverId === null) return null;
+  const river = useWorldMapEditor.getState().rivers.find((r) => r.id === riverTool.editingRiverId);
+  if (!river || river.points.length === 0) return null;
+  const cursor = cursorRef.current;
+  if (!cursor) return null;
+  const last = river.points[river.points.length - 1];
+  const a: [number, number, number] = [last.x, 0.06, -last.y];
+  const b: [number, number, number] = [cursor.x, 0.06, -cursor.y];
+  return (
+    <line>
+      <bufferGeometry
+        attach="geometry"
+        ref={(g) => {
+          if (!g) return;
+          const arr = new Float32Array([...a, ...b]);
+          g.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+        }}
+      />
+      <lineBasicMaterial color="#76d6ff" transparent opacity={0.85} depthTest={false} />
+    </line>
+  );
+};
+
+// River control-point overlay — draggable spheres, shift-click deletes, click
+// selects the river for editing. Mirrors EditorProps' RiverEditOverlay but
+// dispatches through the world-map editor store.
+const POINT_RADIUS = 0.45;
+
+const RiverEditOverlay = ({
+  rivers,
+  editingRiverId,
+  selectedRiverId,
+}: {
+  rivers: River[];
+  editingRiverId: string | null;
+  selectedRiverId: string | null;
+}) => {
+  if (rivers.length === 0) return null;
+  return (
+    <group>
+      {rivers.map((r) => (
+        <RiverPointGroup
+          key={r.id}
+          river={r}
+          isEditing={r.id === editingRiverId}
+          isSelected={r.id === selectedRiverId}
+        />
+      ))}
+    </group>
+  );
+};
+
+const RiverPointGroup = ({
+  river,
+  isEditing,
+  isSelected,
+}: {
+  river: River;
+  isEditing: boolean;
+  isSelected: boolean;
+}) => {
+  const color = isEditing ? "#ffd66a" : isSelected ? "#76d6ff" : "#3aa8d8";
+  return (
+    <group>
+      {river.points.map((p, i) => (
+        <RiverPoint
+          // biome-ignore lint/suspicious/noArrayIndexKey: control points have no stable id
+          key={`${river.id}:${i}`}
+          riverId={river.id}
+          index={i}
+          x={p.x}
+          y={p.y}
+          color={color}
+        />
+      ))}
+    </group>
+  );
+};
+
+const RiverPoint = ({
+  riverId,
+  index,
+  x,
+  y,
+  color,
+}: {
+  riverId: string;
+  index: number;
+  x: number;
+  y: number;
+  color: string;
+}) => {
+  const dragging = useRef(false);
+
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const ed = useWorldMapEditor.getState();
+    if (e.shiftKey) {
+      ed.deleteRiverPoint(riverId, index);
+      return;
+    }
+    if (ed.riverTool.selectedRiverId !== riverId && ed.riverTool.editingRiverId !== riverId) {
+      ed.selectRiver(riverId);
+    }
+    dragging.current = true;
+    ed.dragRiverPointStart();
+    (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    useWorldMapEditor.getState().dragRiverPoint(riverId, index, e.point.x, -e.point.z);
+  };
+
+  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    dragging.current = false;
+    useWorldMapEditor.getState().dragRiverPointEnd();
+    (e.target as Element | null)?.releasePointerCapture?.(e.pointerId);
+  };
+
+  return (
+    <mesh
+      position={[x, 0.18, -y]}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      renderOrder={21}
+    >
+      <sphereGeometry args={[POINT_RADIUS, 16, 12]} />
+      <meshBasicMaterial color={color} transparent opacity={0.95} depthTest={false} />
+    </mesh>
   );
 };
 

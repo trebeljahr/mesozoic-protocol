@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River, RiverPoint } from "../sim/types";
 import { getBrushPreset, pickWeighted, randRange, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
@@ -39,13 +39,33 @@ type BrushState = {
   minSpacing: number;
 };
 
+// River width clamp — mirrors editorStore.ts. Kept duplicated rather than
+// extracted to a shared module so the two editor stores stay independent of
+// each other (per-level editor has no need to import the world-map editor).
+const MIN_RIVER_WIDTH = 0.5;
+const MAX_RIVER_WIDTH = 20;
+const DEFAULT_RIVER_WIDTH = 2.5;
+const clampRiverWidth = (w: number): number =>
+  Math.min(MAX_RIVER_WIDTH, Math.max(MIN_RIVER_WIDTH, w));
+
+// See RiverToolState in editorStore.ts for the field semantics. Mirrored
+// here for the world-map editor; the two stores stay independent.
+type RiverToolState = {
+  active: boolean;
+  editingRiverId: string | null;
+  selectedRiverId: string | null;
+  width: number;
+};
+
 type WorldMapEditorState = {
   active: boolean;
   placingUrl: string | null;
   selectedId: string | null;
   moving: boolean;
   props: PlacedProp[];
+  rivers: River[];
   override: boolean;
+  riverTool: RiverToolState;
   // Static-geometry invalidation key. Bumped on every mutation so the
   // render layer can re-derive its instanced groups.
   version: number;
@@ -71,6 +91,18 @@ type WorldMapEditorState = {
   beginStroke: () => void;
   paintAt: (x: number, y: number) => void;
   endStroke: () => void;
+  // River-tool actions. See editorStore.ts for behavior parity.
+  setRiverToolActive: (on: boolean) => void;
+  beginRiver: (x: number, y: number) => void;
+  addRiverPoint: (x: number, y: number) => void;
+  finishRiver: () => void;
+  selectRiver: (id: string | null) => void;
+  dragRiverPointStart: () => void;
+  dragRiverPoint: (riverId: string, index: number, x: number, y: number) => void;
+  dragRiverPointEnd: () => void;
+  deleteRiverPoint: (riverId: string, index: number) => void;
+  deleteRiver: (id: string) => void;
+  setRiverWidth: (width: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -86,8 +118,8 @@ const DEFAULT_BRUSH: BrushState = {
   minSpacing: 1.0,
 };
 
-const persist = (props: PlacedProp[], override: boolean): void => {
-  const edit: WorldMapEdit = { v: 1, override, props };
+const persist = (props: PlacedProp[], override: boolean, rivers: River[]): void => {
+  const edit: WorldMapEdit = { v: 1, override, props, rivers };
   saveWorldMapEdit(edit);
 };
 
@@ -99,7 +131,11 @@ const persist = (props: PlacedProp[], override: boolean): void => {
 export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((set, get) => {
   const seed = loadWorldMapEdit();
 
-  const snapshot = (): Snapshot => ({ props: [...get().props], override: get().override });
+  const snapshot = (): Snapshot => ({
+    props: [...get().props],
+    override: get().override,
+    rivers: get().rivers.map((r) => ({ ...r, points: r.points.map((p) => ({ ...p })) })),
+  });
 
   // Capture pre-mutation state onto the undo stack. Resets redo stack.
   const snapshotAndPush = (): void => {
@@ -112,7 +148,15 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     selectedId: null,
     moving: false,
     props: seed?.props ?? [],
+    // Additive field — older v:1 blobs without rivers load with [].
+    rivers: seed?.rivers ?? [],
     override: seed?.override ?? false,
+    riverTool: {
+      active: false,
+      editingRiverId: null,
+      selectedRiverId: null,
+      width: DEFAULT_RIVER_WIDTH,
+    },
     version: 0,
     brush: DEFAULT_BRUSH,
     strokeAnchor: null,
@@ -130,6 +174,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         strokeAnchor: null,
         strokeOpen: false,
         strokePushed: false,
+        riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
       }));
     },
 
@@ -139,6 +184,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         selectedId: null,
         moving: false,
         brush: { ...s.brush, active: false },
+        riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
       })),
 
     placeAt: (x, y) => {
@@ -154,7 +200,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       };
       snapshotAndPush();
       const next = [...get().props, prop];
-      persist(next, get().override);
+      persist(next, get().override, get().rivers);
       set((s) => ({ props: next, selectedId: prop.id, version: s.version + 1 }));
     },
 
@@ -170,7 +216,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       if (id === null) return;
       snapshotAndPush();
       const next = get().props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p));
-      persist(next, get().override);
+      persist(next, get().override, get().rivers);
       set((s) => ({ props: next, moving: false, version: s.version + 1 }));
     },
 
@@ -179,7 +225,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       if (id === null) return;
       snapshotAndPush();
       const next = get().props.filter((p) => p.id !== id);
-      persist(next, get().override);
+      persist(next, get().override, get().rivers);
       set((s) => ({
         props: next,
         selectedId: null,
@@ -193,7 +239,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       if (id === null) return;
       snapshotAndPush();
       const next = get().props.map((p) => (p.id === id ? { ...p, rot: p.rot + deltaRad } : p));
-      persist(next, get().override);
+      persist(next, get().override, get().rivers);
       set((s) => ({ props: next, version: s.version + 1 }));
     },
 
@@ -204,7 +250,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       const next = get().props.map((p) =>
         p.id === id ? { ...p, scale: clampScale(p.scale * mul) } : p,
       );
-      persist(next, get().override);
+      persist(next, get().override, get().rivers);
       set((s) => ({ props: next, version: s.version + 1 }));
     },
 
@@ -213,13 +259,13 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       if (id === null) return;
       snapshotAndPush();
       const next = get().props.map((p) => (p.id === id ? { ...p, blocks: !p.blocks } : p));
-      persist(next, get().override);
+      persist(next, get().override, get().rivers);
       set((s) => ({ props: next, version: s.version + 1 }));
     },
 
     setOverride: (on) => {
       snapshotAndPush();
-      persist(get().props, on);
+      persist(get().props, on, get().rivers);
       set((s) => ({ override: on, version: s.version + 1 }));
     },
 
@@ -228,10 +274,17 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       // Fresh state is the new baseline — drop history.
       set((s) => ({
         props: [],
+        rivers: [],
         override: false,
         selectedId: null,
         moving: false,
         placingUrl: null,
+        riverTool: {
+          ...s.riverTool,
+          active: false,
+          editingRiverId: null,
+          selectedRiverId: null,
+        },
         version: s.version + 1,
         history: { past: [], future: [] },
         strokeAnchor: null,
@@ -251,6 +304,8 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         placingUrl: null,
         selectedId: null,
         moving: false,
+        // Arming a brush disarms the river tool — both consume the click plane.
+        riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
       }));
     },
 
@@ -299,7 +354,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
         blocks: preset.defaultBlocks,
       }));
       const next = [...s.props, ...additions];
-      persist(next, s.override);
+      persist(next, s.override, s.rivers);
       set((ss) => ({ props: next, version: ss.version + 1 }));
     },
 
@@ -307,16 +362,140 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
       set({ strokeAnchor: null, strokeOpen: false, strokePushed: false });
     },
 
+    setRiverToolActive: (on) => {
+      set((s) => ({
+        placingUrl: null,
+        selectedId: null,
+        moving: false,
+        // Arming the river tool disarms the brush — both consume map clicks.
+        brush: { ...s.brush, active: false },
+        riverTool: {
+          ...s.riverTool,
+          active: on,
+          editingRiverId: on ? s.riverTool.editingRiverId : null,
+        },
+      }));
+    },
+
+    beginRiver: (x, y) => {
+      const id = nanoid(8);
+      const seed: River = {
+        id,
+        points: [
+          { x, y },
+          { x: x + 0.01, y: y + 0.01 },
+        ],
+        width: get().riverTool.width,
+      };
+      snapshotAndPush();
+      const next = [...get().rivers, seed];
+      persist(get().props, get().override, next);
+      set((s) => ({
+        rivers: next,
+        riverTool: { ...s.riverTool, editingRiverId: id, selectedRiverId: id },
+        version: s.version + 1,
+      }));
+    },
+
+    addRiverPoint: (x, y) => {
+      const editingId = get().riverTool.editingRiverId;
+      if (editingId === null) return;
+      const next = get().rivers.map((r) => {
+        if (r.id !== editingId) return r;
+        if (r.points.length === 2 && r.points[1].x === r.points[0].x + 0.01) {
+          return { ...r, points: [r.points[0], { x, y }] };
+        }
+        return { ...r, points: [...r.points, { x, y } as RiverPoint] };
+      });
+      persist(get().props, get().override, next);
+      set((s) => ({ rivers: next, version: s.version + 1 }));
+    },
+
+    finishRiver: () => {
+      set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
+    },
+
+    selectRiver: (id) => {
+      set((s) => ({
+        riverTool: { ...s.riverTool, selectedRiverId: id, editingRiverId: null },
+      }));
+    },
+
+    dragRiverPointStart: () => {
+      snapshotAndPush();
+    },
+
+    dragRiverPoint: (riverId, index, x, y) => {
+      const next = get().rivers.map((r) => {
+        if (r.id !== riverId) return r;
+        if (index < 0 || index >= r.points.length) return r;
+        return { ...r, points: r.points.map((p, i) => (i === index ? { x, y } : p)) };
+      });
+      persist(get().props, get().override, next);
+      set((s) => ({ rivers: next, version: s.version + 1 }));
+    },
+
+    dragRiverPointEnd: () => {
+      // Drag-end hook reserved for future diff-coalescing. The undo entry
+      // was opened on drag start.
+    },
+
+    deleteRiverPoint: (riverId, index) => {
+      const river = get().rivers.find((r) => r.id === riverId);
+      if (!river) return;
+      if (river.points.length <= 2) return;
+      snapshotAndPush();
+      const next = get().rivers.map((r) =>
+        r.id === riverId ? { ...r, points: r.points.filter((_, i) => i !== index) } : r,
+      );
+      persist(get().props, get().override, next);
+      set((s) => ({ rivers: next, version: s.version + 1 }));
+    },
+
+    deleteRiver: (id) => {
+      snapshotAndPush();
+      const next = get().rivers.filter((r) => r.id !== id);
+      persist(get().props, get().override, next);
+      set((s) => ({
+        rivers: next,
+        riverTool: {
+          ...s.riverTool,
+          selectedRiverId: s.riverTool.selectedRiverId === id ? null : s.riverTool.selectedRiverId,
+          editingRiverId: s.riverTool.editingRiverId === id ? null : s.riverTool.editingRiverId,
+        },
+        version: s.version + 1,
+      }));
+    },
+
+    setRiverWidth: (width) => {
+      const w = clampRiverWidth(width);
+      const targetId = get().riverTool.editingRiverId ?? get().riverTool.selectedRiverId ?? null;
+      if (targetId === null) {
+        set((s) => ({ riverTool: { ...s.riverTool, width: w } }));
+        return;
+      }
+      snapshotAndPush();
+      const next = get().rivers.map((r) => (r.id === targetId ? { ...r, width: w } : r));
+      persist(get().props, get().override, next);
+      set((s) => ({
+        rivers: next,
+        riverTool: { ...s.riverTool, width: w },
+        version: s.version + 1,
+      }));
+    },
+
     undo: () => {
       const result = undoHistory(get().history, snapshot());
       if (!result) return;
-      persist(result.restored.props, result.restored.override);
+      persist(result.restored.props, result.restored.override, result.restored.rivers);
       set((s) => ({
         props: result.restored.props,
+        rivers: result.restored.rivers,
         override: result.restored.override,
         history: result.next,
         selectedId: null,
         moving: false,
+        riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
         version: s.version + 1,
         strokeAnchor: null,
         strokeOpen: false,
@@ -327,13 +506,15 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
     redo: () => {
       const result = redoHistory(get().history, snapshot());
       if (!result) return;
-      persist(result.restored.props, result.restored.override);
+      persist(result.restored.props, result.restored.override, result.restored.rivers);
       set((s) => ({
         props: result.restored.props,
+        rivers: result.restored.rivers,
         override: result.restored.override,
         history: result.next,
         selectedId: null,
         moving: false,
+        riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
         version: s.version + 1,
         strokeAnchor: null,
         strokeOpen: false,
@@ -356,6 +537,7 @@ export const useWorldMapEditor = /* @__PURE__ */ create<WorldMapEditorState>((se
           generatedAt: new Date().toISOString(),
           override: s.override,
           props: s.props,
+          rivers: s.rivers,
         },
         null,
         2,

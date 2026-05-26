@@ -1,10 +1,10 @@
 import { type ThreeEvent, useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import { useEditor } from "../editor/editorStore";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River } from "../sim/types";
 import { useGame } from "../store";
 import { InstancedGroup } from "./InstancedGroup";
 import type { MeshSource } from "./meshSource";
@@ -37,8 +37,10 @@ export const EditorProps = () => {
   const brushPresetId = useEditor((s) => s.brush.presetId);
   const brushRadius = useEditor((s) => s.brush.radius);
   const brushMode = brushActive && brushPresetId !== null;
+  const riverTool = useEditor((s) => s.riverTool);
   void treeVersion;
   const props = useGame.getState().world.props;
+  const rivers = useGame.getState().world.rivers;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: treeVersion is the intended invalidation key
   const groups = useMemo(() => {
@@ -66,7 +68,7 @@ export const EditorProps = () => {
       ))}
 
       {active && <EditorGroundPlane brushMode={brushMode} brushRadius={brushRadius} />}
-      {active && !placingUrl && !brushMode && (
+      {active && !placingUrl && !brushMode && !riverTool.active && (
         <PropHitTargets props={props} version={treeVersion} />
       )}
 
@@ -90,6 +92,16 @@ export const EditorProps = () => {
             />
           </mesh>
         </group>
+      )}
+
+      {/* River edit overlay — control-point spheres on every river, plus a
+          preview segment from the last in-progress point to the cursor. */}
+      {active && riverTool.active && (
+        <RiverEditOverlay
+          rivers={rivers}
+          editingRiverId={riverTool.editingRiverId}
+          selectedRiverId={riverTool.selectedRiverId}
+        />
       )}
     </group>
   );
@@ -166,6 +178,12 @@ const EditorGroundPlane = ({
     ring.visible = true;
   });
 
+  // While the river tool is armed, track the cursor so we can render the
+  // "next segment" preview from the last in-progress point. Re-renders each
+  // pointer move; the actual preview line lives in RiverPreviewSegment below.
+  const [, forceUpdate] = useState({});
+  const cursorRef = useRef<{ x: number; y: number } | null>(null);
+
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     const ed = useEditor.getState();
@@ -175,6 +193,15 @@ const EditorGroundPlane = ({
     if (ed.brush.active && ed.brush.presetId) return;
     const x = e.point.x;
     const y = -e.point.z;
+    // River tool wins over prop placement/move/select while active.
+    if (ed.riverTool.active) {
+      if (ed.riverTool.editingRiverId === null) {
+        ed.beginRiver(x, y);
+      } else {
+        ed.addRiverPoint(x, y);
+      }
+      return;
+    }
     if (ed.moving && ed.selectedId !== null) {
       ed.moveSelectedTo(x, y);
     } else if (ed.placingUrl) {
@@ -206,11 +233,21 @@ const EditorGroundPlane = ({
   };
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
-    if (!brushMode || !isDownRef.current) return;
-    const now = performance.now();
-    if (now - lastPaintRef.current < PAINT_INTERVAL_MS) return;
-    lastPaintRef.current = now;
-    useEditor.getState().paintAt(e.point.x, -e.point.z);
+    // Brush takes the pointer while a stroke is open.
+    if (brushMode && isDownRef.current) {
+      const now = performance.now();
+      if (now - lastPaintRef.current >= PAINT_INTERVAL_MS) {
+        lastPaintRef.current = now;
+        useEditor.getState().paintAt(e.point.x, -e.point.z);
+      }
+      return;
+    }
+    // River-tool preview cursor — only meaningful while mid-stroke.
+    const ed = useEditor.getState();
+    if (ed.riverTool.active && ed.riverTool.editingRiverId !== null) {
+      cursorRef.current = { x: e.point.x, y: -e.point.z };
+      forceUpdate({});
+    }
   };
 
   const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
@@ -253,7 +290,169 @@ const EditorGroundPlane = ({
           depthWrite={false}
         />
       </mesh>
+      <RiverPreviewSegment cursorRef={cursorRef} />
     </group>
+  );
+};
+
+// Dashed preview line from the last point of the in-progress river to the
+// cursor — only visible while the river tool is editing. Re-derives on each
+// cursor move via the parent's forceUpdate.
+const RiverPreviewSegment = ({
+  cursorRef,
+}: {
+  cursorRef: React.MutableRefObject<{ x: number; y: number } | null>;
+}) => {
+  const riverTool = useEditor((s) => s.riverTool);
+  const version = useGame((s) => s.ui.treeVersion);
+  void version;
+  if (!riverTool.active || riverTool.editingRiverId === null) return null;
+  const river = useGame.getState().world.rivers.find((r) => r.id === riverTool.editingRiverId);
+  if (!river || river.points.length === 0) return null;
+  const cursor = cursorRef.current;
+  if (!cursor) return null;
+  const last = river.points[river.points.length - 1];
+  // Lifted slightly above the river ribbon so the preview is visible.
+  const a: [number, number, number] = [last.x, 0.06, -last.y];
+  const b: [number, number, number] = [cursor.x, 0.06, -cursor.y];
+  return (
+    <line>
+      <bufferGeometry
+        attach="geometry"
+        ref={(g) => {
+          if (!g) return;
+          const arr = new Float32Array([...a, ...b]);
+          g.setAttribute("position", new THREE.BufferAttribute(arr, 3));
+        }}
+      />
+      <lineBasicMaterial color="#76d6ff" transparent opacity={0.85} depthTest={false} />
+    </line>
+  );
+};
+
+// Per-river control-point overlay. Renders a small draggable sphere at each
+// point of each river. Drag updates the point live; release commits a single
+// undo entry (the snapshot was opened on drag start). Shift-click deletes
+// a point (refuses if the river would drop below 2 points). Clicking a
+// non-edited river's point selects that river for editing.
+const POINT_RADIUS = 0.45;
+
+const RiverEditOverlay = ({
+  rivers,
+  editingRiverId,
+  selectedRiverId,
+}: {
+  rivers: River[];
+  editingRiverId: string | null;
+  selectedRiverId: string | null;
+}) => {
+  if (rivers.length === 0) return null;
+  return (
+    <group>
+      {rivers.map((r) => (
+        <RiverPointGroup
+          key={r.id}
+          river={r}
+          isEditing={r.id === editingRiverId}
+          isSelected={r.id === selectedRiverId}
+        />
+      ))}
+    </group>
+  );
+};
+
+const RiverPointGroup = ({
+  river,
+  isEditing,
+  isSelected,
+}: {
+  river: River;
+  isEditing: boolean;
+  isSelected: boolean;
+}) => {
+  // Highlight color: in-progress > selected > idle. Idle points are the
+  // soft cyan so they read as part of the river preview.
+  const color = isEditing ? "#ffd66a" : isSelected ? "#76d6ff" : "#3aa8d8";
+  return (
+    <group>
+      {river.points.map((p, i) => (
+        <RiverPoint
+          // Points have no stable id of their own — index-keyed is fine because
+          // adds/removes happen at the tail or via explicit delete that
+          // unmounts the whole group on a different react cycle.
+          // biome-ignore lint/suspicious/noArrayIndexKey: control points have no stable id
+          key={`${river.id}:${i}`}
+          riverId={river.id}
+          index={i}
+          x={p.x}
+          y={p.y}
+          color={color}
+        />
+      ))}
+    </group>
+  );
+};
+
+const RiverPoint = ({
+  riverId,
+  index,
+  x,
+  y,
+  color,
+}: {
+  riverId: string;
+  index: number;
+  x: number;
+  y: number;
+  color: string;
+}) => {
+  const dragging = useRef(false);
+
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    const ed = useEditor.getState();
+    // Shift-click deletes the point (or refuses for the last two).
+    if (e.shiftKey) {
+      ed.deleteRiverPoint(riverId, index);
+      return;
+    }
+    // Clicking a point on a non-edited river selects that river (so its
+    // controls light up in the panel). For the in-progress river this is a
+    // no-op pre-drag — the user can still drag.
+    if (ed.riverTool.selectedRiverId !== riverId && ed.riverTool.editingRiverId !== riverId) {
+      ed.selectRiver(riverId);
+    }
+    dragging.current = true;
+    // Snapshot once at drag start so the whole drag is one undo entry.
+    ed.dragRiverPointStart();
+    (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    useEditor.getState().dragRiverPoint(riverId, index, e.point.x, -e.point.z);
+  };
+
+  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    dragging.current = false;
+    useEditor.getState().dragRiverPointEnd();
+    (e.target as Element | null)?.releasePointerCapture?.(e.pointerId);
+  };
+
+  return (
+    <mesh
+      position={[x, 0.18, -y]}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      renderOrder={21}
+    >
+      <sphereGeometry args={[POINT_RADIUS, 16, 12]} />
+      <meshBasicMaterial color={color} transparent opacity={0.95} depthTest={false} />
+    </mesh>
   );
 };
 

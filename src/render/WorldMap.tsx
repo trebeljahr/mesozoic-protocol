@@ -16,6 +16,7 @@ import { MapOrbitControls } from "./useMapGestures";
 import { WorldMapEditorProps } from "./WorldMapEditorProps";
 import { WorldMapOutposts } from "./WorldMapOutposts";
 import { WorldMapPrewarm } from "./WorldMapPrewarm";
+import { WorldMapRivers } from "./WorldMapRivers";
 import {
   CONTENT_H,
   CONTENT_W,
@@ -254,6 +255,8 @@ export const WorldMapScene = () => {
       <WorldMapOutposts />
 
       <MapRoute />
+
+      <WorldMapRivers />
 
       {import.meta.env.DEV && <WorldMapEditorProps />}
 

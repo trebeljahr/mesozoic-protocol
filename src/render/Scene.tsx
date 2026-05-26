@@ -32,6 +32,7 @@ import { PlannerOverlay } from "./PlannerOverlay";
 import { ProjectileMesh } from "./ProjectileMesh";
 import { PulseTracerFx } from "./PulseTracerFx";
 import { RegenBadges } from "./RegenBadges";
+import { Rivers } from "./Rivers";
 import { RobotHud } from "./RobotHud";
 import { RobotSelectionVfx } from "./RobotSelectionVfx";
 import { Rocks } from "./Rocks";
@@ -85,6 +86,7 @@ export const PlayScene = () => {
       <Rocks />
       <Trees />
       <BiomeCosmetics />
+      <PlayRivers />
       {import.meta.env.DEV && <EditorProps />}
       <EasterEggs />
       <Placement />
@@ -182,4 +184,15 @@ export const PlayScene = () => {
       <SunProxy biome={biome} />
     </>
   );
+};
+
+// Thin wrapper that pulls the level's rivers off the game store. Subscribes
+// to ui.treeVersion so the bumpGeometry tick the editor fires on each river
+// mutation also re-runs this selector — same invalidation pattern Trees /
+// Rocks / EditorProps use.
+const PlayRivers = () => {
+  const version = useGame((s) => s.ui.treeVersion);
+  void version;
+  const rivers = useGame.getState().world.rivers;
+  return <Rivers rivers={rivers} />;
 };

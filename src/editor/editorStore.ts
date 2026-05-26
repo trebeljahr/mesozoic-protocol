@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { create } from "zustand";
 import { classifyPropUrl } from "../biomes";
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River, RiverPoint } from "../sim/types";
 import { useGame } from "../store";
 import { getBrushPreset, pickWeighted, randRange, samplePoints } from "./brush";
 import {
@@ -32,6 +32,13 @@ const MIN_SCALE = 0.15;
 const MAX_SCALE = 6;
 const clampScale = (s: number): number => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
 
+// River width clamp — keeps the ribbon usable (no zero-width or absurd widths).
+const MIN_RIVER_WIDTH = 0.5;
+const MAX_RIVER_WIDTH = 20;
+const DEFAULT_RIVER_WIDTH = 2.5;
+const clampRiverWidth = (w: number): number =>
+  Math.min(MAX_RIVER_WIDTH, Math.max(MIN_RIVER_WIDTH, w));
+
 // Re-snapshot ui.treeVersion (the static-geometry invalidation key the
 // render layers + Placement already subscribe to) so an in-place props
 // mutation actually re-renders.
@@ -44,17 +51,34 @@ const bumpGeometry = (): void => {
 
 const persist = (): void => {
   const w = useGame.getState().world;
-  saveLevelEdit(w.levelId, { v: 1, override: w.overrideActive, props: w.props });
+  saveLevelEdit(w.levelId, {
+    v: 1,
+    override: w.overrideActive,
+    props: w.props,
+    rivers: w.rivers,
+  });
 };
 
 const currentSnapshot = (): Snapshot => {
   const w = useGame.getState().world;
-  return { props: [...w.props], override: w.overrideActive };
+  return {
+    props: [...w.props],
+    override: w.overrideActive,
+    rivers: w.rivers.map((r) => ({ ...r, points: r.points.map((p) => ({ ...p })) })),
+  };
 };
 
 // Replace world.props with a fresh array, invalidate render, and persist.
 const commitProps = (next: PlacedProp[]): void => {
   useGame.getState().world.props = next;
+  bumpGeometry();
+  persist();
+};
+
+// Replace world.rivers with a fresh array, invalidate render, and persist.
+// Mirrors commitProps so the same treeVersion bump invalidates Rivers as well.
+const commitRivers = (next: River[]): void => {
+  useGame.getState().world.rivers = next;
   bumpGeometry();
   persist();
 };
@@ -79,6 +103,20 @@ type BrushState = {
   minSpacing: number;
 };
 
+// River-tool state. `active` flips the editor into river-painting mode
+// (mutually exclusive with placingUrl / brush / prop-select). While editing
+// a single river, `editingRiverId` points at the in-progress river so map
+// clicks append points. `finishRiver` commits one undo entry for the whole
+// stroke (per-point clicks don't pollute history). `selectedRiverId` is the
+// post-finish selection for editing existing rivers (drag points, set width,
+// delete).
+type RiverToolState = {
+  active: boolean;
+  editingRiverId: string | null;
+  selectedRiverId: string | null;
+  width: number;
+};
+
 type EditorState = {
   active: boolean;
   // Asset url armed for placement — each map click drops one. null = select mode.
@@ -94,6 +132,7 @@ type EditorState = {
   strokeAnchor: Snapshot | null;
   strokeOpen: boolean;
   strokePushed: boolean;
+  riverTool: RiverToolState;
   history: History;
   toggleActive: () => void;
   setPlacing: (url: string | null) => void;
@@ -113,6 +152,18 @@ type EditorState = {
   beginStroke: () => void;
   paintAt: (x: number, y: number) => void;
   endStroke: () => void;
+  // River-tool actions. See RiverToolState docstring.
+  setRiverToolActive: (on: boolean) => void;
+  beginRiver: (x: number, y: number) => void;
+  addRiverPoint: (x: number, y: number) => void;
+  finishRiver: () => void;
+  selectRiver: (id: string | null) => void;
+  dragRiverPointStart: () => void;
+  dragRiverPoint: (riverId: string, index: number, x: number, y: number) => void;
+  dragRiverPointEnd: () => void;
+  deleteRiverPoint: (riverId: string, index: number) => void;
+  deleteRiver: (id: string) => void;
+  setRiverWidth: (width: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -148,6 +199,12 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
     strokeAnchor: null,
     strokeOpen: false,
     strokePushed: false,
+    riverTool: {
+      active: false,
+      editingRiverId: null,
+      selectedRiverId: null,
+      width: DEFAULT_RIVER_WIDTH,
+    },
     history: { past: [], future: [] },
 
     toggleActive: () => {
@@ -157,16 +214,17 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
         // editor, not tower placement / robot move orders.
         useGame.getState().clearSelection();
       }
-      set({
+      set((s) => ({
         active: next,
         placingUrl: null,
         selectedId: null,
         moving: false,
-        brush: { ...get().brush, active: false },
+        brush: { ...s.brush, active: false },
         strokeAnchor: null,
         strokeOpen: false,
         strokePushed: false,
-      });
+        riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+      }));
     },
 
     setPlacing: (url) =>
@@ -178,6 +236,8 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
         selectedId: null,
         moving: false,
         brush: { ...s.brush, active: false },
+        // Picking an asset disarms the river tool — they share the click plane.
+        riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
       })),
 
     placeAt: (x, y) => {
@@ -268,17 +328,24 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       const w = useGame.getState().world;
       clearLevelEdit(w.levelId);
       w.props = [];
+      w.rivers = [];
       w.overrideActive = false;
       // Fresh state is the new baseline — drop history.
-      set({
+      set((s) => ({
         selectedId: null,
         moving: false,
         placingUrl: null,
+        riverTool: {
+          ...s.riverTool,
+          active: false,
+          editingRiverId: null,
+          selectedRiverId: null,
+        },
         history: { past: [], future: [] },
         strokeAnchor: null,
         strokeOpen: false,
         strokePushed: false,
-      });
+      }));
       bumpGeometry();
       reloadLevel();
     },
@@ -291,13 +358,20 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       clearAllLevelEdits();
       const w = useGame.getState().world;
       w.props = [];
+      w.rivers = [];
       w.overrideActive = false;
-      set({
+      set((s) => ({
         selectedId: null,
         moving: false,
         placingUrl: null,
+        riverTool: {
+          ...s.riverTool,
+          active: false,
+          editingRiverId: null,
+          selectedRiverId: null,
+        },
         history: { past: [], future: [] },
-      });
+      }));
       bumpGeometry();
       reloadLevel();
     },
@@ -315,6 +389,8 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
         placingUrl: null,
         selectedId: null,
         moving: false,
+        // Arming a brush disarms the river tool — both consume the click plane.
+        riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
       }));
     },
 
@@ -375,23 +451,160 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       set({ strokeAnchor: null, strokeOpen: false, strokePushed: false });
     },
 
+    setRiverToolActive: (on) => {
+      if (on) useGame.getState().clearSelection();
+      set((s) => ({
+        // Mutually exclusive with prop placement / move / brush.
+        placingUrl: null,
+        selectedId: null,
+        moving: false,
+        brush: { ...s.brush, active: false },
+        riverTool: {
+          ...s.riverTool,
+          active: on,
+          // Disarm in-progress stroke when toggling off; preserve selection
+          // so a re-toggle still has the last-edited river highlighted.
+          editingRiverId: on ? s.riverTool.editingRiverId : null,
+        },
+      }));
+    },
+
+    beginRiver: (x, y) => {
+      // First click of a new river: seed two coincident-ish points so the
+      // Catmull-Rom curve has enough samples to render immediately. The
+      // second click (addRiverPoint) replaces the placeholder offset.
+      const id = nanoid(8);
+      const seed: River = {
+        id,
+        points: [
+          { x, y },
+          { x: x + 0.01, y: y + 0.01 },
+        ],
+        width: get().riverTool.width,
+      };
+      snapshotAndPush();
+      commitRivers([...useGame.getState().world.rivers, seed]);
+      set((s) => ({
+        riverTool: { ...s.riverTool, editingRiverId: id, selectedRiverId: id },
+      }));
+    },
+
+    addRiverPoint: (x, y) => {
+      const editingId = get().riverTool.editingRiverId;
+      if (editingId === null) return;
+      // No history push during a stroke — finishRiver commits one entry for
+      // the whole creation. Without snapshotAndPush each map click would
+      // pollute undo with N intermediate states.
+      const next = useGame.getState().world.rivers.map((r) => {
+        if (r.id !== editingId) return r;
+        // Replace the placeholder seed point on the second click; append after.
+        if (r.points.length === 2 && r.points[1].x === r.points[0].x + 0.01) {
+          return { ...r, points: [r.points[0], { x, y }] };
+        }
+        return { ...r, points: [...r.points, { x, y } as RiverPoint] };
+      });
+      commitRivers(next);
+    },
+
+    finishRiver: () => {
+      // Commit-only — the initial snapshotAndPush in beginRiver already
+      // covered the creation. Just clear the editing handle so further
+      // map clicks don't extend this river.
+      set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
+    },
+
+    selectRiver: (id) => {
+      set((s) => ({
+        riverTool: { ...s.riverTool, selectedRiverId: id, editingRiverId: null },
+      }));
+    },
+
+    dragRiverPointStart: () => {
+      // One undo entry per drag — snapshot here, then mutate freely via
+      // dragRiverPoint until dragRiverPointEnd. The drag points are
+      // controlled by pointer events on the editor sphere.
+      snapshotAndPush();
+    },
+
+    dragRiverPoint: (riverId, index, x, y) => {
+      // Pure mutation — history was captured at drag start.
+      const next = useGame.getState().world.rivers.map((r) => {
+        if (r.id !== riverId) return r;
+        if (index < 0 || index >= r.points.length) return r;
+        const points = r.points.map((p, i) => (i === index ? { x, y } : p));
+        return { ...r, points };
+      });
+      commitRivers(next);
+    },
+
+    dragRiverPointEnd: () => {
+      // No-op for now; the undo entry was opened at drag start. Hook left
+      // in place for future "commit on release" diff-coalescing.
+    },
+
+    deleteRiverPoint: (riverId, index) => {
+      const river = useGame.getState().world.rivers.find((r) => r.id === riverId);
+      if (!river) return;
+      // A river needs ≥2 points to render — refuse the delete instead of
+      // silently destroying the river.
+      if (river.points.length <= 2) return;
+      snapshotAndPush();
+      const next = useGame
+        .getState()
+        .world.rivers.map((r) =>
+          r.id === riverId ? { ...r, points: r.points.filter((_, i) => i !== index) } : r,
+        );
+      commitRivers(next);
+    },
+
+    deleteRiver: (id) => {
+      snapshotAndPush();
+      const next = useGame.getState().world.rivers.filter((r) => r.id !== id);
+      commitRivers(next);
+      set((s) => ({
+        riverTool: {
+          ...s.riverTool,
+          selectedRiverId: s.riverTool.selectedRiverId === id ? null : s.riverTool.selectedRiverId,
+          editingRiverId: s.riverTool.editingRiverId === id ? null : s.riverTool.editingRiverId,
+        },
+      }));
+    },
+
+    setRiverWidth: (width) => {
+      const w = clampRiverWidth(width);
+      const targetId = get().riverTool.editingRiverId ?? get().riverTool.selectedRiverId ?? null;
+      if (targetId === null) {
+        // No active river — just update the tool default for the next river.
+        set((s) => ({ riverTool: { ...s.riverTool, width: w } }));
+        return;
+      }
+      snapshotAndPush();
+      const next = useGame
+        .getState()
+        .world.rivers.map((r) => (r.id === targetId ? { ...r, width: w } : r));
+      commitRivers(next);
+      set((s) => ({ riverTool: { ...s.riverTool, width: w } }));
+    },
+
     undo: () => {
       const result = undoHistory(get().history, currentSnapshot());
       if (!result) return;
       const w = useGame.getState().world;
       w.props = result.restored.props;
       w.overrideActive = result.restored.override;
+      w.rivers = result.restored.rivers;
       bumpGeometry();
       persist();
-      // Restored selection may no longer exist. Drop any open stroke too.
-      set({
+      // Restored selection may no longer exist. Drop any open stroke + river-edit handle.
+      set((s) => ({
         history: result.next,
         selectedId: null,
         moving: false,
         strokeAnchor: null,
         strokeOpen: false,
         strokePushed: false,
-      });
+        riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+      }));
     },
 
     redo: () => {
@@ -400,16 +613,18 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
       const w = useGame.getState().world;
       w.props = result.restored.props;
       w.overrideActive = result.restored.override;
+      w.rivers = result.restored.rivers;
       bumpGeometry();
       persist();
-      set({
+      set((s) => ({
         history: result.next,
         selectedId: null,
         moving: false,
         strokeAnchor: null,
         strokeOpen: false,
         strokePushed: false,
-      });
+        riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+      }));
     },
 
     canUndo: () => canUndoH(get().history),
@@ -429,6 +644,7 @@ export const useEditor = /* @__PURE__ */ create<EditorState>((set, get) => {
           generatedAt: new Date().toISOString(),
           override: w.overrideActive,
           props: w.props,
+          rivers: w.rivers,
         },
         null,
         2,

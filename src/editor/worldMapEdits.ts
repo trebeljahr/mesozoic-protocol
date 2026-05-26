@@ -1,13 +1,14 @@
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River } from "../sim/types";
 
 // Persistence for the dev-only world-map editor (src/editor). Hand-placed
 // overworld props live in localStorage under a single key (the world map
 // isn't level-scoped) and are re-applied on every load so authored
 // decoration "stays that way" across reloads.
 //
-// This module has no top-level side effects, so when its only consumers
-// (WorldMapEditorPanel / WorldMapEditorProps) are dead-coded in production,
-// Rollup tree-shakes the whole module out.
+// Rivers also live in this blob — but unlike props, the world-map renderer
+// reads rivers in production too, so the prod-safe Rivers wrapper in
+// src/render/WorldMap.tsx parses the same localStorage key directly to
+// avoid pulling this module into the production bundle.
 
 export type WorldMapEdit = {
   v: 1;
@@ -15,6 +16,9 @@ export type WorldMapEdit = {
   // toggle. Currently unused — render layer ignores it.
   override: boolean;
   props: PlacedProp[];
+  // Hand-painted rivers from the river tool. Additive over v:1 — older
+  // blobs without this field load with rivers defaulting to [].
+  rivers?: River[];
 };
 
 const STORAGE_KEY = "mz:worldmapedit:v1";

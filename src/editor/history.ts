@@ -1,4 +1,4 @@
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River } from "../sim/types";
 
 // In-memory undo/redo for the dev-only editors. Pure helpers, no globals.
 // A snapshot captures the pre-mutation state; each mutating action pushes
@@ -8,7 +8,7 @@ import type { PlacedProp } from "../sim/types";
 // resets it, while persisted prop/override state survives via levelEdits /
 // worldMapEdits.
 
-export type Snapshot = { props: PlacedProp[]; override: boolean };
+export type Snapshot = { props: PlacedProp[]; override: boolean; rivers: River[] };
 export type History = { past: Snapshot[]; future: Snapshot[] };
 
 export const HISTORY_CAP = 50;

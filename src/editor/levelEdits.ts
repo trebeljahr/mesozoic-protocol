@@ -1,4 +1,4 @@
-import type { PlacedProp } from "../sim/types";
+import type { PlacedProp, River } from "../sim/types";
 
 // Persistence for the dev-only level editor (src/editor). Hand-placed props
 // and the per-level "override procedural" flag are stored in localStorage,
@@ -15,6 +15,10 @@ export type LevelEdit = {
   // for this level so the hand-placed props are the only set-dressing.
   override: boolean;
   props: PlacedProp[];
+  // Hand-painted rivers from the river tool. Additive over v:1 — older
+  // blobs without this field load with rivers defaulting to []. The
+  // schema version stays at 1 because the addition is purely additive.
+  rivers?: River[];
 };
 
 const STORAGE_KEY = "mz:leveledits:v1";

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PropRole } from "../biomes";
+import type { River } from "../sim/types";
 import { useGame } from "../store";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
 import { BUILTIN_BRUSH_PRESETS } from "./brush";
@@ -84,6 +85,81 @@ const fab: React.CSSProperties = {
   font: "12px/1 system-ui, sans-serif",
 };
 
+// Dev-only river-tool control panel. Renders inside the LevelEditorPanel
+// when the tool is active. Width slider drives the in-progress or selected
+// river; delete-river is the explicit destroy. Per-point delete is wired
+// through the spheres rendered by EditorProps (the user shift-clicks them).
+const RiverControls = ({
+  tool,
+  editingRiver,
+  selectedRiver,
+}: {
+  tool: { width: number; editingRiverId: string | null; selectedRiverId: string | null };
+  editingRiver: River | null;
+  selectedRiver: River | null;
+}) => {
+  // editingRiver has priority — while the user is mid-stroke, the slider
+  // should affect that river, not whatever was previously selected.
+  const target = editingRiver ?? selectedRiver;
+  const targetWidth = target?.width ?? tool.width;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: 8,
+        background: "#11151d",
+        border: "1px solid #2a313d",
+        borderRadius: 6,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontWeight: 600 }}>
+          {editingRiver ? "Painting river…" : selectedRiver ? "River selected" : "River tool"}
+        </span>
+        <span style={{ color: "#8b93a3" }}>{targetWidth.toFixed(2)}w</span>
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#8b93a3", minWidth: 40 }}>Width</span>
+        <input
+          type="range"
+          min={0.5}
+          max={20}
+          step={0.1}
+          value={targetWidth}
+          onChange={(e) => useEditor.getState().setRiverWidth(Number(e.target.value))}
+          style={{ flex: 1 }}
+        />
+      </label>
+      <div style={{ color: "#8b93a3", fontSize: 11 }}>
+        {editingRiver
+          ? "Click map to add points. Finish river to commit. Shift-click a point to delete it."
+          : selectedRiver
+            ? `${selectedRiver.points.length} pts. Drag spheres to move. Shift-click to delete a point.`
+            : "Click map to start a new river. Click an existing point to select that river."}
+      </div>
+      {selectedRiver && !editingRiver && (
+        <button
+          type="button"
+          style={{
+            padding: "5px 8px",
+            borderRadius: 5,
+            border: "1px solid #7a3a3a",
+            background: "#3a1c1c",
+            color: "#e6e9ef",
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+          onClick={() => useEditor.getState().deleteRiver(selectedRiver.id)}
+        >
+          Delete river
+        </button>
+      )}
+    </div>
+  );
+};
+
 const PencilIcon = () => (
   <svg
     width="13"
@@ -108,6 +184,7 @@ export const LevelEditorPanel = () => {
   const selectedId = useEditor((s) => s.selectedId);
   const moving = useEditor((s) => s.moving);
   const brush = useEditor((s) => s.brush);
+  const riverTool = useEditor((s) => s.riverTool);
   const toggleActive = useEditor((s) => s.toggleActive);
   // Subscribe to history so Undo/Redo button enabled state refreshes on push.
   const history = useEditor((s) => s.history);
@@ -124,7 +201,12 @@ export const LevelEditorPanel = () => {
   // Re-read live props each render; `version` (subscribed above) drives the refresh.
   void version;
   const propsArr = useGame.getState().world.props;
+  const riversArr = useGame.getState().world.rivers;
   const selected = selectedId !== null ? (propsArr.find((p) => p.id === selectedId) ?? null) : null;
+  const selectedRiver =
+    riverTool.selectedRiverId !== null
+      ? (riversArr.find((r) => r.id === riverTool.selectedRiverId) ?? null)
+      : null;
 
   // Keyboard: Esc steps back (disarm → deselect → close); Delete removes;
   // Ctrl/Meta+Z undoes, Ctrl+Shift+Z / Ctrl+Y redoes. Skip undo/redo
@@ -257,6 +339,39 @@ export const LevelEditorPanel = () => {
       </label>
 
       <BrushSection brush={brush} />
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          type="button"
+          style={btn(riverTool.active)}
+          onClick={() => useEditor.getState().setRiverToolActive(!riverTool.active)}
+          title="River-painting tool — click the map to drop spline control points"
+        >
+          {riverTool.active ? "River ✓" : "River"}
+        </button>
+        {riverTool.active && riverTool.editingRiverId !== null && (
+          <button
+            type="button"
+            style={btn()}
+            onClick={() => useEditor.getState().finishRiver()}
+            title="Finish the current river (close stroke; further clicks start a new river)"
+          >
+            Finish river
+          </button>
+        )}
+      </div>
+
+      {riverTool.active && (
+        <RiverControls
+          tool={riverTool}
+          selectedRiver={selectedRiver}
+          editingRiver={
+            riverTool.editingRiverId !== null
+              ? (riversArr.find((r) => r.id === riverTool.editingRiverId) ?? null)
+              : null
+          }
+        />
+      )}
 
       {brush.active ? (
         <div style={{ color: "#8b93a3" }}>

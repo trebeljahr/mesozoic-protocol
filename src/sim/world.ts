@@ -62,6 +62,7 @@ import type {
   PlacedProp,
   Projectile,
   ProjectileKind,
+  River,
   Robot,
   RobotVariant,
   Rock,
@@ -762,6 +763,7 @@ export const createWorld = (
   // authored props are the only set-dressing. Gated on import.meta.env.DEV so
   // the localStorage read and this whole branch dead-code out of production.
   let editorProps: PlacedProp[] = [];
+  let editorRivers: River[] = [];
   let overrideActive = false;
   let finalTrees = trees;
   let finalRocks = rocks;
@@ -778,6 +780,8 @@ export const createWorld = (
       const edit = raw ? JSON.parse(raw)?.[String(level.id)] : null;
       if (edit) {
         editorProps = (Array.isArray(edit.props) ? edit.props : []) as PlacedProp[];
+        // Additive field: missing on legacy v:1 blobs, defaults to [].
+        editorRivers = (Array.isArray(edit.rivers) ? edit.rivers : []) as River[];
         overrideActive = edit.override === true;
         if (overrideActive) {
           finalTrees = [];
@@ -916,6 +920,7 @@ export const createWorld = (
     outposts: finalOutposts,
     props: editorProps,
     overrideActive,
+    rivers: editorRivers,
     projectiles: [],
     beams: [],
     explosions: [],
