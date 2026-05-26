@@ -21,3 +21,23 @@ export const BIOME_STORY_TRACE_STYLE: Record<Biome, BiomeStoryTraceStyle> = {
 // reuse the same source of truth. See materialTunables.ts for the live
 // values — kept canonical there to avoid two copies of the same table.
 export { BIOME_MATRIARCH_RIM, BIOME_RIM_BIAS } from "./materialTunables";
+
+// Cloning-canister palette. The biotech-outpost backstory lands per-biome:
+// temperate worlds default to green growth medium, lava/wasteland to amber
+// (volcanic specimens), snow to pale-cyan cryogenic fluid, alien to magenta
+// xeno-fluid. Glass tint stays subtle so the fluid carries the colour.
+export type CanisterPalette = {
+  fluid: string;
+  glass: string;
+  indicator: string;
+  indicatorAlt: string;
+};
+
+export const CANISTER_PALETTE: Record<Biome, CanisterPalette> = {
+  forest: { fluid: "#7bff6a", glass: "#bff0d8", indicator: "#73f7ff", indicatorAlt: "#a5ffd0" },
+  desert: { fluid: "#9aff6a", glass: "#c6e6c2", indicator: "#73f7ff", indicatorAlt: "#fff0a8" },
+  snow: { fluid: "#9af0ff", glass: "#d0eaff", indicator: "#bef6ff", indicatorAlt: "#7fc8ff" },
+  wasteland: { fluid: "#ffb84a", glass: "#dec8a8", indicator: "#ff9a3a", indicatorAlt: "#ffd58a" },
+  lava: { fluid: "#ff9a3a", glass: "#d4b89a", indicator: "#ffe060", indicatorAlt: "#ff5a2a" },
+  alien: { fluid: "#ff70d8", glass: "#e6c8ff", indicator: "#b070ff", indicatorAlt: "#ffb0e8" },
+};

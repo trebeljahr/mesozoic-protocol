@@ -8,6 +8,7 @@ import { BiomeAmbientVfx } from "./BiomeAmbientVfx";
 import { BiomeCosmetics } from "./BiomeCosmetics";
 import { CameraRig } from "./CameraRig";
 import { ChainArcsFx } from "./ChainArcsFx";
+import { CloningVats } from "./CloningVats";
 import { CoalTrail } from "./CoalTrail";
 import { EasterEggs } from "./EasterEggs";
 import { EditorProps } from "./EditorProps";
@@ -91,6 +92,7 @@ export const PlayScene = () => {
       <PathLine />
       <HQTurrets />
       <HQBase />
+      <CloningVats />
       <WorldOutposts />
 
       <ModelEnemyMesh kind="raptor" url="/models/Velociraptor.glb" targetSize={1.6} />
