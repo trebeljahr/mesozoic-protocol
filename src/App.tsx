@@ -232,20 +232,30 @@ export const App = () => {
             dpr={dprCap}
             gl={{ antialias: true, powerPreference: "high-performance" }}
             onCreated={({ gl }) => {
-              // WebGL context-loss safety net. Without preventDefault on the
-              // lost event the browser refuses to restore, leaving the canvas
-              // permanently black. On restore the renderer rebuilds programs
-              // and uploads on demand, but the EffectComposer's internal
-              // render targets need a remount — bump the scene key so the
-              // whole SceneRoot tears down and re-creates.
+              // WebGL context-loss safety net. preventDefault on the lost
+              // event tells the browser we're willing to receive a restore;
+              // without it the canvas stays permanently black. We do NOT
+              // bump the scene epoch on lost — three.js + R3F can't render
+              // against a dead context anyway, so remounting at that point
+              // just thrashes React. Wait for restore, then bump the epoch
+              // so SceneRoot + EffectComposer rebuild all their GPU-side
+              // resources against the freshly-restored context.
               const canvas = gl.domElement;
+              const dumpInfo = (tag: string) => {
+                const info = gl.info;
+                console.warn(
+                  `[gl] ${tag} — programs=${info.programs?.length ?? "?"} ` +
+                    `geometries=${info.memory.geometries} textures=${info.memory.textures} ` +
+                    `calls=${info.render.calls} triangles=${info.render.triangles}`,
+                );
+              };
               const onLost = (e: Event) => {
                 e.preventDefault();
                 console.warn("[gl] context lost — preventing default so it can be restored");
-                useGame.setState({ glContextEpoch: useGame.getState().glContextEpoch + 1 });
+                dumpInfo("at-lost");
               };
               const onRestored = () => {
-                console.warn("[gl] context restored — bumping scene epoch");
+                console.warn("[gl] context restored — bumping scene epoch to rebuild");
                 useGame.setState({ glContextEpoch: useGame.getState().glContextEpoch + 1 });
               };
               canvas.addEventListener("webglcontextlost", onLost as EventListener, false);

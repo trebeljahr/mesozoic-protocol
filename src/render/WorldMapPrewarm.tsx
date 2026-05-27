@@ -72,6 +72,7 @@ const cancelIdle = (id: IdleHandle): void => {
 
 export const WorldMapPrewarm = () => {
   const gl = useThree((s) => s.gl);
+  const sceneRoot = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const alreadyDone = useGame((s) => s.assetsPrewarmed);
   const markDone = useGame((s) => s.markAssetsPrewarmed);
@@ -106,14 +107,19 @@ export const WorldMapPrewarm = () => {
     return () => cancelAnimationFrame(id);
   }, [phase, mountedCount, markDone]);
 
+  // Compile the WHOLE scene each tick so light-count uniforms are baked
+  // correctly into the prewarm programs (a subtree-only compile compiles
+  // against zero lights and forces a recompile during real rendering).
+  // three.js's program cache makes the per-tick cost bounded to the
+  // newly-mounted GLB's materials.
   const registerRoot = useMemo(
     () => (root: THREE.Object3D) => {
       const key = root.uuid;
       if (compiledRef.current.has(key)) return;
       compiledRef.current.add(key);
-      gl.compile(root, camera);
+      gl.compile(sceneRoot, camera);
     },
-    [gl, camera],
+    [gl, sceneRoot, camera],
   );
 
   if (phase !== "mount") return null;

@@ -52,6 +52,7 @@ const PrewarmModel = ({
 
 export const ShaderPrewarm = () => {
   const gl = useThree((s) => s.gl);
+  const sceneRoot = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const alreadyWarm = useGame((s) => s.assetsPrewarmed);
   const markWarm = useGame((s) => s.markAssetsPrewarmed);
@@ -60,8 +61,9 @@ export const ShaderPrewarm = () => {
   const compiledRef = useRef<Set<string>>(new Set());
 
   // Step through the URL list one frame at a time. Each tick mounts the
-  // next prewarm model (which re-runs this effect via mountedCount) and
-  // compiles JUST that model — never the whole scene at once.
+  // next prewarm model (which re-runs this effect via mountedCount); the
+  // effect that registers the freshly mounted root then runs gl.compile
+  // for that frame's incremental work.
   useEffect(() => {
     if (done) return;
     if (mountedCount === 0) {
@@ -81,19 +83,34 @@ export const ShaderPrewarm = () => {
     return () => cancelAnimationFrame(id);
   }, [mountedCount, done, markWarm]);
 
-  // Compile the local subtree of each freshly registered prewarm root.
-  // Touching just the subtree (instead of the full scene each tick) keeps
-  // the per-frame compile budget bounded to one GLB's materials and
-  // textures, so the renderer never blocks long enough to lose the
-  // context.
+  // Compile the WHOLE scene each tick, but only at the point where a new
+  // prewarm GLB has just been added. three.js's program cache makes the
+  // call no-op for materials whose program is already built, so the per-
+  // frame compile cost is bounded to the new GLB's materials. Passing
+  // the full sceneRoot (not just the prewarm subtree) is critical: the
+  // compile pass derives light-count uniforms from `scene`'s lights, and
+  // if we compile against a light-less subtree, three.js compiles
+  // programs without lights and then has to RECOMPILE them when the
+  // real meshes render under the scene's directional/hemi/ambient lights
+  // — which lands the full compile cost in one tick anyway and trips
+  // Chrome's WebGL context-loss watchdog (the symptom this whole pass
+  // was meant to prevent).
   const registerRoot = useMemo(
     () => (root: THREE.Object3D) => {
       const key = root.uuid;
       if (compiledRef.current.has(key)) return;
       compiledRef.current.add(key);
-      gl.compile(root, camera);
+      const t0 = performance.now();
+      gl.compile(sceneRoot, camera);
+      const dt = performance.now() - t0;
+      if (dt > 60) {
+        // Surface any prewarm tick that lands a long compile burst — that
+        // would be the watchdog-tripping budget if it slipped past the
+        // chunking limit.
+        console.warn(`[prewarm] tick gl.compile=${dt.toFixed(0)}ms`);
+      }
     },
-    [gl, camera],
+    [gl, sceneRoot, camera],
   );
 
   if (done) return null;
