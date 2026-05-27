@@ -2008,6 +2008,17 @@
     color: #8a98aa;
   }
 
+  /* Challenge-mode badges. The wrapper itself stays click-through so the
+   level dome behind it remains hoverable; individual buttons re-enable
+   pointer events so they can open the mode picker. */
+  .map-badges-wrap,
+  .map-badges-wrap > * {
+    pointer-events: none;
+  }
+  .map-badges-wrap button {
+    pointer-events: auto;
+  }
+
   .stars-row {
     display: inline-flex;
     align-items: center;

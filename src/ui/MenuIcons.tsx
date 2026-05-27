@@ -231,3 +231,22 @@ export const IconSpeaker: FC<MenuIconProps> = (p) => (
     <path d="M17.5 6.5a7 7 0 0 1 0 11" />
   </Svg>
 );
+
+export const IconBreach: FC<MenuIconProps> = (p) => (
+  <Svg {...p} label="Breach">
+    <path
+      d="M12 2.5 L13.6 10.4 L21.5 12 L13.6 13.6 L12 21.5 L10.4 13.6 L2.5 12 L10.4 10.4 Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export const IconLockdown: FC<MenuIconProps> = (p) => (
+  <Svg {...p} label="Lockdown">
+    <path d="M12 3 L4.5 6 V12.5 c0 4.4 3.1 7.4 7.5 8.5 c4.4-1.1 7.5-4.1 7.5-8.5 V6 Z" />
+    <rect x="9" y="11" width="6" height="6" rx="1" />
+    <path d="M10.5 11 V9 a1.5 1.5 0 0 1 3 0 V11" />
+  </Svg>
+);

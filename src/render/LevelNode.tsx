@@ -17,7 +17,7 @@ import {
   type Stars,
 } from "../progress";
 import { useGame } from "../store";
-import { IconLock, IconStar, IconUnlock } from "../ui/MenuIcons";
+import { IconBreach, IconLock, IconLockdown, IconStar, IconUnlock } from "../ui/MenuIcons";
 
 type Props = { level: LevelConfig };
 
@@ -40,21 +40,26 @@ const STAR_SHAPE = (() => {
 const STAR_GEOM = new THREE.ShapeGeometry(STAR_SHAPE);
 const STAR_SLOTS = ["slot-left", "slot-center", "slot-right"] as const;
 
-// World-map challenge-mode badge styling. Glyph is the mode's visual
-// identity; the letter is derived from the localized label initial so it
-// tracks renames. Three render states (locked / unlocked / cleared) are
-// chosen at the call site.
+// World-map challenge-mode badge styling. Icon carries the mode's visual
+// identity (no letter — the letters overlapped the level-number plaque
+// and were illegible against the terrain). Three render states
+// (locked / unlocked / cleared) are chosen at the call site.
 const MODE_BADGE: Record<
   "heroic" | "iron",
-  { glyph: string; text: string; border: string; bg: string }
+  { Icon: typeof IconBreach; text: string; border: string; bg: string }
 > = {
   heroic: {
-    glyph: "✦",
+    Icon: IconBreach,
     text: "text-orange",
     border: "border-orange",
-    bg: "bg-[rgba(255,178,102,0.10)]",
+    bg: "bg-[rgba(60,30,5,0.92)]",
   },
-  iron: { glyph: "▣", text: "text-red", border: "border-red", bg: "bg-[rgba(255,90,122,0.10)]" },
+  iron: {
+    Icon: IconLockdown,
+    text: "text-red",
+    border: "border-red",
+    bg: "bg-[rgba(50,10,18,0.92)]",
+  },
 };
 
 export const LevelNode = ({ level }: Props) => {
@@ -249,28 +254,44 @@ export const LevelNode = ({ level }: Props) => {
       {challengeBadges.length > 0 && (
         <Html
           center
-          position={[0, 0.05, labelZ + 0.7]}
+          position={[0, 0.05, labelZ + 1.5]}
           zIndexRange={[0, 10]}
-          wrapperClass="map-label-wrap"
+          wrapperClass="map-badges-wrap"
         >
-          <div className="flex gap-1 text-[11px] font-bold tabular-nums select-none">
+          <div className="flex gap-1 select-none">
             {challengeBadges.map(({ mode, cleared, open }) => {
               const b = MODE_BADGE[mode];
               const state = cleared ? "cleared" : open ? "unlocked" : "locked";
               const cls = cleared
                 ? `${b.border} ${b.text} ${b.bg}`
                 : open
-                  ? `${b.border} ${b.text} bg-transparent`
-                  : "border-border-faint text-fg-dim bg-transparent opacity-60";
+                  ? `${b.border} ${b.text} bg-[rgba(10,16,24,0.92)]`
+                  : "border-border-faint text-fg-dim bg-[rgba(10,16,24,0.92)] opacity-70";
               return (
-                <span
+                <button
                   key={mode}
-                  className={`px-1.5 py-0.5 rounded border ${cls}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!unlocked) return;
+                    audio.ensureResumed();
+                    audio.play("level-select", "ui", 0.7, 80);
+                    openModePicker(level.id);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className={`relative flex items-center justify-center w-7 h-7 rounded border ${cls} transition-all hover:brightness-125 cursor-pointer`}
                   title={`${LEVEL_MODE_LABEL[mode]} — ${state}`}
+                  aria-label={`${LEVEL_MODE_LABEL[mode]} — ${state}`}
                 >
-                  {b.glyph} {LEVEL_MODE_LABEL[mode].charAt(0)}
-                  {cleared ? " ✓" : ""}
-                </span>
+                  <b.Icon size={16} />
+                  {cleared && (
+                    <span
+                      className={`absolute -top-1 -right-1 text-[9px] font-bold ${b.text} bg-[rgba(10,16,24,0.95)] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none`}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </button>
               );
             })}
           </div>
