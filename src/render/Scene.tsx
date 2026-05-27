@@ -10,6 +10,7 @@ import { CameraRig } from "./CameraRig";
 import { ChainArcsFx } from "./ChainArcsFx";
 import { CloningVats } from "./CloningVats";
 import { CoalTrail } from "./CoalTrail";
+import { Defer } from "./Defer";
 import { EasterEggs } from "./EasterEggs";
 import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
@@ -80,22 +81,37 @@ export const PlayScene = () => {
 
       <SimTicker />
       <ShaderPrewarm />
+      {/* Frame 0 — the minimum playable framing (ground, lights already in
+          parent, HQ + path) so the first render compiles a small core. */}
       <Ground />
-      <OuterScenery />
-      <FlowFeatures />
-      <Rocks />
-      <Trees />
-      <BiomeCosmetics />
-      <PlayRivers />
-      {import.meta.env.DEV && <EditorProps />}
-      <EasterEggs />
-      <Placement />
-      <PlannerOverlay />
-      <PathLine />
       <HQTurrets />
       <HQBase />
-      <CloningVats />
-      <WorldOutposts />
+      <PathLine />
+      <Placement />
+      {/* Frame 1 — bulk of the static decor (trees, rocks, biome cosmetics
+          live here so their material compiles don't pile onto the same
+          frame as core scene programs). */}
+      <Defer frames={1}>
+        <Trees />
+        <Rocks />
+        <BiomeCosmetics />
+        <OuterScenery />
+        <FlowFeatures />
+        <PlayRivers />
+      </Defer>
+      {/* Frame 2 — props introduced post-launch that pushed mount-time
+          GPU work over the WebGL watchdog ceiling on busy levels (the
+          cloning canisters each carry a skinned-mesh specimen + ~15
+          sub-meshes; the world outposts add another batch of GLBs).
+          Holding them back one extra frame lets the GPU command queue
+          drain before they pile in. */}
+      <Defer frames={2}>
+        <CloningVats />
+        <WorldOutposts />
+        <EasterEggs />
+        <PlannerOverlay />
+      </Defer>
+      {import.meta.env.DEV && <EditorProps />}
 
       <ModelEnemyMesh kind="raptor" url="/models/Velociraptor.glb" targetSize={1.6} />
       <ModelEnemyMesh kind="swarm" url="/models/Velociraptor.glb" targetSize={0.8} />
@@ -159,28 +175,34 @@ export const PlayScene = () => {
       <ModelTowerMesh kind="cryo" url="/models/turrets/Emp Turret.glb" targetSize={1.55} idleSpin />
       <ModelTowerMesh kind="flame" url="/models/turrets/Flamethrower Turret.glb" targetSize={1.7} />
       <ModelTowerMesh kind="hive" url="/models/turrets/Hive Turret.glb" targetSize={1.8} />
-      <HiveDrones />
-      <ShieldBubbles />
-      <HealAuras />
-      <RegenBadges />
-      <EnemyEyes />
-
       <ModelRobotMesh />
       <RobotHud />
-      <CoalTrail />
-
-      <TowerVfx />
-      <HealthBars />
-      <SelectionRing />
-      <RobotSelectionVfx />
-      <SpotTargetMarker />
-      <ProjectileMesh />
-      <PulseTracerFx />
-      <ChainArcsFx />
-      <Effects />
-      <SmokePuffs />
-      <BiomeAmbientVfx />
-      <AmbientHaze />
+      {/* Frame 3 — the VFX / overlay pool components. Most pre-allocate
+          large InstancedMesh / LineSegments buffers that the renderer
+          uploads on first sight, plus their pool materials all compile
+          shaders the first time they're drawn. Defer one more frame so
+          this batch doesn't pile onto the same tick as the model hosts
+          above. */}
+      <Defer frames={3}>
+        <HiveDrones />
+        <ShieldBubbles />
+        <HealAuras />
+        <RegenBadges />
+        <EnemyEyes />
+        <CoalTrail />
+        <TowerVfx />
+        <HealthBars />
+        <SelectionRing />
+        <RobotSelectionVfx />
+        <SpotTargetMarker />
+        <ProjectileMesh />
+        <PulseTracerFx />
+        <ChainArcsFx />
+        <Effects />
+        <SmokePuffs />
+        <BiomeAmbientVfx />
+        <AmbientHaze />
+      </Defer>
       <SunProxy biome={biome} />
     </>
   );
