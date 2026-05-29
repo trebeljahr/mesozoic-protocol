@@ -22,6 +22,8 @@ import {
   GODRAYS_DENSITY,
   GODRAYS_EXPOSURE,
   GODRAYS_KERNEL,
+  GODRAYS_MAX_DRAWING_BUFFER_PIXELS,
+  GODRAYS_RESOLUTION_SCALE,
   GODRAYS_SAMPLES,
   GODRAYS_WEIGHT,
   GRADE_BRIGHTNESS,
@@ -34,6 +36,8 @@ import {
   OUTLINE_HIDDEN_COLOR,
   OUTLINE_KERNEL,
   OUTLINE_LAYER,
+  OUTLINE_MAX_DRAWING_BUFFER_PIXELS,
+  OUTLINE_RESOLUTION_SCALE,
   OUTLINE_VISIBLE_COLOR,
   SUN_POSITION,
   SUN_RADIUS,
@@ -154,6 +158,8 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
   const biome = useGame((s) => s.world.biome);
   const palette = BIOME_PAINTED[biome];
   const scene = useThree((s) => s.scene);
+  const size = useThree((s) => s.size);
+  const dpr = useThree((s) => s.viewport.dpr);
   const sunMesh = useSunMesh();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: built once, uniforms updated by the effect below
@@ -179,8 +185,16 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
   const lightPlaceholders = useMemo(() => [scene], [scene]);
 
   const bloomIntensity = BLOOM_INTENSITY * palette.bloomBias;
-  const includeOutline = GRAPHICS_QUALITY !== "low";
-  const includeGodRays = GRAPHICS_QUALITY === "high" && sunMesh !== null;
+  const drawingBufferPixels = size.width * size.height * dpr * dpr;
+  const includeOutline =
+    GRAPHICS_QUALITY !== "low" &&
+    drawingBufferPixels > 0 &&
+    drawingBufferPixels <= OUTLINE_MAX_DRAWING_BUFFER_PIXELS;
+  const includeGodRays =
+    GRAPHICS_QUALITY === "high" &&
+    sunMesh !== null &&
+    drawingBufferPixels > 0 &&
+    drawingBufferPixels <= GODRAYS_MAX_DRAWING_BUFFER_PIXELS;
 
   if (!enabled) return null;
 
@@ -207,6 +221,7 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
           weight={GODRAYS_WEIGHT}
           exposure={GODRAYS_EXPOSURE}
           kernelSize={GODRAYS_KERNEL}
+          resolutionScale={GODRAYS_RESOLUTION_SCALE}
           blur
         />
       )}
@@ -218,6 +233,7 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
           hiddenEdgeColor={OUTLINE_HIDDEN_COLOR}
           kernelSize={OUTLINE_KERNEL[GRAPHICS_QUALITY]}
           blur={OUTLINE_BLUR}
+          resolutionScale={OUTLINE_RESOLUTION_SCALE}
           pulseSpeed={0}
           xRay={false}
         />

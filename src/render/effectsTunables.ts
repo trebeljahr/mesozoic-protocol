@@ -64,8 +64,13 @@ export const GODRAYS_DENSITY = 0.97;
 export const GODRAYS_DECAY = 0.94;
 export const GODRAYS_WEIGHT = 0.35;
 export const GODRAYS_EXPOSURE = 0.5;
-export const GODRAYS_SAMPLES = 48;
+export const GODRAYS_SAMPLES = 36;
 export const GODRAYS_KERNEL = KernelSize.SMALL;
+export const GODRAYS_RESOLUTION_SCALE = 0.35;
+// GodRays allocates three extra render targets plus a depth texture. At
+// retina-size drawing buffers that tipped Chrome's GPU process into a
+// hard context loss, while the rest of the painted stack stayed stable.
+export const GODRAYS_MAX_DRAWING_BUFFER_PIXELS = 2_750_000;
 // Sun mesh world position. High up + slightly forward of camera origin so it
 // projects near the top edge of the orthographic frame. The directional
 // light's `position` in Scene.tsx is the conceptual match.
@@ -83,6 +88,11 @@ export const OUTLINE_KERNEL: Record<GraphicsQuality, KernelSize> = {
   high: KernelSize.SMALL,
 };
 export const OUTLINE_BLUR = true;
+export const OUTLINE_RESOLUTION_SCALE = 0.4;
+// Outline renders selected objects into extra mask/depth/edge targets.
+// Once live enemies enter the selection layer, retina-size buffers can
+// trip the same GPU-process crash as GodRays.
+export const OUTLINE_MAX_DRAWING_BUFFER_PIXELS = 2_750_000;
 
 // Ambient haze (ember + dust scene layer in AmbientHaze.tsx). Density scales
 // with biome bias; quality knocks the pool size down on low-end hardware so

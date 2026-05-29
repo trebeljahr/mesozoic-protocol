@@ -173,9 +173,13 @@ self.addEventListener("message", (ev: MessageEvent<FractureWorkerRequest>) => {
   const req = ev.data;
   try {
     const chunks = doFracture(req);
-    const transferables: ArrayBuffer[] = [];
+    const transferables: Transferable[] = [];
     for (const c of chunks) {
-      transferables.push(c.positions.buffer, c.normals.buffer, c.indices.buffer);
+      transferables.push(
+        c.positions.buffer as ArrayBuffer,
+        c.normals.buffer as ArrayBuffer,
+        c.indices.buffer as ArrayBuffer,
+      );
     }
     const response: FractureWorkerResponse = { jobId: req.jobId, ok: true, chunks };
     (self as DedicatedWorkerGlobalScope).postMessage(response, transferables);
