@@ -28,6 +28,18 @@ import { useLevelLoadProgress } from "./ui/useLevelLoadProgress";
 import { useIsMobile } from "./ui/useMediaQuery";
 import { WorldMapUI } from "./ui/WorldMapUI";
 
+const worldSceneKeys = new WeakMap<object, number>();
+let nextWorldSceneKey = 1;
+
+const keyForWorld = (world: object): number => {
+  let key = worldSceneKeys.get(world);
+  if (key === undefined) {
+    key = nextWorldSceneKey++;
+    worldSceneKeys.set(world, key);
+  }
+  return key;
+};
+
 // Heavy panels and the world-map scene only load when the user actually
 // opens them. WorldMapScene pulls all biome models; Compendium and
 // AchievementsPanel each carry their own art and copy. Splitting them
@@ -56,6 +68,7 @@ const RobotShop = lazy(() => import("./ui/RobotShop").then((m) => ({ default: m.
 
 const SceneRoot = () => {
   const screen = useGame((s) => s.screen);
+  const world = useGame((s) => s.world);
   // Suspense fallback is null — Canvas already renders nothing on first
   // frame anyway, and the world-map only shows up post-load.
   return screen === "worldMap" ? (
@@ -63,7 +76,7 @@ const SceneRoot = () => {
       <WorldMapScene />
     </Suspense>
   ) : (
-    <PlayScene />
+    <PlayScene key={keyForWorld(world)} />
   );
 };
 

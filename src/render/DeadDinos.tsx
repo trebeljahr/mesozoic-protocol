@@ -54,13 +54,16 @@ const noRaycast: THREE.Mesh["raycast"] = () => {};
 const DEATH_TINT = new THREE.Color(0.56, 0.53, 0.5);
 
 const tintCorpseMaterial = (mat: THREE.Material): THREE.Material => {
-  const std = mat as THREE.MeshStandardMaterial;
-  if (!std.color) return mat;
-  const cloned = std.clone();
-  cloned.color.copy(DEATH_TINT);
-  if (cloned.emissive) cloned.emissive.setRGB(0, 0, 0);
-  if ("metalness" in cloned) cloned.metalness = 0;
-  if ("roughness" in cloned) cloned.roughness = 1;
+  const cloned = mat.clone();
+  const corpse = cloned as THREE.MeshStandardMaterial;
+  if (corpse.color) corpse.color.copy(DEATH_TINT);
+  if (corpse.emissive) {
+    corpse.emissive.setRGB(0, 0, 0);
+    corpse.emissiveIntensity = 0;
+  }
+  if ("metalness" in corpse) corpse.metalness = 0;
+  if ("roughness" in corpse) corpse.roughness = 1;
+  if ("toneMapped" in corpse) corpse.toneMapped = true;
   return cloned;
 };
 

@@ -19,6 +19,12 @@ import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
 import { ENEMY_EMISSIVE, EYE_FALLBACK_NAMES, MATRIARCH_CONDUIT_PATTERNS } from "./emissiveRegistry";
 import {
+  buildEyePositions,
+  clearEnemyEyeProfile,
+  eyeColorFor,
+  setEnemyEyeProfile,
+} from "./enemyEyeProfiles";
+import {
   buildPlateGroup,
   type ConduitUniforms,
   getConduitColor,
@@ -26,12 +32,6 @@ import {
   makeConduitUniforms,
   resolveEnemyTier,
 } from "./enemyGrafts";
-import {
-  buildEyePositions,
-  clearEnemyEyeProfile,
-  eyeColorFor,
-  setEnemyEyeProfile,
-} from "./enemyEyeProfiles";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
 import {
   applyEmissiveSpec,
@@ -73,6 +73,7 @@ const FROST_EMISSIVE = new THREE.Color("#3a6aa0");
 const FROST_RIM_COLOR = new THREE.Color("#cfe6ff");
 
 type Item = {
+  enemyId: number;
   obj: THREE.Object3D;
   proxy: THREE.Mesh | null;
   mixer: THREE.AnimationMixer;
@@ -122,6 +123,25 @@ const YAW_HALFLIFE = 0.06;
 // so a single oversized swarm doesn't pin a permanent ceiling of skinned
 // meshes in the scene graph.
 const POOL_LIMIT = 16;
+
+const resetEnemyMaterialState = (obj: THREE.Object3D, restoreEmissive = true): void => {
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.material) return;
+    const reset = (mm: THREE.Material) => {
+      const std = mm as THREE.MeshStandardMaterial;
+      const baseColor = std.userData.baseColor as THREE.Color | undefined;
+      if (baseColor && std.color) std.color.copy(baseColor);
+      const baseEmissive = std.userData.baseEmissive as THREE.Color | undefined;
+      if (std.emissive) {
+        if (restoreEmissive && baseEmissive) std.emissive.copy(baseEmissive);
+        else std.emissive.setRGB(0, 0, 0);
+      }
+    };
+    if (Array.isArray(m.material)) m.material.forEach(reset);
+    else reset(m.material);
+  });
+};
 
 export const ModelEnemyMesh = ({
   kind,
@@ -272,6 +292,8 @@ export const ModelEnemyMesh = ({
       if (!parent) return;
       for (const [, item] of itemsRef.current) {
         item.mixer.stopAllAction();
+        clearEnemyRender(item.enemyId);
+        clearEnemyEyeProfile(item.enemyId);
         parent.remove(item.obj);
         if (item.proxy) parent.remove(item.proxy);
         if (item.plateGroup) parent.remove(item.plateGroup);
@@ -279,6 +301,8 @@ export const ModelEnemyMesh = ({
       itemsRef.current.clear();
       for (const item of poolRef.current) {
         item.mixer.stopAllAction();
+        clearEnemyRender(item.enemyId);
+        clearEnemyEyeProfile(item.enemyId);
         parent.remove(item.obj);
         if (item.proxy) parent.remove(item.proxy);
         if (item.plateGroup) parent.remove(item.plateGroup);
@@ -292,13 +316,11 @@ export const ModelEnemyMesh = ({
     const parent = groupRef.current;
     if (!parent) return;
     item.mixer.stopAllAction();
+    resetEnemyMaterialState(item.obj);
     item.obj.rotation.x = 0;
     item.obj.rotation.z = 0;
-    const recycledId = item.obj.userData.enemyId;
-    if (typeof recycledId === "number") {
-      clearEnemyRender(recycledId);
-      clearEnemyEyeProfile(recycledId);
-    }
+    clearEnemyRender(item.enemyId);
+    clearEnemyEyeProfile(item.enemyId);
     if (poolRef.current.length < POOL_LIMIT) {
       item.obj.visible = false;
       item.obj.userData.enemyId = undefined;
@@ -362,6 +384,8 @@ export const ModelEnemyMesh = ({
         const recycled = poolRef.current.pop();
         if (recycled) {
           // Reuse: update id metadata, restart the animation, unhide.
+          recycled.enemyId = e.id;
+          resetEnemyMaterialState(recycled.obj);
           recycled.obj.visible = true;
           recycled.obj.userData.enemyId = e.id;
           recycled.obj.userData.enemyMaxHp = e.maxHp;
@@ -526,6 +550,7 @@ export const ModelEnemyMesh = ({
           parent.add(plateGroup);
 
           item = {
+            enemyId: e.id,
             obj,
             proxy,
             mixer,
@@ -871,6 +896,8 @@ export const ModelEnemyMesh = ({
       item.dyingStart = world.time;
       item.dyingBaseRotX = item.obj.rotation.x;
       item.dyingBaseY = item.obj.position.y;
+      clearEnemyRender(id);
+      resetEnemyMaterialState(item.obj, false);
       // Strip click affordance immediately — corpse mid-fall is not a
       // valid inspect target.
       item.obj.userData.enemyId = undefined;

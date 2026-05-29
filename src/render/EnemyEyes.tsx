@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import type { World } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
 import { clearEnemyEyeProfile, getEnemyEyeProfile } from "./enemyEyeProfiles";
@@ -71,6 +72,7 @@ export const EnemyEyes = () => {
   // fadeStart anchors the linear ramp to 0 over DEATH_FADE seconds and we
   // keep emitting eyes at the last-known transform until alpha hits 0.
   const fadeRef = useRef<Map<number, FadeState>>(new Map());
+  const worldRef = useRef<World | null>(null);
 
   useEffect(
     () => () => {
@@ -97,6 +99,11 @@ export const EnemyEyes = () => {
     const now = world.time;
     const camQuat = state.camera.quaternion;
     const fades = fadeRef.current;
+    if (worldRef.current !== null && worldRef.current !== world) {
+      fades.clear();
+      m.count = 0;
+    }
+    worldRef.current = world;
 
     let i = 0;
     const seen = new Set<number>();
@@ -168,45 +175,51 @@ export const EnemyEyes = () => {
     // Death-fade tail — enemies that vanished from world.enemies this frame
     // get DEATH_FADE seconds of ramp-down at their last-known transform so
     // the eyes go out instead of snapping off the moment the body starts
-    // falling. ModelEnemyMesh still owns the body's death animation.
-    for (const [id, fade] of fades) {
-      if (seen.has(id)) continue;
-      if (!fade.lastTransform) {
-        fades.delete(id);
-        continue;
-      }
-      if (fade.fadeStart === null) fade.fadeStart = now;
-      const t = clamp01((now - fade.fadeStart) / DEATH_FADE);
-      const alpha = 1 - t;
-      if (alpha <= 0) {
-        fades.delete(id);
-        clearEnemyEyeProfile(id);
-        continue;
-      }
-      const profile = getEnemyEyeProfile(id);
-      if (!profile) {
-        fades.delete(id);
-        continue;
-      }
-      const cosY = Math.cos(fade.lastTransform.yaw);
-      const sinY = Math.sin(fade.lastTransform.yaw);
-      tmpColor.setRGB(
-        profile.baseColor[0] * alpha,
-        profile.baseColor[1] * alpha,
-        profile.baseColor[2] * alpha,
-      );
-      for (const pos of profile.positions) {
-        if (i >= MAX_EYES) break;
-        const wx = fade.lastTransform.x + cosY * pos.x + sinY * pos.z;
-        const wz = fade.lastTransform.z - sinY * pos.x + cosY * pos.z;
-        const wy = fade.lastTransform.y + pos.y;
-        dummy.position.set(wx, wy, wz);
-        dummy.quaternion.copy(camQuat);
-        dummy.scale.setScalar(pos.radius * BILLBOARD_SCALE);
-        dummy.updateMatrix();
-        m.setMatrixAt(i, dummy.matrix);
-        m.setColorAt(i, tmpColor);
-        i++;
+    // falling. Loss/retry freezes world.time, so clear tails whenever the
+    // sim is not running; otherwise stale eyes can stay bright forever.
+    if (world.status !== "running") {
+      for (const [id] of fades) clearEnemyEyeProfile(id);
+      fades.clear();
+    } else {
+      for (const [id, fade] of fades) {
+        if (seen.has(id)) continue;
+        if (!fade.lastTransform) {
+          fades.delete(id);
+          continue;
+        }
+        if (fade.fadeStart === null) fade.fadeStart = now;
+        const t = clamp01((now - fade.fadeStart) / DEATH_FADE);
+        const alpha = 1 - t;
+        if (alpha <= 0) {
+          fades.delete(id);
+          clearEnemyEyeProfile(id);
+          continue;
+        }
+        const profile = getEnemyEyeProfile(id);
+        if (!profile) {
+          fades.delete(id);
+          continue;
+        }
+        const cosY = Math.cos(fade.lastTransform.yaw);
+        const sinY = Math.sin(fade.lastTransform.yaw);
+        tmpColor.setRGB(
+          profile.baseColor[0] * alpha,
+          profile.baseColor[1] * alpha,
+          profile.baseColor[2] * alpha,
+        );
+        for (const pos of profile.positions) {
+          if (i >= MAX_EYES) break;
+          const wx = fade.lastTransform.x + cosY * pos.x + sinY * pos.z;
+          const wz = fade.lastTransform.z - sinY * pos.x + cosY * pos.z;
+          const wy = fade.lastTransform.y + pos.y;
+          dummy.position.set(wx, wy, wz);
+          dummy.quaternion.copy(camQuat);
+          dummy.scale.setScalar(pos.radius * BILLBOARD_SCALE);
+          dummy.updateMatrix();
+          m.setMatrixAt(i, dummy.matrix);
+          m.setColorAt(i, tmpColor);
+          i++;
+        }
       }
     }
 
