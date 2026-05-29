@@ -4,87 +4,14 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
-import {
-  applyToonRimPatch,
-  biomeRimColor,
-  RIM_COLOR_ALLY,
-  RIM_COLOR_CRYO,
-  RIM_COLOR_FLAME,
-  RIM_INTENSITY_ALLY,
-} from "./materialTunables";
 import { type AtlasSwatch, computeTowerTints, tierKey } from "./towerTints";
 
-type AtlasState = {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  tex: THREE.CanvasTexture;
-  source: TexImageSource;
+type SolidAtlasState = {
+  materialsBySwatch: Map<number, THREE.MeshStandardMaterial>;
 };
 
 type AtlasMaterial = THREE.MeshStandardMaterial & {
-  __atlasState?: AtlasState;
-};
-
-const setupAtlasState = (mat: AtlasMaterial): AtlasState | null => {
-  if (mat.__atlasState) return mat.__atlasState;
-  const origMap = mat.map;
-  const src = origMap?.image as TexImageSource | undefined;
-  if (!origMap || !src) return null;
-  const w = (src as HTMLImageElement | HTMLCanvasElement).width;
-  const h = (src as HTMLImageElement | HTMLCanvasElement).height;
-  if (!w || !h) return null;
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = origMap.magFilter;
-  tex.minFilter = origMap.minFilter;
-  tex.wrapS = origMap.wrapS;
-  tex.wrapT = origMap.wrapT;
-  tex.colorSpace = origMap.colorSpace;
-  tex.flipY = origMap.flipY;
-  tex.generateMipmaps = false;
-  mat.map = tex;
-  // Atlas materials previously relied on `mat.color` / `mat.emissive` to
-  // multiply the shared texture. Now the texture itself carries the
-  // per-part colours, so neutralise both factors.
-  mat.color.setRGB(1, 1, 1);
-  mat.emissive.setRGB(0, 0, 0);
-  mat.emissiveIntensity = 0;
-  mat.needsUpdate = true;
-  const state: AtlasState = { canvas, ctx, tex, source: src };
-  mat.__atlasState = state;
-  return state;
-};
-
-const repaintAtlas = (state: AtlasState, swatches: AtlasSwatch[]) => {
-  const { ctx, canvas, source } = state;
-  // Reset to the pristine baked atlas, then stamp the per-tier swatches.
-  // Starting from the source on every tier change keeps swatches that the
-  // current tier doesn't override at their original baked colours.
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(source as CanvasImageSource, 0, 0);
-  for (const sw of swatches) {
-    const r = Math.round(Math.min(1, Math.max(0, sw.rgb[0])) * 255);
-    const g = Math.round(Math.min(1, Math.max(0, sw.rgb[1])) * 255);
-    const b = Math.round(Math.min(1, Math.max(0, sw.rgb[2])) * 255);
-    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    ctx.fillRect(sw.x, 0, 4, canvas.height);
-  }
-  state.tex.needsUpdate = true;
-};
-
-// Per-kind rim base. Most kinds use the cyan-white ally rim; flame
-// pulls warm orange, cryo pulls cool blue-white.
-const TOWER_RIM_BASE: Record<TowerKind, string> = {
-  pulse: RIM_COLOR_ALLY,
-  chain: RIM_COLOR_ALLY,
-  cryo: RIM_COLOR_CRYO,
-  mortar: RIM_COLOR_ALLY,
-  flame: RIM_COLOR_FLAME,
-  hive: RIM_COLOR_ALLY,
+  __solidAtlasState?: SolidAtlasState;
 };
 
 const clearEmissive = (mat: THREE.MeshStandardMaterial) => {
@@ -93,12 +20,136 @@ const clearEmissive = (mat: THREE.MeshStandardMaterial) => {
   mat.emissiveIntensity = 0;
 };
 
+const swatchXForVertex = (uv: THREE.BufferAttribute, vertexIndex: number): number => {
+  const u = Math.min(0.999999, Math.max(0, uv.getX(vertexIndex)));
+  return Math.min(28, Math.max(0, Math.floor((u * 32) / 4) * 4));
+};
+
+const nearestSwatchX = (x: number, swatchXs: readonly number[]): number => {
+  let best = swatchXs[0] ?? 0;
+  let bestDist = Math.abs(x - best);
+  for (const sx of swatchXs) {
+    const d = Math.abs(x - sx);
+    if (d < bestDist) {
+      best = sx;
+      bestDist = d;
+    }
+  }
+  return best;
+};
+
+const triangleSwatchX = (
+  uv: THREE.BufferAttribute,
+  a: number,
+  b: number,
+  c: number,
+  swatchXs: readonly number[],
+): number => {
+  const ax = swatchXForVertex(uv, a);
+  const bx = swatchXForVertex(uv, b);
+  const cx = swatchXForVertex(uv, c);
+  if (ax === bx || ax === cx) return nearestSwatchX(ax, swatchXs);
+  if (bx === cx) return nearestSwatchX(bx, swatchXs);
+  return nearestSwatchX(Math.round((ax + bx + cx) / 12) * 4, swatchXs);
+};
+
+const solidifyAtlasGeometry = (geometry: THREE.BufferGeometry, swatchXs: readonly number[]) => {
+  const uv = geometry.getAttribute("uv") as THREE.BufferAttribute | undefined;
+  const pos = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+  if (!uv || !pos || swatchXs.length === 0) return null;
+
+  const buckets = new Map<number, number[]>();
+  for (const x of swatchXs) buckets.set(x, []);
+
+  const sourceIndex = geometry.getIndex();
+  const readIndex = (i: number) => sourceIndex?.getX(i) ?? i;
+  const indexCount = sourceIndex?.count ?? pos.count;
+  for (let i = 0; i + 2 < indexCount; i += 3) {
+    const a = readIndex(i);
+    const b = readIndex(i + 1);
+    const c = readIndex(i + 2);
+    const x = triangleSwatchX(uv, a, b, c, swatchXs);
+    buckets.get(x)?.push(a, b, c);
+  }
+
+  const nextIndex: number[] = [];
+  const groups: { start: number; count: number; materialIndex: number }[] = [];
+  for (let materialIndex = 0; materialIndex < swatchXs.length; materialIndex++) {
+    const bucket = buckets.get(swatchXs[materialIndex]) ?? [];
+    if (bucket.length === 0) continue;
+    groups.push({ start: nextIndex.length, count: bucket.length, materialIndex });
+    nextIndex.push(...bucket);
+  }
+
+  const next = geometry.clone();
+  next.clearGroups();
+  let maxIndex = 0;
+  for (const i of nextIndex) if (i > maxIndex) maxIndex = i;
+  const IndexArray = maxIndex > 65535 ? Uint32Array : Uint16Array;
+  next.setIndex(new THREE.BufferAttribute(new IndexArray(nextIndex), 1));
+  for (const group of groups) next.addGroup(group.start, group.count, group.materialIndex);
+  return next;
+};
+
+const setupSolidAtlasState = (
+  mesh: THREE.Mesh,
+  sourceMat: AtlasMaterial,
+  swatches: AtlasSwatch[],
+): SolidAtlasState | null => {
+  if (sourceMat.__solidAtlasState) return sourceMat.__solidAtlasState;
+  const swatchXs = swatches.map((sw) => sw.x);
+  const geometry = solidifyAtlasGeometry(mesh.geometry, swatchXs);
+  if (!geometry) return null;
+
+  const materialsBySwatch = new Map<number, THREE.MeshStandardMaterial>();
+  const materials = swatches.map((sw) => {
+    const mat = sourceMat.clone();
+    mat.map = null;
+    mat.emissiveMap = null;
+    mat.color.setRGB(sw.rgb[0], sw.rgb[1], sw.rgb[2]);
+    clearEmissive(mat);
+    mat.name = `${sourceMat.name}:solid:${sw.x}`;
+    mat.needsUpdate = true;
+    materialsBySwatch.set(sw.x, mat);
+    return mat;
+  });
+
+  mesh.geometry = geometry;
+  mesh.material = materials;
+  const state = { materialsBySwatch };
+  for (const mat of materials) (mat as AtlasMaterial).__solidAtlasState = state;
+  return state;
+};
+
+const updateSolidAtlas = (state: SolidAtlasState, swatches: AtlasSwatch[]) => {
+  for (const sw of swatches) {
+    const mat = state.materialsBySwatch.get(sw.x);
+    if (!mat) continue;
+    mat.color.setRGB(sw.rgb[0], sw.rgb[1], sw.rgb[2]);
+    clearEmissive(mat);
+  }
+};
+
 const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrades) => {
   const tints = computeTowerTints(kind, upgrades);
   item.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const atlasTint = tints.find(
+      (tn) => tn.kind === "atlas" && mats.some((mat) => mat?.name.includes(tn.match)),
+    );
+    if (atlasTint?.kind === "atlas") {
+      const sourceMat = mats.find((mat) => mat?.name.includes(atlasTint.match)) as
+        | AtlasMaterial
+        | undefined;
+      if (sourceMat) {
+        const state = setupSolidAtlasState(mesh, sourceMat, atlasTint.swatches);
+        if (state) updateSolidAtlas(state, atlasTint.swatches);
+      }
+      return;
+    }
+
     for (const raw of mats) {
       const mat = raw as AtlasMaterial;
       if (!mat) continue;
@@ -109,10 +160,6 @@ const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrad
         // Untextured baseColorFactor part — set its colour directly.
         mat.color.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]);
         mat.needsUpdate = true;
-      } else {
-        // Atlas part — repaint the per-instance cloned PaletteBaseColor.
-        const state = setupAtlasState(mat);
-        if (state) repaintAtlas(state, tint.swatches);
       }
     }
   });
@@ -186,8 +233,6 @@ export const ModelTowerMesh = ({
     const parent = groupRef.current;
     if (!parent) return;
     const { world } = useGame.getState();
-    const rimBase = TOWER_RIM_BASE[kind];
-    const rimTinted = biomeRimColor(rimBase, world.biome);
 
     const live = new Set<number>();
     for (const t of world.towers) {
@@ -208,14 +253,11 @@ export const ModelTowerMesh = ({
           const m = mesh.material;
           if (Array.isArray(m)) mesh.material = m.map((sub) => sub.clone());
           else if (m) mesh.material = m.clone();
-          // Rim + toon patch on every cloned material.
+          // Tower materials should read as solid albedo, not emissive overlays.
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           for (const mm of mats) {
             if (!mm) continue;
             clearEmissive(mm as THREE.MeshStandardMaterial);
-            applyToonRimPatch(mm, {
-              rim: { color: rimTinted, intensity: RIM_INTENSITY_ALLY },
-            });
           }
         });
         parent.add(item);

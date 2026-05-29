@@ -23,7 +23,6 @@ export type MaterialTint = {
   kind: "material";
   match: string;
   rgb: [number, number, number];
-  multiply: boolean;
 };
 
 export type AtlasSwatch = {
@@ -295,10 +294,10 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
             ][b] as [number, number, number])
           : ([0.173, 0.127, 0.002] as [number, number, number]);
       return [
-        { kind: "material", match: "BlueMiddleEMPTurret", rgb: blueCore, multiply: false },
-        { kind: "material", match: "YellowRing1EMPTurret", rgb: yellowRing, multiply: false },
-        { kind: "material", match: "YellowRing3EMPTurret", rgb: yellowRing, multiply: false },
-        { kind: "material", match: "YellowBaseEMPTurret", rgb: yellowBase, multiply: false },
+        { kind: "material", match: "BlueMiddleEMPTurret", rgb: blueCore },
+        { kind: "material", match: "YellowRing1EMPTurret", rgb: yellowRing },
+        { kind: "material", match: "YellowRing3EMPTurret", rgb: yellowRing },
+        { kind: "material", match: "YellowBaseEMPTurret", rgb: yellowBase },
       ];
     }
 
@@ -319,8 +318,8 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
         [0.044, 0.044, 0.044],
       ][b] as [number, number, number];
       return [
-        { kind: "material", match: "RedBaseFlamethrowerTurret", rgb: red, multiply: false },
-        { kind: "material", match: "GrayMiddleFlamethrowerTurret", rgb: gray, multiply: false },
+        { kind: "material", match: "RedBaseFlamethrowerTurret", rgb: red },
+        { kind: "material", match: "GrayMiddleFlamethrowerTurret", rgb: gray },
       ];
     }
 
@@ -340,8 +339,8 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
         [0.9, 0.7, 0.22],
       ][b] as [number, number, number];
       return [
-        { kind: "material", match: "OrangeStorageHiveTurret", rgb: orange, multiply: false },
-        { kind: "material", match: "YellowBaseHiveTurret", rgb: yellowBase, multiply: false },
+        { kind: "material", match: "OrangeStorageHiveTurret", rgb: orange },
+        { kind: "material", match: "YellowBaseHiveTurret", rgb: yellowBase },
       ];
     }
   }
