@@ -23,7 +23,7 @@ export const LevelEditorPanel = () => {
   const onClearAll = () => {
     if (
       !window.confirm(
-        "Clear hand-placed props for EVERY level? This is irreversible (history is per-session).",
+        "Clear hand-placed props and rivers for EVERY level? This is irreversible (history is per-session).",
       )
     ) {
       return;
@@ -42,9 +42,24 @@ export const LevelEditorPanel = () => {
 
   const clearButtons: FooterButton[] = [
     {
-      label: "Clear level",
-      title: `Clear hand-placed props on L${levelId}`,
+      label: "Clear",
+      title: `Clear manual and procedural set-dressing on L${levelId}; keeps paths and HQ`,
       onClick: () => useEditor.getState().clear(),
+    },
+    {
+      label: "Clear procedural",
+      title: `Clear only procedural set-dressing on L${levelId}`,
+      onClick: () => useEditor.getState().clearProcedural(),
+    },
+    {
+      label: "Clear manual",
+      title: `Clear only hand-placed props and rivers on L${levelId}`,
+      onClick: () => useEditor.getState().clearManual(),
+    },
+    {
+      label: "Reload procedural",
+      title: `Pick a new procedural seed for L${levelId}`,
+      onClick: () => useEditor.getState().reloadProcedural(),
     },
     {
       label: "Clear all",

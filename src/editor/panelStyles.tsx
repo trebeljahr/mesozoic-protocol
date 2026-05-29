@@ -14,6 +14,7 @@ export const panel: CSSProperties = {
   zIndex: 10000,
   display: "flex",
   flexDirection: "column",
+  minHeight: 0,
   gap: 8,
   padding: 10,
   background: "rgba(14,16,22,0.94)",
@@ -22,6 +23,9 @@ export const panel: CSSProperties = {
   color: "#e6e9ef",
   font: "12px/1.4 system-ui, sans-serif",
   boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+  overflow: "hidden",
+  touchAction: "pan-y",
+  overscrollBehavior: "contain",
 };
 
 export const btn = (on = false): CSSProperties => ({

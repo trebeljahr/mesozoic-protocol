@@ -8,7 +8,12 @@ import type { PlacedProp, River } from "../sim/types";
 // resets it, while persisted prop/override state survives via levelEdits /
 // worldMapEdits.
 
-export type Snapshot = { props: PlacedProp[]; override: boolean; rivers: River[] };
+export type Snapshot = {
+  props: PlacedProp[];
+  override: boolean;
+  rivers: River[];
+  proceduralSeed?: number;
+};
 export type History = { past: Snapshot[]; future: Snapshot[] };
 
 export const HISTORY_CAP = 50;

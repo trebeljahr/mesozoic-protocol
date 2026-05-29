@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import { classifyPropUrl } from "../biomes";
-import type { PlacedProp, River, RiverPoint } from "../sim/types";
+import type { PlacedProp, River, RiverMaterial, RiverPoint, Vec2 } from "../sim/types";
 import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
@@ -36,8 +36,18 @@ const MAX_RIVER_WIDTH = 20;
 export const DEFAULT_RIVER_WIDTH = 2.5;
 const clampRiverWidth = (w: number): number =>
   Math.min(MAX_RIVER_WIDTH, Math.max(MIN_RIVER_WIDTH, w));
+export const RIVER_MATERIALS: { id: RiverMaterial; label: string }[] = [
+  { id: "water", label: "Water" },
+  { id: "lava", label: "Lava" },
+  { id: "toxic", label: "Toxic" },
+];
 
-export type EditorSource = { props: PlacedProp[]; override: boolean; rivers: River[] };
+export type EditorSource = {
+  props: PlacedProp[];
+  override: boolean;
+  rivers: River[];
+  proceduralSeed?: number;
+};
 
 export type EditorAdapter = {
   // Authoritative read of the underlying data source. Called on every
@@ -51,6 +61,11 @@ export type EditorAdapter = {
   // Drop persistence + reset the source to empty. Called by clear() before
   // the factory wipes its own history and fires onClear (e.g. reloadLevel).
   clear: () => void;
+  clearManual?: () => void;
+  clearProcedural?: () => void;
+  reloadProcedural?: () => void;
+  canPlaceAt?: (x: number, y: number, ignorePropId?: string | null) => boolean;
+  snapToEdge?: (point: Vec2) => Vec2;
   // Scope-aware JSON dump. Each adapter stamps its own metadata (scope,
   // levelId, generatedAt) on top of the persisted { v, override, props,
   // rivers } shape so a downloaded file is self-describing.
@@ -86,6 +101,7 @@ export type RiverToolState = {
   editingRiverId: string | null;
   selectedRiverId: string | null;
   width: number;
+  material: RiverMaterial;
 };
 
 const DEFAULT_BRUSH: BrushState = {
@@ -102,6 +118,7 @@ const DEFAULT_RIVER_TOOL: RiverToolState = {
   editingRiverId: null,
   selectedRiverId: null,
   width: DEFAULT_RIVER_WIDTH,
+  material: "water",
 };
 
 export type EditorStoreApi = {
@@ -137,6 +154,9 @@ export type EditorStoreApi = {
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
   clear: () => void;
+  clearManual: () => void;
+  clearProcedural: () => void;
+  reloadProcedural: () => void;
   setBrushPreset: (id: string | null) => void;
   setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
   toggleBrushUrl: (url: string) => void;
@@ -155,6 +175,7 @@ export type EditorStoreApi = {
   deleteRiverPoint: (riverId: string, index: number) => void;
   deleteRiver: (id: string) => void;
   setRiverWidth: (width: number) => void;
+  setRiverMaterial: (material: RiverMaterial) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -186,6 +207,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props: [...cur.props],
         override: cur.override,
         rivers: cloneRivers(cur.rivers),
+        proceduralSeed: cur.proceduralSeed,
       };
     };
 
@@ -205,13 +227,23 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
     // Replace just the props array, keeping override + rivers unchanged.
     const commitProps = (props: PlacedProp[]): void => {
       const cur = adapter.getCurrent();
-      commit({ props, override: cur.override, rivers: cur.rivers });
+      commit({
+        props,
+        override: cur.override,
+        rivers: cur.rivers,
+        proceduralSeed: cur.proceduralSeed,
+      });
     };
 
     // Replace just the rivers array, keeping props + override unchanged.
     const commitRivers = (rivers: River[]): void => {
       const cur = adapter.getCurrent();
-      commit({ props: cur.props, override: cur.override, rivers });
+      commit({
+        props: cur.props,
+        override: cur.override,
+        rivers,
+        proceduralSeed: cur.proceduralSeed,
+      });
     };
 
     // Single-prop transform shorthand for rotate/scale/toggleBlocks.
@@ -264,6 +296,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       placeAt: (x, y) => {
         const url = get().placingUrl;
         if (!url) return;
+        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, null)) return;
         const prop: PlacedProp = {
           id: nanoid(8),
           url,
@@ -288,6 +321,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       moveSelectedTo: (x, y) => {
         const id = get().selectedId;
         if (id === null) return;
+        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, id)) return;
         snapshotAndPush();
         const cur = adapter.getCurrent();
         commitProps(cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)));
@@ -310,7 +344,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       setOverride: (on) => {
         snapshotAndPush();
         const cur = adapter.getCurrent();
-        commit({ props: cur.props, override: on, rivers: cur.rivers });
+        commit({
+          props: cur.props,
+          override: on,
+          rivers: cur.rivers,
+          proceduralSeed: cur.proceduralSeed,
+        });
         set({ selectedId: null, moving: false, placingUrl: null });
         adapter.onOverrideChange?.();
       },
@@ -327,6 +366,71 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
         }));
         adapter.onClear?.();
+      },
+
+      clearManual: () => {
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        if (adapter.clearManual) {
+          adapter.clearManual();
+        } else {
+          commit({
+            props: [],
+            override: cur.override,
+            rivers: [],
+            proceduralSeed: cur.proceduralSeed,
+          });
+        }
+        set((s) => ({
+          selectedId: null,
+          moving: false,
+          placingUrl: null,
+          version: s.version + 1,
+          ...STROKE_CLEAR,
+          riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+        }));
+      },
+
+      clearProcedural: () => {
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        if (adapter.clearProcedural) {
+          adapter.clearProcedural();
+        } else {
+          commit({
+            props: cur.props,
+            override: true,
+            rivers: cur.rivers,
+            proceduralSeed: cur.proceduralSeed,
+          });
+        }
+        set((s) => ({
+          selectedId: null,
+          moving: false,
+          placingUrl: null,
+          version: s.version + 1,
+        }));
+      },
+
+      reloadProcedural: () => {
+        snapshotAndPush();
+        if (adapter.reloadProcedural) {
+          adapter.reloadProcedural();
+          set((s) => ({
+            selectedId: null,
+            moving: false,
+            placingUrl: null,
+            version: s.version + 1,
+          }));
+          return;
+        }
+        const cur = adapter.getCurrent();
+        commit({
+          props: cur.props,
+          override: false,
+          rivers: cur.rivers,
+          proceduralSeed: Date.now(),
+        });
       },
 
       setBrushPreset: (id) => {
@@ -402,7 +506,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           s.brush.density,
           s.brush.minSpacing,
           existing,
-        );
+        ).filter((pt) => !adapter.canPlaceAt || adapter.canPlaceAt(pt.x, pt.y, null));
         if (points.length === 0) return;
         if (s.strokeOpen) {
           if (!s.strokePushed && s.strokeAnchor) {
@@ -451,13 +555,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // Catmull-Rom curve has enough samples to render immediately. The
         // second click (addRiverPoint) replaces the placeholder offset.
         const id = nanoid(8);
+        const start = adapter.snapToEdge ? adapter.snapToEdge({ x, y }) : { x, y };
         const seed: River = {
           id,
-          points: [
-            { x, y },
-            { x: x + 0.01, y: y + 0.01 },
-          ],
+          points: [start, { x: start.x + 0.01, y: start.y + 0.01 }],
           width: get().riverTool.width,
+          material: get().riverTool.material,
         };
         snapshotAndPush();
         const cur = adapter.getCurrent();
@@ -476,7 +579,11 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const next = cur.rivers.map((r) => {
           if (r.id !== editingId) return r;
           // Replace the placeholder seed point on the second click; append after.
-          if (r.points.length === 2 && r.points[1].x === r.points[0].x + 0.01) {
+          if (
+            r.points.length === 2 &&
+            r.points[1].x === r.points[0].x + 0.01 &&
+            r.points[1].y === r.points[0].y + 0.01
+          ) {
             return { ...r, points: [r.points[0], { x, y }] };
           }
           return { ...r, points: [...r.points, { x, y } as RiverPoint] };
@@ -485,6 +592,20 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       },
 
       finishRiver: () => {
+        const editingId = get().riverTool.editingRiverId;
+        if (editingId !== null && adapter.snapToEdge) {
+          const cur = adapter.getCurrent();
+          commitRivers(
+            cur.rivers.map((r) => {
+              if (r.id !== editingId || r.points.length < 2) return r;
+              const last = r.points.length - 1;
+              return {
+                ...r,
+                points: r.points.map((p, i) => (i === last ? adapter.snapToEdge!(p) : p)),
+              };
+            }),
+          );
+        }
         set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
       },
 
@@ -506,7 +627,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const next = cur.rivers.map((r) => {
           if (r.id !== riverId) return r;
           if (index < 0 || index >= r.points.length) return r;
-          return { ...r, points: r.points.map((p, i) => (i === index ? { x, y } : p)) };
+          const last = r.points.length - 1;
+          const nextPoint =
+            adapter.snapToEdge && (index === 0 || index === last)
+              ? adapter.snapToEdge({ x, y })
+              : { x, y };
+          return { ...r, points: r.points.map((p, i) => (i === index ? nextPoint : p)) };
         });
         commitRivers(next);
       },
@@ -557,6 +683,18 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const next = cur.rivers.map((r) => (r.id === targetId ? { ...r, width: w } : r));
         commitRivers(next);
         set((s) => ({ riverTool: { ...s.riverTool, width: w } }));
+      },
+
+      setRiverMaterial: (material) => {
+        const targetId = get().riverTool.editingRiverId ?? get().riverTool.selectedRiverId ?? null;
+        if (targetId === null) {
+          set((s) => ({ riverTool: { ...s.riverTool, material } }));
+          return;
+        }
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitRivers(cur.rivers.map((r) => (r.id === targetId ? { ...r, material } : r)));
+        set((s) => ({ riverTool: { ...s.riverTool, material } }));
       },
 
       undo: () => {

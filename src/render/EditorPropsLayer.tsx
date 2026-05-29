@@ -1,6 +1,7 @@
-import { type ThreeEvent, useFrame } from "@react-three/fiber";
+import { type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import type { EditorStore } from "../editor/editorCore";
 import type { PlacedProp, River } from "../sim/types";
@@ -43,13 +44,26 @@ export const EditorPropsLayer = ({
   const active = store((s) => s.active);
   const placingUrl = store((s) => s.placingUrl);
   const selectedId = store((s) => s.selectedId);
+  const moving = store((s) => s.moving);
   const brushActive = store((s) => s.brush.active);
   const brushPresetId = store((s) => s.brush.presetId);
   const brushRadius = store((s) => s.brush.radius);
   const brushMode = brushActive && brushPresetId !== null;
   const riverTool = store((s) => s.riverTool);
+  const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   void version;
   const { props, rivers } = store.getState().getCurrent();
+
+  useEffect(() => {
+    const toolOwnsPointer =
+      active && (placingUrl !== null || moving || brushMode || riverTool.active);
+    if (!controls || !toolOwnsPointer) return;
+    const previous = controls.enabled;
+    controls.enabled = false;
+    return () => {
+      controls.enabled = previous;
+    };
+  }, [active, placingUrl, moving, brushMode, riverTool.active, controls]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is the intended invalidation key
   const groups = useMemo(() => {
@@ -235,6 +249,7 @@ const EditorGroundPlane = ({
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (brushMode && isDownRef.current) {
+      e.stopPropagation();
       const now = performance.now();
       if (now - lastPaintRef.current >= PAINT_INTERVAL_MS) {
         lastPaintRef.current = now;

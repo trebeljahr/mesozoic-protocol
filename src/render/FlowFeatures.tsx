@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { useMemo } from "react";
-import { buildFlowFeatures, type FlowPalette, getFlowConfig } from "../flowGeometry";
+import type { FlowPalette } from "../flowGeometry";
+import { getFlowConfig } from "../flowGeometry";
 import { PATH_WIDTH } from "../level";
 import type { Vec2 } from "../sim/types";
 import { useGame } from "../store";
@@ -12,20 +13,18 @@ import { ForestWaterGroup } from "./ForestWater";
 // styles the same shapes differently.
 export const FlowFeatures = () => {
   const biome = useGame((s) => s.world.biome);
-  const paths = useGame((s) => s.world.paths);
-  const levelId = useGame((s) => s.world.levelId);
+  const features = useGame((s) => s.world.flowFeatures);
 
   const decorated = useMemo(() => {
     const config = getFlowConfig(biome);
-    if (!config) return null;
-    const features = buildFlowFeatures(paths, levelId, biome);
+    if (!config || !features) return null;
     return {
       palette: config.palette,
       rivers: features.rivers.map((r) => ({ ...r, id: nanoid() })),
       lakes: features.lakes.map((l) => ({ ...l, id: nanoid() })),
       bridges: features.bridges.map((b) => ({ ...b, id: nanoid() })),
     };
-  }, [biome, paths, levelId]);
+  }, [biome, features]);
 
   if (!decorated) return null;
 

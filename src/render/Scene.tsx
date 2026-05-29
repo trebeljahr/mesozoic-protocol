@@ -49,6 +49,7 @@ import { WorldOutposts } from "./WorldOutposts";
 
 export const PlayScene = () => {
   const biome = useGame((s) => s.world.biome);
+  const proceduralHidden = useGame((s) => s.world.overrideActive);
   const style = BIOME_STYLE[biome];
   return (
     <>
@@ -92,11 +93,15 @@ export const PlayScene = () => {
           live here so their material compiles don't pile onto the same
           frame as core scene programs). */}
       <Defer frames={1}>
-        <Trees />
-        <Rocks />
-        <BiomeCosmetics />
-        <OuterScenery />
-        <FlowFeatures />
+        {!proceduralHidden && (
+          <>
+            <Trees />
+            <Rocks />
+            <BiomeCosmetics />
+            <OuterScenery />
+            <FlowFeatures />
+          </>
+        )}
         <PlayRivers />
       </Defer>
       {/* Frame 2 — props introduced post-launch that pushed mount-time
@@ -106,9 +111,13 @@ export const PlayScene = () => {
           Holding them back one extra frame lets the GPU command queue
           drain before they pile in. */}
       <Defer frames={2}>
-        <CloningVats />
-        <WorldOutposts />
-        <EasterEggs />
+        {!proceduralHidden && (
+          <>
+            <CloningVats />
+            <WorldOutposts />
+            <EasterEggs />
+          </>
+        )}
         <PlannerOverlay />
       </Defer>
       {import.meta.env.DEV && <EditorProps />}
@@ -215,6 +224,6 @@ export const PlayScene = () => {
 const PlayRivers = () => {
   const version = useGame((s) => s.ui.treeVersion);
   void version;
-  const rivers = useGame.getState().world.rivers;
-  return <Rivers rivers={rivers} />;
+  const world = useGame.getState().world;
+  return <Rivers rivers={world.rivers} paths={world.paths} />;
 };

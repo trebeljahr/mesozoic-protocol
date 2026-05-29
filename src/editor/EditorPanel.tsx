@@ -10,7 +10,12 @@ import {
   BUILTIN_BRUSH_PRESETS,
   getBrushPreset,
 } from "./brush";
-import type { BrushState, EditorStore, RiverToolState } from "./editorCore";
+import {
+  type BrushState,
+  type EditorStore,
+  RIVER_MATERIALS,
+  type RiverToolState,
+} from "./editorCore";
 import { PropPreview } from "./PropPreview";
 import {
   btn,
@@ -226,7 +231,7 @@ export const EditorPanel = ({
             checked={override ?? false}
             onChange={(e) => store.getState().setOverride(e.target.checked)}
           />
-          Override procedural placement
+          Clear procedural placement
           <span style={{ color: "#8b93a3" }}>(reloads)</span>
         </label>
       )}
@@ -365,6 +370,7 @@ export const EditorPanel = ({
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
+          minHeight: 0,
           gap: 8,
           opacity: brush.active ? 0.5 : 1,
         }}
@@ -412,7 +418,9 @@ export const EditorPanel = ({
         <div
           style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "space-between" }}
         >
-          <span style={{ color: "#8b93a3" }}>{propsArr.length} props</span>
+          <span style={{ color: "#8b93a3" }}>
+            {propsArr.length} props · {riversArr.length} rivers
+          </span>
           <div style={{ display: "flex", gap: 6 }}>
             {copyButton && (
               <button
@@ -651,6 +659,7 @@ const RiverControls = ({
   // should affect that river, not whatever was previously selected.
   const target = editingRiver ?? selectedRiver;
   const targetWidth = target?.width ?? tool.width;
+  const targetMaterial = target?.material ?? tool.material;
   return (
     <div
       style={{
@@ -681,6 +690,21 @@ const RiverControls = ({
           style={{ flex: 1 }}
         />
       </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#8b93a3", minWidth: 40 }}>Material</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {RIVER_MATERIALS.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              style={btn(targetMaterial === m.id)}
+              onClick={() => store.getState().setRiverMaterial(m.id)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div style={{ color: "#8b93a3", fontSize: 11 }}>
         {editingRiver
           ? "Click map to add points. Finish river to commit. Shift-click a point to delete it."

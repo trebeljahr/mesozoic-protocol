@@ -280,6 +280,8 @@ export const Ground = () => {
   const paths = useGame((s) => s.world.paths);
   const biome = useGame((s) => s.world.biome);
   const levelId = useGame((s) => s.world.levelId);
+  const proceduralSeed = useGame((s) => s.world.proceduralSeed);
+  const overrideActive = useGame((s) => s.world.overrideActive);
   const trees = useGame((s) => s.world.trees);
   const rocks = useGame((s) => s.world.rocks);
   // world.towers is mutated in place on placement (push), so subscribing to
@@ -295,19 +297,21 @@ export const Ground = () => {
   // overlap is impossible. Lava/forest/alien surfaces are also avoided
   // so we don't sprinkle grass into the river.
   const layers = useMemo(() => {
+    if (overrideActive) return [];
     const blockers = buildBlockers(trees, rocks);
     const decor: DecorEntry[] = [];
-    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, levelId, biome) : null;
+    const proceduralKey = levelId + proceduralSeed;
+    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, proceduralKey, biome) : null;
     return specs.map((spec, layerIndex) => ({
       spec,
-      buckets: buildLayer(paths, spec, decor, blockers, flow, levelId, layerIndex).map(
+      buckets: buildLayer(paths, spec, decor, blockers, flow, proceduralKey, layerIndex).map(
         (placements) => ({
           id: nanoid(),
           placements,
         }),
       ),
     }));
-  }, [paths, specs, biome, levelId, trees, rocks]);
+  }, [paths, specs, biome, levelId, proceduralSeed, overrideActive, trees, rocks]);
 
   // Cull any decor instance the player has built a tower on top of, so the
   // tower base sits on clean ground instead of poking through a mushroom

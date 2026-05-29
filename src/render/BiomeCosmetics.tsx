@@ -468,6 +468,7 @@ export const BiomeCosmetics = () => {
   const biome = useGame((s) => s.world.biome);
   const paths = useGame((s) => s.world.paths);
   const levelId = useGame((s) => s.world.levelId);
+  const proceduralSeed = useGame((s) => s.world.proceduralSeed);
   const trees = useGame((s) => s.world.trees);
   const rocks = useGame((s) => s.world.rocks);
   // world.towers is mutated in place on placement (push), so subscribing to
@@ -482,10 +483,11 @@ export const BiomeCosmetics = () => {
       ...trees.map((t) => ({ pos: t.pos, radius: 0.9 * t.scale })),
       ...rocks.map((r) => ({ pos: r.pos, radius: 0.7 * r.scale })),
     ];
-    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, levelId, biome) : null;
-    const story = buildStoryDetails(biome, paths, levelId, blockers, flow);
+    const proceduralKey = levelId + proceduralSeed;
+    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, proceduralKey, biome) : null;
+    const story = buildStoryDetails(biome, paths, proceduralKey, blockers, flow);
     const instances = [
-      ...buildInstances(biome, paths, levelId, blockers, flow),
+      ...buildInstances(biome, paths, proceduralKey, blockers, flow),
       ...story.instances,
     ];
     const byUrl = new Map<string, Instance[]>();
@@ -495,7 +497,7 @@ export const BiomeCosmetics = () => {
       byUrl.set(inst.url, list);
     }
     return { groups: Array.from(byUrl.entries()), traces: story.traces, markers: story.markers };
-  }, [biome, paths, levelId, trees, rocks]);
+  }, [biome, paths, levelId, proceduralSeed, trees, rocks]);
 
   // Cull cosmetics that overlap a tower so the base sits on clean ground.
   // Filtered at render-time to keep placement stable as towers come/go.

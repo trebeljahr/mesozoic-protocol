@@ -283,6 +283,8 @@ export type PlacedProp = {
 // extrudes a flat water ribbon of `width` along it on the XZ ground plane.
 export type RiverPoint = { x: number; y: number };
 
+export type RiverMaterial = "water" | "lava" | "toxic";
+
 // Hand-painted river. Persisted alongside props in the same per-level (or
 // world-map) edit blob. Visual-only today — rivers do NOT affect tower
 // placement or pathing; gameplay reactivity is a follow-up.
@@ -293,6 +295,9 @@ export type River = {
   points: RiverPoint[];
   // Ribbon thickness in world units.
   width: number;
+  // Render material chosen in the editor. Missing legacy values default
+  // to water at load/render time.
+  material?: RiverMaterial;
   // Optional water color override (defaults to a soft editor-preview blue).
   color?: string;
 };
@@ -824,6 +829,8 @@ export type World = {
   // createWorld blanks the procedural trees/rocks/outposts/cosmetics so the
   // hand-placed props are the only set-dressing. Always false in production.
   overrideActive: boolean;
+  // Dev editor procedural reseed offset. Zero in production/default saves.
+  proceduralSeed: number;
   // Hand-painted rivers from the dev-only river tool. Persisted alongside
   // props in the same per-level edit blob. Empty in production unless the
   // saved blob ships rivers. Visual-only today.

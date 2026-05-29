@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import type { River } from "../sim/types";
+import { computeBridges, type FlowPalette } from "../flowGeometry";
+import { PATH_WIDTH } from "../level";
+import type { River, RiverMaterial, Vec2 } from "../sim/types";
 
 // Universal renderer for hand-painted rivers. Reads from a `rivers` prop
 // (caller-supplied) so both the per-level scene (world.rivers from useGame)
@@ -22,7 +24,29 @@ const Y_OFFSET = 0.04;
 const SAMPLES_PER_SEGMENT = 16;
 const MIN_SAMPLES = 32;
 
-const DEFAULT_COLOR = "#3aa8d8";
+const MATERIALS: Record<RiverMaterial, FlowPalette> = {
+  water: {
+    fluidColor: "#3a82c6",
+    fluidEmissive: "#1a4870",
+    fluidEmissiveIntensity: 0.18,
+    bridgeDeck: "#5a3c20",
+    bridgeTrim: "#3a2614",
+  },
+  lava: {
+    fluidColor: "#ff6a1c",
+    fluidEmissive: "#ff5010",
+    fluidEmissiveIntensity: 1.6,
+    bridgeDeck: "#2e1a10",
+    bridgeTrim: "#7a3a1e",
+  },
+  toxic: {
+    fluidColor: "#3ad6b0",
+    fluidEmissive: "#5affc8",
+    fluidEmissiveIntensity: 0.55,
+    bridgeDeck: "#1f1230",
+    bridgeTrim: "#4a2a70",
+  },
+};
 
 // Build the ribbon geometry for a single river. Returns a BufferGeometry
 // laid out as a triangle strip along the spline: two vertices per sample
@@ -114,10 +138,13 @@ const RiverMesh = ({ river }: { river: River }) => {
   return (
     <mesh geometry={geom} renderOrder={1} receiveShadow={false} castShadow={false}>
       <meshStandardMaterial
-        color={river.color ?? DEFAULT_COLOR}
+        color={river.color ?? MATERIALS[river.material ?? "water"].fluidColor}
+        emissive={MATERIALS[river.material ?? "water"].fluidEmissive}
+        emissiveIntensity={MATERIALS[river.material ?? "water"].fluidEmissiveIntensity}
         roughness={0.3}
         metalness={0.05}
         side={THREE.DoubleSide}
+        toneMapped={false}
       />
     </mesh>
   );
@@ -127,13 +154,53 @@ const RiverMesh = ({ river }: { river: River }) => {
 // in both per-level and world-map scenes. Tree-shaking is driven by whether
 // the component is referenced at all; when rivers === [] the subtree is a
 // single guard return, so the render cost is negligible at boot.
-export const Rivers = ({ rivers }: { rivers: River[] }) => {
+export const Rivers = ({ rivers, paths = [] }: { rivers: River[]; paths?: Vec2[][] }) => {
   if (rivers.length === 0) return null;
+  const bridges = paths.length > 0 ? computeBridges(paths, rivers) : [];
+  const bridgeWidth = PATH_WIDTH + 0.4;
   return (
     <group>
       {rivers.map((r) => (
         <RiverMesh key={r.id} river={r} />
       ))}
+      {bridges.map((b, i) =>
+        b.kind === "plaza" ? (
+          <group
+            // biome-ignore lint/suspicious/noArrayIndexKey: computed bridge list has no stable id
+            key={`bridge:${i}`}
+            position={[b.pos.x, 0.08, -b.pos.y]}
+          >
+            <mesh castShadow receiveShadow>
+              <cylinderGeometry args={[b.radius, b.radius, 0.18, 28]} />
+              <meshStandardMaterial color={MATERIALS.water.bridgeDeck} roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.16, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+              <torusGeometry args={[b.radius - 0.05, 0.06, 8, 28]} />
+              <meshStandardMaterial color={MATERIALS.water.bridgeTrim} roughness={1} />
+            </mesh>
+          </group>
+        ) : (
+          <group
+            // biome-ignore lint/suspicious/noArrayIndexKey: computed bridge list has no stable id
+            key={`bridge:${i}`}
+            position={[b.pos.x, 0.08, -b.pos.y]}
+            rotation={[0, -b.rotY, 0]}
+          >
+            <mesh castShadow receiveShadow>
+              <boxGeometry args={[b.length, 0.18, bridgeWidth]} />
+              <meshStandardMaterial color={MATERIALS.water.bridgeDeck} roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.18, bridgeWidth / 2 - 0.06]} castShadow>
+              <boxGeometry args={[b.length, 0.22, 0.12]} />
+              <meshStandardMaterial color={MATERIALS.water.bridgeTrim} roughness={1} />
+            </mesh>
+            <mesh position={[0, 0.18, -(bridgeWidth / 2 - 0.06)]} castShadow>
+              <boxGeometry args={[b.length, 0.22, 0.12]} />
+              <meshStandardMaterial color={MATERIALS.water.bridgeTrim} roughness={1} />
+            </mesh>
+          </group>
+        ),
+      )}
     </group>
   );
 };

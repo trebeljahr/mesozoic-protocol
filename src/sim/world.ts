@@ -716,84 +716,74 @@ export const createWorld = (
   // Ribbon + spawn ring both anchor at path[0], the lead-in point at the
   // fully zoomed-out entry bounds. Kept per-path for future offsets.
   const pathRibbonStart = level.paths.map(() => 0);
-  // Rivers and lakes block organic decoration placement so trees, rocks,
-  // and easter eggs don't spawn on the flow surface. Pass null for non-flow
-  // biomes so isOnFlowSurface short-circuits. The lava, forest, and alien
-  // biomes share the same flow geometry — see hasFlowFeatures.
-  const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, level.id, biome) : null;
-  // Outposts are placed first so trees and rocks treat them as fixed
-  // blockers and never spawn inside an authored colony.
-  const { outposts, nextId: afterOutposts } = buildOutposts(paths, biome, level.id, flow, 1);
-  const { trees, nextId: afterTrees } = buildTrees(
-    paths,
-    level.id * 7919 + 101,
-    afterOutposts,
-    flow,
-    biome,
-    outposts,
-  );
-  const { rocks, nextId: afterRocks } = buildRocks(
-    biome,
-    paths,
-    trees,
-    afterTrees,
-    flow,
-    level.id,
-    outposts,
-  );
-  const { eggs, nextId } = buildEasterEggs(
-    biome,
-    paths,
-    trees,
-    rocks,
-    outposts,
-    level.id * 2311 + 47,
-    afterRocks,
-    flow,
-    triggeredEggsOnLevel,
-  );
-  const easterEggSchedule = buildEasterEggSchedule(
-    biome,
-    level.id * 5471 + 3,
-    triggeredEggsOnLevel,
-  );
-  // Dev-only level-editor overrides. Hand-placed props are layered on top of
-  // the procedural set-dressing; when "override procedural" was enabled for
-  // this level, the procedural trees/rocks/outposts/eggs are blanked so the
-  // authored props are the only set-dressing. Gated on import.meta.env.DEV so
-  // the localStorage read and this whole branch dead-code out of production.
+  // Dev-only level-editor overrides. Read before procedural generation so
+  // clear/reload can suppress or reseed all derived set-dressing.
   let editorProps: PlacedProp[] = [];
   let editorRivers: River[] = [];
   let overrideActive = false;
-  let finalTrees = trees;
-  let finalRocks = rocks;
-  let finalOutposts = outposts;
-  let finalEggs = eggs;
+  let proceduralSeed = 0;
   if (import.meta.env.DEV) {
-    // Read the editor overrides inline (rather than importing the editor's
-    // levelEdits module) so this whole branch — and any reference to the
-    // editor surface — is dead-code-eliminated from production. The storage
-    // shape mirrors src/editor/levelEdits.ts (key "mz:leveledits:v1").
     try {
       const raw =
         typeof window !== "undefined" ? window.localStorage.getItem("mz:leveledits:v1") : null;
       const edit = raw ? JSON.parse(raw)?.[String(level.id)] : null;
       if (edit) {
         editorProps = (Array.isArray(edit.props) ? edit.props : []) as PlacedProp[];
-        // Additive field: missing on legacy v:1 blobs, defaults to [].
-        editorRivers = (Array.isArray(edit.rivers) ? edit.rivers : []) as River[];
+        editorRivers = (Array.isArray(edit.rivers) ? edit.rivers : []).map((river: River) => ({
+          ...river,
+          material: river.material ?? "water",
+        }));
         overrideActive = edit.override === true;
-        if (overrideActive) {
-          finalTrees = [];
-          finalRocks = [];
-          finalOutposts = [];
-          finalEggs = [];
-        }
+        proceduralSeed =
+          typeof edit.proceduralSeed === "number" && Number.isFinite(edit.proceduralSeed)
+            ? edit.proceduralSeed
+            : 0;
       }
     } catch {
-      // Malformed/inaccessible storage — fall back to procedural placement.
+      editorProps = [];
+      editorRivers = [];
+      overrideActive = false;
+      proceduralSeed = 0;
     }
   }
+  const proceduralKey = level.id + proceduralSeed;
+  // Rivers and lakes block organic decoration placement so trees, rocks,
+  // and easter eggs don't spawn on the flow surface. Pass null for non-flow
+  // biomes so isOnFlowSurface short-circuits. The lava, forest, and alien
+  // biomes share the same flow geometry — see hasFlowFeatures.
+  const flow =
+    !overrideActive && hasFlowFeatures(biome)
+      ? buildFlowFeatures(paths, proceduralKey, biome)
+      : null;
+  // Outposts are placed first so trees and rocks treat them as fixed
+  // blockers and never spawn inside an authored colony.
+  const { outposts, nextId: afterOutposts } = overrideActive
+    ? { outposts: [], nextId: 1 }
+    : buildOutposts(paths, biome, proceduralKey, flow, 1);
+  const { trees, nextId: afterTrees } = overrideActive
+    ? { trees: [], nextId: afterOutposts }
+    : buildTrees(paths, proceduralKey * 7919 + 101, afterOutposts, flow, biome, outposts);
+  const { rocks, nextId: afterRocks } = overrideActive
+    ? { rocks: [], nextId: afterTrees }
+    : buildRocks(biome, paths, trees, afterTrees, flow, proceduralKey, outposts);
+  const { eggs, nextId } = overrideActive
+    ? { eggs: [], nextId: afterRocks }
+    : buildEasterEggs(
+        biome,
+        paths,
+        trees,
+        rocks,
+        outposts,
+        proceduralKey * 2311 + 47,
+        afterRocks,
+        flow,
+        triggeredEggsOnLevel,
+      );
+  const easterEggSchedule = buildEasterEggSchedule(
+    biome,
+    proceduralKey * 5471 + 3,
+    triggeredEggsOnLevel,
+  );
   // Compose per-level hpScale × difficulty.hp into each wave's hpMul. The
   // spawner already respects spec.hpMul, so baking it once at creation
   // means the rest of the sim doesn't need to know about difficulty.
@@ -915,11 +905,12 @@ export const createWorld = (
     enemyById: new Map(),
     towers: [],
     towerById: new Map(),
-    trees: finalTrees,
-    rocks: finalRocks,
-    outposts: finalOutposts,
+    trees,
+    rocks,
+    outposts,
     props: editorProps,
     overrideActive,
+    proceduralSeed,
     rivers: editorRivers,
     projectiles: [],
     beams: [],
@@ -964,7 +955,7 @@ export const createWorld = (
     },
     runEnemyKinds: {},
     runTowerKinds: {},
-    easterEggs: finalEggs,
+    easterEggs: eggs,
     easterEggSchedule,
     speedMul: difficulty.speed,
     goldKillMul: difficulty.goldKill,

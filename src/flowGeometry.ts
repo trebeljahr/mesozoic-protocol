@@ -396,7 +396,7 @@ const segIntersect = (a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): Vec2 | null => {
 // covers the river's footprint along the path direction. Bridge length scales
 // with river width so tributary crossings get smaller decks.
 const BRIDGE_OVERHANG = 2.2;
-const computeBridges = (paths: Vec2[][], rivers: River[]): Bridge[] => {
+export const computeBridges = (paths: Vec2[][], rivers: River[]): Bridge[] => {
   const rects: SourcedRect[] = [];
   for (let pIdx = 0; pIdx < paths.length; pIdx++) {
     const path = paths[pIdx];

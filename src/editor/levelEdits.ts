@@ -14,6 +14,8 @@ export type LevelEdit = {
   // When true, createWorld blanks procedural trees/rocks/outposts/cosmetics
   // for this level so the hand-placed props are the only set-dressing.
   override: boolean;
+  // Extra deterministic seed offset for regenerating procedural placement.
+  proceduralSeed?: number;
   props: PlacedProp[];
   // Hand-painted rivers from the river tool. Additive over v:1 — older
   // blobs without this field load with rivers defaulting to []. The
