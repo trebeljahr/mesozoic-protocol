@@ -27,7 +27,7 @@ const DEATH_FADE = 0.7;
 // Quad scale multiplier on top of the per-anchor radius. The radial
 // gradient texture's bright core fills ~30% of the quad, so we oversize the
 // quad to allow a visible soft halo around the eye.
-const BILLBOARD_SCALE = 3.2;
+const BILLBOARD_SCALE = 2.2;
 
 // Build the shared radial-gradient texture once on mount. Tight bright
 // core + long soft falloff so additive blending reads as a glow, not a hard
@@ -66,6 +66,7 @@ export const EnemyEyes = () => {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const tmpColor = useMemo(() => new THREE.Color(), []);
   const baseColor = useMemo(() => new THREE.Color(), []);
+  const eyeWorld = useMemo(() => new THREE.Vector3(), []);
   const texture = useMemo(() => buildEyeTexture(), []);
   // Per-enemy fade-out state. Live enemies reset fadeStart each frame; once
   // an enemy disappears from world.enemies (sim-side swap-and-pop on death),
@@ -159,9 +160,20 @@ export const EnemyEyes = () => {
 
       for (const pos of profile.positions) {
         if (i >= MAX_EYES) break;
-        const wx = transform.x + cosY * pos.x + sinY * pos.z;
-        const wz = transform.z - sinY * pos.x + cosY * pos.z;
-        const wy = transform.y + pos.y;
+        let wx: number;
+        let wy: number;
+        let wz: number;
+        if (pos.bone && pos.localPosition) {
+          eyeWorld.copy(pos.localPosition);
+          pos.bone.localToWorld(eyeWorld);
+          wx = eyeWorld.x;
+          wy = eyeWorld.y;
+          wz = eyeWorld.z;
+        } else {
+          wx = transform.x + cosY * pos.x + sinY * pos.z;
+          wz = transform.z - sinY * pos.x + cosY * pos.z;
+          wy = transform.y + pos.y;
+        }
         dummy.position.set(wx, wy, wz);
         dummy.quaternion.copy(camQuat);
         dummy.scale.setScalar(pos.radius * BILLBOARD_SCALE);

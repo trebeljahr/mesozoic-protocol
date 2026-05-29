@@ -9,7 +9,6 @@ import { smoothDirection } from "../sim/path";
 import type { BossVariant, DamageType, EnemyKind, World } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
 import {
-  ADAPTIVE_EMISSIVE_BY_TYPE,
   ADAPTIVE_TINT_BY_TYPE,
   BOSS_VARIANT_FOOTSTEP,
   BOSS_VARIANT_MATERIAL,
@@ -17,28 +16,21 @@ import {
 } from "../sim/world";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
-import { ENEMY_EMISSIVE, EYE_FALLBACK_NAMES, MATRIARCH_CONDUIT_PATTERNS } from "./emissiveRegistry";
+import { ENEMY_EMISSIVE, EYE_FALLBACK_NAMES } from "./emissiveRegistry";
 import {
   buildEyePositions,
   clearEnemyEyeProfile,
+  type EyePosition,
   eyeColorFor,
   setEnemyEyeProfile,
 } from "./enemyEyeProfiles";
-import {
-  buildPlateGroup,
-  type ConduitUniforms,
-  getConduitColor,
-  installConduitOnBody,
-  makeConduitUniforms,
-  resolveEnemyTier,
-} from "./enemyGrafts";
+import { buildPlateGroup, resolveEnemyTier, syncPlateGroup } from "./enemyGrafts";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
 import {
   applyEmissiveSpec,
   applyToonRimPatch,
   BIOME_MATRIARCH_RIM,
   biomeRimColor,
-  MATRIARCH_CONDUIT_COLOR,
   MATRIARCH_VARIANT_BIOME,
   RIM_COLOR_ENEMY,
   RIM_INTENSITY_BOSS,
@@ -67,7 +59,6 @@ type Props = {
 // Frost tint target — pale ice blue. Enemies lerp from their base color
 // toward this as e.frost climbs from 0 → 1.
 const FROST_COLOR = new THREE.Color("#cfe6ff");
-const FROST_EMISSIVE = new THREE.Color("#3a6aa0");
 // Frost rim handoff: as frost climbs, the rim hue drifts toward this so
 // frozen enemies read with a cold halo, not the bio-green one.
 const FROST_RIM_COLOR = new THREE.Color("#cfe6ff");
@@ -101,14 +92,11 @@ type Item = {
   // footstep crossing detection. -1 = unprimed (don't emit until the next
   // frame seeds a baseline, so a clip (re)start can't burst a step).
   lastStepPhase: number;
-  // Bone-grafted plate scaffolding mounted as a sibling of obj so its
-  // transform tracks the smoothed pose without depending on the skinned
-  // skeleton. Null on the very first frame before installGrafts runs.
+  // Bone-grafted plate scaffolding mounted as a sibling of obj. Each mesh
+  // stores a local bind to a body/head/tail bone and is synced after the
+  // animation mixer advances, so armor hugs the dinosaur through clips.
   plateGroup: THREE.Group | null;
-  // Shared bio-conduit shader uniforms — same object referenced by every
-  // submesh in this body so the stripes stay phase-locked. Mutated each
-  // frame to drive idle pulse + aggression / hit-flash / death.
-  conduitUniforms: ConduitUniforms | null;
+  eyePositions: EyePosition[];
 };
 
 // Exp-damp half-life (seconds). Lower = snappier, higher = floatier.
@@ -188,20 +176,6 @@ export const ModelEnemyMesh = ({
     }),
     [],
   );
-  // Matching emissive palette — same useMemo pattern as the tints so
-  // the inner loop never allocates a THREE.Color. Multiplied by the
-  // adaptive lerp amount so the inner glow only kicks in once the
-  // body tint is already visible.
-  const adaptiveEmissiveByType = useMemo<Record<DamageType, THREE.Color>>(
-    () => ({
-      kinetic: new THREE.Color(ADAPTIVE_EMISSIVE_BY_TYPE.kinetic),
-      electric: new THREE.Color(ADAPTIVE_EMISSIVE_BY_TYPE.electric),
-      cold: new THREE.Color(ADAPTIVE_EMISSIVE_BY_TYPE.cold),
-      explosive: new THREE.Color(ADAPTIVE_EMISSIVE_BY_TYPE.explosive),
-      flame: new THREE.Color(ADAPTIVE_EMISSIVE_BY_TYPE.flame),
-    }),
-    [],
-  );
   // Free list of skinned clones from dead-but-recyclable enemies. Reusing
   // is significantly cheaper than another `cloneSkinned + AnimationMixer`,
   // which matters for swarms.
@@ -220,12 +194,8 @@ export const ModelEnemyMesh = ({
     };
   }, [scene, targetSize]);
 
-  // Pre-resolved eye anchors (world-unit offsets relative to the obj root,
-  // in body-local frame) and the per-enemy eye color. Computed once per
-  // mount and pushed to the enemyEyes registry for every enemy that
-  // initializes on this mesh; the global EnemyEyes renderer reads from
-  // there each frame.
-  const eyePositions = useMemo(() => buildEyePositions(url, targetSize), [url, targetSize]);
+  // Per-enemy eye color. Eye positions are computed per clone because the
+  // glow is bound to that clone's animated Head bone.
   const eyeBaseColor = useMemo(() => eyeColorFor(kind, bossVariant), [kind, bossVariant]);
 
   const activeClip = useMemo(
@@ -403,11 +373,6 @@ export const ModelEnemyMesh = ({
           if (recycled.plateGroup) {
             recycled.plateGroup.visible = true;
           }
-          // Reset conduit pulse so the next life starts at idle intensity.
-          if (recycled.conduitUniforms) {
-            recycled.conduitUniforms.uIntensity.value = 1.0;
-            recycled.conduitUniforms.uPhaseOffset.value = (e.id * 0.6173) % (Math.PI * 2);
-          }
           recycled.visInit = false;
           // Pool may have stashed a corpse mid-fall; reset transient
           // death state so the recycled clone runs fresh.
@@ -434,12 +399,9 @@ export const ModelEnemyMesh = ({
             o.userData.enemyId = e.id;
             o.userData.enemyMaxHp = e.maxHp;
             if (bossOnTop) o.renderOrder = 10;
-            // Painted-look passes opt enemies into selective bloom (emissive
-            // eyes / variant tints / hit flash) and outline (dark silhouette
-            // pop at thumbnail scale). Layer membership is per-Object3D so
-            // every descendant — including bones and attachments — joins
-            // both layers; non-mesh nodes are harmless extras.
-            o.layers.enable(BLOOM_LAYER);
+            // Painted-look outline gives dinosaurs a dark silhouette pop at
+            // gameplay scale. Bloom is deliberately reserved for eyes/VFX;
+            // putting the whole body on BLOOM_LAYER made every dinosaur glow.
             o.layers.enable(OUTLINE_LAYER);
             const m = o as THREE.Mesh;
             if (m.isMesh) {
@@ -471,16 +433,11 @@ export const ModelEnemyMesh = ({
               // adds to outgoingLight before gl_FragColor. Per-frame
               // code refreshes the rim uniform from world.biome so the
               // same recycled clone reads correctly across biomes.
-              const matriarchBiome =
-                bossVariant !== undefined ? MATRIARCH_VARIANT_BIOME[bossVariant] : null;
               const rimIntensity =
                 bossVariant !== undefined ? RIM_INTENSITY_BOSS : RIM_INTENSITY_ENEMY;
               const mats = Array.isArray(m.material) ? m.material : [m.material];
               const meshName = (m.name || "").toLowerCase();
               const isEye = EYE_FALLBACK_NAMES.some((p) => meshName.includes(p));
-              const isConduit =
-                matriarchBiome !== null &&
-                MATRIARCH_CONDUIT_PATTERNS.some((p) => meshName.includes(p));
               for (const mm of mats) {
                 if (!mm) continue;
                 applyToonRimPatch(mm, {
@@ -488,25 +445,15 @@ export const ModelEnemyMesh = ({
                 });
                 const matName = (mm.name || "").toLowerCase();
                 const matIsEye = EYE_FALLBACK_NAMES.some((p) => matName.includes(p));
-                const matIsConduit =
-                  matriarchBiome !== null &&
-                  MATRIARCH_CONDUIT_PATTERNS.some((p) => matName.includes(p));
                 // Eye glow: registry-matched material name or fallback
                 // mesh/material-name pattern.
                 if (isEye || matIsEye) {
                   const eyeSpec = ENEMY_EMISSIVE[kind]?.[0]?.spec;
                   if (eyeSpec) applyEmissiveSpec(mm, eyeSpec);
-                }
-                // Matriarch spine / bio-conduit strip.
-                if ((isConduit || matIsConduit) && matriarchBiome) {
-                  applyEmissiveSpec(mm, {
-                    color: MATRIARCH_CONDUIT_COLOR[matriarchBiome],
-                    intensity: 1.4,
-                    bloom: true,
-                  });
+                  m.layers.enable(BLOOM_LAYER);
+                  m.userData.bloom = true;
                 }
               }
-              if (isEye || isConduit) m.userData.bloom = true;
             }
           });
           const mixer = new THREE.AnimationMixer(obj);
@@ -521,26 +468,19 @@ export const ModelEnemyMesh = ({
             parent.add(proxy);
           }
 
-          // Bone-grafted alloy plates + bio-conduit shader install.
-          // Both layers piggy-back on the smoothed pose computed below —
-          // plates ride a sibling group, conduit shader patches the
-          // body materials in place. Quality::low skips the conduit
-          // patch (plates still draw), Quality::medium halves the stripe
-          // frequency.
+          // Bone-grafted alloy plates. The group is a scene sibling, but
+          // each plate stores a bind to a clone-local bone so it follows
+          // walk/attack/death animation instead of hovering off the skin.
           const matriarch = bossVariant !== undefined;
           const effectiveTier = resolveEnemyTier(kind, matriarch);
-          const conduitColor = getConduitColor(bossVariant);
-          // Per-enemy phase offset desyncs the idle pulse across the
-          // pack so a row of raptors doesn't strobe in unison.
-          const phaseOffset = (e.id * 0.6173) % (Math.PI * 2);
-          const conduitUniforms = makeConduitUniforms(
-            conduitColor,
+          const plateGroup = buildPlateGroup(
+            obj,
+            kind,
+            bossVariant,
             effectiveTier,
-            phaseOffset,
-            matriarch,
+            targetSize,
+            centerXZ,
           );
-          installConduitOnBody(obj, conduitUniforms);
-          const plateGroup = buildPlateGroup(kind, bossVariant, effectiveTier, targetSize);
           // Plates join the painted-look outline pass so they read as
           // part of the silhouette rather than pasted 3D shapes; they
           // skip BLOOM_LAYER because steel has no emissive.
@@ -567,7 +507,7 @@ export const ModelEnemyMesh = ({
             dyingBaseY: 0,
             lastStepPhase: -1,
             plateGroup,
-            conduitUniforms,
+            eyePositions: buildEyePositions(url, targetSize, obj, centerXZ),
           };
         }
         itemsRef.current.set(e.id, item);
@@ -575,9 +515,9 @@ export const ModelEnemyMesh = ({
         // Fires on first mount and on every recycle so each enemy id gets a
         // fresh pulseSeed; cleared in recycleOrDispose so a pooled slot
         // doesn't keep emitting for a stale id.
-        if (eyePositions.length > 0) {
+        if (item.eyePositions.length > 0) {
           setEnemyEyeProfile(e.id, {
-            positions: eyePositions,
+            positions: item.eyePositions,
             baseColor: eyeBaseColor,
             pulseSeed: (e.id * 0.137) % (Math.PI * 2),
           });
@@ -712,14 +652,7 @@ export const ModelEnemyMesh = ({
         yaw: baseRotY + item.visYaw,
       });
 
-      // Plate scaffolding rides the smoothed pose as a sibling group —
-      // its local plate offsets are in target-size-unit world space, so
-      // matching the obj's position/rotation/yaw is all it takes for the
-      // plates to track the body without any normalizedScale gymnastics.
-      if (item.plateGroup) {
-        item.plateGroup.position.copy(item.obj.position);
-        item.plateGroup.rotation.copy(item.obj.rotation);
-      }
+      if (item.plateGroup) syncPlateGroup(item.plateGroup);
 
       const flashing = world.time < e.flashUntil;
       const frost = e.frost;
@@ -736,7 +669,6 @@ export const ModelEnemyMesh = ({
       const adaptiveType = e.adaptiveResistType;
       const adaptiveAmount = e.adaptiveResistAmount ?? 0;
       const adaptiveTint = adaptiveType ? adaptiveTintByType[adaptiveType] : null;
-      const adaptiveEmissive = adaptiveType ? adaptiveEmissiveByType[adaptiveType] : null;
       // Rim hue/intensity handoff. Frost drifts every enemy's rim toward
       // the cool frost color; matriarchs hold their variant biome accent
       // regardless of which biome they walk through, ordinary enemies
@@ -787,35 +719,17 @@ export const ModelEnemyMesh = ({
             setRimIntensity(mm, rimBaseIntensity * rimBoost);
           }
           if (!mm.emissive) return;
-          // Registry-applied emissive overrides (eyes, matriarch
-          // conduits) live as the material's `baseEmissive`. The per-
-          // frame loop preserves them in the no-override branch, and
-          // matriarch/adaptive body washes skip these materials so the
-          // eye/conduit glow isn't clobbered.
+          // Registry-applied emissive overrides are eyes only. Body
+          // materials stay dark except for the short hit flash.
           const baseEmissive = mm.userData.baseEmissive as THREE.Color | undefined;
-          const hasOverride = mm.userData.emissiveOverride === true;
           if (flashing) {
             // Warm-tinted, dimmed flash instead of pure white at full
             // intensity — reads as "got hit" without the harsh clinical
             // pop the (1,1,1) version had against varied dino base colors.
             mm.emissive.setRGB(0.7, 0.6, 0.5);
-          } else if (frost > 0.05) {
-            // Cool inner glow when heavily frosted — sells the "frozen
-            // solid" read at high frost without a halo at low frost.
-            mm.emissive.copy(FROST_EMISSIVE).multiplyScalar(frost * 0.5);
-          } else if (matriarch && matriarchMaterial && !hasOverride) {
-            // Variant-specific charge: early species queens stay material
-            // first, later queens carry more supernatural light. Skips
-            // conduit/eye materials so their registry glow survives.
-            mm.emissive.copy(variantTint).multiplyScalar(matriarchMaterial.emissiveAmount);
-          } else if (adaptiveEmissive && adaptiveAmount > 0 && !hasOverride) {
-            // Subtle adaptive inner glow scaled to the body tint
-            // amount so heavy late-game / high-streak adaptation pops
-            // visibly without ever competing with frost/matriarch tint.
-            mm.emissive.copy(adaptiveEmissive).multiplyScalar(adaptiveAmount * 0.6);
           } else if (baseEmissive) {
             // Restore captured baseEmissive — preserves registry eye /
-            // conduit glow across frames. cloneAndCaptureBase populates
+            // glow across frames. cloneAndCaptureBase populates
             // baseEmissive at clone time; applyEmissiveSpec overwrites
             // it when the material was tagged with an override.
             mm.emissive.copy(baseEmissive);
@@ -826,23 +740,6 @@ export const ModelEnemyMesh = ({
         if (Array.isArray(mat)) mat.forEach(apply);
         else apply(mat as THREE.MeshStandardMaterial);
       });
-
-      // Bio-conduit pulse — idle wave runs continuously, aggression
-      // (engaged with robot or leak attack at HQ) lifts the base
-      // intensity, the existing hit-flash window spikes it, and the
-      // body fades emissive while frozen so cryo doesn't keep the
-      // conduits blazing through a stasis. Death fade is handled in
-      // the dying branch below.
-      if (item.conduitUniforms) {
-        const u = item.conduitUniforms;
-        u.uTime.value = world.time;
-        let intensity = 1.0;
-        const aggression = leak !== undefined || engagingRobot;
-        if (aggression) intensity *= 1.5;
-        if (flashing) intensity *= 3.0;
-        if (frost > 0.5) intensity *= Math.max(0.15, 1 - frost);
-        u.uIntensity.value = intensity;
-      }
     }
 
     for (const [id, item] of itemsRef.current) {
@@ -864,17 +761,7 @@ export const ModelEnemyMesh = ({
         // the rest-pose bbox dip as the skeleton flattens. Eased so the
         // first frame doesn't pop and the held-final-pose stays lifted.
         item.obj.position.y = item.dyingBaseY + deathGroundLift * eased;
-        // Plates ride the corpse pose so they topple with the body.
-        if (item.plateGroup) {
-          item.plateGroup.position.copy(item.obj.position);
-          item.plateGroup.rotation.copy(item.obj.rotation);
-        }
-        // Bio-conduit fade — smooth ramp to dark over the death anim
-        // so the grafts cool as the body goes still.
-        if (item.conduitUniforms) {
-          item.conduitUniforms.uTime.value = world.time;
-          item.conduitUniforms.uIntensity.value = (1 - t) * 0.8;
-        }
+        if (item.plateGroup) syncPlateGroup(item.plateGroup);
         if (t >= 1) {
           recycleOrDispose(item);
           itemsRef.current.delete(id);

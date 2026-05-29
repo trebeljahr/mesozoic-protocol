@@ -10,6 +10,7 @@
 // (Scene.tsx scales the matriarch mounts up via targetSize, not normalizedScale
 // post-hoc).
 
+import * as THREE from "three";
 import type { BossVariant, EnemyKind } from "../sim/types";
 import { ENEMY_EMISSIVE } from "./emissiveRegistry";
 import { MATRIARCH_CONDUIT_COLOR, MATRIARCH_VARIANT_BIOME } from "./materialTunables";
@@ -29,12 +30,12 @@ export type EyeAnchor = {
 // targetSize) inherit the same head placement. Hand-tuned starting values;
 // adjust by visual inspection.
 const EYE_ANCHORS_BY_URL: Record<string, EyeAnchor[]> = {
-  "/models/Velociraptor.glb": [{ y: 0.62, z: 0.46, dx: 0.06, radius: 0.07 }],
-  "/models/Trex.glb": [{ y: 0.68, z: 0.5, dx: 0.075, radius: 0.075 }],
-  "/models/Stegosaurus.glb": [{ y: 0.22, z: 0.42, dx: 0.05, radius: 0.055 }],
-  "/models/Triceratops.glb": [{ y: 0.26, z: 0.44, dx: 0.07, radius: 0.06 }],
-  "/models/Parasaurolophus.glb": [{ y: 0.56, z: 0.48, dx: 0.055, radius: 0.06 }],
-  "/models/Apatosaurus.glb": [{ y: 0.56, z: 0.48, dx: 0.028, radius: 0.045 }],
+  "/models/Velociraptor.glb": [{ y: 0.54, z: 0.4, dx: 0.035, radius: 0.035 }],
+  "/models/Trex.glb": [{ y: 0.58, z: 0.42, dx: 0.04, radius: 0.034 }],
+  "/models/Stegosaurus.glb": [{ y: 0.2, z: 0.34, dx: 0.032, radius: 0.026 }],
+  "/models/Triceratops.glb": [{ y: 0.23, z: 0.37, dx: 0.04, radius: 0.028 }],
+  "/models/Parasaurolophus.glb": [{ y: 0.5, z: 0.42, dx: 0.035, radius: 0.03 }],
+  "/models/Apatosaurus.glb": [{ y: 0.52, z: 0.42, dx: 0.016, radius: 0.018 }],
 };
 
 const hexRGB = (hex: string): [number, number, number] => {
@@ -84,22 +85,58 @@ export const eyeColorFor = (
 // data the renderer can consume directly. Each EyeAnchor with dx > 0 expands
 // into a left + right eye pair so EnemyEyes doesn't have to special-case
 // pairs in its inner loop.
-export type EyePosition = { x: number; y: number; z: number; radius: number };
+export type EyePosition = {
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  bone?: THREE.Object3D;
+  localPosition?: THREE.Vector3;
+};
 
-export const buildEyePositions = (url: string, targetSize: number): EyePosition[] => {
+const normalizeName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const findHeadBone = (root: THREE.Object3D): THREE.Object3D | null => {
+  let head: THREE.Object3D | null = null;
+  let neck: THREE.Object3D | null = null;
+  root.traverse((o) => {
+    const n = normalizeName(o.name);
+    if (!head && n === "head") head = o;
+    if (!neck && n === "neck") neck = o;
+  });
+  return head ?? neck;
+};
+
+export const buildEyePositions = (
+  url: string,
+  targetSize: number,
+  root?: THREE.Object3D,
+  centerXZ: { x: number; z: number } = { x: 0, z: 0 },
+): EyePosition[] => {
   const anchors = EYE_ANCHORS_BY_URL[url];
   if (!anchors) return [];
   const out: EyePosition[] = [];
+  const headBone = root ? findHeadBone(root) : null;
+  if (root) root.updateMatrixWorld(true);
   for (const a of anchors) {
     const sx = a.dx * targetSize;
     const sy = a.y * targetSize;
     const sz = a.z * targetSize;
     const sr = a.radius * targetSize;
+    const pushEye = (x: number) => {
+      const eye: EyePosition = { x, y: sy, z: sz, radius: sr };
+      if (headBone) {
+        const desired = new THREE.Vector3(centerXZ.x + x, sy, centerXZ.z + sz);
+        eye.bone = headBone;
+        eye.localPosition = headBone.worldToLocal(desired);
+      }
+      out.push(eye);
+    };
     if (a.dx > 0) {
-      out.push({ x: -sx, y: sy, z: sz, radius: sr });
-      out.push({ x: sx, y: sy, z: sz, radius: sr });
+      pushEye(-sx);
+      pushEye(sx);
     } else {
-      out.push({ x: 0, y: sy, z: sz, radius: sr });
+      pushEye(0);
     }
   }
   return out;

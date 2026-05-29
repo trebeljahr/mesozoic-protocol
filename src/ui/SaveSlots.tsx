@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LEVELS } from "../levels";
 import { DIFFICULTY_ACCENT, listSlots, type SlotId, type SlotInfo } from "../progress";
+import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { SaveSlotsScene } from "../render/SaveSlotsScene";
 import { useGame } from "../store";
 import { DifficultyModelIcon } from "./DifficultyModelIcon";
@@ -80,6 +81,7 @@ export const SaveSlots = () => {
           dpr={[1, 1.75]}
           camera={{ position: [0, 5.5, 17], fov: 40, near: 0.1, far: 200 }}
         >
+          <ExpectedCanvasTeardown />
           <Suspense fallback={null}>
             <SaveSlotsScene />
           </Suspense>

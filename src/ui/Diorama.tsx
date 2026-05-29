@@ -2,6 +2,7 @@ import { ContactShadows, Environment, OrbitControls, useGLTF } from "@react-thre
 import { Canvas } from "@react-three/fiber";
 import { type ReactNode, Suspense, useMemo } from "react";
 import * as THREE from "three";
+import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { measureVisibleBox } from "../render/measureModel";
 
 type DecorSpec = {
@@ -141,6 +142,7 @@ export const Diorama = ({
           far: 50,
         }}
       >
+        <ExpectedCanvasTeardown />
         <color attach="background" args={["#3a4858"]} />
 
         {/* Matches PlayScene lighting so subjects don't look flat or dark. */}

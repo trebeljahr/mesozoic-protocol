@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { cloneAndCaptureBase, findClip } from "../render/animUtils";
+import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { HEAL_HUG_RADIUS_BY_KIND } from "../render/HealAuras.constants";
 import { measureVisibleBox } from "../render/measureModel";
 import {
@@ -362,6 +363,7 @@ export const MechanicPreview = ({ id, size = 360 }: Props) => {
           far: 50,
         }}
       >
+        <ExpectedCanvasTeardown />
         <color attach="background" args={["#3a4858"]} />
 
         <Environment

@@ -6,6 +6,7 @@ import { useAudioBridge } from "./audio/useAudioBridge";
 import { LevelEditorPanel } from "./editor/LevelEditorPanel";
 import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
 import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
+import { ExpectedCanvasTeardown } from "./render/ExpectedCanvasTeardown";
 import { PaintedPostFx } from "./render/PaintedPostFx";
 import { PlayScene } from "./render/Scene";
 import { useGame } from "./store";
@@ -275,6 +276,7 @@ export const App = () => {
               canvas.addEventListener("webglcontextrestored", onRestored, false);
             }}
           >
+            <ExpectedCanvasTeardown />
             <SceneRoot key={`scene-${glContextEpoch}`} />
             <EffectComposer key={`fx-${glContextEpoch}`} multisampling={composerMultisampling}>
               {screen === "playing" ? (

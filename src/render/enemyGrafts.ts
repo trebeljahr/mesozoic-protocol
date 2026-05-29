@@ -2,13 +2,12 @@ import * as THREE from "three";
 import type { BossVariant, EnemyKind } from "../sim/types";
 import { BOSS_VARIANT_TINT } from "../sim/world";
 
-// Biotech-horror signature for every enemy dinosaur — bone-grafted alloy
-// plating + pulsing bio-conduits. Two layers compose the look:
-//   Layer 1 — opaque steel BoxGeometry "plates" parented to the enemy
-//             so they ride pose/yaw without skeleton skinning.
-//   Layer 2 — a shader stripe pattern injected into the body material via
-//             onBeforeCompile. Emissive uniforms drive the head-to-tail
-//             pulse, aggression spike, hit flash, and death fade-out.
+// Bone-grafted alloy treatment for enemy dinosaurs:
+//   Layer 1 — opaque steel BoxGeometry "plates" bound to torso / head /
+//             tail bones so armor rides the walk, bite, and death clips.
+//   Layer 2 — optional shader stripe helpers kept here for future boss-only
+//             conduit work. The gameplay mesh currently leaves body glow off;
+//             eye glow is handled by EnemyEyes.
 //
 // Tier escalation: each plate is gated by `ENEMY_GRAFT_TIER[kind] >=
 // plate.tier`, so a tier-1 raptor wears only the bare scaffolding while a
@@ -27,6 +26,8 @@ export type PlateSpec = {
   size: Vec3;
   // Optional Euler rotation in radians.
   rotation?: Vec3;
+  // Preferred bone bucket. If omitted, the installer infers one from z.
+  bone?: "torso" | "shoulders" | "neck" | "head" | "back" | "tail";
   // Min enemy tier to show this plate (1 = always, 3 = apex only).
   tier: 1 | 2 | 3;
 };
@@ -54,50 +55,122 @@ export const ENEMY_GRAFT_TIER: Record<EnemyKind, 1 | 2 | 3> = {
 // iterate. Each kind authors the FULL tier-3 kit; tier filtering at install
 // time drops the higher-tier plates for lower-tier enemies of that kind.
 export const GRAFT_PLATES: Record<EnemyKind, PlateSpec[]> = {
-  swarm: [{ offset: [0, 0.5, 0.0], size: [0.18, 0.06, 0.32], tier: 1 }],
+  swarm: [{ offset: [0, 0.38, 0.0], size: [0.12, 0.035, 0.22], bone: "torso", tier: 1 }],
   raptor: [
-    { offset: [0, 1.05, 0.1], size: [0.3, 0.09, 0.6], tier: 1 },
-    { offset: [0, 1.25, 0.55], size: [0.32, 0.12, 0.3], tier: 2 },
-    { offset: [0.16, 0.95, 0.0], size: [0.1, 0.25, 0.2], rotation: [0, 0, 0.3], tier: 3 },
-    { offset: [-0.16, 0.95, 0.0], size: [0.1, 0.25, 0.2], rotation: [0, 0, -0.3], tier: 3 },
+    { offset: [0, 0.82, 0.05], size: [0.22, 0.045, 0.42], bone: "torso", tier: 1 },
+    { offset: [0, 0.92, 0.44], size: [0.2, 0.055, 0.2], bone: "shoulders", tier: 2 },
+    {
+      offset: [0.12, 0.72, 0.04],
+      size: [0.06, 0.18, 0.15],
+      rotation: [0, 0, 0.28],
+      bone: "torso",
+      tier: 3,
+    },
+    {
+      offset: [-0.12, 0.72, 0.04],
+      size: [0.06, 0.18, 0.15],
+      rotation: [0, 0, -0.28],
+      bone: "torso",
+      tier: 3,
+    },
   ],
   para: [
-    { offset: [0, 1.15, 0.2], size: [0.34, 0.1, 0.7], tier: 1 },
-    { offset: [0, 1.05, -0.45], size: [0.28, 0.1, 0.5], tier: 2 },
-    { offset: [0, 1.35, 1.0], size: [0.3, 0.12, 0.25], tier: 2 },
-    { offset: [0.28, 1.0, 0.1], size: [0.1, 0.32, 0.3], rotation: [0, 0, 0.35], tier: 3 },
-    { offset: [-0.28, 1.0, 0.1], size: [0.1, 0.32, 0.3], rotation: [0, 0, -0.35], tier: 3 },
+    { offset: [0, 0.88, 0.15], size: [0.25, 0.055, 0.48], bone: "torso", tier: 1 },
+    { offset: [0, 0.78, -0.35], size: [0.22, 0.05, 0.34], bone: "back", tier: 2 },
+    { offset: [0, 1.02, 0.72], size: [0.2, 0.06, 0.18], bone: "head", tier: 2 },
+    {
+      offset: [0.18, 0.74, 0.08],
+      size: [0.07, 0.22, 0.2],
+      rotation: [0, 0, 0.32],
+      bone: "torso",
+      tier: 3,
+    },
+    {
+      offset: [-0.18, 0.74, 0.08],
+      size: [0.07, 0.22, 0.2],
+      rotation: [0, 0, -0.32],
+      bone: "torso",
+      tier: 3,
+    },
   ],
   allosaur: [
-    { offset: [0, 1.85, 0.0], size: [0.5, 0.13, 0.9], tier: 1 },
-    { offset: [0, 2.45, 1.05], size: [0.55, 0.18, 0.4], tier: 2 },
-    { offset: [0.4, 1.45, 0.2], size: [0.18, 0.4, 0.32], rotation: [0, 0, 0.3], tier: 2 },
-    { offset: [-0.4, 1.45, 0.2], size: [0.18, 0.4, 0.32], rotation: [0, 0, -0.3], tier: 2 },
-    { offset: [0, 1.75, -1.1], size: [0.45, 0.13, 0.6], tier: 3 },
+    { offset: [0, 1.38, 0.0], size: [0.38, 0.075, 0.66], bone: "torso", tier: 1 },
+    { offset: [0, 1.78, 0.78], size: [0.36, 0.09, 0.28], bone: "head", tier: 2 },
+    {
+      offset: [0.28, 1.08, 0.14],
+      size: [0.11, 0.3, 0.24],
+      rotation: [0, 0, 0.28],
+      bone: "torso",
+      tier: 2,
+    },
+    {
+      offset: [-0.28, 1.08, 0.14],
+      size: [0.11, 0.3, 0.24],
+      rotation: [0, 0, -0.28],
+      bone: "torso",
+      tier: 2,
+    },
+    { offset: [0, 1.05, -0.78], size: [0.32, 0.065, 0.42], bone: "back", tier: 3 },
   ],
   stego: [
-    { offset: [0, 1.55, 0.1], size: [0.4, 0.11, 0.7], tier: 1 },
-    { offset: [0, 1.25, 1.0], size: [0.35, 0.13, 0.3], tier: 2 },
-    { offset: [0, 1.55, -0.7], size: [0.4, 0.11, 0.6], tier: 2 },
-    { offset: [0.5, 1.35, 0.0], size: [0.18, 0.4, 0.5], rotation: [0, 0, 0.3], tier: 3 },
-    { offset: [-0.5, 1.35, 0.0], size: [0.18, 0.4, 0.5], rotation: [0, 0, -0.3], tier: 3 },
+    { offset: [0, 0.98, 0.05], size: [0.32, 0.065, 0.52], bone: "torso", tier: 1 },
+    { offset: [0, 0.78, 0.78], size: [0.27, 0.07, 0.22], bone: "shoulders", tier: 2 },
+    { offset: [0, 0.86, -0.52], size: [0.3, 0.06, 0.42], bone: "back", tier: 2 },
+    {
+      offset: [0.36, 0.78, 0.0],
+      size: [0.11, 0.28, 0.34],
+      rotation: [0, 0, 0.28],
+      bone: "torso",
+      tier: 3,
+    },
+    {
+      offset: [-0.36, 0.78, 0.0],
+      size: [0.11, 0.28, 0.34],
+      rotation: [0, 0, -0.28],
+      bone: "torso",
+      tier: 3,
+    },
   ],
   armored: [
-    { offset: [0, 1.55, 0.1], size: [0.4, 0.11, 0.7], tier: 1 },
-    { offset: [0, 1.2, 1.05], size: [0.6, 0.15, 0.35], tier: 2 },
-    { offset: [0, 1.55, -0.7], size: [0.4, 0.11, 0.6], tier: 2 },
-    { offset: [0.55, 1.3, 0.0], size: [0.18, 0.4, 0.55], rotation: [0, 0, 0.3], tier: 3 },
-    { offset: [-0.55, 1.3, 0.0], size: [0.18, 0.4, 0.55], rotation: [0, 0, -0.3], tier: 3 },
+    { offset: [0, 0.98, 0.06], size: [0.32, 0.065, 0.52], bone: "torso", tier: 1 },
+    { offset: [0, 0.78, 0.92], size: [0.42, 0.08, 0.24], bone: "head", tier: 2 },
+    { offset: [0, 0.86, -0.5], size: [0.3, 0.06, 0.4], bone: "back", tier: 2 },
+    {
+      offset: [0.38, 0.76, 0.02],
+      size: [0.11, 0.28, 0.36],
+      rotation: [0, 0, 0.28],
+      bone: "torso",
+      tier: 3,
+    },
+    {
+      offset: [-0.38, 0.76, 0.02],
+      size: [0.11, 0.28, 0.36],
+      rotation: [0, 0, -0.28],
+      bone: "torso",
+      tier: 3,
+    },
   ],
   titan: [
-    { offset: [0, 5.6, 0.0], size: [0.9, 0.28, 2.2], tier: 1 },
-    { offset: [0, 6.5, 4.0], size: [0.6, 0.22, 1.2], tier: 1 },
-    { offset: [0, 7.5, 5.0], size: [0.45, 0.2, 0.9], tier: 2 },
-    { offset: [0, 7.6, 5.8], size: [0.55, 0.22, 0.6], tier: 2 },
-    { offset: [1.4, 5.0, 0.0], size: [0.35, 1.2, 1.4], rotation: [0, 0, 0.45], tier: 2 },
-    { offset: [-1.4, 5.0, 0.0], size: [0.35, 1.2, 1.4], rotation: [0, 0, -0.45], tier: 2 },
-    { offset: [0, 5.5, -2.5], size: [0.7, 0.24, 1.4], tier: 3 },
-    { offset: [0, 4.2, -4.5], size: [0.5, 0.2, 1.5], tier: 3 },
+    { offset: [0, 4.35, 0.0], size: [0.72, 0.16, 1.65], bone: "torso", tier: 1 },
+    { offset: [0, 5.45, 3.2], size: [0.46, 0.14, 0.82], bone: "neck", tier: 1 },
+    { offset: [0, 6.2, 4.25], size: [0.34, 0.13, 0.62], bone: "head", tier: 2 },
+    { offset: [0, 6.35, 4.95], size: [0.38, 0.13, 0.42], bone: "head", tier: 2 },
+    {
+      offset: [1.0, 3.75, 0.0],
+      size: [0.22, 0.72, 0.9],
+      rotation: [0, 0, 0.38],
+      bone: "torso",
+      tier: 2,
+    },
+    {
+      offset: [-1.0, 3.75, 0.0],
+      size: [0.22, 0.72, 0.9],
+      rotation: [0, 0, -0.38],
+      bone: "torso",
+      tier: 2,
+    },
+    { offset: [0, 3.55, -1.85], size: [0.52, 0.13, 0.95], bone: "back", tier: 3 },
+    { offset: [0, 2.8, -3.4], size: [0.38, 0.12, 1.0], bone: "tail", tier: 3 },
   ],
   // Matriarchs route through BOSS_BASE_KIND to pick the matching base
   // roster (scaled implicitly by the variant's target-size when installed),
@@ -330,16 +403,102 @@ export const installConduitOnBody = (root: THREE.Object3D, uniforms: ConduitUnif
   });
 };
 
-// Spawn the plate group for one enemy. Returns the group (caller mounts
-// it as a sibling to the body mesh and updates its transform per frame
-// to match the smoothed pose). `renderTargetSize` is the Scene.tsx mount
-// size — matriarchs pass their (larger) variant target size so the plates
-// scale up with the body instead of shrinking to flecks.
+type PlateBinding = {
+  bone: THREE.Object3D;
+  localPosition: THREE.Vector3;
+  localQuaternion: THREE.Quaternion;
+  size: THREE.Vector3;
+};
+
+const plateSyncQuaternion = new THREE.Quaternion();
+
+const normalizeBoneName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const BONE_CANDIDATES: Record<NonNullable<PlateSpec["bone"]>, string[]> = {
+  torso: ["torso", "body", "hips"],
+  shoulders: ["shoulders", "torso", "body"],
+  neck: ["neck", "head", "shoulders"],
+  head: ["head", "neck", "shoulders"],
+  back: ["back", "hips", "tail1"],
+  tail: ["tail2", "tail1", "back"],
+};
+
+const inferPlateBone = (spec: PlateSpec): NonNullable<PlateSpec["bone"]> => {
+  if (spec.bone) return spec.bone;
+  if (spec.offset[2] > 0.8) return "head";
+  if (spec.offset[2] > 0.25) return "shoulders";
+  if (spec.offset[2] < -0.55) return "back";
+  return "torso";
+};
+
+const findPlateBone = (
+  root: THREE.Object3D,
+  bucket: NonNullable<PlateSpec["bone"]>,
+): THREE.Object3D => {
+  const wanted = BONE_CANDIDATES[bucket];
+  const found = new Map<string, THREE.Object3D>();
+  root.traverse((o) => {
+    if (o.type !== "Bone") return;
+    found.set(normalizeBoneName(o.name), o);
+  });
+  for (const name of wanted) {
+    const bone = found.get(name);
+    if (bone) return bone;
+  }
+  return root;
+};
+
+const bindPlateToBone = (
+  mesh: THREE.Mesh,
+  root: THREE.Object3D,
+  spec: PlateSpec,
+  scale: number,
+  centerXZ: { x: number; z: number },
+): void => {
+  const bone = findPlateBone(root, inferPlateBone(spec));
+  const desiredPosition = new THREE.Vector3(
+    centerXZ.x + spec.offset[0] * scale,
+    spec.offset[1] * scale,
+    centerXZ.z + spec.offset[2] * scale,
+  );
+  const desiredQuaternion = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(spec.rotation?.[0] ?? 0, spec.rotation?.[1] ?? 0, spec.rotation?.[2] ?? 0),
+  );
+  const boneWorldQuaternion = bone.getWorldQuaternion(new THREE.Quaternion());
+  const localQuaternion = boneWorldQuaternion.clone().invert().multiply(desiredQuaternion);
+
+  mesh.userData.plateBinding = {
+    bone,
+    localPosition: bone.worldToLocal(desiredPosition.clone()),
+    localQuaternion,
+    size: new THREE.Vector3(spec.size[0] * scale, spec.size[1] * scale, spec.size[2] * scale),
+  } satisfies PlateBinding;
+};
+
+export const syncPlateGroup = (group: THREE.Group): void => {
+  group.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const binding = mesh.userData.plateBinding as PlateBinding | undefined;
+    if (!mesh.isMesh || !binding) return;
+    mesh.position.copy(binding.localPosition);
+    binding.bone.localToWorld(mesh.position);
+    binding.bone.getWorldQuaternion(plateSyncQuaternion);
+    mesh.quaternion.copy(plateSyncQuaternion).multiply(binding.localQuaternion);
+    mesh.scale.copy(binding.size);
+  });
+};
+
+// Spawn the plate group for one enemy. The meshes live as scene siblings
+// but each stores a local offset against a body/head/tail bone. Syncing the
+// group every frame makes armor ride walk, attack, and death clips without
+// skinning the boxes.
 export const buildPlateGroup = (
+  root: THREE.Object3D,
   kind: EnemyKind,
   bossVariant: BossVariant | undefined,
   effectiveTier: 1 | 2 | 3,
   renderTargetSize: number,
+  centerXZ: { x: number; z: number },
 ): THREE.Group => {
   const baseKind = bossVariant !== undefined ? BOSS_BASE_KIND[bossVariant] : kind;
   const specs = GRAFT_PLATES[baseKind] ?? [];
@@ -349,17 +508,16 @@ export const buildPlateGroup = (
   const group = new THREE.Group();
   const mat = getPlateMaterial();
   const geom = getPlateGeometry();
-  group.scale.setScalar(scale);
+  root.updateMatrixWorld(true);
   for (const spec of specs) {
     // Matriarchs force max density: every authored plate shows.
     if (!matriarch && spec.tier > effectiveTier) continue;
     const mesh = new THREE.Mesh(geom, mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mesh.position.set(spec.offset[0], spec.offset[1], spec.offset[2]);
-    mesh.scale.set(spec.size[0], spec.size[1], spec.size[2]);
-    if (spec.rotation) mesh.rotation.set(spec.rotation[0], spec.rotation[1], spec.rotation[2]);
+    bindPlateToBone(mesh, root, spec, scale, centerXZ);
     group.add(mesh);
   }
+  syncPlateGroup(group);
   return group;
 };

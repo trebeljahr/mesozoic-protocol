@@ -3,6 +3,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { measureVisibleBox } from "../render/measureModel";
 import type { RobotVariant } from "../sim/types";
 
@@ -109,6 +110,7 @@ export const RobotDiorama = ({ variant }: { variant: RobotVariant }) => {
       gl={{ antialias: true, alpha: true }}
       style={{ pointerEvents: "none" }}
     >
+      <ExpectedCanvasTeardown />
       <fog attach="fog" args={["#0a1220", 6, 14]} />
       <ambientLight intensity={0.55} color="#eaf2ff" />
       <directionalLight

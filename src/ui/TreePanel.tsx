@@ -3,6 +3,7 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { BIOME_LAYERS, BIOME_STYLE, BIOME_TREE_URLS } from "../biomes";
+import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { ROCK_REMOVE_COST, TREE_REMOVE_COST } from "../sim/world";
 import { useGame } from "../store";
 import { RightOverlay } from "./RightOverlay";
@@ -110,6 +111,7 @@ export const TreePanel = () => {
           gl={{ antialias: true, alpha: true }}
           onCreated={({ camera }) => camera.lookAt(0, 0.7, 0)}
         >
+          <ExpectedCanvasTeardown />
           <color attach="background" args={[style.groundColor]} />
           <ambientLight intensity={0.7} color={style.hemiTop} />
           <directionalLight position={[4, 6, 3]} intensity={1.4} color="#fff4dc" />
