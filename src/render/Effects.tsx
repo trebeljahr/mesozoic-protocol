@@ -1,6 +1,6 @@
 // Selective-bloom opt-in convention: emissive sub-meshes added by the
-// unit material pipeline (ModelEnemyMesh / ModelTowerMesh /
-// ModelRobotMesh via src/render/materialTunables.ts) set
+// unit material pipeline (ModelEnemyMesh / ModelRobotMesh via
+// src/render/materialTunables.ts) set
 // `mesh.userData.bloom = true` (and `material.userData.bloom = true`
 // on the cloned material). When the post-FX selective-bloom pass is
 // wired into this file, it should walk the scene and add objects with
@@ -44,15 +44,10 @@ const makeBeamPair = (): { core: BeamPass; halo: BeamPass } => {
       color: baseColor,
       transparent: true,
       opacity,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     const line = new THREE.Line(geom, mat);
     line.visible = false;
-    // Beam lines are HDR additive — opt them into selective bloom so the
-    // chain-lightning / ult arcs paint a halo instead of a hard 1px line.
-    line.layers.enable(BLOOM_LAYER);
     return { line, mat };
   };
   return {

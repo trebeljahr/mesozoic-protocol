@@ -3,7 +3,7 @@ import type { TowerKind, TowerUpgrades } from "../sim/types";
 // Visual feedback for the in-game upgrade tree. Each path picks 1–2
 // material "roles" and drifts their colour per tier so the player can
 // read a tower's investment from across the board. Stays inside the
-// existing brand palette (no neons) and respects tower type (fire stays
+// existing brand palette and respects tower type (fire stays
 // warm, electric stays cool).
 //
 // Two GLB flavours, each with its own tint variant:
@@ -24,7 +24,6 @@ export type MaterialTint = {
   match: string;
   rgb: [number, number, number];
   multiply: boolean;
-  emissive?: [number, number, number];
 };
 
 export type AtlasSwatch = {

@@ -4,7 +4,6 @@ import * as THREE from "three";
 import { useGame } from "../store";
 import { CHAIN_BEAM_COLOR } from "./Effects";
 import { GRAPHICS_QUALITY } from "./effectsTunables";
-import { BLOOM_LAYER } from "./PaintedPostFx";
 
 // Forked lightning render for the Chain Coil tower. Sim still emits
 // the chain shot via createBeam(world, points, CHAIN_BEAM_COLOR, ...),
@@ -12,16 +11,11 @@ import { BLOOM_LAYER } from "./PaintedPostFx";
 // added). Effects.tsx skips beams of this color so the regular polyline
 // path doesn't double-render under us.
 //
-// Output is built from a single LineSegments pool per pass — additive
-// core + halo — plus an instanced impact-flash billboard at each chain
+// Output is built from a single LineSegments pool per pass — core +
+// halo — plus an instanced impact-flash billboard at each chain
 // hit point. Each frame we regenerate jagged offsets bucketed at ~16Hz
 // so the arc shimmers across its short (~100ms) lifetime without
-// allocating, and per-vertex colour carries the life-driven fade (alpha
-// baked into RGB because additive blending sums).
-//
-// Every emissive surface here opts into the selective-bloom pass via
-// `obj.layers.enable(BLOOM_LAYER)` — same convention Effects.tsx and the
-// post-FX pipeline use.
+// allocating, and per-vertex colour carries the life-driven fade.
 
 const MAX_BEAMS = 24;
 const MAX_HOPS = 5;
@@ -86,13 +80,6 @@ export const ChainArcsFx = () => {
     const big = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e4);
     m.boundingSphere = big.clone();
     m.geometry.boundingSphere = big.clone();
-  }, []);
-
-  useEffect(() => {
-    for (const ref of [coreRef, haloRef, flashRef]) {
-      const obj = ref.current;
-      if (obj) obj.layers.enable(BLOOM_LAYER);
-    }
   }, []);
 
   useFrame((state) => {
@@ -341,24 +328,10 @@ export const ChainArcsFx = () => {
   return (
     <group>
       <lineSegments ref={haloRef} args={[haloGeom]} renderOrder={2} frustumCulled={false}>
-        <lineBasicMaterial
-          vertexColors
-          transparent
-          opacity={1}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
+        <lineBasicMaterial vertexColors transparent opacity={1} depthWrite={false} />
       </lineSegments>
       <lineSegments ref={coreRef} args={[coreGeom]} renderOrder={3} frustumCulled={false}>
-        <lineBasicMaterial
-          vertexColors
-          transparent
-          opacity={1}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
+        <lineBasicMaterial vertexColors transparent opacity={1} depthWrite={false} />
       </lineSegments>
       <instancedMesh
         ref={flashRef}
@@ -366,14 +339,7 @@ export const ChainArcsFx = () => {
         renderOrder={3}
         frustumCulled={false}
       >
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={1}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
+        <meshBasicMaterial color="#ffffff" transparent opacity={1} depthWrite={false} />
       </instancedMesh>
     </group>
   );

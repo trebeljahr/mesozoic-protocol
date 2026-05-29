@@ -1,8 +1,7 @@
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
-import { BLOOM_LAYER } from "./PaintedPostFx";
 
 const MAX_PROJECTILES = 512;
 
@@ -10,14 +9,6 @@ export const ProjectileMesh = () => {
   const directRef = useRef<THREE.InstancedMesh>(null);
   const splashRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-
-  // Projectiles are inherently HDR (toneMapped=false hot colors); opt them
-  // into the selective bloom pass so the tracers carry a halo. Done once
-  // on mount — InstancedMesh layer membership covers every instance.
-  useEffect(() => {
-    directRef.current?.layers.enable(BLOOM_LAYER);
-    splashRef.current?.layers.enable(BLOOM_LAYER);
-  }, []);
 
   useFrame(() => {
     const { world } = useGame.getState();
@@ -63,11 +54,11 @@ export const ProjectileMesh = () => {
     <group>
       <instancedMesh ref={directRef} args={[undefined, undefined, MAX_PROJECTILES]}>
         <sphereGeometry args={[0.12, 8, 8]} />
-        <meshBasicMaterial color="#ffe866" toneMapped={false} />
+        <meshStandardMaterial color="#d8bf5d" roughness={0.48} metalness={0.08} />
       </instancedMesh>
       <instancedMesh ref={splashRef} args={[undefined, undefined, MAX_PROJECTILES]}>
         <sphereGeometry args={[0.2, 8, 8]} />
-        <meshBasicMaterial color="#ff9944" toneMapped={false} />
+        <meshStandardMaterial color="#c36f38" roughness={0.55} metalness={0.12} />
       </instancedMesh>
     </group>
   );

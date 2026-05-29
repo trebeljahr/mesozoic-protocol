@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
-import { TOWER_EMISSIVE } from "./emissiveRegistry";
 import {
-  applyEmissiveSpec,
   applyToonRimPatch,
   biomeRimColor,
   RIM_COLOR_ALLY,
@@ -14,7 +12,6 @@ import {
   RIM_COLOR_FLAME,
   RIM_INTENSITY_ALLY,
 } from "./materialTunables";
-import { BLOOM_LAYER } from "./PaintedPostFx";
 import { type AtlasSwatch, computeTowerTints, tierKey } from "./towerTints";
 
 type AtlasState = {
@@ -90,9 +87,14 @@ const TOWER_RIM_BASE: Record<TowerKind, string> = {
   hive: RIM_COLOR_ALLY,
 };
 
+const clearEmissive = (mat: THREE.MeshStandardMaterial) => {
+  if (!mat.emissive) return;
+  mat.emissive.setRGB(0, 0, 0);
+  mat.emissiveIntensity = 0;
+};
+
 const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrades) => {
   const tints = computeTowerTints(kind, upgrades);
-  if (tints.length === 0) return;
   item.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -100,15 +102,12 @@ const applyTints = (item: THREE.Object3D, kind: TowerKind, upgrades: TowerUpgrad
     for (const raw of mats) {
       const mat = raw as AtlasMaterial;
       if (!mat) continue;
+      clearEmissive(mat);
       const tint = tints.find((tn) => mat.name.includes(tn.match));
       if (!tint) continue;
       if (tint.kind === "material") {
         // Untextured baseColorFactor part — set its colour directly.
         mat.color.setRGB(tint.rgb[0], tint.rgb[1], tint.rgb[2]);
-        if (tint.emissive) {
-          mat.emissive.setRGB(tint.emissive[0], tint.emissive[1], tint.emissive[2]);
-          mat.emissiveIntensity = 1;
-        }
         mat.needsUpdate = true;
       } else {
         // Atlas part — repaint the per-instance cloned PaletteBaseColor.
@@ -165,8 +164,8 @@ export const ModelTowerMesh = ({
         // Flamethrower's particle stream extends far beyond the turret's
         // bounding box. When the player zooms in and pans so the nozzle
         // sits off-screen, the model's per-mesh frustum test kills the
-        // draw — and visually the flame stream + emissive nozzle vanish
-        // with it. Disabling per-mesh culling on tower models is cheap
+        // draw and the flame stream vanishes with it. Disabling per-mesh
+        // culling on tower models is cheap
         // (6 kinds, low instance counts) and prevents the pop.
         m.frustumCulled = false;
       }
@@ -189,7 +188,6 @@ export const ModelTowerMesh = ({
     const { world } = useGame.getState();
     const rimBase = TOWER_RIM_BASE[kind];
     const rimTinted = biomeRimColor(rimBase, world.biome);
-    const emissivePatterns = TOWER_EMISSIVE[kind] ?? [];
 
     const live = new Set<number>();
     for (const t of world.towers) {
@@ -204,37 +202,21 @@ export const ModelTowerMesh = ({
         // would tint them all. Clone here so each tower's upgrade
         // colours are independent.
         item.traverse((o) => {
-          // Tower meshes opt into selective bloom — muzzle / indicator
-          // emissive (set by computeTowerTints) crosses the bloom threshold,
-          // chassis stays under. Outline is intentionally NOT applied to
-          // towers — they're scenery once placed, and dark silhouette lines
-          // around every tower at every tier would crowd the playfield.
-          o.layers.enable(BLOOM_LAYER);
           const mesh = o as THREE.Mesh;
           if (!mesh.isMesh) return;
           mesh.frustumCulled = false;
           const m = mesh.material;
           if (Array.isArray(m)) mesh.material = m.map((sub) => sub.clone());
           else if (m) mesh.material = m.clone();
-          // Rim + toon patch on every cloned material. Emissive accents
-          // are applied below by matching material-name patterns from
-          // the registry; matches set userData.bloom so the post-FX
-          // selective-bloom pass can pick them up.
+          // Rim + toon patch on every cloned material.
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          let anyEmissive = false;
           for (const mm of mats) {
             if (!mm) continue;
+            clearEmissive(mm as THREE.MeshStandardMaterial);
             applyToonRimPatch(mm, {
               rim: { color: rimTinted, intensity: RIM_INTENSITY_ALLY },
             });
-            const nameLc = (mm.name || "").toLowerCase();
-            for (const pat of emissivePatterns) {
-              if (!pat.spec.intensity || !nameLc.includes(pat.match.toLowerCase())) continue;
-              applyEmissiveSpec(mm, pat.spec);
-              anyEmissive = true;
-            }
           }
-          if (anyEmissive) mesh.userData.bloom = true;
         });
         parent.add(item);
         itemsRef.current.set(t.id, item);

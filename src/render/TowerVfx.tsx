@@ -36,8 +36,8 @@ export const TowerVfx = () => {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
 
-  // Small additive-blend overlays — segment counts above 8/12 just burn
-  // verts the silhouette can't show.
+  // Small lit overlays — segment counts above 8/12 just burn verts the
+  // silhouette can't show.
   const orbGeom = useMemo(() => new THREE.SphereGeometry(0.22, 12, 8), []);
   const arcGeom = useMemo(() => new THREE.TorusGeometry(0.38, 0.028, 6, 16), []);
 
@@ -110,33 +110,33 @@ export const TowerVfx = () => {
   return (
     <group>
       <instancedMesh ref={chainOrbRef} args={[orbGeom, undefined, MAX_PER_KIND]} renderOrder={1}>
-        <meshBasicMaterial
+        <meshStandardMaterial
           color="#9fd8ff"
           transparent
           opacity={0.6}
-          blending={THREE.AdditiveBlending}
           depthWrite={false}
-          toneMapped={false}
+          roughness={0.38}
+          metalness={0.12}
         />
       </instancedMesh>
       <instancedMesh ref={chainArcARef} args={[arcGeom, undefined, MAX_PER_KIND]} renderOrder={1}>
-        <meshBasicMaterial
+        <meshStandardMaterial
           color="#9fd8ff"
           transparent
           opacity={0.55}
-          blending={THREE.AdditiveBlending}
           depthWrite={false}
-          toneMapped={false}
+          roughness={0.38}
+          metalness={0.12}
         />
       </instancedMesh>
       <instancedMesh ref={chainArcBRef} args={[arcGeom, undefined, MAX_PER_KIND]} renderOrder={1}>
-        <meshBasicMaterial
+        <meshStandardMaterial
           color="#bdf0ff"
           transparent
           opacity={0.55}
-          blending={THREE.AdditiveBlending}
           depthWrite={false}
-          toneMapped={false}
+          roughness={0.38}
+          metalness={0.12}
         />
       </instancedMesh>
     </group>
