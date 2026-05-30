@@ -27,14 +27,20 @@ const bumpGeometry = (): void => {
 
 // Rebuild the current level so createWorld re-reads the override flag (the
 // only way to suppress / restore the procedural set-dressing cleanly).
+// startLevel/startEndless re-seat the world and reset treeVersion to 0;
+// bumping AFTER the rebuild guarantees subscribers (EditorProps, PlayRivers)
+// always observe a strictly increasing delta even when the pre-reload value
+// was already 0 (fresh page load). Pre-bumping was self-cancelling — the
+// reset wiped the bump before any subscriber could react.
 const reloadLevel = (): void => {
   const g = useGame.getState();
   if (g.selectedLevelId !== null) {
     g.startLevel(g.selectedLevelId, g.world.mode);
-    return;
+  } else {
+    const endlessMapId = g.world.endless?.mapId;
+    if (endlessMapId) g.startEndless(endlessMapId);
   }
-  const endlessMapId = g.world.endless?.mapId;
-  if (endlessMapId) g.startEndless(endlessMapId);
+  bumpGeometry();
 };
 
 const saveCurrentLevelEdit = (): void => {
@@ -130,7 +136,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     w.props = [];
     w.rivers = [];
     w.overrideActive = true;
-    bumpGeometry();
+    // No bump here — onClear -> reloadLevel does it after the rebuild.
     saveCurrentLevelEdit();
   },
   clearManual: () => {
@@ -143,7 +149,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
   clearProcedural: () => {
     const w = useGame.getState().world;
     w.overrideActive = true;
-    bumpGeometry();
+    // No bump here — reloadLevel() at the tail does it after the rebuild.
     saveCurrentLevelEdit();
     reloadLevel();
   },
@@ -151,7 +157,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     const w = useGame.getState().world;
     w.overrideActive = false;
     w.proceduralSeed = Math.floor(Math.random() * 1_000_000_000);
-    bumpGeometry();
+    // No bump here — reloadLevel() at the tail does it after the rebuild.
     saveCurrentLevelEdit();
     reloadLevel();
   },
@@ -217,7 +223,7 @@ export const clearAllLevels = (): void => {
   w.rivers = [];
   w.overrideActive = false;
   w.proceduralSeed = 0;
-  bumpGeometry();
+  // No pre-bump — reloadLevel() handles it after the rebuild.
   reloadLevel();
 };
 
