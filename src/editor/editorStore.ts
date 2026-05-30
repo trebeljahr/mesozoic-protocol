@@ -1,10 +1,9 @@
-import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import { isOnFlowSurface } from "../flowGeometry";
 import { MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "../level";
 import { distPointToSegSq, distSq } from "../sim/vec2";
 import { ROCK_FOOTPRINT, TOWER_FOOTPRINT, TREE_FOOTPRINT } from "../sim/world";
 import { useGame } from "../store";
-import { createEditorStore, type EditorStore } from "./editorCore";
+import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./editorCore";
 import { clearAllLevelHistories, loadLevelHistory, saveLevelHistory } from "./historyPersist";
 import { clearAllLevelEdits, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
 
@@ -68,12 +67,16 @@ const snapToEdge = (point: { x: number; y: number }): { x: number; y: number } =
   return { x: Math.max(-halfW, Math.min(halfW, point.x)), y: halfH };
 };
 
-const canEditPlaceAt = (x: number, y: number, ignorePropId?: string | null): boolean => {
+const canEditPlaceAt = (
+  x: number,
+  y: number,
+  candidateRadius: number,
+  ignorePropId?: string | null,
+): boolean => {
   const w = useGame.getState().world;
   const pos = { x, y };
   if (Math.abs(x) > MAP_WIDTH / 2 || Math.abs(y) > MAP_HEIGHT / 2) return false;
-  const propRadius = 0.7;
-  const pathRadius = PATH_WIDTH * 0.5 + propRadius;
+  const pathRadius = PATH_WIDTH * 0.5 + candidateRadius;
   for (const path of w.paths) {
     for (let i = 0; i < path.length - 1; i++) {
       if (
@@ -84,26 +87,29 @@ const canEditPlaceAt = (x: number, y: number, ignorePropId?: string | null): boo
       }
     }
   }
-  if (isOnFlowSurface(w.flowFeatures, x, y, propRadius)) return false;
+  if (isOnFlowSurface(w.flowFeatures, x, y, candidateRadius)) return false;
+  // Hand-painted rivers (river tool). Same per-segment scan as flowGeometry's
+  // procedural rivers, just over the authored polylines.
+  if (isOnRiver(w.rivers, x, y, candidateRadius)) return false;
   for (const t of w.towers) {
-    const r = TOWER_FOOTPRINT * 0.5 + propRadius;
+    const r = TOWER_FOOTPRINT * 0.5 + candidateRadius;
     if (distSq(t.pos, pos) < r * r) return false;
   }
   for (const t of w.trees) {
-    const r = TREE_FOOTPRINT * t.scale + propRadius;
+    const r = TREE_FOOTPRINT * t.scale + candidateRadius;
     if (distSq(t.pos, pos) < r * r) return false;
   }
   for (const rck of w.rocks) {
-    const r = ROCK_FOOTPRINT * rck.scale + propRadius;
+    const r = ROCK_FOOTPRINT * rck.scale + candidateRadius;
     if (distSq(rck.pos, pos) < r * r) return false;
   }
   for (const o of w.outposts) {
-    const r = o.radius + propRadius;
+    const r = o.radius + candidateRadius;
     if (distSq(o.pos, pos) < r * r) return false;
   }
   for (const p of w.props) {
     if (p.id === ignorePropId) continue;
-    const r = TARGET_SIZE_BY_ROLE[classifyPropUrl(p.url)] * p.scale * 0.5 + propRadius;
+    const r = propRadius(p.url, p.scale) + candidateRadius;
     if (distSq(p.pos, pos) < r * r) return false;
   }
   return true;

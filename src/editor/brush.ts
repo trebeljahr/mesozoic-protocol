@@ -148,48 +148,28 @@ export const resolveBrushUrls = (preset: BrushPreset, customUrls: string[] | nul
   return customUrls.filter((u) => allowed.has(u));
 };
 
-// Poisson-disk-ish reject sampling within a disc. Candidates are uniform-in-
-// disc (sqrt for radial distribution); rejected if within `minSpacing` of
-// any other accepted point OR any point in `existing`. Caps at `density`
-// accepted points or `density * 8` tries — whichever first. Pure (Math.random
-// driven; no seed plumbing — determinism not required per task).
+// Emit up to `density * 16` raw candidate points uniform-in-disc (sqrt for
+// radial distribution). Pure geometry — no collision gating; the caller
+// (paintAt) is responsible for radius-aware rejection against paths,
+// rivers, existing props, and same-stroke siblings using the full role /
+// scale knowledge of each candidate, and for stopping once `density`
+// candidates have been accepted. Budget is `density * 16` (up from the old
+// `density * 8` reject-sampling limit) since real collisions in dense
+// forests / near paths reduce the acceptance rate sharply — without the
+// extra attempts the brush feels weak when scattering through obstacles.
 export const samplePoints = (
   center: { x: number; y: number },
   radius: number,
   density: number,
-  minSpacing: number,
-  existing: { x: number; y: number }[],
 ): { x: number; y: number }[] => {
-  const accepted: { x: number; y: number }[] = [];
-  const sqMin = minSpacing * minSpacing;
-  const maxTries = Math.max(1, Math.floor(density * 8));
-  for (let i = 0; i < maxTries && accepted.length < density; i++) {
+  const budget = Math.max(1, Math.floor(density * 16));
+  const out: { x: number; y: number }[] = new Array(budget);
+  for (let i = 0; i < budget; i++) {
     const t = Math.random() * Math.PI * 2;
     const r = Math.sqrt(Math.random()) * radius;
-    const x = center.x + Math.cos(t) * r;
-    const y = center.y + Math.sin(t) * r;
-    let ok = true;
-    for (const p of accepted) {
-      const dx = p.x - x;
-      const dy = p.y - y;
-      if (dx * dx + dy * dy < sqMin) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) {
-      for (const p of existing) {
-        const dx = p.x - x;
-        const dy = p.y - y;
-        if (dx * dx + dy * dy < sqMin) {
-          ok = false;
-          break;
-        }
-      }
-    }
-    if (ok) accepted.push({ x, y });
+    out[i] = { x: center.x + Math.cos(t) * r, y: center.y + Math.sin(t) * r };
   }
-  return accepted;
+  return out;
 };
 
 // Weighted random url choice over an explicit url list. Uniform when

@@ -1,7 +1,14 @@
+import { PAN_LIMIT_X, PAN_LIMIT_Z } from "../render/worldMapBounds";
 import type { PlacedProp, River } from "../sim/types";
-import { createEditorStore, type EditorStore } from "./editorCore";
+import { distSq } from "../sim/vec2";
+import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./editorCore";
 import { clearWorldMapHistory, loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
 import { clearWorldMapEdit, loadWorldMapEdit, saveWorldMapEdit } from "./worldMapEdits";
+
+// Inset from the pan-limit edge so a candidate placed at the very corner
+// can't sit half-off the editable area. Matches the spirit of the level
+// adapter's MAP_WIDTH/2 clamp.
+const WORLDMAP_BOUNDS_INSET = 0.5;
 
 // Dev-only world-map editor store. A thin adapter over the shared
 // editorCore factory: unlike the level editor (which writes through
@@ -42,6 +49,22 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
     // stacks. World-map history is a single global blob (no level scope).
     loadHistory: () => loadWorldMapHistory(),
     saveHistory: (history) => saveWorldMapHistory(history),
+    // Mirrors the level adapter's collision gate: bounds + existing props +
+    // hand-painted rivers. World-map data has no explicit path geometry
+    // (worldMapEdits.ts persists only props + rivers + override), so the
+    // path-overlap check is intentionally omitted.
+    canPlaceAt: (x, y, candidateRadius, ignorePropId) => {
+      if (Math.abs(x) > PAN_LIMIT_X - WORLDMAP_BOUNDS_INSET) return false;
+      if (Math.abs(y) > PAN_LIMIT_Z - WORLDMAP_BOUNDS_INSET) return false;
+      if (isOnRiver(rivers, x, y, candidateRadius)) return false;
+      const pos = { x, y };
+      for (const p of props) {
+        if (p.id === ignorePropId) continue;
+        const r = propRadius(p.url, p.scale) + candidateRadius;
+        if (distSq(p.pos, pos) < r * r) return false;
+      }
+      return true;
+    },
     // Export adds metadata (scope/generatedAt) on top of the persisted
     // shape so a downloaded file is self-describing.
     exportJson: () =>

@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
-import { classifyPropUrl } from "../biomes";
+import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import type { PlacedProp, River, RiverMaterial, RiverPoint, Vec2 } from "../sim/types";
+import { distPointToSegSq } from "../sim/vec2";
 import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
@@ -29,6 +30,29 @@ const defaultBlocks = (url: string): boolean => BLOCKING_ROLES.has(classifyPropU
 const MIN_SCALE = 0.15;
 const MAX_SCALE = 6;
 const clampScale = (s: number): number => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+
+// Effective half-footprint of a placed prop in world units. Single source of
+// truth shared by canPlaceAt (level + world map) and brush sampling so the
+// collision radius always matches the rendered silhouette: role-target size
+// times the per-prop scale, halved (target size is full-extent, not radius).
+export const propRadius = (url: string, scale: number): number =>
+  TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] * scale * 0.5;
+
+// True if (x, y) lies within `padding` world units of any hand-painted
+// river's polyline. Mirrors the per-segment scan in isOnFlowSurface's river
+// loop. Used by the editor placement gate to refuse props that would
+// overlap an authored river ribbon.
+export const isOnRiver = (rivers: River[], x: number, y: number, padding: number): boolean => {
+  for (const river of rivers) {
+    const half = river.width / 2 + padding;
+    const r2 = half * half;
+    const pts = river.points;
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (distPointToSegSq(x, y, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) < r2) return true;
+    }
+  }
+  return false;
+};
 
 // River width clamp — keeps the ribbon usable (no zero-width or absurd widths).
 const MIN_RIVER_WIDTH = 0.5;
@@ -64,7 +88,12 @@ export type EditorAdapter = {
   clearManual?: () => void;
   clearProcedural?: () => void;
   reloadProcedural?: () => void;
-  canPlaceAt?: (x: number, y: number, ignorePropId?: string | null) => boolean;
+  canPlaceAt?: (
+    x: number,
+    y: number,
+    candidateRadius: number,
+    ignorePropId?: string | null,
+  ) => boolean;
   snapToEdge?: (point: Vec2) => Vec2;
   // Scope-aware JSON dump. Each adapter stamps its own metadata (scope,
   // levelId, generatedAt) on top of the persisted { v, override, props,
@@ -316,7 +345,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       placeAt: (x, y) => {
         const url = get().placingUrl;
         if (!url) return;
-        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, null)) return;
+        const radius = propRadius(url, 1);
+        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, null)) return;
         const prop: PlacedProp = {
           id: nanoid(8),
           url,
@@ -341,9 +371,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       moveSelectedTo: (x, y) => {
         const id = get().selectedId;
         if (id === null) return;
-        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, id)) return;
-        snapshotAndPush();
         const cur = adapter.getCurrent();
+        const sel = cur.props.find((p) => p.id === id);
+        if (!sel) return;
+        const radius = propRadius(sel.url, sel.scale);
+        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, id)) return;
+        snapshotAndPush();
         commitProps(cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)));
         set({ moving: false });
       },
@@ -582,21 +615,61 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const urls = resolveBrushUrls(preset, s.brush.customUrls);
         if (urls.length === 0) return;
         const cur = adapter.getCurrent();
-        const existing = cur.props.map((p) => p.pos);
-        const points = samplePoints(
-          { x, y },
-          s.brush.radius,
-          s.brush.density,
-          s.brush.minSpacing,
-          existing,
-        ).filter((pt) => !adapter.canPlaceAt || adapter.canPlaceAt(pt.x, pt.y, null));
-        if (points.length === 0) return;
+        // Radius-tagged existing props so the per-candidate collision test
+        // can compare sums-of-radii against actual rendered silhouettes (a
+        // bare-point list would let small candidates clip into big trees).
+        const existing: { x: number; y: number; r: number }[] = cur.props.map((p) => ({
+          x: p.pos.x,
+          y: p.pos.y,
+          r: propRadius(p.url, p.scale),
+        }));
+        const candidates = samplePoints({ x, y }, s.brush.radius, s.brush.density);
+        if (candidates.length === 0) return;
+        // Same-stroke siblings — accepted candidates from earlier in THIS
+        // paintAt call. Keeps intra-stroke spawns from overlapping each
+        // other in dense bursts.
+        const accepted: { x: number; y: number; r: number; url: string; scale: number }[] = [];
+        // `minSpacing` is now an extra floor on top of role-radius gaps so
+        // the slider semantics still make sense — boosts the effective
+        // candidate radius when the author wants extra breathing room.
+        const spacingFloor = Math.max(0, s.brush.minSpacing);
+        const targetCount = s.brush.density;
+        for (const pt of candidates) {
+          if (accepted.length >= targetCount) break;
+          const url = pickFromUrls(urls);
+          const scale = randRange(preset.scaleJitter[0], preset.scaleJitter[1]);
+          const r = Math.max(propRadius(url, scale), spacingFloor);
+          let collides = false;
+          for (const e of existing) {
+            const sum = r + e.r;
+            const dx = e.x - pt.x;
+            const dy = e.y - pt.y;
+            if (dx * dx + dy * dy < sum * sum) {
+              collides = true;
+              break;
+            }
+          }
+          if (collides) continue;
+          for (const sib of accepted) {
+            const sum = r + sib.r;
+            const dx = sib.x - pt.x;
+            const dy = sib.y - pt.y;
+            if (dx * dx + dy * dy < sum * sum) {
+              collides = true;
+              break;
+            }
+          }
+          if (collides) continue;
+          if (adapter.canPlaceAt && !adapter.canPlaceAt(pt.x, pt.y, r, null)) continue;
+          accepted.push({ x: pt.x, y: pt.y, r, url, scale });
+        }
+        if (accepted.length === 0) return;
         openStrokeEntry();
-        const additions: PlacedProp[] = points.map((pt) => ({
+        const additions: PlacedProp[] = accepted.map((a) => ({
           id: nanoid(8),
-          url: pickFromUrls(urls),
-          pos: pt,
-          scale: randRange(preset.scaleJitter[0], preset.scaleJitter[1]),
+          url: a.url,
+          pos: { x: a.x, y: a.y },
+          scale: a.scale,
           rot: randRange(preset.rotateRange[0], preset.rotateRange[1]),
           blocks: preset.defaultBlocks,
         }));
