@@ -137,6 +137,32 @@ type Item = {
 const POS_HALFLIFE = 0.02;
 const YAW_HALFLIFE = 0.06;
 
+type MeleeContactProfile = {
+  contactDistance: number;
+  maxLunge: number;
+  dip: number;
+  pitch: number;
+};
+
+const MELEE_CONTACT_BY_KIND: Record<EnemyKind, MeleeContactProfile> = {
+  swarm: { contactDistance: 0.52, maxLunge: 0.9, dip: 0.025, pitch: 0.12 },
+  raptor: { contactDistance: 0.68, maxLunge: 0.95, dip: 0.04, pitch: 0.16 },
+  para: { contactDistance: 0.9, maxLunge: 0.85, dip: 0.035, pitch: 0.12 },
+  allosaur: { contactDistance: 1.0, maxLunge: 0.75, dip: 0.045, pitch: 0.14 },
+  stego: { contactDistance: 1.02, maxLunge: 0.7, dip: 0.03, pitch: 0.1 },
+  armored: { contactDistance: 0.96, maxLunge: 0.72, dip: 0.035, pitch: 0.12 },
+  titan: { contactDistance: 1.45, maxLunge: 0.45, dip: 0.06, pitch: 0.08 },
+  boss: { contactDistance: 1.3, maxLunge: 0.6, dip: 0.065, pitch: 0.08 },
+};
+
+const meleeStrikePulse = (mixerTime: number, duration: number | undefined, id: number): number => {
+  const cycle = Math.max(0.45, duration ?? 0.95);
+  const phase = ((mixerTime + id * 0.071) % cycle) / cycle;
+  const main = Math.max(0, Math.sin((phase - 0.12) * Math.PI * 2));
+  const followThrough = Math.max(0, Math.sin((phase - 0.62) * Math.PI * 2)) * 0.35;
+  return Math.min(1, main * main + followThrough * followThrough);
+};
+
 // Soft cap on pooled clones per kind. Beyond this we let GC reclaim them
 // so a single oversized swarm doesn't pin a permanent ceiling of skinned
 // meshes in the scene graph.
@@ -679,13 +705,40 @@ export const ModelEnemyMesh = ({
         item.visYaw += shortAngleDelta(item.visYaw, targetYaw) * ky;
       }
 
-      const poseT = leak ? clamp01((leakProgress - 0.35) / 0.65) : 0;
-      const attackPose = Math.sin(poseT * Math.PI);
+      const leakPoseT = leak ? clamp01((leakProgress - 0.35) / 0.65) : 0;
+      const leakAttackPose = Math.sin(leakPoseT * Math.PI);
+      const meleeProfile = MELEE_CONTACT_BY_KIND[kind];
+      const meleeAttackPose = engagingRobot
+        ? meleeStrikePulse(item.mixer.time, attackClip?.duration, e.id)
+        : 0;
+      let meleeLungeX = 0;
+      let meleeLungeZ = 0;
+      if (engagingRobot && world.robot.alive) {
+        const robotDX = world.robot.pos.x - item.visX;
+        const robotDY = world.robot.pos.y + item.visZ;
+        const robotDist = Math.hypot(robotDX, robotDY);
+        if (robotDist > 1e-4) {
+          // Render-only contact correction: sim uses one fixed engage radius,
+          // while GLB attack reach varies widely by species and scale.
+          const contactDistance =
+            kind === "boss"
+              ? Math.min(1.55, Math.max(meleeProfile.contactDistance, targetSize * 0.18))
+              : meleeProfile.contactDistance;
+          const approach = Math.min(
+            meleeProfile.maxLunge,
+            Math.max(0, robotDist - contactDistance),
+          );
+          const lunge = approach * (0.72 + meleeAttackPose * 0.28);
+          meleeLungeX = (robotDX / robotDist) * lunge;
+          meleeLungeZ = (-robotDY / robotDist) * lunge;
+        }
+      }
+      const attackDip = leakAttackPose * 0.08 + meleeAttackPose * meleeProfile.dip;
       const bobY = bob ? Math.sin(world.time * 3 + e.id) * 0.12 : 0;
       item.obj.position.set(
-        item.visX - centerXZ.x,
-        yOffset - scaledMinY + bobY - attackPose * 0.08,
-        item.visZ - centerXZ.z,
+        item.visX + meleeLungeX - centerXZ.x,
+        yOffset - scaledMinY + bobY - attackDip,
+        item.visZ + meleeLungeZ - centerXZ.z,
       );
       if (item.proxy) {
         // Click target tracks the true sim position so taps line up with
@@ -699,15 +752,19 @@ export const ModelEnemyMesh = ({
           );
         }
       }
-      item.obj.rotation.set(attackPose * 0.18, baseRotY + item.visYaw, attackPose * 0.035);
+      item.obj.rotation.set(
+        leakAttackPose * 0.18 + meleeAttackPose * meleeProfile.pitch,
+        baseRotY + item.visYaw,
+        leakAttackPose * 0.035 + meleeAttackPose * 0.015,
+      );
       // Publish smoothed body-center XZ + bob so any decoration renderers
       // ride the same animated pose as the skeleton instead of snapping
       // to the raw sim position.
       setEnemyRender(e.id, {
-        x: item.visX,
-        z: item.visZ,
+        x: item.visX + meleeLungeX,
+        z: item.visZ + meleeLungeZ,
         y: item.obj.position.y,
-        bobY: bobY - attackPose * 0.08,
+        bobY: bobY - attackDip,
         yaw: baseRotY + item.visYaw,
       });
 
