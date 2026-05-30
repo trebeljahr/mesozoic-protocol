@@ -65,12 +65,25 @@ const migrateFromV1 = (raw: string): AudioPrefs | null => {
   }
 };
 
-// Force-mute in Claude Code's preview browser (UA contains "Claude/")
-// and in any Vite dev build so reloads don't blast sound at whoever's nearby.
-const shouldForceMute = (): boolean => {
-  if (import.meta.env.DEV) return true;
+// Hard force-mute in agent preview browsers (Claude Code, Codex) — UA
+// contains "Claude/" or "Codex/". Saved unmute preferences are ignored
+// in these environments so dev previews never blast sound at whoever's
+// nearby; the user's normal-browser preference is preserved verbatim.
+const isPreviewAgentBrowser = (): boolean => {
   try {
-    return /Claude\//.test(navigator.userAgent);
+    return /(Claude|Codex)\//i.test(navigator.userAgent);
+  } catch {
+    return false;
+  }
+};
+
+// In any Vite dev build we *default* to muted on first run, but the
+// user can unmute and the preference is honored on reload. This is
+// only the seed value when nothing is stored yet — it does not
+// override an existing saved preference.
+const isDevBuild = (): boolean => {
+  try {
+    return import.meta.env.DEV === true;
   } catch {
     return false;
   }
@@ -87,12 +100,13 @@ let prefsLoaded = false;
 export const loadAudioPrefs = (): AudioPrefs => {
   if (prefsLoaded) return readAudioPrefs();
   prefsLoaded = true;
-  const muteOverride = shouldForceMute();
+  const forceMute = isPreviewAgentBrowser();
+  const defaultMute = isDevBuild();
   try {
     const v2 = localStorage.getItem(STORAGE_KEY_V2);
     if (v2) {
       const parsed = parseV2(v2);
-      if (parsed) return muteOverride ? { ...parsed, muted: true } : parsed;
+      if (parsed) return forceMute ? { ...parsed, muted: true } : parsed;
     }
     const v1 = localStorage.getItem(STORAGE_KEY_V1);
     if (v1) {
@@ -104,13 +118,13 @@ export const loadAudioPrefs = (): AudioPrefs => {
         } catch {
           /* ignore */
         }
-        return muteOverride ? { ...migrated, muted: true } : migrated;
+        return forceMute ? { ...migrated, muted: true } : migrated;
       }
     }
   } catch {
     /* ignore */
   }
-  return { ...DEFAULTS, muted: muteOverride || DEFAULTS.muted };
+  return { ...DEFAULTS, muted: forceMute || defaultMute || DEFAULTS.muted };
 };
 
 export const saveAudioPrefs = (p: AudioPrefs) => {
