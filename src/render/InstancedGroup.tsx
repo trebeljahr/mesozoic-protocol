@@ -45,7 +45,11 @@ export const InstancedGroup = <T extends GroupItem>({
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
         const s = baseScale * it.scale;
-        dummy.position.set(it.pos.x, -source.minY * s, -it.pos.y);
+        const cos = Math.cos(it.rotY);
+        const sin = Math.sin(it.rotY);
+        const centerX = (source.centerX * cos - source.centerZ * sin) * s;
+        const centerZ = (source.centerX * sin + source.centerZ * cos) * s;
+        dummy.position.set(it.pos.x - centerX, -source.minY * s, -it.pos.y - centerZ);
         dummy.rotation.set(0, it.rotY, 0);
         dummy.scale.setScalar(s);
         dummy.updateMatrix();

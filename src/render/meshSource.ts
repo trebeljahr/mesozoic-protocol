@@ -20,6 +20,11 @@ export type MeshSource = {
   // crashed on mobile Safari when a malformed Box3 slips through.
   minY: number;
   maxY: number;
+  // X/Z center of the visible mesh bounds in scene-local space. Some GLBs
+  // ship with pivots at an edge/corner; editors expect the authored point
+  // to sit under the model center.
+  centerX: number;
+  centerZ: number;
   // Vertical extent of the union AABB (maxY - minY, floored at a tiny
   // positive to avoid divide-by-zero downstream).
   height: number;
@@ -74,9 +79,16 @@ const collect = (scene: THREE.Object3D): MeshSource | null => {
   const maxY = maxVec?.y ?? size.y;
   const minZ = minVec?.z ?? -size.z / 2;
   const maxZ = maxVec?.z ?? size.z / 2;
-  const xzRadius = Math.max(Math.abs(minX), Math.abs(maxX), Math.abs(minZ), Math.abs(maxZ));
+  const centerX = (minX + maxX) / 2;
+  const centerZ = (minZ + maxZ) / 2;
+  const xzRadius = Math.max(
+    Math.abs(minX - centerX),
+    Math.abs(maxX - centerX),
+    Math.abs(minZ - centerZ),
+    Math.abs(maxZ - centerZ),
+  );
   const height = Math.max(maxY - minY, 0.001);
-  return { parts, minY, maxY, height, maxDim, xzRadius };
+  return { parts, minY, maxY, centerX, centerZ, height, maxDim, xzRadius };
 };
 
 export const collectMeshSource = (scene: THREE.Object3D): MeshSource | null => {

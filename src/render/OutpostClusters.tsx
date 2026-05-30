@@ -70,7 +70,11 @@ const ModelInstances = ({
       if (!im) continue;
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
-        dummy.position.set(it.x, -source.minY * it.scale + it.y, it.z);
+        const cos = Math.cos(it.yaw);
+        const sin = Math.sin(it.yaw);
+        const centerX = (source.centerX * cos - source.centerZ * sin) * it.scale;
+        const centerZ = (source.centerX * sin + source.centerZ * cos) * it.scale;
+        dummy.position.set(it.x - centerX, -source.minY * it.scale + it.y, it.z - centerZ);
         dummy.rotation.set(0, it.yaw, 0);
         dummy.scale.setScalar(it.scale);
         dummy.updateMatrix();

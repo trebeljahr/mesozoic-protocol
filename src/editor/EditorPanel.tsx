@@ -72,6 +72,20 @@ const PRESET_GROUPS: { biome: Biome | "any"; label: string; presets: BrushPreset
   })).filter((g) => g.presets.length > 0),
 ];
 
+const ROLE_ICON: Record<PropRole, string> = {
+  building: "HQ",
+  tree: "TR",
+  bush: "BU",
+  rock: "RK",
+  grass: "GR",
+  cosmetic: "FX",
+};
+
+const shortModelLabel = (url: string): string => {
+  const compact = labelFor(url).replace(/[^a-z0-9]/gi, "");
+  return compact.slice(0, 3).toUpperCase();
+};
+
 export const EditorPanel = ({
   store,
   title,
@@ -96,6 +110,7 @@ export const EditorPanel = ({
   const history = store((s) => s.history);
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
+  const clearAllButton = clearButtons.find((b) => b.label.toLowerCase() === "clear all");
 
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
@@ -310,6 +325,16 @@ export const EditorPanel = ({
           >
             {toggleUiLabel}
           </button>
+          {clearAllButton && (
+            <button
+              type="button"
+              style={dangerBtn}
+              onClick={clearAllButton.onClick}
+              title={clearAllButton.title}
+            >
+              Clear all
+            </button>
+          )}
         </div>
       </div>
 
@@ -545,6 +570,8 @@ const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState 
   const resetBrushUrls = store((s) => s.resetBrushUrls);
   const activePreset = getBrushPreset(brush.presetId);
   const eraserOn = brush.active && brush.eraser;
+  const [open, setOpen] = useState(true);
+  const activeLabel = eraserOn ? "Eraser" : activePreset?.label;
   return (
     <div
       style={{
@@ -565,26 +592,45 @@ const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState 
           gap: 6,
         }}
       >
-        <div
+        <button
+          type="button"
           style={{
+            ...btn(),
+            display: "inline-flex",
+            alignItems: "center",
+            flex: 1,
+            justifyContent: "space-between",
+            padding: "4px 7px",
+            textAlign: "left",
             color: "#8b93a3",
             textTransform: "uppercase",
             letterSpacing: 0.5,
             fontSize: 10,
           }}
+          onClick={() => setOpen((s) => !s)}
+          title="Collapse brush controls"
         >
-          Brush
-        </div>
-        <button
-          type="button"
-          style={btn(eraserOn)}
-          onClick={() => setBrushEraser(!eraserOn)}
-          title="Eraser — click-drag the map to remove props within radius"
-        >
-          {eraserOn ? "Eraser ✓" : "Eraser"}
+          <span>{open ? "v" : ">"} Brush</span>
+          {activeLabel && <span style={{ color: "#d7deea" }}>{activeLabel}</span>}
         </button>
+        {open && (
+          <button
+            type="button"
+            style={btn(eraserOn)}
+            onClick={() => setBrushEraser(!eraserOn)}
+            title="Eraser — click-drag the map to remove props within radius"
+          >
+            {eraserOn ? "Eraser ✓" : "Eraser"}
+          </button>
+        )}
       </div>
-      {!eraserOn &&
+      {!open && activeLabel && (
+        <div style={{ color: "#8b93a3", fontSize: 11 }}>
+          {eraserOn ? "Eraser armed" : `${activeLabel} armed`} · radius {brush.radius.toFixed(1)}
+        </div>
+      )}
+      {open &&
+        !eraserOn &&
         PRESET_GROUPS.map((group) => (
           <div key={group.biome} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <div style={{ color: "#8b93a3", fontSize: 10 }}>{group.label}</div>
@@ -600,61 +646,137 @@ const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState 
                       empty ? `${p.label} (no assets)` : `${p.label} · ${p.urls.length} variants`
                     }
                     disabled={empty}
-                    style={{ ...btn(on), opacity: empty ? 0.4 : 1 }}
+                    style={{
+                      ...btn(on),
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      minHeight: 34,
+                      maxWidth: 124,
+                      opacity: empty ? 0.4 : 1,
+                    }}
                     onClick={() => setBrushPreset(p.id)}
                   >
-                    {p.label}
+                    <span
+                      aria-hidden
+                      style={{
+                        minWidth: 22,
+                        height: 22,
+                        borderRadius: 4,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: on ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
+                        color: "#d7deea",
+                        fontSize: 9,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {p.role ? ROLE_ICON[p.role] : "??"}
+                    </span>
+                    <span
+                      aria-hidden
+                      style={{ display: "inline-flex", alignItems: "center", marginLeft: -2 }}
+                    >
+                      {p.urls.slice(0, 2).map((url) => (
+                        <span
+                          key={url}
+                          style={{
+                            position: "relative",
+                            width: 22,
+                            height: 22,
+                            marginLeft: -4,
+                            borderRadius: 4,
+                            overflow: "hidden",
+                            border: "1px solid rgba(255,255,255,0.18)",
+                            background: "#0d1118",
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#8b93a3",
+                              fontSize: 7,
+                              fontWeight: 800,
+                              letterSpacing: 0,
+                            }}
+                          >
+                            {shortModelLabel(url)}
+                          </span>
+                          <PropPreview url={url} size={22} />
+                        </span>
+                      ))}
+                    </span>
+                    <span
+                      style={{
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.label}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
         ))}
-      <div style={sliderRow}>
-        <span style={{ color: "#8b93a3" }}>Radius</span>
-        <input
-          type="range"
-          min={1}
-          max={12}
-          step={0.5}
-          value={brush.radius}
-          onChange={(e) => setBrushParams({ radius: Number(e.target.value) })}
-        />
-        <span>{brush.radius.toFixed(1)}</span>
-      </div>
-      {!eraserOn && (
+      {open && (
         <>
           <div style={sliderRow}>
-            <span style={{ color: "#8b93a3" }}>Density</span>
+            <span style={{ color: "#8b93a3" }}>Radius</span>
             <input
               type="range"
               min={1}
-              max={30}
-              step={1}
-              value={brush.density}
-              onChange={(e) => setBrushParams({ density: Number(e.target.value) })}
+              max={12}
+              step={0.5}
+              value={brush.radius}
+              onChange={(e) => setBrushParams({ radius: Number(e.target.value) })}
             />
-            <span>{brush.density}</span>
+            <span>{brush.radius.toFixed(1)}</span>
           </div>
-          <div style={sliderRow}>
-            <span style={{ color: "#8b93a3" }}>Spacing</span>
-            <input
-              type="range"
-              min={0.3}
-              max={3}
-              step={0.1}
-              value={brush.minSpacing}
-              onChange={(e) => setBrushParams({ minSpacing: Number(e.target.value) })}
-            />
-            <span>{brush.minSpacing.toFixed(1)}</span>
-          </div>
-          {activePreset && (
-            <BrushVariants
-              preset={activePreset}
-              customUrls={brush.customUrls}
-              onToggle={toggleBrushUrl}
-              onReset={resetBrushUrls}
-            />
+          {!eraserOn && (
+            <>
+              <div style={sliderRow}>
+                <span style={{ color: "#8b93a3" }}>Density</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={30}
+                  step={1}
+                  value={brush.density}
+                  onChange={(e) => setBrushParams({ density: Number(e.target.value) })}
+                />
+                <span>{brush.density}</span>
+              </div>
+              <div style={sliderRow}>
+                <span style={{ color: "#8b93a3" }}>Spacing</span>
+                <input
+                  type="range"
+                  min={0.3}
+                  max={3}
+                  step={0.1}
+                  value={brush.minSpacing}
+                  onChange={(e) => setBrushParams({ minSpacing: Number(e.target.value) })}
+                />
+                <span>{brush.minSpacing.toFixed(1)}</span>
+              </div>
+              {activePreset && (
+                <BrushVariants
+                  preset={activePreset}
+                  customUrls={brush.customUrls}
+                  onToggle={toggleBrushUrl}
+                  onReset={resetBrushUrls}
+                />
+              )}
+            </>
           )}
         </>
       )}
