@@ -1,7 +1,8 @@
 import { isOnFlowSurface } from "../flowGeometry";
-import { MAP_HEIGHT, MAP_WIDTH } from "../level";
+import { MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "../level";
 import { dampFactor, shortAngleDelta } from "./angle";
 import { isEnemyTargetable } from "./enemyState";
+import { projectOnPath } from "./path";
 import { type DashSpec, ROBOT_SPECS, type RobotVariantSpec } from "./robotVariants";
 import type {
   BeamPoint,
@@ -48,9 +49,11 @@ const ROBOT_REGEN_PER_SEC = 38;
 // hitting + sliding off via resolveOverlap. Primary obstacle avoidance
 // now that move orders are free-roam straight-line across terrain;
 // resolveOverlap + the map clamp are the hard backstop.
-const ROBOT_AVOID_LOOKAHEAD = 2.6;
-const ROBOT_AVOID_CLEARANCE = 0.25;
-const ROBOT_AVOID_STRENGTH = 2.4;
+const ROBOT_AVOID_LOOKAHEAD = 3.2;
+const ROBOT_AVOID_CLEARANCE = 0.35;
+const ROBOT_AVOID_STRENGTH = 3.0;
+const ROBOT_PROP_BLOCKER_PADDING = 0.08;
+const ROBOT_TOWER_BLOCKER_RADIUS = TOWER_FOOTPRINT * 0.8;
 // World units the robot walks between footfalls. Step rate = speed / stride,
 // so fast variants patter quicker and slow ones plod — matches the shared
 // walk clip well enough without hooking animation frames.
@@ -68,11 +71,10 @@ const ROBOT_ENGAGE_RANGE = 1.6;
 const MAX_ENGAGED_DINOS = 5;
 // Window in which a pre-dash aim stays valid before auto-clearing.
 const DASH_AIM_LIFETIME = 4.0;
-// Free-roam move orders: a click up to this far past the map edge still
-// registers (the target is clamped back inside). Clicks beyond it — the
-// camera margin / spawn aprons — are rejected so the touch "tap away to
-// deselect" gesture still has dead space to land on.
-const ROBOT_MOVE_BOUNDS_PAD = 1.0;
+// Move orders only accept clicks on the painted lane; the destination
+// is projected to the path centerline. Movement stays free-roam, so the
+// robot may cut across terrain while travelling to that valid path point.
+const ROBOT_MOVE_ON_PATH_TOLERANCE = PATH_WIDTH / 2;
 // Mike dash coal-trail tuning.
 const COAL_DROP_INTERVAL = 0.045; // ~9 embers per default 0.4s dash
 const COAL_TICK_DAMAGE = 16;
@@ -89,9 +91,11 @@ const ROBOT_MUZZLE_HEIGHT = 1.05;
 // is intentionally not included — mecha treats it as crossable terrain
 // and applies DoT separately (see updateRobot).
 const forRobotBlockers = (world: World, fn: (bx: number, by: number, br: number) => void): void => {
-  for (const t of world.trees) fn(t.pos.x, t.pos.y, TREE_FOOTPRINT * t.scale);
-  for (const r of world.rocks) fn(r.pos.x, r.pos.y, ROCK_FOOTPRINT * r.scale);
-  for (const t of world.towers) fn(t.pos.x, t.pos.y, TOWER_FOOTPRINT * 0.6);
+  for (const t of world.trees)
+    fn(t.pos.x, t.pos.y, TREE_FOOTPRINT * t.scale + ROBOT_PROP_BLOCKER_PADDING);
+  for (const r of world.rocks)
+    fn(r.pos.x, r.pos.y, ROCK_FOOTPRINT * r.scale + ROBOT_PROP_BLOCKER_PADDING);
+  for (const t of world.towers) fn(t.pos.x, t.pos.y, ROBOT_TOWER_BLOCKER_RADIUS);
 };
 
 // Push position out of any overlapping blocker by the smallest displacement
@@ -445,6 +449,8 @@ const avoidObstacles = (world: World, robot: Robot, dx: number, dy: number): Vec
   if (mag < 0.1) return { x: dx, y: dy };
   const fx = dx / mag;
   const fy = dy / mag;
+  const lookahead = ROBOT_AVOID_LOOKAHEAD + Math.min(0.9, robot.stuckTimer * 1.2);
+  const stuckBoost = 1 + Math.min(1.35, robot.stuckTimer * 1.5);
   // Left-perpendicular (rotate forward 90° CCW in world XY).
   const px = -fy;
   const py = fx;
@@ -454,7 +460,7 @@ const avoidObstacles = (world: World, robot: Robot, dx: number, dy: number): Vec
     const ox = bx - robot.pos.x;
     const oy = by - robot.pos.y;
     const forward = ox * fx + oy * fy;
-    if (forward <= 0 || forward > ROBOT_AVOID_LOOKAHEAD) return;
+    if (forward <= -0.1 || forward > lookahead) return;
     const lateral = ox * px + oy * py;
     const band = br + ROBOT_RADIUS + ROBOT_AVOID_CLEARANCE;
     const absLat = Math.abs(lateral);
@@ -462,9 +468,9 @@ const avoidObstacles = (world: World, robot: Robot, dx: number, dy: number): Vec
     // Push to the opposite side of where the blocker sits. Urgency
     // ramps as the obstacle approaches: full strength at touch range,
     // ~0 at the lookahead horizon.
-    const urgency = 1 - forward / ROBOT_AVOID_LOOKAHEAD;
+    const urgency = 1 - Math.max(0, forward) / lookahead;
     const sign = lateral >= 0 ? -1 : 1;
-    const strength = ((band - absLat) / band) * urgency * ROBOT_AVOID_STRENGTH * mag;
+    const strength = ((band - absLat) / band) * urgency * ROBOT_AVOID_STRENGTH * stuckBoost * mag;
     pushX += px * sign * strength;
     pushY += py * sign * strength;
   };
@@ -768,9 +774,10 @@ export const updateRobot = (world: World, dt: number) => {
     const expected = Math.max(robot.speed * dt * 0.25, 0.01);
     if (moved2 < expected * expected) {
       robot.stuckTimer += dt;
-      if (robot.stuckTimer > 0.6) {
-        robot.moveTarget = null;
-        robot.stuckTimer = 0;
+      if (robot.stuckTimer > 1.2) {
+        robot.vel.x *= 0.25;
+        robot.vel.y *= 0.25;
+        robot.stuckTimer = 0.45;
       }
     } else {
       robot.stuckTimer = 0;
@@ -896,26 +903,46 @@ export const updateRobot = (world: World, dt: number) => {
 
 // --- Player-issued actions ---------------------------------------------
 
-// Returns true if the order was accepted. Free-roam: any click inside the
-// playfield (plus a small pad past the edge) is taken; the robot walks
-// straight there, cutting across terrain between lanes. The target is
-// clamped to the reachable rect so it always arrives instead of grinding
-// the wall. Clicks well outside the field are rejected so the caller
-// (store/UI) can surface feedback or drop robot command mode.
+const nearestPathForMove = (
+  world: World,
+  pos: Vec2,
+  fallbackIdx: number,
+): { pathIndex: number; pos: Vec2; distSq: number } | null => {
+  if (world.paths.length === 0) return null;
+  let bestIdx = Math.max(0, Math.min(world.paths.length - 1, fallbackIdx));
+  let best = projectOnPath(world.paths[bestIdx], pos);
+  let bestD2 = (best.pos.x - pos.x) ** 2 + (best.pos.y - pos.y) ** 2;
+  for (let i = 0; i < world.paths.length; i++) {
+    if (i === bestIdx) continue;
+    const proj = projectOnPath(world.paths[i], pos);
+    const d2 = (proj.pos.x - pos.x) ** 2 + (proj.pos.y - pos.y) ** 2;
+    if (d2 < bestD2) {
+      bestIdx = i;
+      best = proj;
+      bestD2 = d2;
+    }
+  }
+  return { pathIndex: bestIdx, pos: best.pos, distSq: bestD2 };
+};
+
+// Returns true if the order was accepted. Clicks must land on the painted
+// path, but the stored destination is the nearest path centerline point.
+// The robot still walks free-roam across terrain toward that point.
 export const orderRobotMove = (world: World, pos: Vec2): boolean => {
   const robot = world.robot;
   if (!robot.alive) return false;
-  const acceptHalfW = MAP_WIDTH / 2 + ROBOT_MOVE_BOUNDS_PAD;
-  const acceptHalfH = MAP_HEIGHT / 2 + ROBOT_MOVE_BOUNDS_PAD;
-  if (pos.x < -acceptHalfW || pos.x > acceptHalfW || pos.y < -acceptHalfH || pos.y > acceptHalfH) {
+  const projection = nearestPathForMove(world, pos, robot.pathIndex);
+  if (!projection) return false;
+  if (projection.distSq > ROBOT_MOVE_ON_PATH_TOLERANCE * ROBOT_MOVE_ON_PATH_TOLERANCE) {
     return false;
   }
   const reachHalfW = MAP_WIDTH / 2 - ROBOT_RADIUS;
   const reachHalfH = MAP_HEIGHT / 2 - ROBOT_RADIUS;
   robot.moveTarget = {
-    x: Math.max(-reachHalfW, Math.min(reachHalfW, pos.x)),
-    y: Math.max(-reachHalfH, Math.min(reachHalfH, pos.y)),
+    x: Math.max(-reachHalfW, Math.min(reachHalfW, projection.pos.x)),
+    y: Math.max(-reachHalfH, Math.min(reachHalfH, projection.pos.y)),
   };
+  robot.pathIndex = projection.pathIndex;
   return true;
 };
 
