@@ -141,6 +141,26 @@ const YAW_HALFLIFE = 0.06;
 // so a single oversized swarm doesn't pin a permanent ceiling of skinned
 // meshes in the scene graph.
 const POOL_LIMIT = 16;
+const DEAD_ENEMY_CLICK_BLOCKER = "deadEnemyClickBlocker";
+
+const hasEnemyId = (object: THREE.Object3D | null): boolean => {
+  let obj: THREE.Object3D | null = object;
+  while (obj) {
+    if (obj.userData.enemyId !== undefined) return true;
+    obj = obj.parent;
+  }
+  return false;
+};
+
+const isDeadEnemyBodyHit = (object: THREE.Object3D): boolean => {
+  let obj: THREE.Object3D | null = object;
+  while (obj) {
+    if (obj.userData[DEAD_ENEMY_CLICK_BLOCKER] === true) return true;
+    if (obj.userData.enemyId !== undefined) return false;
+    obj = obj.parent;
+  }
+  return !hasEnemyId(object);
+};
 
 const resetEnemyMaterialState = (obj: THREE.Object3D, restoreEmissive = true): void => {
   obj.traverse((o) => {
@@ -326,11 +346,13 @@ export const ModelEnemyMesh = ({
     if (poolRef.current.length < POOL_LIMIT) {
       item.obj.visible = false;
       item.obj.userData.enemyId = undefined;
+      item.obj.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
       // Clear the stale id from every descendant too — the click handler
       // walks UP from the hit object, so a child that still carries the
       // old id would resurface a panel for an enemy that's been pooled.
       item.obj.traverse((o) => {
         o.userData.enemyId = undefined;
+        o.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
       });
       if (item.proxy) {
         item.proxy.visible = false;
@@ -391,9 +413,11 @@ export const ModelEnemyMesh = ({
           recycled.obj.visible = true;
           recycled.obj.userData.enemyId = e.id;
           recycled.obj.userData.enemyMaxHp = e.maxHp;
+          recycled.obj.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
           recycled.obj.traverse((o) => {
             o.userData.enemyId = e.id;
             o.userData.enemyMaxHp = e.maxHp;
+            o.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
           });
           recycled.mixer.stopAllAction();
           recycled.clip = null;
@@ -423,6 +447,7 @@ export const ModelEnemyMesh = ({
           obj.scale.setScalar(normalizedScale);
           obj.userData.enemyId = e.id;
           obj.userData.enemyMaxHp = e.maxHp;
+          obj.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
           // Boss draws after environment props so dense trees / rocks
           // can't visually swallow her silhouette during a wave. Shadow
           // still grounds her since shadows render in their own pass.
@@ -430,6 +455,7 @@ export const ModelEnemyMesh = ({
           obj.traverse((o) => {
             o.userData.enemyId = e.id;
             o.userData.enemyMaxHp = e.maxHp;
+            o.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
             if (bossOnTop) o.renderOrder = 10;
             // Painted-look outline gives dinosaurs a dark silhouette pop at
             // gameplay scale. Bloom is deliberately reserved for eyes/VFX;
@@ -821,8 +847,10 @@ export const ModelEnemyMesh = ({
       // Strip click affordance immediately — corpse mid-fall is not a
       // valid inspect target.
       item.obj.userData.enemyId = undefined;
+      item.obj.userData[DEAD_ENEMY_CLICK_BLOCKER] = true;
       item.obj.traverse((o) => {
         o.userData.enemyId = undefined;
+        o.userData[DEAD_ENEMY_CLICK_BLOCKER] = true;
       });
       if (item.proxy) {
         item.proxy.visible = false;
@@ -851,6 +879,10 @@ export const ModelEnemyMesh = ({
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     const state = useGame.getState();
+    if (isDeadEnemyBodyHit(e.object)) {
+      e.stopPropagation();
+      return;
+    }
     // Placing a tower? Let the placement plane handle the click.
     if (state.selectedKind !== null) return;
     // Mortar aiming in spot mode outranks inspecting a passing dino —
@@ -901,6 +933,11 @@ export const ModelEnemyMesh = ({
   // also fire — the player asked for info, not a move order.
   const handleContextMenu = (e: ThreeEvent<MouseEvent>) => {
     const state = useGame.getState();
+    if (isDeadEnemyBodyHit(e.object)) {
+      e.nativeEvent.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (state.selectedKind !== null) return;
     // Right-click while a dash aim is armed cancels the aim (handled by the
     // placement plane's contextmenu) rather than inspecting the dino —
@@ -917,7 +954,21 @@ export const ModelEnemyMesh = ({
     state.inspectEnemy(enemyId, kind, obj.userData.enemyMaxHp as number, bossVariant ?? null);
   };
 
-  return <group ref={groupRef} onClick={handleClick} onContextMenu={handleContextMenu} />;
+  const handlePointerBlock = (e: ThreeEvent<PointerEvent>) => {
+    if (!isDeadEnemyBodyHit(e.object)) return;
+    e.stopPropagation();
+  };
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: r3f scene group handles mesh pointer events, not DOM UI
+    <group
+      ref={groupRef}
+      onPointerDown={handlePointerBlock}
+      onPointerUp={handlePointerBlock}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+    />
+  );
 };
 
 useGLTF.preload("/models/Velociraptor.glb");

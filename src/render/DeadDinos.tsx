@@ -1,5 +1,6 @@
 import { useGLTF } from "@react-three/drei";
-import { Fragment, useMemo } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
+import { Fragment, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { mulberry32 } from "../sim/random";
@@ -45,6 +46,12 @@ export type DeadDinoItem = {
 };
 
 const noRaycast: THREE.Mesh["raycast"] = () => {};
+const CORPSE_BLOCKER_HEIGHT = 2.4;
+
+const stopCorpseSelection = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
+  e.stopPropagation();
+  if ("preventDefault" in e.nativeEvent) e.nativeEvent.preventDefault();
+};
 
 // Pale-grey corpse multiplier. GLB materials usually have white base color
 // modulating a texture; copying this color into the cloned material drains
@@ -80,7 +87,13 @@ type Splat = {
   opacity: number;
 };
 
-type Corpse = { id: string; obj: THREE.Object3D; splats: Splat[] };
+type Corpse = {
+  id: string;
+  obj: THREE.Object3D;
+  splats: Splat[];
+  blockerPos: THREE.Vector3;
+  blockerRadius: number;
+};
 
 const hashString = (s: string): number => {
   let h = 2166136261 >>> 0;
@@ -94,6 +107,25 @@ const hashString = (s: string): number => {
 export const DeadDinoInstancer = ({ url, items }: { url: string; items: DeadDinoItem[] }) => {
   const gltf = useGLTF(url);
   const footprint = DEAD_DINO_FOOTPRINT[url] ?? 2.0;
+  const blockerGeom = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 24), []);
+  const blockerMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        colorWrite: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0,
+      }),
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      blockerGeom.dispose();
+      blockerMat.dispose();
+    },
+    [blockerGeom, blockerMat],
+  );
 
   // One skinned clone per instance, posed once at Death-clip end and then
   // left static. Memoized on the source scene + url so HMR rebuilds the
@@ -173,15 +205,33 @@ export const DeadDinoInstancer = ({ url, items }: { url: string; items: DeadDino
           });
         }
       }
-      return { id: it.id, obj, splats };
+      return {
+        id: it.id,
+        obj,
+        splats,
+        blockerPos: it.pos,
+        blockerRadius: deadDinoCollisionRadius(url, it.scale),
+      };
     });
-  }, [gltf.scene, gltf.animations, items, footprint]);
+  }, [gltf.scene, gltf.animations, items, footprint, url]);
 
   return (
     <group>
       {clones.map((c) => (
         <Fragment key={c.id}>
           <primitive object={c.obj} />
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: invisible r3f hit shield blocks corpse click-through */}
+          <mesh
+            geometry={blockerGeom}
+            material={blockerMat}
+            position={[c.blockerPos.x, CORPSE_BLOCKER_HEIGHT / 2, c.blockerPos.z]}
+            scale={[c.blockerRadius, CORPSE_BLOCKER_HEIGHT, c.blockerRadius]}
+            onPointerDown={stopCorpseSelection}
+            onPointerUp={stopCorpseSelection}
+            onClick={stopCorpseSelection}
+            onContextMenu={stopCorpseSelection}
+            userData={{ corpseClickBlocker: true }}
+          />
           {c.splats.map((s, i) => (
             <mesh
               // biome-ignore lint/suspicious/noArrayIndexKey: deterministic per corpse id

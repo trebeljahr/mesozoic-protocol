@@ -46,6 +46,17 @@ const MUZZLE_ANCHOR_NAMES = [
 const MUZZLE_FORWARD_OFFSET = 0.3;
 const MUZZLE_SIDE_OFFSET = 0.12;
 
+const isCorpseClickBlocker = (object: THREE.Object3D): boolean => {
+  let obj: THREE.Object3D | null = object;
+  while (obj) {
+    if (obj.userData.corpseClickBlocker === true || obj.userData.deadEnemyClickBlocker === true) {
+      return true;
+    }
+    obj = obj.parent;
+  }
+  return false;
+};
+
 export const ModelRobotMesh = () => {
   const variant = useGame((s) => s.world.robot.variant);
   const url = ROBOT_URL[variant] ?? ROBOT_URL.george;
@@ -367,6 +378,14 @@ export const ModelRobotMesh = () => {
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     const state = useGame.getState();
+    const robotHitIndex = e.intersections.findIndex(
+      (hit) => hit.object.userData.robotProxy === true,
+    );
+    const corpseHitIndex = e.intersections.findIndex((hit) => isCorpseClickBlocker(hit.object));
+    if (corpseHitIndex !== -1 && (robotHitIndex === -1 || corpseHitIndex <= robotHitIndex)) {
+      e.stopPropagation();
+      return;
+    }
     // Mortar spot mode still wins — clicking the robot while aiming a
     // mortar sets the spot, not the selection.
     const selId = state.world.selectedTowerId;
@@ -386,6 +405,7 @@ export const ModelRobotMesh = () => {
 
   return (
     <group ref={groupRef}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: invisible r3f mesh is the robot click proxy */}
       <mesh
         ref={proxyRef}
         geometry={proxyGeom}
