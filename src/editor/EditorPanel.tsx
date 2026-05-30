@@ -31,11 +31,11 @@ import {
 // Shared dev-only editor side-panel. Mounted in App.tsx behind
 // import.meta.env.DEV by two thin wrappers (LevelEditorPanel /
 // WorldMapEditorPanel) that hand it a store + labels + per-editor footer
-// button config. The whole panel surface — undo/redo header, optional
-// override toggle, brush palette + variants + sliders, river tool controls,
-// per-selection transforms, asset palette with preview swatches,
-// copy/download/clear footer, plus the Esc/Delete/Ctrl+Z keyboard handler —
-// is driven off the store's EditorStoreApi, so both editors share one UX.
+// button config. The whole panel surface — undo/redo header, brush palette
+// + variants + sliders, river tool controls, per-selection transforms,
+// asset palette with preview swatches, copy/download/clear footer, plus
+// the Esc/Delete/Ctrl+Z keyboard handler — is driven off the store's
+// EditorStoreApi, so both editors share one UX.
 
 // Footer button cluster — each editor declares its own export targets
 // (clipboard/download/download-all) and clear targets (clear-scope/clear-all).
@@ -50,11 +50,6 @@ export type EditorPanelProps = {
   title: string;
   fabLabel: string;
   fabTitle: string;
-  showOverride?: boolean;
-  // Override checkbox value source. Level editor reads from useGame
-  // (survives reloadLevel); world map would read getCurrent().override.
-  // Only consulted when showOverride is true.
-  override?: boolean;
   exportButtons: FooterButton[];
   clearButtons: FooterButton[];
   // Optional copy button — toggles to "Copied!" briefly after clipboard write.
@@ -81,8 +76,6 @@ export const EditorPanel = ({
   title,
   fabLabel,
   fabTitle,
-  showOverride = false,
-  override,
   exportButtons,
   clearButtons,
   copyButton,
@@ -227,18 +220,6 @@ export const EditorPanel = ({
         </div>
       </div>
 
-      {showOverride && (
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={override ?? false}
-            onChange={(e) => store.getState().setOverride(e.target.checked)}
-          />
-          Clear procedural placement
-          <span style={{ color: "#8b93a3" }}>(reloads)</span>
-        </label>
-      )}
-
       <BrushSection store={store} brush={brush} />
 
       <div style={{ display: "flex", gap: 6 }}>
@@ -372,11 +353,8 @@ export const EditorPanel = ({
 
       <div
         style={{
-          flex: 1,
-          overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          minHeight: 0,
           gap: 8,
           opacity: brush.active ? 0.5 : 1,
         }}

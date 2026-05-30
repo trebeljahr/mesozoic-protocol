@@ -23,7 +23,9 @@ export const panel: CSSProperties = {
   color: "#e6e9ef",
   font: "12px/1.4 system-ui, sans-serif",
   boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
-  overflow: "hidden",
+  overflowY: "auto",
+  overflowX: "hidden",
+  scrollbarGutter: "stable",
   touchAction: "pan-y",
   overscrollBehavior: "contain",
   // Explicit so the panel always swallows pointer events (and the
