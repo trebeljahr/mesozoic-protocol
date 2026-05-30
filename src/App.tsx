@@ -3,8 +3,10 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { KernelSize } from "postprocessing";
 import { lazy, Suspense, useEffect } from "react";
 import { useAudioBridge } from "./audio/useAudioBridge";
+import { useEditor } from "./editor/editorStore";
 import { LevelEditorPanel } from "./editor/LevelEditorPanel";
 import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
+import { useWorldMapEditor } from "./editor/worldMapEditorStore";
 import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
 import { ExpectedCanvasTeardown } from "./render/ExpectedCanvasTeardown";
 import { PaintedPostFx } from "./render/PaintedPostFx";
@@ -118,6 +120,10 @@ export const App = () => {
   const skillTreeOpen = useGame((s) => s.skillTreeOpen);
   const robotShopOpen = useGame((s) => s.robotShopOpen);
   const robotPanelOpen = useGame((s) => s.robotPanelOpen);
+  const levelEditorActive = useEditor((s) => s.active);
+  const levelEditorChromeHidden = useEditor((s) => s.chromeHidden);
+  const worldMapEditorActive = useWorldMapEditor((s) => s.active);
+  const worldMapEditorChromeHidden = useWorldMapEditor((s) => s.chromeHidden);
   const selectedKind = useGame((s) => s.selectedKind);
   const paused = useGame((s) => s.ui.status === "paused");
   const newEnemyAlertVisible = useGame((s) => s.newEnemyQueue.length > 0);
@@ -139,6 +145,14 @@ export const App = () => {
     skillTreeOpen ||
     robotShopOpen;
   const isMobile = useIsMobile();
+  const hideLevelChrome =
+    import.meta.env.DEV && screen === "playing" && levelEditorActive && levelEditorChromeHidden;
+  const hideWorldMapChrome =
+    import.meta.env.DEV &&
+    screen === "worldMap" &&
+    worldMapEditorActive &&
+    worldMapEditorChromeHidden;
+  const hideEditorChrome = hideLevelChrome || hideWorldMapChrome;
   useInputModeSignal();
   useAudioBridge();
   useLevelLoadProgress();
@@ -295,9 +309,9 @@ export const App = () => {
         </ErrorBoundary>
       )}
 
-      {screen === "worldMap" && !sceneBlockingModalOpen && <WorldMapUI />}
-      {screen !== "worldMap" && !sceneBlockingModalOpen && <HUD />}
-      {screen === "playing" && !sceneBlockingModalOpen && <PlannerHud />}
+      {screen === "worldMap" && !sceneBlockingModalOpen && !hideWorldMapChrome && <WorldMapUI />}
+      {screen !== "worldMap" && !sceneBlockingModalOpen && !hideLevelChrome && <HUD />}
+      {screen === "playing" && !sceneBlockingModalOpen && !hideLevelChrome && <PlannerHud />}
       {screen === "results" && !sceneBlockingModalOpen && <ResultsScreen />}
       {compendiumOpen && (
         <Suspense fallback={null}>
@@ -340,10 +354,10 @@ export const App = () => {
         </Suspense>
       )}
       <LevelLoadOverlay />
-      {screen === "playing" && levelIntroVisible && <LevelIntro />}
-      {screen === "playing" && !modalOpen && <NewEnemyAlert />}
-      <AchievementToast />
-      <LandscapeNudge />
+      {screen === "playing" && levelIntroVisible && !hideLevelChrome && <LevelIntro />}
+      {screen === "playing" && !modalOpen && !hideLevelChrome && <NewEnemyAlert />}
+      {!hideEditorChrome && <AchievementToast />}
+      {!hideEditorChrome && <LandscapeNudge />}
       {import.meta.env.DEV && screen === "playing" && !modalOpen && <LevelEditorPanel />}
       {import.meta.env.DEV && screen === "worldMap" && !sceneBlockingModalOpen && (
         <WorldMapEditorPanel />

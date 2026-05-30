@@ -21,6 +21,7 @@ import {
   btn,
   dangerBtn,
   fab,
+  miniPanel,
   PencilIcon,
   panel,
   sliderRow,
@@ -81,6 +82,8 @@ export const EditorPanel = ({
   copyButton,
 }: EditorPanelProps): ReactElement => {
   const active = store((s) => s.active);
+  const panelCollapsed = store((s) => s.panelCollapsed);
+  const chromeHidden = store((s) => s.chromeHidden);
   const placingUrl = store((s) => s.placingUrl);
   const selectedId = store((s) => s.selectedId);
   const moving = store((s) => s.moving);
@@ -88,6 +91,8 @@ export const EditorPanel = ({
   const riverTool = store((s) => s.riverTool);
   const version = store((s) => s.version);
   const toggleActive = store((s) => s.toggleActive);
+  const setPanelCollapsed = store((s) => s.setPanelCollapsed);
+  const setChromeHidden = store((s) => s.setChromeHidden);
   const history = store((s) => s.history);
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
@@ -98,12 +103,7 @@ export const EditorPanel = ({
   // Browser/OS back gesture closes the editor — same behavior as the panel
   // close button. Re-uses the existing in-app navigation stack.
   useBackNavigation(active, () => {
-    store.setState({
-      active: false,
-      placingUrl: null,
-      selectedId: null,
-      moving: false,
-    });
+    store.getState().toggleActive();
   });
 
   void version;
@@ -175,6 +175,67 @@ export const EditorPanel = ({
     );
   }
 
+  const statusLabel = brush.active
+    ? brush.eraser
+      ? "Eraser"
+      : `Brush${brush.presetId ? ` · ${getBrushPreset(brush.presetId)?.label ?? brush.presetId}` : ""}`
+    : riverTool.active
+      ? riverTool.editingRiverId
+        ? "River · drawing"
+        : riverTool.selectedRiverId
+          ? "River · selected"
+          : "River"
+      : moving
+        ? "Move prop"
+        : placingUrl
+          ? `Placing · ${labelFor(placingUrl)}`
+          : selected
+            ? "Prop selected"
+            : selectedRiver
+              ? "River selected"
+              : "Select";
+
+  const toggleUiLabel = chromeHidden ? "Show UI" : "Hide UI";
+
+  if (panelCollapsed) {
+    return (
+      <div style={miniPanel} onPointerDownCapture={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          style={btn()}
+          onClick={() => setPanelCollapsed(false)}
+          title="Show the editor panel"
+        >
+          Show Panel
+        </button>
+        <span
+          style={{
+            minWidth: 0,
+            maxWidth: 180,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            color: "#aeb7c6",
+          }}
+          title={statusLabel}
+        >
+          {statusLabel}
+        </span>
+        <button
+          type="button"
+          style={btn(chromeHidden)}
+          onClick={() => setChromeHidden(!chromeHidden)}
+          title={`${toggleUiLabel} while editing`}
+        >
+          {toggleUiLabel}
+        </button>
+        <button type="button" style={dangerBtn} onClick={toggleActive} title="Exit editor">
+          Exit
+        </button>
+      </div>
+    );
+  }
+
   const onCopy = () => {
     if (!copyButton) return;
     const json = store.getState().exportJson();
@@ -193,9 +254,28 @@ export const EditorPanel = ({
     // canvas-level OrbitControls drag gate (which listens at document level)
     // and don't get mistaken for a deselect on the editor click plane.
     <div style={panel} onPointerDownCapture={(e) => e.stopPropagation()}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <strong style={{ fontSize: 13 }}>{title}</strong>
-        <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ minWidth: 0 }}>
+            <strong style={{ display: "block", fontSize: 13 }}>{title}</strong>
+            <span
+              style={{
+                display: "block",
+                color: "#8b93a3",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={statusLabel}
+            >
+              {statusLabel}
+            </span>
+          </div>
+          <button type="button" style={dangerBtn} onClick={toggleActive} title="Exit editor">
+            Exit
+          </button>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           <button
             type="button"
             style={{ ...btn(), opacity: canUndo ? 1 : 0.4 }}
@@ -214,8 +294,21 @@ export const EditorPanel = ({
           >
             Redo
           </button>
-          <button type="button" style={btn()} onClick={toggleActive}>
-            Close
+          <button
+            type="button"
+            style={btn()}
+            onClick={() => setPanelCollapsed(true)}
+            title="Hide this panel without leaving editor mode"
+          >
+            Hide Panel
+          </button>
+          <button
+            type="button"
+            style={btn(chromeHidden)}
+            onClick={() => setChromeHidden(!chromeHidden)}
+            title={`${toggleUiLabel} while editing`}
+          >
+            {toggleUiLabel}
           </button>
         </div>
       </div>

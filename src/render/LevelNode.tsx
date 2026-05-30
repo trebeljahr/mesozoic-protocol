@@ -303,8 +303,8 @@ export const LevelNode = ({ level }: Props) => {
         </Html>
       )}
 
-      {isDebug && <DebugLevelControl levelId={level.id} levelName={level.name} />}
-      {import.meta.env.DEV && unlocked && <EditLevelButton levelId={level.id} />}
+      {isDebug && !editorActive && <DebugLevelControl levelId={level.id} levelName={level.name} />}
+      {import.meta.env.DEV && unlocked && !editorActive && <EditLevelButton levelId={level.id} />}
     </group>
   );
 };

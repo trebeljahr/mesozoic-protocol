@@ -35,6 +35,25 @@ export const panel: CSSProperties = {
   pointerEvents: "auto",
 };
 
+export const miniPanel: CSSProperties = {
+  position: "fixed",
+  top: 8,
+  right: 8,
+  zIndex: 10000,
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  maxWidth: "calc(100vw - 16px)",
+  padding: 8,
+  background: "rgba(14,16,22,0.94)",
+  border: "1px solid #3a4150",
+  borderRadius: 8,
+  color: "#e6e9ef",
+  font: "12px/1.2 system-ui, sans-serif",
+  boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+  pointerEvents: "auto",
+};
+
 export const btn = (on = false): CSSProperties => ({
   padding: "5px 8px",
   borderRadius: 5,
@@ -87,8 +106,9 @@ export const sliderRow: CSSProperties = {
 
 export const fab: CSSProperties = {
   position: "fixed",
-  left: 10,
-  bottom: 10,
+  left: "calc(10px + env(safe-area-inset-left, 0px))",
+  top: "50%",
+  transform: "translateY(-50%)",
   zIndex: 10000,
   display: "flex",
   alignItems: "center",

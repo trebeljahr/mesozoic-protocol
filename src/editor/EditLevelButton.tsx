@@ -62,6 +62,8 @@ export const EditLevelButton = ({ levelId }: Props) => (
         game.clearSelection();
         useEditor.setState({
           active: true,
+          panelCollapsed: false,
+          chromeHidden: true,
           placingUrl: null,
           selectedId: null,
           moving: false,

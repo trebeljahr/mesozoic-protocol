@@ -242,6 +242,8 @@ const DEFAULT_RIVER_TOOL: RiverToolState = {
 
 export type EditorStoreApi = {
   active: boolean;
+  panelCollapsed: boolean;
+  chromeHidden: boolean;
   // Asset url armed for placement — each map click drops one. null = select mode.
   placingUrl: string | null;
   selectedId: string | null;
@@ -262,6 +264,8 @@ export type EditorStoreApi = {
   // store itself (world map) or on useGame.world (level editor).
   getCurrent: () => EditorSource;
   toggleActive: () => void;
+  setPanelCollapsed: (collapsed: boolean) => void;
+  setChromeHidden: (hidden: boolean) => void;
   setPlacing: (url: string | null) => void;
   placeAt: (x: number, y: number) => void;
   select: (id: string | null) => void;
@@ -396,6 +400,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
 
     return {
       active: false,
+      panelCollapsed: false,
+      chromeHidden: false,
       placingUrl: null,
       selectedId: null,
       moving: false,
@@ -412,6 +418,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         if (next) adapter.onActivate?.();
         set((s) => ({
           active: next,
+          panelCollapsed: false,
+          chromeHidden: next,
           placingUrl: null,
           selectedId: null,
           moving: false,
@@ -420,6 +428,10 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
         }));
       },
+
+      setPanelCollapsed: (collapsed) => set({ panelCollapsed: collapsed }),
+
+      setChromeHidden: (hidden) => set({ chromeHidden: hidden }),
 
       setPlacing: (url) =>
         set((s) => ({
