@@ -30,12 +30,12 @@ export type EyeAnchor = {
 // targetSize) inherit the same head placement. Hand-tuned starting values;
 // adjust by visual inspection.
 const EYE_ANCHORS_BY_URL: Record<string, EyeAnchor[]> = {
-  "/models/Velociraptor.glb": [{ y: 0.54, z: 0.4, dx: 0.035, radius: 0.035 }],
-  "/models/Trex.glb": [{ y: 0.58, z: 0.42, dx: 0.04, radius: 0.034 }],
-  "/models/Stegosaurus.glb": [{ y: 0.2, z: 0.34, dx: 0.032, radius: 0.026 }],
-  "/models/Triceratops.glb": [{ y: 0.23, z: 0.37, dx: 0.04, radius: 0.028 }],
-  "/models/Parasaurolophus.glb": [{ y: 0.5, z: 0.42, dx: 0.035, radius: 0.03 }],
-  "/models/Apatosaurus.glb": [{ y: 0.52, z: 0.42, dx: 0.016, radius: 0.018 }],
+  "/models/Velociraptor.glb": [{ y: 0.43, z: 0.31, dx: 0.028, radius: 0.018 }],
+  "/models/Trex.glb": [{ y: 0.46, z: 0.33, dx: 0.034, radius: 0.019 }],
+  "/models/Stegosaurus.glb": [{ y: 0.14, z: 0.27, dx: 0.028, radius: 0.015 }],
+  "/models/Triceratops.glb": [{ y: 0.16, z: 0.3, dx: 0.034, radius: 0.016 }],
+  "/models/Parasaurolophus.glb": [{ y: 0.39, z: 0.33, dx: 0.03, radius: 0.017 }],
+  "/models/Apatosaurus.glb": [{ y: 0.42, z: 0.35, dx: 0.012, radius: 0.011 }],
 };
 
 const hexRGB = (hex: string): [number, number, number] => {

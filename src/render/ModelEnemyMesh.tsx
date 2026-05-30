@@ -63,6 +63,36 @@ const FROST_COLOR = new THREE.Color("#cfe6ff");
 // frozen enemies read with a cold halo, not the bio-green one.
 const FROST_RIM_COLOR = new THREE.Color("#cfe6ff");
 
+const BODY_TINT_BY_KIND: Record<EnemyKind, THREE.ColorRepresentation> = {
+  swarm: "#9a7a4f",
+  raptor: "#9a7a4f",
+  para: "#7b6f73",
+  allosaur: "#7d6854",
+  stego: "#6e7461",
+  armored: "#84705e",
+  titan: "#72756a",
+  boss: "#72756a",
+};
+
+const BODY_TINT_AMOUNT: Record<EnemyKind, number> = {
+  swarm: 0.72,
+  raptor: 0.72,
+  para: 0.62,
+  allosaur: 0.62,
+  stego: 0.58,
+  armored: 0.66,
+  titan: 0.5,
+  boss: 0.46,
+};
+
+const applyBodyPalette = (material: THREE.Material, tint: THREE.Color, amount: number): void => {
+  const std = material as THREE.MeshStandardMaterial;
+  const base = std.userData.baseColor as THREE.Color | undefined;
+  if (!base || !std.color) return;
+  base.lerp(tint, amount);
+  std.color.copy(base);
+};
+
 type Item = {
   enemyId: number;
   obj: THREE.Object3D;
@@ -162,6 +192,8 @@ export const ModelEnemyMesh = ({
   );
   const matriarchMaterial = bossVariant !== undefined ? BOSS_VARIANT_MATERIAL[bossVariant] : null;
   const footstepProfile = bossVariant !== undefined ? BOSS_VARIANT_FOOTSTEP[bossVariant] : null;
+  const bodyTint = useMemo(() => new THREE.Color(BODY_TINT_BY_KIND[kind]), [kind]);
+  const bodyTintAmount = BODY_TINT_AMOUNT[kind];
   // Adaptive-resistance tint palette — one stable THREE.Color per damage
   // type so the per-frame body lerp doesn't allocate. Built once and
   // shared by every enemy in this mesh; the per-enemy snapshot
@@ -445,6 +477,7 @@ export const ModelEnemyMesh = ({
                 });
                 const matName = (mm.name || "").toLowerCase();
                 const matIsEye = EYE_FALLBACK_NAMES.some((p) => matName.includes(p));
+                if (!isEye && !matIsEye) applyBodyPalette(mm, bodyTint, bodyTintAmount);
                 // Eye glow: registry-matched material name or fallback
                 // mesh/material-name pattern.
                 if (isEye || matIsEye) {

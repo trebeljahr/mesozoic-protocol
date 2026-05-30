@@ -27,7 +27,7 @@ const DEATH_FADE = 0.7;
 // Quad scale multiplier on top of the per-anchor radius. The radial
 // gradient texture's bright core fills ~30% of the quad, so we oversize the
 // quad to allow a visible soft halo around the eye.
-const BILLBOARD_SCALE = 2.2;
+const BILLBOARD_SCALE = 1.25;
 
 // Build the shared radial-gradient texture once on mount. Tight bright
 // core + long soft falloff so additive blending reads as a glow, not a hard

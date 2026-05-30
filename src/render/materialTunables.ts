@@ -28,10 +28,11 @@ const TOON_THRESH_HI = 0.66;
 
 export const RIM_DEFAULT_POWER = 2.4;
 
-// Team rim colors — cyan-white for player/turret/mech; bio-green default
-// for enemies (matriarchs override per-biome below).
+// Team rim colors — cyan-white for player/turret/mech. Enemy body rim is
+// disabled in ModelEnemyMesh; keep a dark fallback color so any accidental
+// enemy rim use cannot reintroduce the old neon body glow.
 export const RIM_COLOR_ALLY = "#7fe6ff";
-export const RIM_COLOR_ENEMY = "#7eff8c";
+export const RIM_COLOR_ENEMY = "#0b1210";
 export const RIM_COLOR_FLAME = "#ffb95a";
 export const RIM_COLOR_CRYO = "#bfe6ff";
 
@@ -84,8 +85,8 @@ export const MATRIARCH_CONDUIT_COLOR: Record<Biome, string> = {
 // against busy biome props without the unit looking like it's lit from
 // behind by a laser.
 export const RIM_INTENSITY_ALLY = 0.55;
-export const RIM_INTENSITY_ENEMY = 0.45;
-export const RIM_INTENSITY_BOSS = 0.7;
+export const RIM_INTENSITY_ENEMY = 0;
+export const RIM_INTENSITY_BOSS = 0;
 
 // Toon amount: 0 keeps stock PBR shading, 1 fully quantizes diffuse into
 // the 3 bands. 0.72 reads as painted without losing PBR cues entirely.

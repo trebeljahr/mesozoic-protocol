@@ -16,6 +16,11 @@ import { BOSS_VARIANT_TINT } from "../sim/world";
 
 type Vec3 = [number, number, number];
 
+const PLATE_VERTICAL_INSET = 0.42;
+const PLATE_WIDTH_SCALE = 0.56;
+const PLATE_HEIGHT_SCALE = 0.22;
+const PLATE_DEPTH_SCALE = 0.64;
+
 export type PlateSpec = {
   // Anchor in target-size-unit world space — feet sit at world Y = 0,
   // body extends along +Y, forward = +Z, right = +X. Authored against
@@ -244,9 +249,9 @@ let cachedPlateMaterial: THREE.MeshStandardMaterial | null = null;
 export const getPlateMaterial = (): THREE.MeshStandardMaterial => {
   if (!cachedPlateMaterial) {
     cachedPlateMaterial = new THREE.MeshStandardMaterial({
-      color: new THREE.Color("#52575e"),
-      metalness: 0.7,
-      roughness: 0.6,
+      color: new THREE.Color("#78838c"),
+      metalness: 0.35,
+      roughness: 0.72,
     });
   }
   return cachedPlateMaterial;
@@ -458,7 +463,7 @@ const bindPlateToBone = (
   const bone = findPlateBone(root, inferPlateBone(spec));
   const desiredPosition = new THREE.Vector3(
     centerXZ.x + spec.offset[0] * scale,
-    spec.offset[1] * scale,
+    (spec.offset[1] - PLATE_VERTICAL_INSET) * scale,
     centerXZ.z + spec.offset[2] * scale,
   );
   const desiredQuaternion = new THREE.Quaternion().setFromEuler(
@@ -471,7 +476,11 @@ const bindPlateToBone = (
     bone,
     localPosition: bone.worldToLocal(desiredPosition.clone()),
     localQuaternion,
-    size: new THREE.Vector3(spec.size[0] * scale, spec.size[1] * scale, spec.size[2] * scale),
+    size: new THREE.Vector3(
+      spec.size[0] * scale * PLATE_WIDTH_SCALE,
+      spec.size[1] * scale * PLATE_HEIGHT_SCALE,
+      spec.size[2] * scale * PLATE_DEPTH_SCALE,
+    ),
   } satisfies PlateBinding;
 };
 
@@ -513,7 +522,7 @@ export const buildPlateGroup = (
     // Matriarchs force max density: every authored plate shows.
     if (!matriarch && spec.tier > effectiveTier) continue;
     const mesh = new THREE.Mesh(geom, mat);
-    mesh.castShadow = true;
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     bindPlateToBone(mesh, root, spec, scale, centerXZ);
     group.add(mesh);
