@@ -57,7 +57,7 @@ export const swatchBtn = (on = false): CSSProperties => ({
   alignItems: "center",
   gap: 3,
   padding: 4,
-  width: 64,
+  width: 80,
   borderRadius: 5,
   border: `1px solid ${on ? "#6aa9ff" : "#3a4150"}`,
   background: on ? "#1d3a66" : "#1a1f29",

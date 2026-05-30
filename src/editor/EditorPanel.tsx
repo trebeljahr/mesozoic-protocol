@@ -403,7 +403,7 @@ export const EditorPanel = ({
                   style={swatchBtn(placingUrl === c.url)}
                   onClick={() => store.getState().setPlacing(c.url)}
                 >
-                  <PropPreview url={c.url} size={42} />
+                  <PropPreview url={c.url} size={56} />
                   <span style={swatchLabel}>{c.label}</span>
                 </button>
               ))}
@@ -635,7 +635,7 @@ const BrushVariants = ({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
             gap: 4,
             maxHeight: 220,
             overflowY: "auto",
@@ -659,7 +659,7 @@ const BrushVariants = ({
                 onClick={() => onToggle(url)}
                 title={`${labelFor(url)}\n${url}`}
               >
-                <PropPreview url={url} size={42} />
+                <PropPreview url={url} size={56} />
                 <span style={swatchLabel}>{labelFor(url)}</span>
               </button>
             );
