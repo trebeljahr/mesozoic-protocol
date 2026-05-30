@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import type { OrthographicCamera as OrthographicCameraImpl } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { useEditor } from "../editor/editorStore";
 import { MAP_HEIGHT, MAP_WIDTH, PATH_ENTRY_MARGIN_X, PATH_ENTRY_MARGIN_Y } from "../level";
 import { useGame } from "../store";
 import { MapOrbitControls } from "./useMapGestures";
@@ -101,6 +102,18 @@ export const CameraRig = () => {
   // camera must not pan or rotate under the gesture.
   const robotDashAiming = useGame((s) => s.ui.robotDashAiming);
   const size = useThree((s) => s.size);
+
+  // Dev-only: when the level editor's brush/river/place/move tool is
+  // armed, the canvas pointer belongs to the editor. We expose this as a
+  // ref to MapOrbitControls so the drag gate inside useMapGestures can
+  // synchronously bail before touching controls.enabled or replaying
+  // pointer events — without this the brush stroke leaks into a camera
+  // pan when the pointer crosses the drag threshold.
+  const editorToolActive = useEditor(
+    (s) => s.active && (s.placingUrl !== null || s.moving || s.brush.active || s.riverTool.active),
+  );
+  const toolOwnsPointerRef = useRef(editorToolActive);
+  toolOwnsPointerRef.current = editorToolActive;
 
   // Local one-shot rumble triggered when the run flips to "lost". The
   // sim loop stops ticking on loss (so world.shake stops decaying), and
@@ -242,6 +255,7 @@ export const CameraRig = () => {
         minPolarAngle={BATTLE_MIN_POLAR}
         maxPolarAngle={BATTLE_MAX_POLAR}
         rotateSpeed={0.6}
+        toolOwnsPointerRef={toolOwnsPointerRef}
       />
     </>
   );

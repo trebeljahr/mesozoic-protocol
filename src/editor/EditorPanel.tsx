@@ -196,7 +196,10 @@ export const EditorPanel = ({
   };
 
   return (
-    <div style={panel}>
+    // Stop pointerdown at the panel root so panel clicks don't bubble to the
+    // canvas-level OrbitControls drag gate (which listens at document level)
+    // and don't get mistaken for a deselect on the editor click plane.
+    <div style={panel} onPointerDownCapture={(e) => e.stopPropagation()}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <strong style={{ fontSize: 13 }}>{title}</strong>
         <div style={{ display: "flex", gap: 6 }}>

@@ -26,6 +26,11 @@ export type MapGestureConfig = {
   minPolarAngle?: number;
   maxPolarAngle?: number;
   rotateSpeed?: number;
+  // When current=true the editor tool owns the pointer — the drag gate must
+  // not flip controls.enabled or replay synthetic events. Lets us bail out
+  // synchronously inside onDown before the gate timer can re-enable the
+  // controls under an in-flight brush/river stroke.
+  toolOwnsPointerRef?: React.RefObject<boolean>;
 };
 
 export const MapOrbitControls = forwardRef<OrbitControlsImpl | null, MapGestureConfig>(
@@ -44,6 +49,7 @@ export const MapOrbitControls = forwardRef<OrbitControlsImpl | null, MapGestureC
       minPolarAngle = 0,
       maxPolarAngle = Math.PI,
       rotateSpeed = 0.7,
+      toolOwnsPointerRef,
     },
     ref,
   ) {
@@ -76,7 +82,7 @@ export const MapOrbitControls = forwardRef<OrbitControlsImpl | null, MapGestureC
       }
     });
 
-    useDragGate(controlsRef, reserveLeftClick, gl);
+    useDragGate(controlsRef, reserveLeftClick, gl, toolOwnsPointerRef);
 
     // Touch stays pan + pinch/pan only. Mobile orbit gestures made camera
     // rotation/tilt feel accidental, so desktop keeps right-mouse orbit
@@ -125,6 +131,7 @@ function useDragGate(
   controlsRef: React.RefObject<OrbitControlsImpl | null>,
   active: boolean,
   gl: THREE.WebGLRenderer,
+  toolOwnsPointerRef?: React.RefObject<boolean>,
 ) {
   useEffect(() => {
     if (!active) return;
@@ -139,6 +146,11 @@ function useDragGate(
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== "mouse" || e.button !== 0) return;
       if (DRAG_GATE in e) return;
+      // Editor tool owns the pointer for this gesture — don't gate, don't
+      // touch controls.enabled. The synchronous controls.enabled = false in
+      // EditorPropsLayer keeps OrbitControls inert; if we re-enabled here
+      // the brush/river stroke would leak into a camera pan mid-drag.
+      if (toolOwnsPointerRef?.current === true) return;
 
       startX = e.clientX;
       startY = e.clientY;
@@ -149,6 +161,10 @@ function useDragGate(
       if (c) {
         c.enabled = false;
         queueMicrotask(() => {
+          // Tool may have armed in the same microtask window — re-check
+          // before flipping enabled back on so the gate doesn't undo the
+          // synchronous controls.enabled = false from EditorPropsLayer.
+          if (toolOwnsPointerRef?.current === true) return;
           if (c) c.enabled = true;
         });
       }
@@ -156,6 +172,11 @@ function useDragGate(
 
     const onMove = (e: PointerEvent) => {
       if (!gated || e.pointerId !== pointerId) return;
+      if (toolOwnsPointerRef?.current === true) {
+        gated = false;
+        pointerId = -1;
+        return;
+      }
 
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
@@ -210,5 +231,5 @@ function useDragGate(
       ownerDocument.removeEventListener("pointerup", clearGate);
       ownerDocument.removeEventListener("pointercancel", clearGate);
     };
-  }, [gl, controlsRef, active]);
+  }, [gl, controlsRef, active, toolOwnsPointerRef]);
 }

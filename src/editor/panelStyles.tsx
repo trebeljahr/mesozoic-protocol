@@ -26,6 +26,11 @@ export const panel: CSSProperties = {
   overflow: "hidden",
   touchAction: "pan-y",
   overscrollBehavior: "contain",
+  // Explicit so the panel always swallows pointer events (and the
+  // EditorPanel's onPointerDownCapture stopper actually has a target). If a
+  // parent ever sets pointerEvents: none, panel clicks would otherwise leak
+  // straight to the canvas / document-level drag gate.
+  pointerEvents: "auto",
 };
 
 export const btn = (on = false): CSSProperties => ({

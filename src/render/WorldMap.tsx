@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { OrthographicCamera as OrthographicCameraImpl } from "three";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { LEVELS } from "../levels";
 import { getStars, isLevelUnlocked, type ProgressData } from "../progress";
 import { useGame } from "../store";
@@ -192,6 +193,14 @@ export const WorldMapScene = () => {
       isMobile ? computeMobileFocus(progress, fitZoom, maxZoom, size.width, size.height) : null,
     [isMobile, progress, fitZoom, maxZoom, size.width, size.height],
   );
+  // Dev-only: when the world-map editor has a brush/river/place/move tool
+  // armed, the canvas pointer belongs to the editor. Mirror of CameraRig's
+  // setup — see useMapGestures' drag gate for why this has to be a ref.
+  const editorToolActive = useWorldMapEditor(
+    (s) => s.active && (s.placingUrl !== null || s.moving || s.brush.active || s.riverTool.active),
+  );
+  const toolOwnsPointerRef = useRef(editorToolActive);
+  toolOwnsPointerRef.current = editorToolActive;
   return (
     <>
       <color attach="background" args={[BG]} />
@@ -225,6 +234,7 @@ export const WorldMapScene = () => {
         // World map controls are pan + zoom only. The camera keeps its
         // authored fixed tilt, but player gestures must not orbit or
         // pitch it.
+        toolOwnsPointerRef={toolOwnsPointerRef}
       />
       <MapFocusTarget focus={focus} />
 

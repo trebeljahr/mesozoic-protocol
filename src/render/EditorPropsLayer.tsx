@@ -27,6 +27,34 @@ const selectRadius = (url: string, scale: number): number =>
 
 const PAINT_INTERVAL_MS = 80;
 
+// Cast a ray through the supplied client-space pointer against an unbounded
+// math plane and return the world-space XZ hit. Used while painting so a
+// brush drag past the bounded mesh edge still hits ground — and so we
+// don't rely on r3f's internal pointer state, which is undefined when the
+// pointer is captured to the canvas but the cursor sits outside it.
+// Returns null when the ray is parallel to (or above) the plane.
+const _planeHit = new THREE.Vector3();
+const _ndc = new THREE.Vector2();
+const raycastPlaneFromClient = (
+  raycaster: THREE.Raycaster,
+  canvas: HTMLCanvasElement,
+  clientX: number,
+  clientY: number,
+  camera: THREE.Camera,
+  plane: THREE.Plane,
+): { x: number; z: number } | null => {
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  _ndc.set(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -(((clientY - rect.top) / rect.height) * 2 - 1),
+  );
+  raycaster.setFromCamera(_ndc, camera);
+  const hit = raycaster.ray.intersectPlane(plane, _planeHit);
+  if (!hit) return null;
+  return { x: hit.x, z: hit.z };
+};
+
 export type EditorPropsLayerProps = {
   store: EditorStore;
   planeHalfExtent: { x: number; z: number };
@@ -54,19 +82,41 @@ export const EditorPropsLayer = ({
   const brushMode = brushActive && (brushPresetId !== null || brushEraser);
   const riverTool = store((s) => s.riverTool);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
+  const gl = useThree((s) => s.gl);
+  // Stable canvas DOM ref. Used by child pointerdown handlers for
+  // setPointerCapture(canvas, ...) so a brush/river drag that leaves the
+  // bounded plane mesh still delivers pointermove/up to the canvas — and
+  // never gets handed to OrbitControls' drag gate mid-stroke.
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    canvasRef.current = gl.domElement as HTMLCanvasElement;
+  }, [gl]);
+  // Shared pointer-ownership flag both the canvas pointer handlers below and
+  // the OrbitControls drag gate read. Kept in a ref (not state) so reads
+  // inside synchronous pointer-event handlers see the current value without
+  // a re-render dance.
+  const toolOwnsPointerRef = useRef(false);
   void version;
   const { props, rivers } = store.getState().getCurrent();
 
+  const toolOwnsPointer =
+    active && (placingUrl !== null || moving || brushMode || riverTool.active);
+
+  // Keep the ref synced before any pointer handler can read it. useEffect
+  // runs after commit, but the ref read inside handlers fires on the next
+  // user event so the order is safe.
   useEffect(() => {
-    const toolOwnsPointer =
-      active && (placingUrl !== null || moving || brushMode || riverTool.active);
-    if (!controls || !toolOwnsPointer) return;
-    const previous = controls.enabled;
-    controls.enabled = false;
-    return () => {
-      controls.enabled = previous;
-    };
-  }, [active, placingUrl, moving, brushMode, riverTool.active, controls]);
+    toolOwnsPointerRef.current = toolOwnsPointer;
+  }, [toolOwnsPointer]);
+
+  // Synchronous hard-set on controls.enabled. The drag gate also defers to
+  // toolOwnsPointerRef so a re-enable from gate's microtask can't sneak in
+  // under a tool gesture. On flip false the controls hard-reset to enabled.
+  useEffect(() => {
+    if (!controls) return;
+    if (toolOwnsPointer) controls.enabled = false;
+    else controls.enabled = true;
+  }, [toolOwnsPointer, controls]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: version is the intended invalidation key
   const groups = useMemo(() => {
@@ -99,6 +149,7 @@ export const EditorPropsLayer = ({
           halfExtent={planeHalfExtent}
           brushMode={brushMode}
           brushRadius={brushRadius}
+          canvasRef={canvasRef}
         />
       )}
       {active && !placingUrl && !brushMode && !riverTool.active && (
@@ -133,6 +184,7 @@ export const EditorPropsLayer = ({
           rivers={rivers}
           editingRiverId={riverTool.editingRiverId}
           selectedRiverId={riverTool.selectedRiverId}
+          canvasRef={canvasRef}
         />
       )}
     </group>
@@ -144,11 +196,13 @@ const EditorGroundPlane = ({
   halfExtent,
   brushMode,
   brushRadius,
+  canvasRef,
 }: {
   store: EditorStore;
   halfExtent: { x: number; z: number };
   brushMode: boolean;
   brushRadius: number;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }) => {
   const geom = useMemo(
     () => new THREE.PlaneGeometry(halfExtent.x * 2, halfExtent.z * 2),
@@ -160,6 +214,16 @@ const EditorGroundPlane = ({
   const ringRef = useRef<THREE.Mesh | null>(null);
   const isDownRef = useRef(false);
   const lastPaintRef = useRef(0);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const capturePointerIdRef = useRef<number | null>(null);
+  // Unbounded math plane (y=0) for paint raycasting. Lets the brush keep
+  // painting when the pointer drifts off the bounded mesh — without this
+  // the stroke goes silent at the plane edge and an off-canvas pointer-up
+  // reads as a never-released gesture.
+  const paintPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
+  const lastPaintHitRef = useRef<{ x: number; z: number } | null>(null);
+  const raycaster = useThree((s) => s.raycaster);
+  const camera = useThree((s) => s.camera);
 
   const ringGeom = useMemo(
     () => new THREE.RingGeometry(brushRadius - 0.06, brushRadius + 0.06, 64),
@@ -169,7 +233,8 @@ const EditorGroundPlane = ({
 
   // Window-level pointerup safety net: if the pointer is released over UI or
   // off-canvas, the plane's onPointerUp may not fire — close any open stroke
-  // anyway so the next stroke starts clean.
+  // anyway so the next stroke starts clean. Also releases the canvas-level
+  // pointer capture so further hover events go where they should.
   useEffect(() => {
     if (!brushMode) return;
     const onUp = () => {
@@ -177,6 +242,18 @@ const EditorGroundPlane = ({
         store.getState().endStroke();
         isDownRef.current = false;
       }
+      const canvas = captureCanvasRef.current;
+      const pid = capturePointerIdRef.current;
+      if (canvas && pid !== null) {
+        try {
+          canvas.releasePointerCapture(pid);
+        } catch {
+          // Capture may have already been released by the browser.
+        }
+      }
+      captureCanvasRef.current = null;
+      capturePointerIdRef.current = null;
+      lastPaintHitRef.current = null;
     };
     window.addEventListener("pointerup", onUp);
     return () => window.removeEventListener("pointerup", onUp);
@@ -240,10 +317,18 @@ const EditorGroundPlane = ({
     ed.paintAt(e.point.x, -e.point.z);
     isDownRef.current = true;
     lastPaintRef.current = performance.now();
-    const t = e.target as Element | null;
-    if (t && "setPointerCapture" in t) {
+    lastPaintHitRef.current = { x: e.point.x, z: e.point.z };
+    // Capture on the canvas DOM (not e.target which is the r3f object); this
+    // forwards every subsequent pointermove/up to the canvas even when the
+    // pointer leaves the bounded plane mesh, so brush strokes don't go silent
+    // mid-drag and the OrbitControls drag gate (canvas-level pointerdown
+    // listener) can't claim the stream back.
+    const canvas = canvasRef.current;
+    if (canvas) {
       try {
-        (t as Element & { setPointerCapture: (id: number) => void }).setPointerCapture(e.pointerId);
+        canvas.setPointerCapture(e.pointerId);
+        captureCanvasRef.current = canvas;
+        capturePointerIdRef.current = e.pointerId;
       } catch {
         // Best-effort capture; window-level pointerup still closes stroke.
       }
@@ -256,7 +341,25 @@ const EditorGroundPlane = ({
       const now = performance.now();
       if (now - lastPaintRef.current >= PAINT_INTERVAL_MS) {
         lastPaintRef.current = now;
-        store.getState().paintAt(e.point.x, -e.point.z);
+        // Cast against an unbounded math plane so the stroke keeps going if
+        // the pointer drifts past the bounded mesh edge. Falls back to the
+        // last known hit if the ray is parallel to (or above) the plane.
+        const canvas = canvasRef.current;
+        const hit = canvas
+          ? raycastPlaneFromClient(
+              raycaster,
+              canvas,
+              e.nativeEvent.clientX,
+              e.nativeEvent.clientY,
+              camera,
+              paintPlaneRef.current,
+            )
+          : null;
+        const useHit = hit ?? lastPaintHitRef.current;
+        if (useHit) {
+          lastPaintHitRef.current = useHit;
+          store.getState().paintAt(useHit.x, -useHit.z);
+        }
       }
       return;
     }
@@ -275,6 +378,18 @@ const EditorGroundPlane = ({
       store.getState().endStroke();
       isDownRef.current = false;
     }
+    const canvas = captureCanvasRef.current;
+    const pid = capturePointerIdRef.current;
+    if (canvas && pid !== null) {
+      try {
+        canvas.releasePointerCapture(pid);
+      } catch {
+        // Capture may have already been released by the browser.
+      }
+    }
+    captureCanvasRef.current = null;
+    capturePointerIdRef.current = null;
+    lastPaintHitRef.current = null;
   };
 
   return (
@@ -362,11 +477,13 @@ const RiverEditOverlay = ({
   rivers,
   editingRiverId,
   selectedRiverId,
+  canvasRef,
 }: {
   store: EditorStore;
   rivers: River[];
   editingRiverId: string | null;
   selectedRiverId: string | null;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }) => {
   if (rivers.length === 0) return null;
   return (
@@ -378,6 +495,7 @@ const RiverEditOverlay = ({
           river={r}
           isEditing={r.id === editingRiverId}
           isSelected={r.id === selectedRiverId}
+          canvasRef={canvasRef}
         />
       ))}
     </group>
@@ -389,11 +507,13 @@ const RiverPointGroup = ({
   river,
   isEditing,
   isSelected,
+  canvasRef,
 }: {
   store: EditorStore;
   river: River;
   isEditing: boolean;
   isSelected: boolean;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }) => {
   // Highlight color: in-progress > selected > idle.
   const color = isEditing ? "#ffd66a" : isSelected ? "#76d6ff" : "#3aa8d8";
@@ -412,6 +532,7 @@ const RiverPointGroup = ({
           x={p.x}
           y={p.y}
           color={color}
+          canvasRef={canvasRef}
         />
       ))}
     </group>
@@ -425,6 +546,7 @@ const RiverPoint = ({
   x,
   y,
   color,
+  canvasRef,
 }: {
   store: EditorStore;
   riverId: string;
@@ -432,8 +554,11 @@ const RiverPoint = ({
   x: number;
   y: number;
   color: string;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }) => {
   const dragging = useRef(false);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const capturePointerIdRef = useRef<number | null>(null);
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
@@ -447,7 +572,19 @@ const RiverPoint = ({
     }
     dragging.current = true;
     ed.dragRiverPointStart();
-    (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+    // Capture on the canvas DOM, mirroring the brush stroke path so drags
+    // off the sphere mesh still deliver pointermove/up and OrbitControls
+    // can't claim the stream.
+    const canvas = canvasRef.current;
+    if (canvas) {
+      try {
+        canvas.setPointerCapture(e.pointerId);
+        captureCanvasRef.current = canvas;
+        capturePointerIdRef.current = e.pointerId;
+      } catch {
+        // Best-effort capture.
+      }
+    }
   };
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
@@ -461,7 +598,17 @@ const RiverPoint = ({
     e.stopPropagation();
     dragging.current = false;
     store.getState().dragRiverPointEnd();
-    (e.target as Element | null)?.releasePointerCapture?.(e.pointerId);
+    const canvas = captureCanvasRef.current;
+    const pid = capturePointerIdRef.current;
+    if (canvas && pid !== null) {
+      try {
+        canvas.releasePointerCapture(pid);
+      } catch {
+        // Capture may have already been released.
+      }
+    }
+    captureCanvasRef.current = null;
+    capturePointerIdRef.current = null;
   };
 
   return (
