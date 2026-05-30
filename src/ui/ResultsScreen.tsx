@@ -27,8 +27,15 @@ export const ResultsScreen = () => {
   const startLevel = useGame((s) => s.startLevel);
 
   const nextLevel = result ? LEVELS.find((l) => l.id === result.levelId + 1) : undefined;
+  // Heroic/iron don't gate next-level unlock (normal 3-star already did), so
+  // surfacing "Unlocked: X" + a Next Level button after a challenge run reads
+  // as nonsense. Only normal mode advances along the campaign spine.
   const showNext =
-    !!result && result.won && nextLevel !== undefined && isLevelUnlocked(nextLevel.id, progress);
+    !!result &&
+    result.won &&
+    result.mode === "normal" &&
+    nextLevel !== undefined &&
+    isLevelUnlocked(nextLevel.id, progress);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
