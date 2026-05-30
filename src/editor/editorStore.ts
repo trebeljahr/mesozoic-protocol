@@ -7,6 +7,10 @@ import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./ed
 import { clearAllLevelHistories, loadLevelHistory, saveLevelHistory } from "./historyPersist";
 import { clearAllLevelEdits, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
 
+// Half-extents of the level's editable area — fed to the editor's river
+// tool so endpoints snap to the perimeter the player actually plays on.
+const LEVEL_BOUNDS = { halfW: MAP_WIDTH / 2, halfH: MAP_HEIGHT / 2 } as const;
+
 // Dev-only level-editor store. A thin adapter over the shared editorCore
 // factory: the source of truth is useGame.world.{props, rivers,
 // overrideActive}, which createWorld populates from localStorage on every
@@ -50,21 +54,8 @@ const saveCurrentLevelEdit = (): void => {
     proceduralSeed: w.proceduralSeed,
     props: w.props,
     rivers: w.rivers,
+    bridges: w.autoBridges,
   });
-};
-
-const snapToEdge = (point: { x: number; y: number }): { x: number; y: number } => {
-  const halfW = MAP_WIDTH / 2;
-  const halfH = MAP_HEIGHT / 2;
-  const left = Math.abs(point.x + halfW);
-  const right = Math.abs(halfW - point.x);
-  const top = Math.abs(point.y + halfH);
-  const bottom = Math.abs(halfH - point.y);
-  const nearest = Math.min(left, right, top, bottom);
-  if (nearest === left) return { x: -halfW, y: Math.max(-halfH, Math.min(halfH, point.y)) };
-  if (nearest === right) return { x: halfW, y: Math.max(-halfH, Math.min(halfH, point.y)) };
-  if (nearest === top) return { x: Math.max(-halfW, Math.min(halfW, point.x)), y: -halfH };
-  return { x: Math.max(-halfW, Math.min(halfW, point.x)), y: halfH };
 };
 
 const canEditPlaceAt = (
@@ -125,14 +116,16 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
       props: w.props,
       override: w.overrideActive,
       rivers: w.rivers,
+      bridges: w.autoBridges,
       proceduralSeed: w.proceduralSeed,
     };
   },
-  commit: ({ props, override, rivers, proceduralSeed }) => {
+  commit: ({ props, override, rivers, bridges, proceduralSeed }) => {
     const w = useGame.getState().world;
     w.props = props;
     w.overrideActive = override;
     w.rivers = rivers;
+    w.autoBridges = bridges;
     w.proceduralSeed = proceduralSeed ?? w.proceduralSeed;
     bumpGeometry();
     saveCurrentLevelEdit();
@@ -141,6 +134,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     const w = useGame.getState().world;
     w.props = [];
     w.rivers = [];
+    w.autoBridges = [];
     w.overrideActive = true;
     // No bump here — onClear -> reloadLevel does it after the rebuild.
     saveCurrentLevelEdit();
@@ -149,6 +143,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     const w = useGame.getState().world;
     w.props = [];
     w.rivers = [];
+    w.autoBridges = [];
     bumpGeometry();
     saveCurrentLevelEdit();
   },
@@ -168,7 +163,8 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     reloadLevel();
   },
   canPlaceAt: canEditPlaceAt,
-  snapToEdge,
+  getMapBounds: () => LEVEL_BOUNDS,
+  getPaths: () => useGame.getState().world.paths,
   // History is persisted per-level so each level keeps its own undo/redo
   // stacks across reloads. A useGame.subscribe below swaps the in-memory
   // history when the active levelId changes.
@@ -188,6 +184,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
         proceduralSeed: w.proceduralSeed,
         props: w.props,
         rivers: w.rivers,
+        bridges: w.autoBridges,
       },
       null,
       2,
@@ -227,6 +224,7 @@ export const clearAllLevels = (): void => {
   const w = useGame.getState().world;
   w.props = [];
   w.rivers = [];
+  w.autoBridges = [];
   w.overrideActive = false;
   w.proceduralSeed = 0;
   // No pre-bump — reloadLevel() handles it after the rebuild.

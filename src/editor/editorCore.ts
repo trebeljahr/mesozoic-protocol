@@ -1,8 +1,9 @@
 import { nanoid } from "nanoid";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
-import type { PlacedProp, River, RiverMaterial, RiverPoint, Vec2 } from "../sim/types";
+import type { AutoBridge, PlacedProp, River, RiverMaterial, RiverPoint, Vec2 } from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
+import { resolveBridges } from "./bridgeResolver";
 import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
 import {
   canRedo as canRedoH,
@@ -66,10 +67,79 @@ export const RIVER_MATERIALS: { id: RiverMaterial; label: string }[] = [
   { id: "toxic", label: "Toxic" },
 ];
 
+// Distance (world units) inside which the river end-point is treated as
+// "already at the edge" and snaps perpendicular. Outside that, the editor
+// extrapolates the user's last stroke direction out to the nearest wall
+// instead of warping the tail sideways — so a river drawn mid-map gets a
+// natural tangent extension rather than a perpendicular jog.
+export const RIVER_EDGE_SNAP_THRESHOLD = 1.5;
+
+export type MapBounds = { halfW: number; halfH: number };
+
+// Project `p` onto the nearest cardinal edge of the bounding rectangle,
+// clamping the perpendicular coordinate so the result lands on the edge
+// itself. Tie-break order Left, Right, Bottom, Top — deterministic across
+// runs so identical rivers re-snap identically.
+export const projectToEdge = (p: Vec2, b: MapBounds): Vec2 => {
+  const left = Math.abs(p.x + b.halfW);
+  const right = Math.abs(b.halfW - p.x);
+  const bottom = Math.abs(p.y + b.halfH);
+  const top = Math.abs(b.halfH - p.y);
+  const nearest = Math.min(left, right, bottom, top);
+  if (nearest === left) return { x: -b.halfW, y: Math.max(-b.halfH, Math.min(b.halfH, p.y)) };
+  if (nearest === right) return { x: b.halfW, y: Math.max(-b.halfH, Math.min(b.halfH, p.y)) };
+  if (nearest === bottom) return { x: Math.max(-b.halfW, Math.min(b.halfW, p.x)), y: -b.halfH };
+  return { x: Math.max(-b.halfW, Math.min(b.halfW, p.x)), y: b.halfH };
+};
+
+// Signed distance to the nearest cardinal edge; positive inside the
+// bounding box. Negative would mean the point already sits outside the
+// rectangle, which the editor's clamps shouldn't allow, but the formula
+// stays well-defined.
+export const distToNearestEdge = (p: Vec2, b: MapBounds): number =>
+  Math.min(b.halfW - Math.abs(p.x), b.halfH - Math.abs(p.y));
+
+// Parametric ray-march from `last` along `(last - prev)` to the smallest
+// positive `t` that hits a wall, then clamp the perpendicular onto the
+// edge. Returns null if the direction is degenerate (lenSq < 1e-6) so the
+// caller can fall back to projectToEdge.
+export const extendToEdge = (prev: Vec2, last: Vec2, b: MapBounds): Vec2 | null => {
+  const dx = last.x - prev.x;
+  const dy = last.y - prev.y;
+  if (dx * dx + dy * dy < 1e-6) return null;
+  // Candidate ts: positive intersections with each wall.
+  let bestT = Number.POSITIVE_INFINITY;
+  if (dx > 0) {
+    const t = (b.halfW - last.x) / dx;
+    if (t > 0 && t < bestT) bestT = t;
+  } else if (dx < 0) {
+    const t = (-b.halfW - last.x) / dx;
+    if (t > 0 && t < bestT) bestT = t;
+  }
+  if (dy > 0) {
+    const t = (b.halfH - last.y) / dy;
+    if (t > 0 && t < bestT) bestT = t;
+  } else if (dy < 0) {
+    const t = (-b.halfH - last.y) / dy;
+    if (t > 0 && t < bestT) bestT = t;
+  }
+  if (!Number.isFinite(bestT)) return null;
+  const x = last.x + dx * bestT;
+  const y = last.y + dy * bestT;
+  return {
+    x: Math.max(-b.halfW, Math.min(b.halfW, x)),
+    y: Math.max(-b.halfH, Math.min(b.halfH, y)),
+  };
+};
+
 export type EditorSource = {
   props: PlacedProp[];
   override: boolean;
   rivers: River[];
+  // Editor-managed bridges resolved per commit from rivers × paths and
+  // persisted alongside the river polylines so they get stable ids,
+  // material-themed palettes, and survive reloads.
+  bridges: AutoBridge[];
   proceduralSeed?: number;
 };
 
@@ -94,7 +164,16 @@ export type EditorAdapter = {
     candidateRadius: number,
     ignorePropId?: string | null,
   ) => boolean;
-  snapToEdge?: (point: Vec2) => Vec2;
+  // Map bounds for the editable area. Used by the river tool to snap
+  // endpoints to the nearest edge (with a threshold + direction-aware
+  // extension) and by the auto-bridge resolver to find path crossings.
+  // Returning null suppresses edge snapping entirely so the user keeps
+  // whatever endpoint they painted.
+  getMapBounds?: () => MapBounds | null;
+  // Live paths the editor's bridge resolver should consider. The level
+  // adapter reads useGame.world.paths; the world map has no path
+  // geometry today so its adapter returns []. Called once per commit.
+  getPaths?: () => Vec2[][];
   // Scope-aware JSON dump. Each adapter stamps its own metadata (scope,
   // levelId, generatedAt) on top of the persisted { v, override, props,
   // rivers } shape so a downloaded file is self-describing.
@@ -248,6 +327,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props: [...cur.props],
         override: cur.override,
         rivers: cloneRivers(cur.rivers),
+        bridges: cur.bridges.map((b) => ({ ...b })),
         proceduralSeed: cur.proceduralSeed,
       };
     };
@@ -273,24 +353,34 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       set((s) => ({ version: s.version + 1 }));
     };
 
-    // Replace just the props array, keeping override + rivers unchanged.
+    // Replace just the props array, keeping override + rivers + bridges unchanged.
     const commitProps = (props: PlacedProp[]): void => {
       const cur = adapter.getCurrent();
       commit({
         props,
         override: cur.override,
         rivers: cur.rivers,
+        bridges: cur.bridges,
         proceduralSeed: cur.proceduralSeed,
       });
     };
 
     // Replace just the rivers array, keeping props + override unchanged.
+    // Every river edit funnels through here, so this is the single point
+    // where editor-managed bridges get re-resolved (preserving stable ids +
+    // user overrides via bridgeResolver). When the adapter doesn't expose
+    // a path source (world-map editor today), the resolver runs against an
+    // empty path set — i.e. no bridges, which matches the current world-map
+    // render behaviour.
     const commitRivers = (rivers: River[]): void => {
       const cur = adapter.getCurrent();
+      const paths = adapter.getPaths?.() ?? [];
+      const bridges = resolveBridges(paths, rivers, cur.bridges);
       commit({
         props: cur.props,
         override: cur.override,
         rivers,
+        bridges,
         proceduralSeed: cur.proceduralSeed,
       });
     };
@@ -401,6 +491,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           props: cur.props,
           override: on,
           rivers: cur.rivers,
+          bridges: cur.bridges,
           proceduralSeed: cur.proceduralSeed,
         });
         set({ selectedId: null, moving: false, placingUrl: null });
@@ -433,6 +524,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             props: [],
             override: cur.override,
             rivers: [],
+            bridges: [],
             proceduralSeed: cur.proceduralSeed,
           });
         }
@@ -456,6 +548,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             props: cur.props,
             override: true,
             rivers: cur.rivers,
+            bridges: cur.bridges,
             proceduralSeed: cur.proceduralSeed,
           });
         }
@@ -484,6 +577,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           props: cur.props,
           override: false,
           rivers: cur.rivers,
+          bridges: cur.bridges,
           proceduralSeed: Date.now(),
         });
       },
@@ -702,8 +796,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // First click of a new river: seed two coincident-ish points so the
         // Catmull-Rom curve has enough samples to render immediately. The
         // second click (addRiverPoint) replaces the placeholder offset.
+        // Always snap the start to the nearest map edge — rivers as a
+        // policy enter the playfield from off-screen, never start
+        // mid-map. When the adapter doesn't know its bounds (world-map
+        // editor today), keep the click position verbatim.
         const id = nanoid(8);
-        const start = adapter.snapToEdge ? adapter.snapToEdge({ x, y }) : { x, y };
+        const bounds = adapter.getMapBounds?.() ?? null;
+        const start = bounds ? projectToEdge({ x, y }, bounds) : { x, y };
         const seed: River = {
           id,
           points: [start, { x: start.x + 0.01, y: start.y + 0.01 }],
@@ -741,19 +840,58 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
 
       finishRiver: () => {
         const editingId = get().riverTool.editingRiverId;
-        if (editingId !== null && adapter.snapToEdge) {
-          const cur = adapter.getCurrent();
-          commitRivers(
-            cur.rivers.map((r) => {
-              if (r.id !== editingId || r.points.length < 2) return r;
-              const last = r.points.length - 1;
-              return {
-                ...r,
-                points: r.points.map((p, i) => (i === last ? adapter.snapToEdge!(p) : p)),
-              };
-            }),
-          );
+        if (editingId === null) return;
+        const bounds = adapter.getMapBounds?.() ?? null;
+        if (!bounds) {
+          set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
+          return;
         }
+        const cur = adapter.getCurrent();
+        const river = cur.rivers.find((r) => r.id === editingId);
+        if (!river) {
+          set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
+          return;
+        }
+        // Single-click finish: only the placeholder seed exists. Drop the
+        // river entirely rather than persisting an unrenderable stub.
+        const pts = river.points;
+        const isPlaceholder =
+          pts.length === 2 && pts[1].x === pts[0].x + 0.01 && pts[1].y === pts[0].y + 0.01;
+        if (isPlaceholder) {
+          commitRivers(cur.rivers.filter((r) => r.id !== editingId));
+          set((s) => ({
+            riverTool: {
+              ...s.riverTool,
+              editingRiverId: null,
+              selectedRiverId:
+                s.riverTool.selectedRiverId === editingId ? null : s.riverTool.selectedRiverId,
+            },
+          }));
+          return;
+        }
+        const lastIdx = pts.length - 1;
+        const last = pts[lastIdx];
+        const prev = lastIdx >= 1 ? pts[lastIdx - 1] : null;
+        const distAbs = Math.abs(distToNearestEdge(last, bounds));
+        let nextPts: RiverPoint[];
+        if (distAbs <= RIVER_EDGE_SNAP_THRESHOLD || !prev) {
+          // Tail already sits near an edge (or there's no direction to
+          // extrapolate from): replace the last point in place.
+          const snapped = projectToEdge(last, bounds);
+          nextPts = pts.map((p, i) => (i === lastIdx ? snapped : p));
+        } else {
+          // Extend the last stroke direction out to the nearest wall so the
+          // river continues off-map along the tangent the user was drawing,
+          // instead of jogging perpendicular to it.
+          const edgePt = extendToEdge(prev, last, bounds);
+          if (edgePt) {
+            nextPts = [...pts, edgePt];
+          } else {
+            const snapped = projectToEdge(last, bounds);
+            nextPts = pts.map((p, i) => (i === lastIdx ? snapped : p));
+          }
+        }
+        commitRivers(cur.rivers.map((r) => (r.id === editingId ? { ...r, points: nextPts } : r)));
         set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
       },
 
@@ -772,14 +910,16 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       dragRiverPoint: (riverId, index, x, y) => {
         // Pure mutation — history was captured at drag start.
         const cur = adapter.getCurrent();
+        const bounds = adapter.getMapBounds?.() ?? null;
         const next = cur.rivers.map((r) => {
           if (r.id !== riverId) return r;
           if (index < 0 || index >= r.points.length) return r;
           const last = r.points.length - 1;
+          // Endpoint drags re-snap to the edge so a river always enters
+          // and exits the map at the perimeter, matching the policy in
+          // beginRiver/finishRiver. Interior point drags are free-form.
           const nextPoint =
-            adapter.snapToEdge && (index === 0 || index === last)
-              ? adapter.snapToEdge({ x, y })
-              : { x, y };
+            bounds && (index === 0 || index === last) ? projectToEdge({ x, y }, bounds) : { x, y };
           return { ...r, points: r.points.map((p, i) => (i === index ? nextPoint : p)) };
         });
         commitRivers(next);

@@ -44,6 +44,7 @@ import {
 } from "./robotSkills";
 import { ROBOT_SPECS } from "./robotVariants";
 import type {
+  AutoBridge,
   Beam,
   BeamPoint,
   BossVariant,
@@ -720,6 +721,7 @@ export const createWorld = (
   // clear/reload can suppress or reseed all derived set-dressing.
   let editorProps: PlacedProp[] = [];
   let editorRivers: River[] = [];
+  let editorBridges: AutoBridge[] = [];
   let overrideActive = false;
   let proceduralSeed = 0;
   if (import.meta.env.DEV) {
@@ -733,6 +735,7 @@ export const createWorld = (
           ...river,
           material: river.material ?? "water",
         }));
+        editorBridges = Array.isArray(edit.bridges) ? (edit.bridges as AutoBridge[]) : [];
         overrideActive = edit.override === true;
         proceduralSeed =
           typeof edit.proceduralSeed === "number" && Number.isFinite(edit.proceduralSeed)
@@ -742,6 +745,7 @@ export const createWorld = (
     } catch {
       editorProps = [];
       editorRivers = [];
+      editorBridges = [];
       overrideActive = false;
       proceduralSeed = 0;
     }
@@ -912,6 +916,7 @@ export const createWorld = (
     overrideActive,
     proceduralSeed,
     rivers: editorRivers,
+    autoBridges: editorBridges,
     projectiles: [],
     beams: [],
     explosions: [],

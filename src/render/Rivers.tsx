@@ -154,17 +154,64 @@ const RiverMesh = ({ river }: { river: River }) => {
 // in both per-level and world-map scenes. Tree-shaking is driven by whether
 // the component is referenced at all; when rivers === [] the subtree is a
 // single guard return, so the render cost is negligible at boot.
-export const Rivers = ({ rivers, paths = [] }: { rivers: River[]; paths?: Vec2[][] }) => {
+//
+// Bridge rendering moved to <AutoBridges/> which reads world.autoBridges,
+// a list resolved by the editor's bridgeResolver on every commit. The
+// per-render computeBridges call is kept here as a *fallback* for legacy
+// blobs that pre-date the persistence migration: when the caller has
+// rivers and paths but no resolved autoBridges yet, we emit one batch of
+// bridges so the level still reads as bridged until the next editor
+// commit writes the persisted version.
+export const Rivers = ({
+  rivers,
+  paths = [],
+  autoBridges = [],
+}: {
+  rivers: River[];
+  paths?: Vec2[][];
+  autoBridges?: { length: number };
+}) => {
   if (rivers.length === 0) return null;
-  const bridges = paths.length > 0 ? computeBridges(paths, rivers) : [];
+  const showFallback = autoBridges.length === 0 && paths.length > 0;
+  const bridges = showFallback ? computeBridges(paths, rivers) : [];
   const bridgeWidth = PATH_WIDTH + 0.4;
+  // Index every river by id so the fallback bridge palette can pick the
+  // matching deck colour instead of hard-coding the water palette. Two
+  // rivers can feed the same crossing — the first match wins (deterministic
+  // per render since rivers are iterated in array order).
+  const paletteForBridge = (b: { pos: { x: number; y: number } }): typeof MATERIALS.water => {
+    // Use the first river whose polyline passes near the bridge centre.
+    // Same per-segment scan as isOnRiver but cheaper for the small bridge
+    // list — typical maps have 0–4 bridges. Falls back to water.
+    for (const r of rivers) {
+      const half = r.width / 2 + 0.5;
+      const r2 = half * half;
+      const pts = r.points;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const ax = pts[i].x;
+        const ay = pts[i].y;
+        const bx = pts[i + 1].x;
+        const by = pts[i + 1].y;
+        const dx = bx - ax;
+        const dy = by - ay;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq < 1e-6) continue;
+        const t = Math.max(0, Math.min(1, ((b.pos.x - ax) * dx + (b.pos.y - ay) * dy) / lenSq));
+        const px = ax + dx * t - b.pos.x;
+        const py = ay + dy * t - b.pos.y;
+        if (px * px + py * py < r2) return MATERIALS[r.material ?? "water"];
+      }
+    }
+    return MATERIALS.water;
+  };
   return (
     <group>
       {rivers.map((r) => (
         <RiverMesh key={r.id} river={r} />
       ))}
-      {bridges.map((b, i) =>
-        b.kind === "plaza" ? (
+      {bridges.map((b, i) => {
+        const palette = paletteForBridge(b);
+        return b.kind === "plaza" ? (
           <group
             // biome-ignore lint/suspicious/noArrayIndexKey: computed bridge list has no stable id
             key={`bridge:${i}`}
@@ -172,11 +219,11 @@ export const Rivers = ({ rivers, paths = [] }: { rivers: River[]; paths?: Vec2[]
           >
             <mesh castShadow receiveShadow>
               <cylinderGeometry args={[b.radius, b.radius, 0.18, 28]} />
-              <meshStandardMaterial color={MATERIALS.water.bridgeDeck} roughness={1} />
+              <meshStandardMaterial color={palette.bridgeDeck} roughness={1} />
             </mesh>
             <mesh position={[0, 0.16, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
               <torusGeometry args={[b.radius - 0.05, 0.06, 8, 28]} />
-              <meshStandardMaterial color={MATERIALS.water.bridgeTrim} roughness={1} />
+              <meshStandardMaterial color={palette.bridgeTrim} roughness={1} />
             </mesh>
           </group>
         ) : (
@@ -188,19 +235,19 @@ export const Rivers = ({ rivers, paths = [] }: { rivers: River[]; paths?: Vec2[]
           >
             <mesh castShadow receiveShadow>
               <boxGeometry args={[b.length, 0.18, bridgeWidth]} />
-              <meshStandardMaterial color={MATERIALS.water.bridgeDeck} roughness={1} />
+              <meshStandardMaterial color={palette.bridgeDeck} roughness={1} />
             </mesh>
             <mesh position={[0, 0.18, bridgeWidth / 2 - 0.06]} castShadow>
               <boxGeometry args={[b.length, 0.22, 0.12]} />
-              <meshStandardMaterial color={MATERIALS.water.bridgeTrim} roughness={1} />
+              <meshStandardMaterial color={palette.bridgeTrim} roughness={1} />
             </mesh>
             <mesh position={[0, 0.18, -(bridgeWidth / 2 - 0.06)]} castShadow>
               <boxGeometry args={[b.length, 0.22, 0.12]} />
-              <meshStandardMaterial color={MATERIALS.water.bridgeTrim} roughness={1} />
+              <meshStandardMaterial color={palette.bridgeTrim} roughness={1} />
             </mesh>
           </group>
-        ),
-      )}
+        );
+      })}
     </group>
   );
 };

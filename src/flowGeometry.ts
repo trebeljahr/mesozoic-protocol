@@ -126,6 +126,14 @@ export type Bridge = RectBridge | PlazaBridge;
 type SourcedRect = RectBridge & { pathIdx: number };
 export type FlowFeatures = { rivers: River[]; lakes: Lake[]; bridges: Bridge[] };
 
+// Same shape as Bridge but carries the ids of every river that contributed
+// to it. Used by the editor's bridge resolver to key bridges across commits
+// so user overrides (dragged plaza centre, custom radius) stick to the
+// same underlying crossing as the user paints around it.
+export type BridgeWithProvenance =
+  | (RectBridge & { riverIds: string[] })
+  | (PlazaBridge & { riverIds: string[] });
+
 // Meandering polyline crossing the map on the chosen axis. Endpoints push
 // well past the max-panned viewport (visible half ≈ 24 + pan ≈ 16 = 40 on
 // X) so the river clearly runs off the screen at any zoom/pan. Shape is
@@ -437,6 +445,165 @@ export const computeBridges = (paths: Vec2[][], rivers: River[]): Bridge[] => {
     }
   }
   return mergeOverlappingBridges(consolidateSamePathBridges(rects));
+};
+
+// Provenance-tracking sibling of computeBridges — same intersection /
+// consolidate / X-merge algorithm, but every output rect/plaza carries
+// the array of river ids that fed into it. The editor's bridge resolver
+// keys off these ids so user overrides (custom plaza radius, dragged
+// centre) stick to the same crossing as rivers are repainted.
+type SourcedRectProv = SourcedRect & { riverIds: string[] };
+type RiverWithId = { id: string; points: Vec2[]; width: number };
+export const computeBridgesWithProvenance = (
+  paths: Vec2[][],
+  rivers: RiverWithId[],
+): BridgeWithProvenance[] => {
+  const rects: SourcedRectProv[] = [];
+  for (let pIdx = 0; pIdx < paths.length; pIdx++) {
+    const path = paths[pIdx];
+    for (let pi = 0; pi < path.length - 1; pi++) {
+      const a = path[pi];
+      const b = path[pi + 1];
+      const pdx = b.x - a.x;
+      const pdy = b.y - a.y;
+      const pLen = Math.hypot(pdx, pdy);
+      if (pLen < 1e-6) continue;
+      const ptx = pdx / pLen;
+      const pty = pdy / pLen;
+      const rotY = Math.atan2(-pdy, pdx);
+
+      for (const river of rivers) {
+        const pts = river.points;
+        for (let ri = 0; ri < pts.length - 1; ri++) {
+          const r1 = pts[ri];
+          const r2 = pts[ri + 1];
+          const hit = segIntersect(a, b, r1, r2);
+          if (!hit) continue;
+          const rdx = r2.x - r1.x;
+          const rdy = r2.y - r1.y;
+          const rLen = Math.hypot(rdx, rdy);
+          if (rLen < 1e-6) continue;
+          const sinTheta = Math.abs(ptx * (rdy / rLen) - pty * (rdx / rLen));
+          const projected = river.width / Math.max(0.25, sinTheta);
+          rects.push({
+            kind: "rect",
+            pos: hit,
+            rotY,
+            length: projected + BRIDGE_OVERHANG,
+            pathIdx: pIdx,
+            riverIds: [river.id],
+          });
+        }
+      }
+    }
+  }
+  return mergeOverlappingBridgesProv(consolidateSamePathBridgesProv(rects));
+};
+
+const consolidateSamePathBridgesProv = (rects: SourcedRectProv[]): SourcedRectProv[] => {
+  const out: SourcedRectProv[] = [];
+  for (const b of rects) {
+    let merged = false;
+    for (let k = 0; k < out.length; k++) {
+      const c = out[k];
+      if (c.pathIdx !== b.pathIdx) continue;
+      const dx = c.pos.x - b.pos.x;
+      const dy = c.pos.y - b.pos.y;
+      if (dx * dx + dy * dy >= SAME_PATH_DIST_SQ) continue;
+      // Keep the longer deck representative and union the river ids so a
+      // single bridge attributes to every river segment that pierces this
+      // crossing event.
+      const unionIds = unionRiverIds(c.riverIds, b.riverIds);
+      if (b.length > c.length) {
+        out[k] = { ...b, riverIds: unionIds };
+      } else {
+        out[k] = { ...c, riverIds: unionIds };
+      }
+      merged = true;
+      break;
+    }
+    if (!merged) out.push(b);
+  }
+  return out;
+};
+
+const mergeOverlappingBridgesProv = (rects: SourcedRectProv[]): BridgeWithProvenance[] => {
+  const n = rects.length;
+  if (n === 0) return [];
+  if (n === 1) {
+    const r = rects[0];
+    return [{ kind: "rect", pos: r.pos, rotY: r.rotY, length: r.length, riverIds: r.riverIds }];
+  }
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (i: number): number => {
+    let r = i;
+    while (parent[r] !== r) r = parent[r];
+    while (parent[i] !== r) {
+      const next = parent[i];
+      parent[i] = r;
+      i = next;
+    }
+    return r;
+  };
+  const distSq = BRIDGE_MERGE_DIST * BRIDGE_MERGE_DIST;
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (rects[i].pathIdx === rects[j].pathIdx) continue;
+      const dx = rects[i].pos.x - rects[j].pos.x;
+      const dy = rects[i].pos.y - rects[j].pos.y;
+      if (dx * dx + dy * dy >= distSq) continue;
+      if (angleBetween(rects[i].rotY, rects[j].rotY) < BRIDGE_MERGE_ANGLE) continue;
+      const ri = find(i);
+      const rj = find(j);
+      if (ri !== rj) parent[ri] = rj;
+    }
+  }
+  const clusters = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const arr = clusters.get(r);
+    if (arr) arr.push(i);
+    else clusters.set(r, [i]);
+  }
+  const out: BridgeWithProvenance[] = [];
+  for (const idxs of clusters.values()) {
+    if (idxs.length === 1) {
+      const r = rects[idxs[0]];
+      out.push({ kind: "rect", pos: r.pos, rotY: r.rotY, length: r.length, riverIds: r.riverIds });
+      continue;
+    }
+    let cx = 0;
+    let cy = 0;
+    let maxLen = 0;
+    let maxOffset = 0;
+    let ids: string[] = [];
+    for (const i of idxs) {
+      cx += rects[i].pos.x;
+      cy += rects[i].pos.y;
+      maxLen = Math.max(maxLen, rects[i].length);
+      ids = unionRiverIds(ids, rects[i].riverIds);
+    }
+    cx /= idxs.length;
+    cy /= idxs.length;
+    for (const i of idxs) {
+      const dx = rects[i].pos.x - cx;
+      const dy = rects[i].pos.y - cy;
+      const offset = Math.hypot(dx, dy);
+      maxOffset = Math.max(maxOffset, offset + rects[i].length / 2);
+    }
+    const radius = Math.max(maxLen / 2, maxOffset) + 0.2;
+    out.push({ kind: "plaza", pos: { x: cx, y: cy }, radius, riverIds: ids });
+  }
+  return out;
+};
+
+const unionRiverIds = (a: string[], b: string[]): string[] => {
+  if (a.length === 0) return b.slice();
+  if (b.length === 0) return a.slice();
+  const set = new Set<string>(a);
+  for (const id of b) set.add(id);
+  return Array.from(set);
 };
 
 // The smoothed path geometry (one polyline per path, ~50 vertices) means a

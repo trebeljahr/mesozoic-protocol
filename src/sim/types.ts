@@ -302,6 +302,28 @@ export type River = {
   color?: string;
 };
 
+// Editor-managed bridge over a path×river crossing. Resolved once per
+// editor commit (see `resolveBridges` in src/editor/bridgeResolver.ts)
+// and persisted alongside the river polylines so bridges get stable ids,
+// material-themed deck palettes, and survive reloads. `userOverride`
+// freezes the geometry the resolver would otherwise refresh — set when
+// the user has dragged a plaza centre or resized a rect deck.
+export type AutoBridge = {
+  id: string;
+  // Ids of every river that fed this crossing. Resolved into a sorted
+  // string when keying bridges across commits so two rivers contributing
+  // to the same plaza always hash to the same bucket.
+  riverIds: string[];
+  // Picked from the river whose id sorts first in `riverIds`. Drives the
+  // deck/trim palette in render/AutoBridges so a lava river gets a sooty
+  // deck and a toxic river gets a violet one.
+  material: RiverMaterial;
+  userOverride: boolean;
+} & (
+  | { kind: "rect"; pos: Vec2; rotY: number; length: number }
+  | { kind: "plaza"; pos: Vec2; radius: number }
+);
+
 export type RobotVariant = "george" | "leela" | "mike" | "stan";
 
 // Slot index used by the HUD + key bindings (Q/W/E/R). Semantic ability
@@ -835,6 +857,10 @@ export type World = {
   // props in the same per-level edit blob. Empty in production unless the
   // saved blob ships rivers. Visual-only today.
   rivers: River[];
+  // Editor-managed bridges resolved per commit from rivers × paths and
+  // persisted alongside the river polylines. Empty in production unless
+  // the saved blob ships bridges. See src/editor/bridgeResolver.ts.
+  autoBridges: AutoBridge[];
   projectiles: Projectile[];
   beams: Beam[];
   explosions: Explosion[];

@@ -4,6 +4,7 @@ import { MAP_HEIGHT } from "../level";
 import { BOSS_VARIANT_MODEL } from "../sim/world";
 import { useGame } from "../store";
 import { AmbientHaze } from "./AmbientHaze";
+import { AutoBridges } from "./AutoBridges";
 import { BiomeAmbientVfx } from "./BiomeAmbientVfx";
 import { BiomeCosmetics } from "./BiomeCosmetics";
 import { CameraRig } from "./CameraRig";
@@ -102,6 +103,7 @@ export const PlayScene = () => {
           </>
         )}
         <PlayRivers />
+        <AutoBridges />
       </Defer>
       {/* Frame 2 — props introduced post-launch that pushed mount-time
           GPU work over the WebGL watchdog ceiling on busy levels (the
@@ -219,9 +221,13 @@ export const PlayScene = () => {
 // to ui.treeVersion so the bumpGeometry tick the editor fires on each river
 // mutation also re-runs this selector — same invalidation pattern Trees /
 // Rocks / EditorProps use.
+//
+// Passes world.autoBridges through so Rivers' built-in fallback bridge pass
+// only fires for legacy blobs without resolved bridges. Once the editor has
+// committed once, AutoBridges takes over the bridge rendering.
 const PlayRivers = () => {
   const version = useGame((s) => s.ui.treeVersion);
   void version;
   const world = useGame.getState().world;
-  return <Rivers rivers={world.rivers} paths={world.paths} />;
+  return <Rivers rivers={world.rivers} paths={world.paths} autoBridges={world.autoBridges} />;
 };

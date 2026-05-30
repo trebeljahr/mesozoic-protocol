@@ -114,7 +114,7 @@ export const EditorPanel = ({
   });
 
   void version;
-  const { props: propsArr, rivers: riversArr } = store.getState().getCurrent();
+  const { props: propsArr, rivers: riversArr, bridges: bridgesArr } = store.getState().getCurrent();
   const selected = selectedId !== null ? (propsArr.find((p) => p.id === selectedId) ?? null) : null;
   const selectedRiver =
     riverTool.selectedRiverId !== null
@@ -255,7 +255,7 @@ export const EditorPanel = ({
             type="button"
             style={btn()}
             onClick={() => store.getState().finishRiver()}
-            title="Finish the current river (close stroke; further clicks start a new river)"
+            title="Finish the current river — start and end snap to the nearest map edge"
           >
             Finish river
           </button>
@@ -268,6 +268,7 @@ export const EditorPanel = ({
           tool={riverTool}
           editingRiver={editingRiver}
           selectedRiver={selectedRiver}
+          bridgeCount={bridgesArr.length}
         />
       )}
 
@@ -678,11 +679,13 @@ const RiverControls = ({
   tool,
   editingRiver,
   selectedRiver,
+  bridgeCount,
 }: {
   store: EditorStore;
   tool: RiverToolState;
   editingRiver: River | null;
   selectedRiver: River | null;
+  bridgeCount: number;
 }) => {
   // editingRiver has priority — while the user is mid-stroke, the slider
   // should affect that river, not whatever was previously selected.
@@ -719,6 +722,10 @@ const RiverControls = ({
           style={{ flex: 1 }}
         />
       </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#8b93a3" }}>
+        <span style={{ minWidth: 40 }}>Bridges</span>
+        <span>{bridgeCount}</span>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ color: "#8b93a3", minWidth: 40 }}>Material</span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>

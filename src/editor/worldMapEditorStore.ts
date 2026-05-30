@@ -1,5 +1,5 @@
 import { PAN_LIMIT_X, PAN_LIMIT_Z } from "../render/worldMapBounds";
-import type { PlacedProp, River } from "../sim/types";
+import type { AutoBridge, PlacedProp, River } from "../sim/types";
 import { distSq } from "../sim/vec2";
 import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./editorCore";
 import { clearWorldMapHistory, loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
@@ -29,20 +29,24 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
   let props: PlacedProp[] = seed?.props ?? [];
   // Additive field — older v:1 blobs without rivers load with [].
   let rivers: River[] = seed?.rivers ?? [];
+  // Additive field — older v:1 blobs without bridges load with [].
+  let bridges: AutoBridge[] = seed?.bridges ?? [];
   let override: boolean = seed?.override ?? false;
   return {
-    getCurrent: () => ({ props, override, rivers }),
+    getCurrent: () => ({ props, override, rivers, bridges }),
     commit: (next) => {
       props = next.props;
       rivers = next.rivers;
+      bridges = next.bridges;
       override = next.override;
-      saveWorldMapEdit({ v: 1, override, props, rivers });
+      saveWorldMapEdit({ v: 1, override, props, rivers, bridges });
     },
     clear: () => {
       clearWorldMapEdit();
       clearWorldMapHistory();
       props = [];
       rivers = [];
+      bridges = [];
       override = false;
     },
     // History persists alongside props/rivers so reloads keep the undo/redo
@@ -65,6 +69,16 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
       }
       return true;
     },
+    // World-map dimensions aren't pinned today — the pan-limit rectangle
+    // is the editable area, but rivers were painted free-form. Returning
+    // null suppresses the edge-snap so existing world-map rivers keep
+    // whatever endpoints they had; the level editor (where bounds are
+    // well-defined) is the one that needs the strict snap.
+    getMapBounds: () => null,
+    // No path geometry on the world map today, so the bridge resolver
+    // always returns []. Kept here so the resolver still gets called and
+    // any stale bridges in older blobs get pruned out on next commit.
+    getPaths: () => [],
     // Export adds metadata (scope/generatedAt) on top of the persisted
     // shape so a downloaded file is self-describing.
     exportJson: () =>
@@ -76,6 +90,7 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
           override,
           props,
           rivers,
+          bridges,
         },
         null,
         2,
