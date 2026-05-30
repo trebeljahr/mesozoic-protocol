@@ -47,8 +47,11 @@ export const EditorPropsLayer = ({
   const moving = store((s) => s.moving);
   const brushActive = store((s) => s.brush.active);
   const brushPresetId = store((s) => s.brush.presetId);
+  const brushEraser = store((s) => s.brush.eraser);
   const brushRadius = store((s) => s.brush.radius);
-  const brushMode = brushActive && brushPresetId !== null;
+  // Either a scatter preset or the eraser counts as a paint-stroke mode —
+  // both own pointerdown/move/up and need the cursor ring + click-plane gate.
+  const brushMode = brushActive && (brushPresetId !== null || brushEraser);
   const riverTool = store((s) => s.riverTool);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   void version;
@@ -210,9 +213,9 @@ const EditorGroundPlane = ({
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     const ed = store.getState();
-    // Brush mode owns pointerdown/move/up; suppress the click action so a
-    // stroke that ends over the plane doesn't also deselect.
-    if (ed.brush.active && ed.brush.presetId) return;
+    // Brush mode (scatter or eraser) owns pointerdown/move/up; suppress the
+    // click action so a stroke that ends over the plane doesn't also deselect.
+    if (ed.brush.active && (ed.brush.presetId !== null || ed.brush.eraser)) return;
     const x = e.point.x;
     const y = -e.point.z;
     if (ed.riverTool.active) {

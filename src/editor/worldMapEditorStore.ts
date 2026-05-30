@@ -1,5 +1,6 @@
 import type { PlacedProp, River } from "../sim/types";
 import { createEditorStore, type EditorStore } from "./editorCore";
+import { clearWorldMapHistory, loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
 import { clearWorldMapEdit, loadWorldMapEdit, saveWorldMapEdit } from "./worldMapEdits";
 
 // Dev-only world-map editor store. A thin adapter over the shared
@@ -32,10 +33,15 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
     },
     clear: () => {
       clearWorldMapEdit();
+      clearWorldMapHistory();
       props = [];
       rivers = [];
       override = false;
     },
+    // History persists alongside props/rivers so reloads keep the undo/redo
+    // stacks. World-map history is a single global blob (no level scope).
+    loadHistory: () => loadWorldMapHistory(),
+    saveHistory: (history) => saveWorldMapHistory(history),
     // Export adds metadata (scope/generatedAt) on top of the persisted
     // shape so a downloaded file is self-describing.
     exportJson: () =>

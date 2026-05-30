@@ -76,11 +76,21 @@ export type EditorAdapter = {
   onActivate?: () => void;
   onOverrideChange?: () => void;
   onClear?: () => void;
+  // Optional history persistence — load on store init, save on every
+  // history mutation (push / undo / redo / clear). Adapters that omit
+  // these keep history per-session in memory only.
+  loadHistory?: () => History;
+  saveHistory?: (history: History) => void;
 };
 
 export type BrushState = {
   active: boolean;
   presetId: string | null;
+  // When true, paintAt removes props within radius instead of scattering.
+  // Mutually exclusive with presetId — arming the eraser drops the preset,
+  // and picking a preset disarms the eraser. Uses the same radius slider
+  // and the same stroke-anchor gating as the scatter brush.
+  eraser: boolean;
   radius: number;
   density: number;
   minSpacing: number;
@@ -107,6 +117,7 @@ export type RiverToolState = {
 const DEFAULT_BRUSH: BrushState = {
   active: false,
   presetId: null,
+  eraser: false,
   radius: 4,
   density: 8,
   minSpacing: 1.0,
@@ -158,6 +169,7 @@ export type EditorStoreApi = {
   clearProcedural: () => void;
   reloadProcedural: () => void;
   setBrushPreset: (id: string | null) => void;
+  setBrushEraser: (on: boolean) => void;
   setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
   toggleBrushUrl: (url: string) => void;
   resetBrushUrls: () => void;
@@ -211,10 +223,18 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       };
     };
 
+    // Persist history alongside the in-memory state. Every history mutation
+    // (push / undo / redo / clear-reset) flows through here so the adapter
+    // can mirror the change to localStorage.
+    const setHistory = (h: History): void => {
+      set({ history: h });
+      adapter.saveHistory?.(h);
+    };
+
     // Capture pre-mutation state onto the undo stack. Call BEFORE applying
     // a mutation. Resets the redo stack.
     const snapshotAndPush = (): void => {
-      set((s) => ({ history: pushHistory(s.history, snapshot()) }));
+      setHistory(pushHistory(get().history, snapshot()));
     };
 
     // Persist + invalidate downstream, then bump the store version so panel
@@ -261,7 +281,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       selectedId: null,
       moving: false,
       version: 0,
-      history: { past: [], future: [] },
+      history: adapter.loadHistory?.() ?? { past: [], future: [] },
       brush: DEFAULT_BRUSH,
       ...STROKE_CLEAR,
       riverTool: DEFAULT_RIVER_TOOL,
@@ -276,7 +296,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           placingUrl: null,
           selectedId: null,
           moving: false,
-          brush: { ...s.brush, active: false },
+          brush: { ...s.brush, active: false, eraser: false },
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
         }));
@@ -289,7 +309,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           placingUrl: s.placingUrl === url ? null : url,
           selectedId: null,
           moving: false,
-          brush: { ...s.brush, active: false },
+          brush: { ...s.brush, active: false, eraser: false },
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
         })),
 
@@ -356,15 +376,17 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
 
       clear: () => {
         adapter.clear();
+        const fresh: History = { past: [], future: [] };
         set((s) => ({
           selectedId: null,
           moving: false,
           placingUrl: null,
-          history: { past: [], future: [] },
+          history: fresh,
           version: s.version + 1,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
         }));
+        adapter.saveHistory?.(fresh);
         adapter.onClear?.();
       },
 
@@ -439,16 +461,44 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // arm. Switching brush on disarms placingUrl + moving + selection.
         // The url filter is preset-scoped — drop it on every switch (incl.
         // disarm) so a re-arm of the same preset starts with the full roster.
-        if (id !== null && cur.presetId === id && cur.active) {
+        // Arming any preset also kicks the eraser off — they share the brush slot.
+        if (id !== null && cur.presetId === id && cur.active && !cur.eraser) {
           set({ brush: { ...cur, active: false, customUrls: null } });
           return;
         }
         set((s) => ({
-          brush: { ...s.brush, presetId: id, active: id !== null, customUrls: null },
+          brush: {
+            ...s.brush,
+            presetId: id,
+            eraser: false,
+            active: id !== null,
+            customUrls: null,
+          },
           placingUrl: null,
           selectedId: null,
           moving: false,
           // Arming a brush disarms the river tool — both consume the click plane.
+          riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+        }));
+      },
+
+      setBrushEraser: (on) => {
+        if (!on) {
+          set((s) => ({ brush: { ...s.brush, eraser: false, active: false } }));
+          return;
+        }
+        set((s) => ({
+          brush: {
+            ...s.brush,
+            eraser: true,
+            active: true,
+            presetId: null,
+            customUrls: null,
+          },
+          placingUrl: null,
+          selectedId: null,
+          moving: false,
+          // Eraser shares the click plane with placement/river/scatter brush.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
         }));
       },
@@ -493,9 +543,42 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
 
       paintAt: (x, y) => {
         const s = get();
+        if (!s.brush.active) return;
+
+        // Open a stroke history entry once per drag — paint and eraser share
+        // the same gating so one drag = one undo entry regardless of mode.
+        const openStrokeEntry = (): void => {
+          if (s.strokeOpen) {
+            if (!s.strokePushed && s.strokeAnchor) {
+              const anchor = s.strokeAnchor;
+              setHistory(pushHistory(get().history, anchor));
+              set({ strokePushed: true });
+            }
+          } else {
+            // Out-of-stroke paint (defensive) — push a single history entry.
+            setHistory(pushHistory(get().history, snapshot()));
+          }
+        };
+
+        if (s.brush.eraser) {
+          const cur = adapter.getCurrent();
+          const radSq = s.brush.radius * s.brush.radius;
+          const next = cur.props.filter((p) => {
+            const dx = p.pos.x - x;
+            const dy = p.pos.y - y;
+            return dx * dx + dy * dy > radSq;
+          });
+          if (next.length === cur.props.length) return;
+          openStrokeEntry();
+          commitProps(next);
+          if (s.selectedId !== null && !next.some((p) => p.id === s.selectedId)) {
+            set({ selectedId: null });
+          }
+          return;
+        }
+
         const preset = getBrushPreset(s.brush.presetId);
         if (!preset) return;
-        if (!s.brush.active) return;
         const urls = resolveBrushUrls(preset, s.brush.customUrls);
         if (urls.length === 0) return;
         const cur = adapter.getCurrent();
@@ -508,15 +591,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           existing,
         ).filter((pt) => !adapter.canPlaceAt || adapter.canPlaceAt(pt.x, pt.y, null));
         if (points.length === 0) return;
-        if (s.strokeOpen) {
-          if (!s.strokePushed && s.strokeAnchor) {
-            const anchor = s.strokeAnchor;
-            set((ss) => ({ history: pushHistory(ss.history, anchor), strokePushed: true }));
-          }
-        } else {
-          // Out-of-stroke paint (defensive) — push a single history entry.
-          set((ss) => ({ history: pushHistory(ss.history, snapshot()) }));
-        }
+        openStrokeEntry();
         const additions: PlacedProp[] = points.map((pt) => ({
           id: nanoid(8),
           url: pickFromUrls(urls),
@@ -539,7 +614,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           placingUrl: null,
           selectedId: null,
           moving: false,
-          brush: { ...s.brush, active: false },
+          brush: { ...s.brush, active: false, eraser: false },
           riverTool: {
             ...s.riverTool,
             active: on,
@@ -708,6 +783,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
         }));
+        adapter.saveHistory?.(result.next);
       },
 
       redo: () => {
@@ -721,6 +797,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
         }));
+        adapter.saveHistory?.(result.next);
       },
 
       canUndo: () => canUndoH(get().history),

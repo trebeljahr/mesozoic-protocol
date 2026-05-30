@@ -270,7 +270,9 @@ export const EditorPanel = ({
 
       {brush.active ? (
         <div style={{ color: "#8b93a3" }}>
-          Brush active — click-drag the map to scatter. Tap the preset again to disarm.
+          {brush.eraser
+            ? "Eraser active — click-drag the map to remove props in radius. Tap Eraser again to disarm."
+            : "Brush active — click-drag the map to scatter. Tap the preset again to disarm."}
         </div>
       ) : selected ? (
         <div
@@ -462,10 +464,12 @@ export const EditorPanel = ({
 // the active preset).
 const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState }) => {
   const setBrushPreset = store((s) => s.setBrushPreset);
+  const setBrushEraser = store((s) => s.setBrushEraser);
   const setBrushParams = store((s) => s.setBrushParams);
   const toggleBrushUrl = store((s) => s.toggleBrushUrl);
   const resetBrushUrls = store((s) => s.resetBrushUrls);
   const activePreset = getBrushPreset(brush.presetId);
+  const eraserOn = brush.active && brush.eraser;
   return (
     <div
       style={{
@@ -480,39 +484,57 @@ const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState 
     >
       <div
         style={{
-          color: "#8b93a3",
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          fontSize: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 6,
         }}
       >
-        Brush
-      </div>
-      {PRESET_GROUPS.map((group) => (
-        <div key={group.biome} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ color: "#8b93a3", fontSize: 10 }}>{group.label}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {group.presets.map((p) => {
-              const empty = p.urls.length === 0;
-              const on = brush.active && brush.presetId === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  title={
-                    empty ? `${p.label} (no assets)` : `${p.label} · ${p.urls.length} variants`
-                  }
-                  disabled={empty}
-                  style={{ ...btn(on), opacity: empty ? 0.4 : 1 }}
-                  onClick={() => setBrushPreset(p.id)}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
+        <div
+          style={{
+            color: "#8b93a3",
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            fontSize: 10,
+          }}
+        >
+          Brush
         </div>
-      ))}
+        <button
+          type="button"
+          style={btn(eraserOn)}
+          onClick={() => setBrushEraser(!eraserOn)}
+          title="Eraser — click-drag the map to remove props within radius"
+        >
+          {eraserOn ? "Eraser ✓" : "Eraser"}
+        </button>
+      </div>
+      {!eraserOn &&
+        PRESET_GROUPS.map((group) => (
+          <div key={group.biome} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ color: "#8b93a3", fontSize: 10 }}>{group.label}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {group.presets.map((p) => {
+                const empty = p.urls.length === 0;
+                const on = brush.active && brush.presetId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    title={
+                      empty ? `${p.label} (no assets)` : `${p.label} · ${p.urls.length} variants`
+                    }
+                    disabled={empty}
+                    style={{ ...btn(on), opacity: empty ? 0.4 : 1 }}
+                    onClick={() => setBrushPreset(p.id)}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       <div style={sliderRow}>
         <span style={{ color: "#8b93a3" }}>Radius</span>
         <input
@@ -525,37 +547,41 @@ const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState 
         />
         <span>{brush.radius.toFixed(1)}</span>
       </div>
-      <div style={sliderRow}>
-        <span style={{ color: "#8b93a3" }}>Density</span>
-        <input
-          type="range"
-          min={1}
-          max={30}
-          step={1}
-          value={brush.density}
-          onChange={(e) => setBrushParams({ density: Number(e.target.value) })}
-        />
-        <span>{brush.density}</span>
-      </div>
-      <div style={sliderRow}>
-        <span style={{ color: "#8b93a3" }}>Spacing</span>
-        <input
-          type="range"
-          min={0.3}
-          max={3}
-          step={0.1}
-          value={brush.minSpacing}
-          onChange={(e) => setBrushParams({ minSpacing: Number(e.target.value) })}
-        />
-        <span>{brush.minSpacing.toFixed(1)}</span>
-      </div>
-      {activePreset && (
-        <BrushVariants
-          preset={activePreset}
-          customUrls={brush.customUrls}
-          onToggle={toggleBrushUrl}
-          onReset={resetBrushUrls}
-        />
+      {!eraserOn && (
+        <>
+          <div style={sliderRow}>
+            <span style={{ color: "#8b93a3" }}>Density</span>
+            <input
+              type="range"
+              min={1}
+              max={30}
+              step={1}
+              value={brush.density}
+              onChange={(e) => setBrushParams({ density: Number(e.target.value) })}
+            />
+            <span>{brush.density}</span>
+          </div>
+          <div style={sliderRow}>
+            <span style={{ color: "#8b93a3" }}>Spacing</span>
+            <input
+              type="range"
+              min={0.3}
+              max={3}
+              step={0.1}
+              value={brush.minSpacing}
+              onChange={(e) => setBrushParams({ minSpacing: Number(e.target.value) })}
+            />
+            <span>{brush.minSpacing.toFixed(1)}</span>
+          </div>
+          {activePreset && (
+            <BrushVariants
+              preset={activePreset}
+              customUrls={brush.customUrls}
+              onToggle={toggleBrushUrl}
+              onReset={resetBrushUrls}
+            />
+          )}
+        </>
       )}
     </div>
   );

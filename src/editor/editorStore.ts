@@ -5,6 +5,7 @@ import { distPointToSegSq, distSq } from "../sim/vec2";
 import { ROCK_FOOTPRINT, TOWER_FOOTPRINT, TREE_FOOTPRINT } from "../sim/world";
 import { useGame } from "../store";
 import { createEditorStore, type EditorStore } from "./editorCore";
+import { clearAllLevelHistories, loadLevelHistory, saveLevelHistory } from "./historyPersist";
 import { clearAllLevelEdits, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
 
 // Dev-only level-editor store. A thin adapter over the shared editorCore
@@ -156,6 +157,11 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
   },
   canPlaceAt: canEditPlaceAt,
   snapToEdge,
+  // History is persisted per-level so each level keeps its own undo/redo
+  // stacks across reloads. A useGame.subscribe below swaps the in-memory
+  // history when the active levelId changes.
+  loadHistory: () => loadLevelHistory(useGame.getState().world.levelId),
+  saveHistory: (history) => saveLevelHistory(useGame.getState().world.levelId, history),
   // Export adds metadata (scope/levelId/generatedAt) on top of the
   // persisted shape so a downloaded file is self-describing.
   exportJson: () => {
@@ -184,12 +190,28 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
   onClear: reloadLevel,
 }));
 
+// Swap the in-memory undo/redo stack when the active level changes so each
+// level's persisted history is reflected. Gated on import.meta.env.DEV so
+// production bundles can tree-shake the subscription (a raw top-level
+// subscribe is a side effect Rollup wouldn't drop).
+if (import.meta.env.DEV) {
+  let lastLevelId: number | null = useGame.getState().world.levelId;
+  useGame.subscribe((state) => {
+    const id = state.world.levelId;
+    if (id === lastLevelId) return;
+    lastLevelId = id;
+    useEditor.setState({ history: loadLevelHistory(id) });
+  });
+}
+
 // Wipe every authored level layout in one shot. Bypasses the per-level
 // history (the undo stack only spans one level's edits anyway) and rebuilds
 // the current level so the in-memory world reflects the wipe. Caller MUST
 // gate this on a user confirm — it's irreversible.
 export const clearAllLevels = (): void => {
   clearAllLevelEdits();
+  clearAllLevelHistories();
+  useEditor.setState({ history: { past: [], future: [] } });
   const w = useGame.getState().world;
   w.props = [];
   w.rivers = [];

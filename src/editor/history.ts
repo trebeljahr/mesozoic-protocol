@@ -1,11 +1,12 @@
 import type { PlacedProp, River } from "../sim/types";
 
-// In-memory undo/redo for the dev-only editors. Pure helpers, no globals.
+// Undo/redo helpers for the dev-only editors. Pure helpers, no globals.
 // A snapshot captures the pre-mutation state; each mutating action pushes
 // the previous snapshot via pushHistory before applying its change, which
 // also drops the redo stack (canonical semantics: any new mutation
-// invalidates pending redos). The stack is NOT persisted — a page reload
-// resets it, while persisted prop/override state survives via levelEdits /
+// invalidates pending redos). The stack itself is persisted by the editor
+// adapter (see historyPersist) so a page reload preserves both past and
+// future stacks alongside the prop/override state from levelEdits /
 // worldMapEdits.
 
 export type Snapshot = {
