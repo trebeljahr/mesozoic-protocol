@@ -20,7 +20,7 @@ export const BIOME_STORY_TRACE_STYLE: Record<Biome, BiomeStoryTraceStyle> = {
 // here so future biome-specific tinting (lights, ambient VFX, etc.) can
 // reuse the same source of truth. See materialTunables.ts for the live
 // values — kept canonical there to avoid two copies of the same table.
-export { BIOME_MATRIARCH_RIM, BIOME_RIM_BIAS } from "./materialTunables";
+export { BIOME_RIM_BIAS } from "./materialTunables";
 
 // Cloning-canister palette. The biotech-outpost backstory lands per-biome:
 // temperate worlds default to green growth medium, lava/wasteland to amber

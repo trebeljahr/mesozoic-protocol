@@ -33,8 +33,8 @@ export const GRAPHICS_QUALITY: GraphicsQuality = detectGraphicsQuality();
 
 // Selective bloom — only meshes on BLOOM_LAYER pass through. Threshold stays
 // moderate because the selection pass already filters to opt-in geometry;
-// it gates non-emissive body parts of opt-in models (dino bodies / mech
-// shells) so only canopies / muzzle flashes / matriarch tints actually glow.
+// it gates non-emissive body parts of opt-in models so only canopies,
+// muzzle flashes, and authored VFX actually glow.
 export const BLOOM_THRESHOLD = 0.55;
 export const BLOOM_SMOOTHING = 0.2;
 export const BLOOM_INTENSITY = 1.25;

@@ -1,12 +1,10 @@
-import type { EnemyKind } from "../sim/types";
 import type { EmissiveSpec } from "./materialTunables";
 
 // Per-asset emissive overrides for mesh wrappers that intentionally glow.
 // Registry maps `(modelKind, subMeshName | materialName)` substring so
-// artists don't have to re-author the unmodified third-party GLBs. Add
-// new entries here rather than editing the wrappers — patterns are
-// soft-matched (substring, case-insensitive) so a single rule covers
-// naming variance across packs.
+// artists don't have to re-author the unmodified third-party GLBs.
+// Enemy dinosaurs intentionally do not use this registry: they render with
+// their model-provided materials and no extra eye/body glow overlays.
 
 export type EmissivePattern = {
   // Substring (case-insensitive) compared against BOTH the sub-mesh name
@@ -16,25 +14,6 @@ export type EmissivePattern = {
   match: string;
   spec: EmissiveSpec;
 };
-
-// Enemy emissive defaults. Generic patterns first — every dino with an
-// "eye"-named mesh gets bio-green eye glow. Boss variant rows override
-// for the spine bio-conduit (biome accent).
-export const ENEMY_EMISSIVE: Record<EnemyKind, EmissivePattern[]> = {
-  raptor: [{ match: "eye", spec: { color: "#7eff8c", intensity: 1.6, bloom: true } }],
-  allosaur: [{ match: "eye", spec: { color: "#9aff7a", intensity: 1.8, bloom: true } }],
-  stego: [{ match: "eye", spec: { color: "#9aff7a", intensity: 1.4, bloom: true } }],
-  swarm: [{ match: "eye", spec: { color: "#a8ff70", intensity: 1.4, bloom: true } }],
-  armored: [{ match: "eye", spec: { color: "#7eff8c", intensity: 1.6, bloom: true } }],
-  para: [{ match: "eye", spec: { color: "#7eff8c", intensity: 1.5, bloom: true } }],
-  titan: [{ match: "eye", spec: { color: "#7eff8c", intensity: 1.4, bloom: true } }],
-  boss: [{ match: "eye", spec: { color: "#aaff80", intensity: 1.8, bloom: true } }],
-};
-
-// Boss spine / rib bio-conduit emissive strip. Matches a generous net of
-// patterns ("spine", "back", "ridge", "plate", "rib") so each species'
-// matriarch finds at least one sub-mesh to light up.
-export const MATRIARCH_CONDUIT_PATTERNS: string[] = ["spine", "ridge", "back", "plate", "rib"];
 
 // Robot variant emissive defaults. Each pilot model is from a different
 // asset pack so the safest pattern is a generic "visor / canopy / eye /
@@ -56,10 +35,5 @@ export const ROBOT_VENT_PATTERNS: { match: string; intensityMul: number }[] = [
   { match: "engine", intensityMul: 0.9 },
   { match: "exhaust", intensityMul: 0.9 },
 ];
-
-// Eye-mesh fallback name patterns used inside the enemy traversal. A
-// material whose name OR mesh name contains any of these counts as an
-// "eye" hit. Kept here so future emissive sub-mesh kinds can plug in.
-export const EYE_FALLBACK_NAMES: string[] = ["eye", "pupil", "iris"];
 
 export type { EmissiveSpec };

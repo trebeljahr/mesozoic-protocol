@@ -6,40 +6,14 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 import { audio } from "../audio/AudioManager";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { smoothDirection } from "../sim/path";
-import type { BossVariant, DamageType, EnemyKind, World } from "../sim/types";
+import type { BossVariant, EnemyKind, World } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
-import {
-  ADAPTIVE_TINT_BY_TYPE,
-  BOSS_VARIANT_FOOTSTEP,
-  BOSS_VARIANT_MATERIAL,
-  BOSS_VARIANT_TINT,
-} from "../sim/world";
+import { BOSS_VARIANT_FOOTSTEP } from "../sim/world";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
-import { ENEMY_EMISSIVE, EYE_FALLBACK_NAMES } from "./emissiveRegistry";
-import {
-  buildEyePositions,
-  clearEnemyEyeProfile,
-  type EyePosition,
-  eyeColorFor,
-  setEnemyEyeProfile,
-} from "./enemyEyeProfiles";
-import { buildPlateGroup, resolveEnemyTier, syncPlateGroup } from "./enemyGrafts";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
-import {
-  applyEmissiveSpec,
-  applyToonRimPatch,
-  BIOME_MATRIARCH_RIM,
-  biomeRimColor,
-  MATRIARCH_VARIANT_BIOME,
-  RIM_COLOR_ENEMY,
-  RIM_INTENSITY_BOSS,
-  RIM_INTENSITY_ENEMY,
-  setRimColor,
-  setRimIntensity,
-} from "./materialTunables";
 import { measureVisibleBox } from "./measureModel";
-import { BLOOM_LAYER, OUTLINE_LAYER } from "./PaintedPostFx";
+import { OUTLINE_LAYER } from "./PaintedPostFx";
 
 type Props = {
   kind: EnemyKind;
@@ -54,43 +28,6 @@ type Props = {
   // biome-themed matriarch variant (each loads a different GLB) so the
   // renderer doesn't need to swap models per-enemy at runtime.
   bossVariant?: BossVariant;
-};
-
-// Frost tint target — pale ice blue. Enemies lerp from their base color
-// toward this as e.frost climbs from 0 → 1.
-const FROST_COLOR = new THREE.Color("#cfe6ff");
-// Frost rim handoff: as frost climbs, the rim hue drifts toward this so
-// frozen enemies read with a cold halo, not the bio-green one.
-const FROST_RIM_COLOR = new THREE.Color("#cfe6ff");
-
-const BODY_TINT_BY_KIND: Record<EnemyKind, THREE.ColorRepresentation> = {
-  swarm: "#9a7a4f",
-  raptor: "#9a7a4f",
-  para: "#7b6f73",
-  allosaur: "#7d6854",
-  stego: "#6e7461",
-  armored: "#84705e",
-  titan: "#72756a",
-  boss: "#72756a",
-};
-
-const BODY_TINT_AMOUNT: Record<EnemyKind, number> = {
-  swarm: 0.72,
-  raptor: 0.72,
-  para: 0.62,
-  allosaur: 0.62,
-  stego: 0.58,
-  armored: 0.66,
-  titan: 0.5,
-  boss: 0.46,
-};
-
-const applyBodyPalette = (material: THREE.Material, tint: THREE.Color, amount: number): void => {
-  const std = material as THREE.MeshStandardMaterial;
-  const base = std.userData.baseColor as THREE.Color | undefined;
-  if (!base || !std.color) return;
-  base.lerp(tint, amount);
-  std.color.copy(base);
 };
 
 type Item = {
@@ -122,11 +59,6 @@ type Item = {
   // footstep crossing detection. -1 = unprimed (don't emit until the next
   // frame seeds a baseline, so a clip (re)start can't burst a step).
   lastStepPhase: number;
-  // Bone-grafted plate scaffolding mounted as a sibling of obj. Each mesh
-  // stores a local bind to a body/head/tail bone and is synced after the
-  // animation mixer advances, so armor hugs the dinosaur through clips.
-  plateGroup: THREE.Group | null;
-  eyePositions: EyePosition[];
 };
 
 // Exp-damp half-life (seconds). Lower = snappier, higher = floatier.
@@ -230,30 +162,7 @@ export const ModelEnemyMesh = ({
   // level". When this ref doesn't match the current world, force-recycle
   // all stale items before the live pass runs.
   const worldRef = useRef<World | null>(null);
-  // Stable matriarch color — built once and reused for the body lerp
-  // every frame so we don't allocate THREE.Color in the inner loop.
-  const variantTint = useMemo(
-    () => new THREE.Color(bossVariant ? BOSS_VARIANT_TINT[bossVariant] : "#ffffff"),
-    [bossVariant],
-  );
-  const matriarchMaterial = bossVariant !== undefined ? BOSS_VARIANT_MATERIAL[bossVariant] : null;
   const footstepProfile = bossVariant !== undefined ? BOSS_VARIANT_FOOTSTEP[bossVariant] : null;
-  const bodyTint = useMemo(() => new THREE.Color(BODY_TINT_BY_KIND[kind]), [kind]);
-  const bodyTintAmount = BODY_TINT_AMOUNT[kind];
-  // Adaptive-resistance tint palette — one stable THREE.Color per damage
-  // type so the per-frame body lerp doesn't allocate. Built once and
-  // shared by every enemy in this mesh; the per-enemy snapshot
-  // (`enemy.adaptiveResistType`) picks which key to read.
-  const adaptiveTintByType = useMemo<Record<DamageType, THREE.Color>>(
-    () => ({
-      kinetic: new THREE.Color(ADAPTIVE_TINT_BY_TYPE.kinetic),
-      electric: new THREE.Color(ADAPTIVE_TINT_BY_TYPE.electric),
-      cold: new THREE.Color(ADAPTIVE_TINT_BY_TYPE.cold),
-      explosive: new THREE.Color(ADAPTIVE_TINT_BY_TYPE.explosive),
-      flame: new THREE.Color(ADAPTIVE_TINT_BY_TYPE.flame),
-    }),
-    [],
-  );
   // Free list of skinned clones from dead-but-recyclable enemies. Reusing
   // is significantly cheaper than another `cloneSkinned + AnimationMixer`,
   // which matters for swarms.
@@ -271,10 +180,6 @@ export const ModelEnemyMesh = ({
       scaledMinY: box.min.y * s,
     };
   }, [scene, targetSize]);
-
-  // Per-enemy eye color. Eye positions are computed per clone because the
-  // glow is bound to that clone's animated Head bone.
-  const eyeBaseColor = useMemo(() => eyeColorFor(kind, bossVariant), [kind, bossVariant]);
 
   const activeClip = useMemo(
     () => findClip(animations, clip) ?? findClip(animations, "Walk") ?? animations[0] ?? null,
@@ -341,19 +246,15 @@ export const ModelEnemyMesh = ({
       for (const [, item] of itemsRef.current) {
         item.mixer.stopAllAction();
         clearEnemyRender(item.enemyId);
-        clearEnemyEyeProfile(item.enemyId);
         parent.remove(item.obj);
         if (item.proxy) parent.remove(item.proxy);
-        if (item.plateGroup) parent.remove(item.plateGroup);
       }
       itemsRef.current.clear();
       for (const item of poolRef.current) {
         item.mixer.stopAllAction();
         clearEnemyRender(item.enemyId);
-        clearEnemyEyeProfile(item.enemyId);
         parent.remove(item.obj);
         if (item.proxy) parent.remove(item.proxy);
-        if (item.plateGroup) parent.remove(item.plateGroup);
       }
       poolRef.current.length = 0;
     },
@@ -368,7 +269,6 @@ export const ModelEnemyMesh = ({
     item.obj.rotation.x = 0;
     item.obj.rotation.z = 0;
     clearEnemyRender(item.enemyId);
-    clearEnemyEyeProfile(item.enemyId);
     if (poolRef.current.length < POOL_LIMIT) {
       item.obj.visible = false;
       item.obj.userData.enemyId = undefined;
@@ -384,7 +284,6 @@ export const ModelEnemyMesh = ({
         item.proxy.visible = false;
         item.proxy.userData.enemyId = undefined;
       }
-      if (item.plateGroup) item.plateGroup.visible = false;
       poolRef.current.push(item);
     } else {
       item.obj.traverse((o) => {
@@ -395,16 +294,6 @@ export const ModelEnemyMesh = ({
       });
       parent.remove(item.obj);
       if (item.proxy) parent.remove(item.proxy);
-      if (item.plateGroup) {
-        parent.remove(item.plateGroup);
-        item.plateGroup.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (m.isMesh && m.geometry) {
-            // Plate geometry is the shared singleton from getPlateGeometry;
-            // don't dispose it. Material is also shared.
-          }
-        });
-      }
     }
   }, []);
 
@@ -452,9 +341,6 @@ export const ModelEnemyMesh = ({
             recycled.proxy.userData.enemyId = e.id;
             recycled.proxy.userData.enemyMaxHp = e.maxHp;
           }
-          if (recycled.plateGroup) {
-            recycled.plateGroup.visible = true;
-          }
           recycled.visInit = false;
           // Pool may have stashed a corpse mid-fall; reset transient
           // death state so the recycled clone runs fresh.
@@ -484,8 +370,7 @@ export const ModelEnemyMesh = ({
             o.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
             if (bossOnTop) o.renderOrder = 10;
             // Painted-look outline gives dinosaurs a dark silhouette pop at
-            // gameplay scale. Bloom is deliberately reserved for eyes/VFX;
-            // putting the whole body on BLOOM_LAYER made every dinosaur glow.
+            // gameplay scale without changing the model's source materials.
             o.layers.enable(OUTLINE_LAYER);
             const m = o as THREE.Mesh;
             if (m.isMesh) {
@@ -501,43 +386,13 @@ export const ModelEnemyMesh = ({
               // and keeps her body drawn for her full lifetime.
               if (kind === "boss") m.frustumCulled = false;
               // SkeletonUtils.clone shares material references across
-              // clones, so mutating .emissive for the hit-flash (and
-              // .color for the frost tint) would light up every enemy of
-              // this kind. Give each clone its own material, and capture
-              // the original base color in userData so the frost lerp can
-              // restore it each frame.
+              // clones. Keep per-clone materials so recycle/death cleanup
+              // cannot leak state across enemies, but leave the model's
+              // authored material values unchanged while alive.
               if (Array.isArray(m.material)) {
                 m.material = m.material.map((mm) => cloneAndCaptureBase(mm));
               } else if (m.material) {
                 m.material = cloneAndCaptureBase(m.material as THREE.Material);
-              }
-              // Rim + toon shader patch on the cloned materials. Stock
-              // PBR maps + tint code paths (frost / matriarch tint /
-              // adaptive resist) keep working because the patch only
-              // adds to outgoingLight before gl_FragColor. Per-frame
-              // code refreshes the rim uniform from world.biome so the
-              // same recycled clone reads correctly across biomes.
-              const rimIntensity =
-                bossVariant !== undefined ? RIM_INTENSITY_BOSS : RIM_INTENSITY_ENEMY;
-              const mats = Array.isArray(m.material) ? m.material : [m.material];
-              const meshName = (m.name || "").toLowerCase();
-              const isEye = EYE_FALLBACK_NAMES.some((p) => meshName.includes(p));
-              for (const mm of mats) {
-                if (!mm) continue;
-                applyToonRimPatch(mm, {
-                  rim: { color: RIM_COLOR_ENEMY, intensity: rimIntensity },
-                });
-                const matName = (mm.name || "").toLowerCase();
-                const matIsEye = EYE_FALLBACK_NAMES.some((p) => matName.includes(p));
-                if (!isEye && !matIsEye) applyBodyPalette(mm, bodyTint, bodyTintAmount);
-                // Eye glow: registry-matched material name or fallback
-                // mesh/material-name pattern.
-                if (isEye || matIsEye) {
-                  const eyeSpec = ENEMY_EMISSIVE[kind]?.[0]?.spec;
-                  if (eyeSpec) applyEmissiveSpec(mm, eyeSpec);
-                  m.layers.enable(BLOOM_LAYER);
-                  m.userData.bloom = true;
-                }
               }
             }
           });
@@ -552,27 +407,6 @@ export const ModelEnemyMesh = ({
             proxy.renderOrder = -1;
             parent.add(proxy);
           }
-
-          // Bone-grafted alloy plates. The group is a scene sibling, but
-          // each plate stores a bind to a clone-local bone so it follows
-          // walk/attack/death animation instead of hovering off the skin.
-          const matriarch = bossVariant !== undefined;
-          const effectiveTier = resolveEnemyTier(kind, matriarch);
-          const plateGroup = buildPlateGroup(
-            obj,
-            kind,
-            bossVariant,
-            effectiveTier,
-            targetSize,
-            centerXZ,
-          );
-          // Plates join the painted-look outline pass so they read as
-          // part of the silhouette rather than pasted 3D shapes; they
-          // skip BLOOM_LAYER because steel has no emissive.
-          plateGroup.traverse((o) => {
-            o.layers.enable(OUTLINE_LAYER);
-          });
-          parent.add(plateGroup);
 
           item = {
             enemyId: e.id,
@@ -591,22 +425,9 @@ export const ModelEnemyMesh = ({
             dyingBaseRotX: 0,
             dyingBaseY: 0,
             lastStepPhase: -1,
-            plateGroup,
-            eyePositions: buildEyePositions(url, targetSize, obj, centerXZ),
           };
         }
         itemsRef.current.set(e.id, item);
-        // Register the per-enemy eye profile for the global EnemyEyes pass.
-        // Fires on first mount and on every recycle so each enemy id gets a
-        // fresh pulseSeed; cleared in recycleOrDispose so a pooled slot
-        // doesn't keep emitting for a stale id.
-        if (item.eyePositions.length > 0) {
-          setEnemyEyeProfile(e.id, {
-            positions: item.eyePositions,
-            baseColor: eyeBaseColor,
-            pulseSeed: (e.id * 0.137) % (Math.PI * 2),
-          });
-        }
       }
 
       const leak = e.leak;
@@ -767,95 +588,6 @@ export const ModelEnemyMesh = ({
         bobY: bobY - attackDip,
         yaw: baseRotY + item.visYaw,
       });
-
-      if (item.plateGroup) syncPlateGroup(item.plateGroup);
-
-      const flashing = world.time < e.flashUntil;
-      const frost = e.frost;
-      // Matriarchs always wear their variant tint — they're a distinct
-      // queen, not a chip-stacked rank-and-file. Captured here once per
-      // enemy so the inner traverse callback is a cheap branch.
-      const matriarch = bossVariant !== undefined;
-      // Adaptive-resistance render: enemies whose extraResists were
-      // bumped at spawn carry a slight off-color body tint hinting at
-      // which damage type they're now hardened against. Lerp amount
-      // scales with level (set at spawn into e.adaptiveResistAmount)
-      // so later mutations read as more pronounced on screen.
-      // Priority is below frost and matriarch tint.
-      const adaptiveType = e.adaptiveResistType;
-      const adaptiveAmount = e.adaptiveResistAmount ?? 0;
-      const adaptiveTint = adaptiveType ? adaptiveTintByType[adaptiveType] : null;
-      // Rim hue/intensity handoff. Frost drifts every enemy's rim toward
-      // the cool frost color; matriarchs hold their variant biome accent
-      // regardless of which biome they walk through, ordinary enemies
-      // pick up the biome bias.
-      const rimLerp = clamp01(frost * 1.2);
-      const rimBoost = flashing ? 1.5 : 1.0;
-      const matriarchBiomeForRim =
-        bossVariant !== undefined ? MATRIARCH_VARIANT_BIOME[bossVariant] : null;
-      const teamRimBase = matriarchBiomeForRim
-        ? BIOME_MATRIARCH_RIM[matriarchBiomeForRim]
-        : RIM_COLOR_ENEMY;
-      const rimAccentBiome = matriarchBiomeForRim ?? world.biome;
-      const currentRim = biomeRimColor(teamRimBase, rimAccentBiome);
-      const rimScratch = currentRim.clone();
-      item.obj.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh) return;
-        const mat = m.material as THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[];
-        const apply = (mm: THREE.MeshStandardMaterial) => {
-          // Restore base color each frame, then layer on tints in order
-          // of priority: frost wins outright (the "frozen solid" read
-          // shouldn't fight with body tint). Skipping when both are 0
-          // keeps the no-op fast path allocation-free.
-          const base = mm.userData.baseColor as THREE.Color | undefined;
-          if (base && mm.color) {
-            if (frost > 0.01) mm.color.copy(base).lerp(FROST_COLOR, frost);
-            else if (matriarch && matriarchMaterial)
-              mm.color.copy(base).lerp(variantTint, matriarchMaterial.tintAmount);
-            else if (adaptiveTint && adaptiveAmount > 0)
-              mm.color.copy(base).lerp(adaptiveTint, adaptiveAmount);
-            else mm.color.copy(base);
-          }
-          if (matriarch && matriarchMaterial) {
-            mm.metalness = matriarchMaterial.metalness;
-            mm.roughness = matriarchMaterial.roughness;
-          }
-          // Rim drifts toward frost as the enemy freezes, and brightens
-          // briefly on hit. currentRim was composed once per enemy from
-          // the team base + biome bias; scratch holds the per-frame
-          // tinted value so the inner callback never allocates.
-          if (mm.userData.rimColorBase) {
-            rimScratch.copy(currentRim);
-            if (rimLerp > 0.001) rimScratch.lerp(FROST_RIM_COLOR, rimLerp);
-            setRimColor(mm, rimScratch);
-            const rimBaseIntensity =
-              (mm.userData.rimIntensityBase as number | undefined) ??
-              (matriarch ? RIM_INTENSITY_BOSS : RIM_INTENSITY_ENEMY);
-            setRimIntensity(mm, rimBaseIntensity * rimBoost);
-          }
-          if (!mm.emissive) return;
-          // Registry-applied emissive overrides are eyes only. Body
-          // materials stay dark except for the short hit flash.
-          const baseEmissive = mm.userData.baseEmissive as THREE.Color | undefined;
-          if (flashing) {
-            // Warm-tinted, dimmed flash instead of pure white at full
-            // intensity — reads as "got hit" without the harsh clinical
-            // pop the (1,1,1) version had against varied dino base colors.
-            mm.emissive.setRGB(0.7, 0.6, 0.5);
-          } else if (baseEmissive) {
-            // Restore captured baseEmissive — preserves registry eye /
-            // glow across frames. cloneAndCaptureBase populates
-            // baseEmissive at clone time; applyEmissiveSpec overwrites
-            // it when the material was tagged with an override.
-            mm.emissive.copy(baseEmissive);
-          } else {
-            mm.emissive.setRGB(0, 0, 0);
-          }
-        };
-        if (Array.isArray(mat)) mat.forEach(apply);
-        else apply(mat as THREE.MeshStandardMaterial);
-      });
     }
 
     for (const [id, item] of itemsRef.current) {
@@ -877,7 +609,6 @@ export const ModelEnemyMesh = ({
         // the rest-pose bbox dip as the skeleton flattens. Eased so the
         // first frame doesn't pop and the held-final-pose stays lifted.
         item.obj.position.y = item.dyingBaseY + deathGroundLift * eased;
-        if (item.plateGroup) syncPlateGroup(item.plateGroup);
         if (t >= 1) {
           recycleOrDispose(item);
           itemsRef.current.delete(id);

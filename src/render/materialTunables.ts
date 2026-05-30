@@ -1,14 +1,15 @@
 import * as THREE from "three";
 import type { Biome } from "../biomes";
-import type { BossVariant } from "../sim/types";
 
-// Shared material pipeline for enemy/tower/mech meshes. Adds:
+// Shared material pipeline for robot/tower/mech meshes. Adds:
 //   1. A fresnel rim light (per-instance color/intensity uniform).
 //   2. A 3-step toon quantization on the *diffuse* lit portion of the
 //      fragment (emissive stays unquantized so glows still pop).
 // Patched into the existing MeshStandardMaterial via onBeforeCompile so
-// PBR maps, hit-flash, frost tint, adaptive resist tint, and tower
-// upgrade tints all keep working unchanged.
+// PBR maps, hit-flash, and tower upgrade tints all keep working unchanged.
+//
+// Enemy dinosaurs do not use this pipeline. They render with their
+// model-provided materials and no added armor, body glow, or eye glow.
 //
 // Sub-meshes that should opt into the post-FX selective-bloom pass set
 // `mesh.userData.bloom = true` (and/or material.userData.bloom = true on
@@ -28,11 +29,8 @@ const TOON_THRESH_HI = 0.66;
 
 export const RIM_DEFAULT_POWER = 2.4;
 
-// Team rim colors — cyan-white for player/turret/mech. Enemy body rim is
-// disabled in ModelEnemyMesh; keep a dark fallback color so any accidental
-// enemy rim use cannot reintroduce the old neon body glow.
+// Team rim colors — cyan-white for player/turret/mech.
 export const RIM_COLOR_ALLY = "#7fe6ff";
-export const RIM_COLOR_ENEMY = "#0b1210";
 export const RIM_COLOR_FLAME = "#ffb95a";
 export const RIM_COLOR_CRYO = "#bfe6ff";
 
@@ -48,45 +46,10 @@ export const BIOME_RIM_BIAS: Record<Biome, [number, number, number]> = {
   alien: [1.0, 0.85, 1.18],
 };
 
-// Per-biome matriarch accent — overrides the green enemy rim on the
-// queen so each variant carries its biome's lighting cue.
-export const BIOME_MATRIARCH_RIM: Record<Biome, string> = {
-  forest: "#9eff7a",
-  desert: "#ffd060",
-  snow: "#aef0ff",
-  wasteland: "#ffaf60",
-  lava: "#ff7030",
-  alien: "#e87fff",
-};
-
-// Variant → biome mapping for matriarchs. Sim doesn't store biome on the
-// boss entity directly (it's implied by which level she spawned on), so
-// the render layer maps variant → biome to pick the rim accent.
-export const MATRIARCH_VARIANT_BIOME: Record<BossVariant, Biome> = {
-  raptor: "forest",
-  stego: "snow",
-  para: "desert",
-  allosaur: "wasteland",
-  armored: "lava",
-  apex: "alien",
-};
-
-// Matriarch spine / bio-conduit emissive color, by biome accent.
-export const MATRIARCH_CONDUIT_COLOR: Record<Biome, string> = {
-  forest: "#7eff8c",
-  desert: "#ffa030",
-  snow: "#8cf0ff",
-  wasteland: "#ff8a3a",
-  lava: "#ff5018",
-  alien: "#ff5cff",
-};
-
 // Default rim intensities by category. Tuned so the silhouette reads
 // against busy biome props without the unit looking like it's lit from
 // behind by a laser.
 export const RIM_INTENSITY_ALLY = 0.55;
-export const RIM_INTENSITY_ENEMY = 0;
-export const RIM_INTENSITY_BOSS = 0;
 
 // Toon amount: 0 keeps stock PBR shading, 1 fully quantizes diffuse into
 // the 3 bands. 0.72 reads as painted without losing PBR cues entirely.
