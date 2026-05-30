@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { audio } from "../audio/AudioManager";
 import { isDebug } from "../debug";
 import { EditLevelButton } from "../editor/EditLevelButton";
+import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { type LevelConfig, levelHasMode } from "../levels";
 import {
   getModeStars,
@@ -69,6 +70,7 @@ export const LevelNode = ({ level }: Props) => {
   const startLevel = useGame((s) => s.startLevel);
   const openModePicker = useGame((s) => s.openModePicker);
   const setHoveredLevel = useGame((s) => s.setHoveredLevel);
+  const editorActive = useWorldMapEditor((s) => s.active);
   const [pointerHovered, setPointerHovered] = useState(false);
 
   const unlocked = isLevelUnlocked(level.id, progress);
@@ -164,16 +166,19 @@ export const LevelNode = ({ level }: Props) => {
           and unplayed pulse don't yank the hover boundary out from
           under the cursor. Radius matches the outer hover ring (1.95)
           so the entire visible button area registers as the same
-          target. */}
-      <mesh
-        position={[0, 0.75, 0]}
-        onPointerDown={handleClick}
-        onPointerOver={handleOver}
-        onPointerOut={handleOut}
-      >
-        <cylinderGeometry args={[1.95, 1.95, 1.6, 16]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
+          target. Skipped while the world-map editor is active so prop
+          placement clicks pass through to the editor's ground plane. */}
+      {!editorActive && (
+        <mesh
+          position={[0, 0.75, 0]}
+          onPointerDown={handleClick}
+          onPointerOver={handleOver}
+          onPointerOut={handleOut}
+        >
+          <cylinderGeometry args={[1.95, 1.95, 1.6, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
 
       <group ref={groupRef}>
         <mesh position={[0, 0.5, 0]} castShadow>
@@ -251,7 +256,7 @@ export const LevelNode = ({ level }: Props) => {
         </group>
       )}
 
-      {challengeBadges.length > 0 && (
+      {!editorActive && challengeBadges.length > 0 && (
         <Html
           center
           position={[0, 0.05, labelZ + 1.5]}

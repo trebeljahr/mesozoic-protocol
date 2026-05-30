@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
 import { isDebug } from "../debug";
+import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { type GamepadInputFrame, snapGamepadDirection, useGamepadInput } from "../input/gamepad";
 import { useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
 import { LEVELS } from "../levels";
@@ -110,6 +111,7 @@ export const WorldMapUI = () => {
 
   useGamepadInput((frame) => {
     if (!frame.gamepad || menuOpen) return;
+    if (useWorldMapEditor.getState().active) return;
 
     const unlocked = LEVELS.filter((level) => isLevelUnlocked(level.id, progress));
     const fallback = unlocked[0];
