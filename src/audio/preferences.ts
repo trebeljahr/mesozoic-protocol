@@ -66,8 +66,9 @@ const migrateFromV1 = (raw: string): AudioPrefs | null => {
 };
 
 // Force-mute in Claude Code's preview browser (UA contains "Claude/")
-// so dev previews don't blast sound at whoever's nearby.
-const isClaudePreview = (): boolean => {
+// and in any Vite dev build so reloads don't blast sound at whoever's nearby.
+const shouldForceMute = (): boolean => {
+  if (import.meta.env.DEV) return true;
   try {
     return /Claude\//.test(navigator.userAgent);
   } catch {
@@ -86,7 +87,7 @@ let prefsLoaded = false;
 export const loadAudioPrefs = (): AudioPrefs => {
   if (prefsLoaded) return readAudioPrefs();
   prefsLoaded = true;
-  const muteOverride = isClaudePreview();
+  const muteOverride = shouldForceMute();
   try {
     const v2 = localStorage.getItem(STORAGE_KEY_V2);
     if (v2) {
