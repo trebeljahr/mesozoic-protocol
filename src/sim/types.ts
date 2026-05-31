@@ -853,6 +853,11 @@ export type World = {
   overrideActive: boolean;
   // Dev editor procedural reseed offset. Zero in production/default saves.
   proceduralSeed: number;
+  // Dev editor: per-position keys (`${x},${y}`) for procedural trees/rocks/
+  // outposts the author erased or overwrote in the editor. createWorld
+  // filters the procedural arrays through this set so erased items stay
+  // gone across reloads. Empty in production unless the saved blob ships it.
+  erasedProcedural: Set<string>;
   // Hand-painted rivers from the dev-only river tool. Persisted alongside
   // props in the same per-level edit blob. Empty in production unless the
   // saved blob ships rivers. Visual-only today.

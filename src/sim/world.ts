@@ -222,6 +222,14 @@ const blockingFootprint = (spec: BiomeLayer): number => spec.footprint ?? ROCK_F
 // Rocks.tsx) when GLBs load, read by canPlaceAt for placement blocking.
 export const meshXZRadii = new Map<string, number>();
 
+// Stable key for a procedurally generated item — encodes its position
+// verbatim. Procedural generation is fully deterministic for a given seed,
+// so the same item always lands at the same float coordinates across world
+// rebuilds, and Number→String is bit-identical for identical floats. The
+// editor's erased-procedural mask keys items by this so erasures persist
+// across reloads and reseeds (until the seed itself changes).
+export const proceduralPosKey = (p: { x: number; y: number }): string => `${p.x},${p.y}`;
+
 const buildTrees = (
   paths: Vec2[][],
   seed: number,
@@ -724,6 +732,7 @@ export const createWorld = (
   let editorBridges: AutoBridge[] = [];
   let overrideActive = false;
   let proceduralSeed = 0;
+  let erasedProcedural: Set<string> = new Set();
   if (import.meta.env.DEV) {
     try {
       const raw =
@@ -741,6 +750,9 @@ export const createWorld = (
           typeof edit.proceduralSeed === "number" && Number.isFinite(edit.proceduralSeed)
             ? edit.proceduralSeed
             : 0;
+        erasedProcedural = new Set(
+          Array.isArray(edit.erasedProcedural) ? (edit.erasedProcedural as string[]) : [],
+        );
       }
     } catch {
       editorProps = [];
@@ -748,6 +760,7 @@ export const createWorld = (
       editorBridges = [];
       overrideActive = false;
       proceduralSeed = 0;
+      erasedProcedural = new Set();
     }
   }
   const proceduralKey = level.id + proceduralSeed;
@@ -760,16 +773,26 @@ export const createWorld = (
       ? buildFlowFeatures(paths, proceduralKey, biome)
       : null;
   // Outposts are placed first so trees and rocks treat them as fixed
-  // blockers and never spawn inside an authored colony.
-  const { outposts, nextId: afterOutposts } = overrideActive
+  // blockers and never spawn inside an authored colony. Each layer is then
+  // filtered through the editor's erased-procedural mask so author-erased
+  // items stay gone after a world rebuild. Downstream layers see the
+  // filtered set, so e.g. eggs can occupy the spot of an erased outpost.
+  const filterErased = <T extends { pos: { x: number; y: number } }>(items: T[]): T[] =>
+    erasedProcedural.size === 0
+      ? items
+      : items.filter((item) => !erasedProcedural.has(proceduralPosKey(item.pos)));
+  const { outposts: rawOutposts, nextId: afterOutposts } = overrideActive
     ? { outposts: [], nextId: 1 }
     : buildOutposts(paths, biome, proceduralKey, flow, 1);
-  const { trees, nextId: afterTrees } = overrideActive
+  const outposts = filterErased(rawOutposts);
+  const { trees: rawTrees, nextId: afterTrees } = overrideActive
     ? { trees: [], nextId: afterOutposts }
     : buildTrees(paths, proceduralKey * 7919 + 101, afterOutposts, flow, biome, outposts);
-  const { rocks, nextId: afterRocks } = overrideActive
+  const trees = filterErased(rawTrees);
+  const { rocks: rawRocks, nextId: afterRocks } = overrideActive
     ? { rocks: [], nextId: afterTrees }
     : buildRocks(biome, paths, trees, afterTrees, flow, proceduralKey, outposts);
+  const rocks = filterErased(rawRocks);
   const { eggs, nextId } = overrideActive
     ? { eggs: [], nextId: afterRocks }
     : buildEasterEggs(
@@ -915,6 +938,7 @@ export const createWorld = (
     props: editorProps,
     overrideActive,
     proceduralSeed,
+    erasedProcedural,
     rivers: editorRivers,
     autoBridges: editorBridges,
     projectiles: [],

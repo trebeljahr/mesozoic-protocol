@@ -153,7 +153,17 @@ export type EditorSource = {
   // material-themed palettes, and survive reloads.
   bridges: AutoBridge[];
   proceduralSeed?: number;
+  // Per-position keys identifying procedural trees/rocks/outposts the
+  // author erased or overwrote (createWorld filters the seeded set
+  // through these on every load). Sources without procedural items
+  // (world-map editor) leave this undefined.
+  erasedProcedural?: string[];
 };
+
+// Single procedural item from an adapter that owns a seeded set-dressing
+// layer (trees/rocks/outposts). x/y/r is its footprint in world units;
+// `key` is the stable id the editor stores in `erasedProcedural`.
+export type ProceduralItem = { x: number; y: number; r: number; key: string };
 
 export type EditorAdapter = {
   // Authoritative read of the underlying data source. Called on every
@@ -176,6 +186,13 @@ export type EditorAdapter = {
     candidateRadius: number,
     ignorePropIds?: ReadonlySet<string> | null,
   ) => boolean;
+  // Snapshot of the adapter's seeded procedural items (trees/rocks/
+  // outposts on the level editor; undefined on world-map). Called by the
+  // eraser brush and placement actions so they can extend the editor's
+  // erased-procedural mask to also bulldoze procedural decor that the
+  // hand-placed action overlaps. Already-erased keys SHOULD be omitted —
+  // the level adapter prunes them so the result is a live snapshot.
+  getProceduralItems?: () => ProceduralItem[];
   // Map bounds for the editable area. Used by the river tool to snap
   // endpoints to the nearest edge (with a threshold + direction-aware
   // extension) and by the auto-bridge resolver to find path crossings.
@@ -357,6 +374,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         rivers: cloneRivers(cur.rivers),
         bridges: cur.bridges.map((b) => ({ ...b })),
         proceduralSeed: cur.proceduralSeed,
+        erasedProcedural: cur.erasedProcedural ? [...cur.erasedProcedural] : undefined,
       };
     };
 
@@ -390,6 +408,27 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         rivers: cur.rivers,
         bridges: cur.bridges,
         proceduralSeed: cur.proceduralSeed,
+        erasedProcedural: cur.erasedProcedural,
+      });
+    };
+
+    // Replace the props array AND extend the procedural-erase mask in one
+    // commit. Used by the eraser brush (erases hand-placed and procedural
+    // in a single stroke step) and by placement actions (auto-bulldozes
+    // any procedural decor the new prop's footprint overlaps so the user
+    // doesn't have to switch tools).
+    const commitPropsAndErasedProcedural = (props: PlacedProp[], newErasedKeys: string[]): void => {
+      const cur = adapter.getCurrent();
+      const merged = newErasedKeys.length
+        ? Array.from(new Set([...(cur.erasedProcedural ?? []), ...newErasedKeys]))
+        : cur.erasedProcedural;
+      commit({
+        props,
+        override: cur.override,
+        rivers: cur.rivers,
+        bridges: cur.bridges,
+        proceduralSeed: cur.proceduralSeed,
+        erasedProcedural: merged,
       });
     };
 
@@ -410,7 +449,31 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         rivers,
         bridges,
         proceduralSeed: cur.proceduralSeed,
+        erasedProcedural: cur.erasedProcedural,
       });
+    };
+
+    // Procedural-decor overlap probe shared by placement + brush scatter.
+    // Returns the stable keys of procedural items whose footprint overlaps
+    // a candidate of radius `r` at (x, y). Used to compute "what to also
+    // erase" when a hand-placed action lands on top of seeded set-dressing.
+    const collectOverlappingProcedural = (
+      x: number,
+      y: number,
+      r: number,
+      alreadyErased: ReadonlySet<string>,
+    ): string[] => {
+      const items = adapter.getProceduralItems?.() ?? [];
+      if (items.length === 0) return [];
+      const keys: string[] = [];
+      for (const item of items) {
+        if (alreadyErased.has(item.key)) continue;
+        const sum = item.r + r;
+        const dx = item.x - x;
+        const dy = item.y - y;
+        if (dx * dx + dy * dy < sum * sum) keys.push(item.key);
+      }
+      return keys;
     };
 
     // Single-prop transform shorthand for rotate/scale/toggleBlocks.
@@ -504,8 +567,17 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           blocks: defaultBlocks(url),
         };
         snapshotAndPush();
+        // Procedural decor (trees/rocks/outposts) the new prop's footprint
+        // covers gets bulldozed too — same overwrite logic as for hand-placed
+        // props above, but routed through the erased-procedural mask.
+        const procOverlap = collectOverlappingProcedural(
+          x,
+          y,
+          radius,
+          new Set(cur.erasedProcedural ?? []),
+        );
         const kept = overlap.size > 0 ? cur.props.filter((p) => !overlap.has(p.id)) : cur.props;
-        commitProps([...kept, prop]);
+        commitPropsAndErasedProcedural([...kept, prop], procOverlap);
         set({ selectedId: prop.id });
       },
 
@@ -526,7 +598,16 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const ignore: ReadonlySet<string> = new Set([id]);
         if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, ignore)) return;
         snapshotAndPush();
-        commitProps(cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)));
+        const overlap = collectOverlappingProcedural(
+          x,
+          y,
+          radius,
+          new Set(cur.erasedProcedural ?? []),
+        );
+        commitPropsAndErasedProcedural(
+          cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)),
+          overlap,
+        );
         set({ moving: false });
       },
 
@@ -572,6 +653,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           rivers: cur.rivers,
           bridges: cur.bridges,
           proceduralSeed: cur.proceduralSeed,
+          erasedProcedural: cur.erasedProcedural,
         });
         set({ selectedId: null, moving: false, placingUrl: null });
         adapter.onOverrideChange?.();
@@ -605,6 +687,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             rivers: [],
             bridges: [],
             proceduralSeed: cur.proceduralSeed,
+            erasedProcedural: cur.erasedProcedural,
           });
         }
         set((s) => ({
@@ -629,6 +712,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             rivers: cur.rivers,
             bridges: cur.bridges,
             proceduralSeed: cur.proceduralSeed,
+            erasedProcedural: [],
           });
         }
         set((s) => ({
@@ -658,6 +742,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           rivers: cur.rivers,
           bridges: cur.bridges,
           proceduralSeed: Date.now(),
+          erasedProcedural: [],
         });
       },
 
@@ -774,9 +859,25 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             const dy = p.pos.y - y;
             return dx * dx + dy * dy > radSq;
           });
-          if (next.length === cur.props.length) return;
+          // Procedural decor (trees/rocks/outposts) is keyed in the
+          // erased-procedural mask the same way hand-placed props are
+          // dropped from the props array — center-in-radius, matching
+          // the rule above so one brush stroke clears both layers
+          // uniformly.
+          const already = new Set(cur.erasedProcedural ?? []);
+          const procItems = adapter.getProceduralItems?.() ?? [];
+          const newErased: string[] = [];
+          for (const item of procItems) {
+            if (already.has(item.key)) continue;
+            const dx = item.x - x;
+            const dy = item.y - y;
+            if (dx * dx + dy * dy <= radSq) newErased.push(item.key);
+          }
+          const erasedProps = next.length !== cur.props.length;
+          const erasedProc = newErased.length > 0;
+          if (!erasedProps && !erasedProc) return;
           openStrokeEntry();
-          commitProps(next);
+          commitPropsAndErasedProcedural(next, newErased);
           if (s.selectedId !== null && !next.some((p) => p.id === s.selectedId)) {
             set({ selectedId: null });
           }
@@ -807,6 +908,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // candidate radius when the author wants extra breathing room.
         const spacingFloor = Math.max(0, s.brush.minSpacing);
         const targetCount = s.brush.density;
+        const erasedSoFar = new Set(cur.erasedProcedural ?? []);
+        const newErased: string[] = [];
         for (const pt of candidates) {
           if (accepted.length >= targetCount) break;
           const url = pickFromUrls(urls);
@@ -834,6 +937,14 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           }
           if (collides) continue;
           if (adapter.canPlaceAt && !adapter.canPlaceAt(pt.x, pt.y, r, null)) continue;
+          // Per-candidate procedural bulldozing — each accepted sample
+          // contributes its overlaps to the stroke's erase batch. The
+          // erasedSoFar set keeps duplicates and re-hits from compounding.
+          const overlap = collectOverlappingProcedural(pt.x, pt.y, r, erasedSoFar);
+          for (const key of overlap) {
+            erasedSoFar.add(key);
+            newErased.push(key);
+          }
           accepted.push({ x: pt.x, y: pt.y, r, url, scale });
         }
         if (accepted.length === 0) return;
@@ -846,7 +957,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           rot: randRange(preset.rotateRange[0], preset.rotateRange[1]),
           blocks: preset.defaultBlocks,
         }));
-        commitProps([...cur.props, ...additions]);
+        commitPropsAndErasedProcedural([...cur.props, ...additions], newErased);
       },
 
       endStroke: () => {

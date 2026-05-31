@@ -1,9 +1,15 @@
 import { isOnFlowSurface } from "../flowGeometry";
 import { MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "../level";
 import { distPointToSegSq, distSq } from "../sim/vec2";
-import { ROCK_FOOTPRINT, TOWER_FOOTPRINT, TREE_FOOTPRINT } from "../sim/world";
+import { proceduralPosKey, ROCK_FOOTPRINT, TOWER_FOOTPRINT, TREE_FOOTPRINT } from "../sim/world";
 import { useGame } from "../store";
-import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./editorCore";
+import {
+  createEditorStore,
+  type EditorStore,
+  isOnRiver,
+  type ProceduralItem,
+  propRadius,
+} from "./editorCore";
 import { clearAllLevelHistories, loadLevelHistory, saveLevelHistory } from "./historyPersist";
 import { clearAllLevelEdits, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
 
@@ -55,6 +61,7 @@ const saveCurrentLevelEdit = (): void => {
     props: w.props,
     rivers: w.rivers,
     bridges: w.autoBridges,
+    erasedProcedural: w.erasedProcedural.size > 0 ? [...w.erasedProcedural] : undefined,
   });
 };
 
@@ -86,18 +93,10 @@ const canEditPlaceAt = (
     const r = TOWER_FOOTPRINT * 0.5 + candidateRadius;
     if (distSq(t.pos, pos) < r * r) return false;
   }
-  for (const t of w.trees) {
-    const r = TREE_FOOTPRINT * t.scale + candidateRadius;
-    if (distSq(t.pos, pos) < r * r) return false;
-  }
-  for (const rck of w.rocks) {
-    const r = ROCK_FOOTPRINT * rck.scale + candidateRadius;
-    if (distSq(rck.pos, pos) < r * r) return false;
-  }
-  for (const o of w.outposts) {
-    const r = o.radius + candidateRadius;
-    if (distSq(o.pos, pos) < r * r) return false;
-  }
+  // Procedural decor (trees/rocks/outposts) does NOT block editor placement
+  // — the editor auto-bulldozes any procedural item the new prop's footprint
+  // overlaps via the erased-procedural mask. Paths/flow/rivers/towers stay
+  // as hard blockers because they're never erased that way.
   for (const p of w.props) {
     if (ignorePropIds?.has(p.id)) continue;
     const r = propRadius(p.url, p.scale) + candidateRadius;
@@ -118,17 +117,49 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
       rivers: w.rivers,
       bridges: w.autoBridges,
       proceduralSeed: w.proceduralSeed,
+      erasedProcedural: w.erasedProcedural.size > 0 ? [...w.erasedProcedural] : undefined,
     };
   },
-  commit: ({ props, override, rivers, bridges, proceduralSeed }) => {
+  commit: ({ props, override, rivers, bridges, proceduralSeed, erasedProcedural }) => {
     const w = useGame.getState().world;
+    const before = w.erasedProcedural;
+    const after = new Set(erasedProcedural ?? []);
+    // Items newly erased this commit — drop them from the in-memory
+    // procedural arrays so the next render reflects the change without
+    // a full level rebuild (rebuilds are reserved for shrinkage below
+    // and explicit override/clear paths).
+    const added: string[] = [];
+    for (const k of after) {
+      if (!before.has(k)) added.push(k);
+    }
+    // Mask shrunk (undo of an erasure) — the previously erased items need
+    // to come back, which only re-running createWorld with the smaller
+    // mask can do.
+    let shrunk = false;
+    for (const k of before) {
+      if (!after.has(k)) {
+        shrunk = true;
+        break;
+      }
+    }
     w.props = props;
     w.overrideActive = override;
     w.rivers = rivers;
     w.autoBridges = bridges;
     w.proceduralSeed = proceduralSeed ?? w.proceduralSeed;
-    bumpGeometry();
+    w.erasedProcedural = after;
+    if (added.length > 0) {
+      const addedSet = new Set(added);
+      w.trees = w.trees.filter((t) => !addedSet.has(proceduralPosKey(t.pos)));
+      w.rocks = w.rocks.filter((r) => !addedSet.has(proceduralPosKey(r.pos)));
+      w.outposts = w.outposts.filter((o) => !addedSet.has(proceduralPosKey(o.pos)));
+    }
     saveCurrentLevelEdit();
+    if (shrunk) {
+      reloadLevel();
+      return;
+    }
+    bumpGeometry();
   },
   clear: () => {
     const w = useGame.getState().world;
@@ -136,6 +167,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     w.rivers = [];
     w.autoBridges = [];
     w.overrideActive = true;
+    w.erasedProcedural = new Set();
     // No bump here — onClear -> reloadLevel does it after the rebuild.
     saveCurrentLevelEdit();
   },
@@ -150,6 +182,9 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
   clearProcedural: () => {
     const w = useGame.getState().world;
     w.overrideActive = true;
+    // Mask is moot while override is on; reset it so a later
+    // reload-procedural starts from a fully restored seeded set.
+    w.erasedProcedural = new Set();
     // No bump here — reloadLevel() at the tail does it after the rebuild.
     saveCurrentLevelEdit();
     reloadLevel();
@@ -158,11 +193,36 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     const w = useGame.getState().world;
     w.overrideActive = false;
     w.proceduralSeed = Math.floor(Math.random() * 1_000_000_000);
+    // New seed means new positions — existing mask keys can't match
+    // anything in the regenerated set, so drop them so the mask doesn't
+    // accidentally suppress fresh items on a future seed-flip.
+    w.erasedProcedural = new Set();
     // No bump here — reloadLevel() at the tail does it after the rebuild.
     saveCurrentLevelEdit();
     reloadLevel();
   },
   canPlaceAt: canEditPlaceAt,
+  getProceduralItems: (): ProceduralItem[] => {
+    const w = useGame.getState().world;
+    const erased = w.erasedProcedural;
+    const items: ProceduralItem[] = [];
+    for (const t of w.trees) {
+      const key = proceduralPosKey(t.pos);
+      if (erased.has(key)) continue;
+      items.push({ x: t.pos.x, y: t.pos.y, r: TREE_FOOTPRINT * t.scale, key });
+    }
+    for (const r of w.rocks) {
+      const key = proceduralPosKey(r.pos);
+      if (erased.has(key)) continue;
+      items.push({ x: r.pos.x, y: r.pos.y, r: ROCK_FOOTPRINT * r.scale, key });
+    }
+    for (const o of w.outposts) {
+      const key = proceduralPosKey(o.pos);
+      if (erased.has(key)) continue;
+      items.push({ x: o.pos.x, y: o.pos.y, r: o.radius, key });
+    }
+    return items;
+  },
   getMapBounds: () => LEVEL_BOUNDS,
   getPaths: () => useGame.getState().world.paths,
   // History is persisted per-level so each level keeps its own undo/redo
@@ -233,6 +293,7 @@ export const clearAllLevels = (): void => {
   w.autoBridges = [];
   w.overrideActive = false;
   w.proceduralSeed = 0;
+  w.erasedProcedural = new Set();
   // No pre-bump — reloadLevel() handles it after the rebuild.
   reloadLevel();
 };

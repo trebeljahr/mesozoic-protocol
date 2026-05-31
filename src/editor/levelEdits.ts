@@ -26,6 +26,10 @@ export type LevelEdit = {
   // bridges defaulting to [] and re-resolve on the next editor commit
   // (or by the legacy auto-bridge fallback in render/Rivers.tsx).
   bridges?: AutoBridge[];
+  // Per-position keys (`${x},${y}`) for procedural trees/rocks/outposts the
+  // author erased or overwrote. Additive over v:1 — older blobs load with
+  // []. createWorld filters procedural arrays through this set.
+  erasedProcedural?: string[];
 };
 
 const STORAGE_KEY = "mz:leveledits:v1";

@@ -17,6 +17,9 @@ export type Snapshot = {
   // Captured here so undo/redo restores the same bridge ids the user saw.
   bridges: AutoBridge[];
   proceduralSeed?: number;
+  // Per-position keys for procedural items the author erased/overwrote.
+  // Captured so undo/redo restores the same procedural-decor mask.
+  erasedProcedural?: string[];
 };
 export type History = { past: Snapshot[]; future: Snapshot[] };
 
