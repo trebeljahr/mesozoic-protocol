@@ -4,8 +4,13 @@ import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
-import type { EditorStore } from "../editor/editorCore";
-import type { PlacedProp, River } from "../sim/types";
+import {
+  type EditorStore,
+  projectToEdge,
+  RIVER_EDGE_HOVER_SNAP_THRESHOLD,
+  snapToEdgeIfNear,
+} from "../editor/editorCore";
+import type { PlacedProp, River, Vec2 } from "../sim/types";
 import { InstancedGroup } from "./InstancedGroup";
 import { collectMeshSource, type MeshSource } from "./meshSource";
 
@@ -286,11 +291,24 @@ const EditorGroundPlane = ({
     ring.visible = true;
   });
 
-  // Cursor tracking for the "next segment" preview while painting a river.
-  // forceUpdate fires only while a river is being drawn, so non-river hover
-  // movement stays free.
+  // Cursor tracking for the river-tool overlay. forceUpdate fires whenever
+  // the tool is armed (pre-click start marker AND mid-stroke preview line),
+  // so non-river hover movement stays free.
   const [, forceUpdate] = useState({});
   const cursorRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Apply the river-tool snap rules to a raw map-plane hit. Pre-click the
+  // start always projects to the nearest edge (rivers must originate
+  // off-map). Mid-stroke a point only snaps when within the hover
+  // threshold, so interior control points stay free of edge attraction.
+  // Returns the raw point unchanged when the adapter doesn't define
+  // bounds (world map editor).
+  const computeRiverCursor = (raw: Vec2, ed: ReturnType<typeof store.getState>): Vec2 => {
+    const bounds = ed.getMapBounds();
+    if (!bounds) return raw;
+    if (ed.riverTool.editingRiverId === null) return projectToEdge(raw, bounds);
+    return snapToEdgeIfNear(raw, bounds, RIVER_EDGE_HOVER_SNAP_THRESHOLD);
+  };
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
@@ -301,8 +319,12 @@ const EditorGroundPlane = ({
     const x = e.point.x;
     const y = -e.point.z;
     if (ed.riverTool.active) {
-      if (ed.riverTool.editingRiverId === null) ed.beginRiver(x, y);
-      else ed.addRiverPoint(x, y);
+      // Use the same projection the hover marker showed so the committed
+      // point matches the preview exactly. Pre-click always edge-locks (rivers
+      // policy); mid-stroke locks only when within hover threshold.
+      const target = computeRiverCursor({ x, y }, ed);
+      if (ed.riverTool.editingRiverId === null) ed.beginRiver(target.x, target.y);
+      else ed.addRiverPoint(target.x, target.y);
       return;
     }
     if (ed.moving && ed.selectedId !== null) {
@@ -368,10 +390,12 @@ const EditorGroundPlane = ({
       }
       return;
     }
-    // River-tool preview cursor — only meaningful while mid-stroke.
+    // River-tool preview cursor — track whenever the tool is armed so the
+    // pre-click start marker and the mid-stroke preview line both have an
+    // up-to-date snap target.
     const ed = store.getState();
-    if (ed.riverTool.active && ed.riverTool.editingRiverId !== null) {
-      cursorRef.current = { x: e.point.x, y: -e.point.z };
+    if (ed.riverTool.active) {
+      cursorRef.current = computeRiverCursor({ x: e.point.x, y: -e.point.z }, ed);
       forceUpdate({});
     }
   };
@@ -429,6 +453,7 @@ const EditorGroundPlane = ({
         />
       </mesh>
       <RiverPreviewSegment store={store} cursorRef={cursorRef} />
+      <RiverHoverMarker store={store} cursorRef={cursorRef} />
     </group>
   );
 };
@@ -504,6 +529,45 @@ const HoverPreview = ({
         />
       ))}
     </group>
+  );
+};
+
+// Snap-target indicator for the river tool. Pre-click it sits on the
+// nearest edge (showing exactly where beginRiver will start). Mid-stroke
+// it tracks the cursor, snapping to the edge when within the hover
+// threshold so the user sees the catch before committing.
+const RiverHoverMarker = ({
+  store,
+  cursorRef,
+}: {
+  store: EditorStore;
+  cursorRef: React.MutableRefObject<{ x: number; y: number } | null>;
+}) => {
+  const riverTool = store((s) => s.riverTool);
+  if (!riverTool.active) return null;
+  const cursor = cursorRef.current;
+  if (!cursor) return null;
+  // Orange highlights an unconfirmed start (no editing river yet); blue
+  // signals an in-progress next-point snap so it reads as "this is where
+  // the next click lands" rather than a fresh origin.
+  const color = riverTool.editingRiverId === null ? "#ffb347" : "#76d6ff";
+  return (
+    <mesh
+      position={[cursor.x, 0.07, -cursor.y]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={22}
+      raycast={noRaycast}
+    >
+      <ringGeometry args={[0.38, 0.58, 40]} />
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={0.95}
+        side={THREE.DoubleSide}
+        depthTest={false}
+        depthWrite={false}
+      />
+    </mesh>
   );
 };
 

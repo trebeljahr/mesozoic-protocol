@@ -74,6 +74,12 @@ export const RIVER_MATERIALS: { id: RiverMaterial; label: string }[] = [
 // natural tangent extension rather than a perpendicular jog.
 export const RIVER_EDGE_SNAP_THRESHOLD = 1.5;
 
+// Hover snap radius for the river tool's live cursor. Wider than the finish
+// snap so the preview marker visibly "catches" on the edge before the user
+// commits, and stays caught through small inward drift — without dragging
+// mid-map control points sideways.
+export const RIVER_EDGE_HOVER_SNAP_THRESHOLD = 3.5;
+
 export type MapBounds = { halfW: number; halfH: number };
 
 // Project `p` onto the nearest cardinal edge of the bounding rectangle,
@@ -98,6 +104,12 @@ export const projectToEdge = (p: Vec2, b: MapBounds): Vec2 => {
 // stays well-defined.
 export const distToNearestEdge = (p: Vec2, b: MapBounds): number =>
   Math.min(b.halfW - Math.abs(p.x), b.halfH - Math.abs(p.y));
+
+// Snap `p` to the nearest map edge if within `threshold` units, else
+// return `p` unchanged. Shared by the hover preview and the click commit
+// so what the user sees on hover is exactly what they get on click.
+export const snapToEdgeIfNear = (p: Vec2, b: MapBounds, threshold: number): Vec2 =>
+  distToNearestEdge(p, b) <= threshold ? projectToEdge(p, b) : p;
 
 // Parametric ray-march from `last` along `(last - prev)` to the smallest
 // positive `t` that hits a wall, then clamp the perpendicular onto the
@@ -268,6 +280,11 @@ export type EditorStoreApi = {
   // the adapter so callers don't need to know whether state lives on the
   // store itself (world map) or on useGame.world (level editor).
   getCurrent: () => EditorSource;
+  // Map bounds passthrough so the render layer can preview river-tool snap
+  // targets with the same projection the commit path uses. Returns null
+  // when the active adapter doesn't define an editable perimeter (world
+  // map today) — render code should skip snap visualization in that case.
+  getMapBounds: () => MapBounds | null;
   toggleActive: () => void;
   setPanelCollapsed: (collapsed: boolean) => void;
   setChromeHidden: (hidden: boolean) => void;
@@ -421,6 +438,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       riverTool: DEFAULT_RIVER_TOOL,
 
       getCurrent: () => adapter.getCurrent(),
+
+      getMapBounds: () => adapter.getMapBounds?.() ?? null,
 
       toggleActive: () => {
         const next = !get().active;
