@@ -69,7 +69,28 @@ export const ChainArcsFx = () => {
 
   const coreGeom = useMemo(makeLineGeom, []);
   const haloGeom = useMemo(makeLineGeom, []);
-  const flashGeom = useMemo(() => new THREE.PlaneGeometry(0.6, 0.6), []);
+  const flashGeom = useMemo(() => new THREE.PlaneGeometry(0.9, 0.9), []);
+  const flashTexture = useMemo(() => {
+    // Radial gradient sprite so the impact flash reads as a soft glow,
+    // not the opaque bluish square the untextured plane was rendering as.
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.35, "rgba(255,255,255,0.55)");
+    grad.addColorStop(0.7, "rgba(255,255,255,0.12)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, []);
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const flashColor = useMemo(() => new THREE.Color(), []);
@@ -339,7 +360,14 @@ export const ChainArcsFx = () => {
         renderOrder={3}
         frustumCulled={false}
       >
-        <meshBasicMaterial color="#ffffff" transparent opacity={1} depthWrite={false} />
+        <meshBasicMaterial
+          map={flashTexture ?? undefined}
+          color="#ffffff"
+          transparent
+          opacity={1}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
       </instancedMesh>
     </group>
   );
