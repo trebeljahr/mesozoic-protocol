@@ -162,7 +162,7 @@ export type EditorAdapter = {
     x: number,
     y: number,
     candidateRadius: number,
-    ignorePropId?: string | null,
+    ignorePropIds?: ReadonlySet<string> | null,
   ) => boolean;
   // Map bounds for the editable area. Used by the river tool to snap
   // endpoints to the nearest edge (with a threshold + direction-aware
@@ -258,6 +258,11 @@ export type EditorStoreApi = {
   strokeAnchor: Snapshot | null;
   strokeOpen: boolean;
   strokePushed: boolean;
+  // Hold-to-rotate gate. While open, repeated rotateSelected calls collapse
+  // into a single undo entry (snapshot pushed on the first call only). Closed
+  // by default — UI buttons keep their one-press-one-entry behavior.
+  rotateStrokeOpen: boolean;
+  rotateStrokePushed: boolean;
   riverTool: RiverToolState;
   // Authoritative read of the underlying props/override/rivers. Defers to
   // the adapter so callers don't need to know whether state lives on the
@@ -273,6 +278,8 @@ export type EditorStoreApi = {
   moveSelectedTo: (x: number, y: number) => void;
   deleteSelected: () => void;
   rotateSelected: (deltaRad: number) => void;
+  beginRotateStroke: () => void;
+  endRotateStroke: () => void;
   scaleSelected: (mul: number) => void;
   toggleSelectedBlocks: () => void;
   setOverride: (on: boolean) => void;
@@ -409,6 +416,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       history: adapter.loadHistory?.() ?? { past: [], future: [] },
       brush: DEFAULT_BRUSH,
       ...STROKE_CLEAR,
+      rotateStrokeOpen: false,
+      rotateStrokePushed: false,
       riverTool: DEFAULT_RIVER_TOOL,
 
       getCurrent: () => adapter.getCurrent(),
@@ -448,7 +457,25 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const url = get().placingUrl;
         if (!url) return;
         const radius = propRadius(url, 1);
-        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, null)) return;
+        const cur = adapter.getCurrent();
+        // Overlapping authored props get overwritten so a click never silently
+        // fails just because another prop sits underneath. Hard blockers
+        // (paths/rivers/towers/trees/rocks/outposts/bounds) still refuse —
+        // we hand the gate the overlap set so it tests as if those props were
+        // already gone.
+        const overlap = new Set<string>();
+        for (const p of cur.props) {
+          const r = propRadius(p.url, p.scale) + radius;
+          const dx = p.pos.x - x;
+          const dy = p.pos.y - y;
+          if (dx * dx + dy * dy < r * r) overlap.add(p.id);
+        }
+        if (
+          adapter.canPlaceAt &&
+          !adapter.canPlaceAt(x, y, radius, overlap.size > 0 ? overlap : null)
+        ) {
+          return;
+        }
         const prop: PlacedProp = {
           id: nanoid(8),
           url,
@@ -458,8 +485,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           blocks: defaultBlocks(url),
         };
         snapshotAndPush();
-        const cur = adapter.getCurrent();
-        commitProps([...cur.props, prop]);
+        const kept = overlap.size > 0 ? cur.props.filter((p) => !overlap.has(p.id)) : cur.props;
+        commitProps([...kept, prop]);
         set({ selectedId: prop.id });
       },
 
@@ -477,7 +504,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const sel = cur.props.find((p) => p.id === id);
         if (!sel) return;
         const radius = propRadius(sel.url, sel.scale);
-        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, id)) return;
+        const ignore: ReadonlySet<string> = new Set([id]);
+        if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, ignore)) return;
         snapshotAndPush();
         commitProps(cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)));
         set({ moving: false });
@@ -492,7 +520,27 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         set({ selectedId: null, moving: false });
       },
 
-      rotateSelected: (deltaRad) => mutateSelected((p) => ({ ...p, rot: p.rot + deltaRad })),
+      rotateSelected: (deltaRad) => {
+        const id = get().selectedId;
+        if (id === null) return;
+        const s = get();
+        // While a rotate stroke is open (q/r held), only the first call pushes
+        // history — subsequent calls fold into the same undo entry. Outside
+        // a stroke (UI buttons) each press is its own entry, matching the
+        // pre-stroke behavior.
+        if (s.rotateStrokeOpen) {
+          if (!s.rotateStrokePushed) {
+            snapshotAndPush();
+            set({ rotateStrokePushed: true });
+          }
+        } else {
+          snapshotAndPush();
+        }
+        const cur = adapter.getCurrent();
+        commitProps(cur.props.map((p) => (p.id === id ? { ...p, rot: p.rot + deltaRad } : p)));
+      },
+      beginRotateStroke: () => set({ rotateStrokeOpen: true, rotateStrokePushed: false }),
+      endRotateStroke: () => set({ rotateStrokeOpen: false, rotateStrokePushed: false }),
       scaleSelected: (mul) => mutateSelected((p) => ({ ...p, scale: clampScale(p.scale * mul) })),
       toggleSelectedBlocks: () => mutateSelected((p) => ({ ...p, blocks: !p.blocks })),
 

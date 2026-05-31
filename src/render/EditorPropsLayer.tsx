@@ -1,3 +1,4 @@
+import { useGLTF } from "@react-three/drei";
 import { type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -6,7 +7,7 @@ import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import type { EditorStore } from "../editor/editorCore";
 import type { PlacedProp, River } from "../sim/types";
 import { InstancedGroup } from "./InstancedGroup";
-import type { MeshSource } from "./meshSource";
+import { collectMeshSource, type MeshSource } from "./meshSource";
 
 // Shared dev-only render + interaction layer for both editors. Renders the
 // hand-placed props as grounded GLB instances; while the editor is active,
@@ -154,6 +155,10 @@ export const EditorPropsLayer = ({
       )}
       {active && !placingUrl && !brushMode && !riverTool.active && (
         <PropHitTargets store={store} props={props} version={version} />
+      )}
+
+      {active && placingUrl && !moving && !brushMode && !riverTool.active && (
+        <HoverPreview url={placingUrl} halfExtent={planeHalfExtent} />
       )}
 
       {active && !brushMode && selected && (
@@ -424,6 +429,80 @@ const EditorGroundPlane = ({
         />
       </mesh>
       <RiverPreviewSegment store={store} cursorRef={cursorRef} />
+    </group>
+  );
+};
+
+// Ghost render of the armed asset at the cursor's ground hit. Clones the
+// GLB scene's materials with transparent=true so the preview is visibly a
+// preview (not a duplicate of an already-placed prop), and reuses the same
+// world-frame geometry + grounding math the InstancedGroup placement path
+// uses so where you see the ghost is exactly where the click would drop it.
+// rotY is fixed at 0 because new props always place at rot=0 — the per-prop
+// rotation handles (Q/R, UI buttons) take over once selected.
+const _hoverPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _hoverHit = new THREE.Vector3();
+
+const HoverPreview = ({
+  url,
+  halfExtent,
+}: {
+  url: string;
+  halfExtent: { x: number; z: number };
+}): ReactElement | null => {
+  const { scene } = useGLTF(url);
+  const source = useMemo(() => collectMeshSource(scene), [scene]);
+  const ghostMaterials = useMemo(() => {
+    if (!source) return [] as THREE.Material[];
+    return source.parts.map((part) => {
+      const m = (part.material as THREE.Material).clone();
+      m.transparent = true;
+      m.opacity = 0.5;
+      m.depthWrite = false;
+      return m;
+    });
+  }, [source]);
+  useEffect(
+    () => () => {
+      for (const m of ghostMaterials) m.dispose();
+    },
+    [ghostMaterials],
+  );
+
+  const groupRef = useRef<THREE.Group>(null);
+  useFrame((state) => {
+    const g = groupRef.current;
+    if (!g) return;
+    if (!source) {
+      g.visible = false;
+      return;
+    }
+    state.raycaster.setFromCamera(state.pointer, state.camera);
+    const hit = state.raycaster.ray.intersectPlane(_hoverPlane, _hoverHit);
+    if (!hit || Math.abs(hit.x) > halfExtent.x || Math.abs(hit.z) > halfExtent.z) {
+      g.visible = false;
+      return;
+    }
+    const s = TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] / source.maxDim;
+    g.position.set(hit.x - source.centerX * s, -source.minY * s, hit.z - source.centerZ * s);
+    g.rotation.set(0, 0, 0);
+    g.scale.setScalar(s);
+    g.visible = true;
+  });
+
+  if (!source) return null;
+  return (
+    <group ref={groupRef} visible={false}>
+      {source.parts.map((part, i) => (
+        <mesh
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts array is stable per scene
+          key={i}
+          geometry={part.geom}
+          material={ghostMaterials[i]}
+          raycast={noRaycast}
+          renderOrder={20}
+        />
+      ))}
     </group>
   );
 };

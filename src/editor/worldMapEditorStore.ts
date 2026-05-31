@@ -57,13 +57,13 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
     // hand-painted rivers. World-map data has no explicit path geometry
     // (worldMapEdits.ts persists only props + rivers + override), so the
     // path-overlap check is intentionally omitted.
-    canPlaceAt: (x, y, candidateRadius, ignorePropId) => {
+    canPlaceAt: (x, y, candidateRadius, ignorePropIds) => {
       if (Math.abs(x) > PAN_LIMIT_X - WORLDMAP_BOUNDS_INSET) return false;
       if (Math.abs(y) > PAN_LIMIT_Z - WORLDMAP_BOUNDS_INSET) return false;
       if (isOnRiver(rivers, x, y, candidateRadius)) return false;
       const pos = { x, y };
       for (const p of props) {
-        if (p.id === ignorePropId) continue;
+        if (ignorePropIds?.has(p.id)) continue;
         const r = propRadius(p.url, p.scale) + candidateRadius;
         if (distSq(p.pos, pos) < r * r) return false;
       }

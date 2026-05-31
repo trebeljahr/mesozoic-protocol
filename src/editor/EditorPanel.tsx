@@ -134,10 +134,49 @@ export const EditorPanel = ({
       : null;
 
   // Keyboard: Esc steps back (disarm → deselect → close); Delete removes;
-  // Ctrl/Meta+Z undoes, Ctrl+Shift+Z / Ctrl+Y redoes. Skip undo/redo
-  // shortcuts when typing in an input/textarea so native field undo wins.
+  // Ctrl/Meta+Z undoes, Ctrl+Shift+Z / Ctrl+Y redoes. Q/R rotate the selected
+  // prop — tap = small step, hold = continuous rotation (rAF-driven so the
+  // speed doesn't depend on OS auto-repeat rate). A held rotation collapses
+  // into one undo entry via the rotateStroke gate. Skip undo/redo shortcuts
+  // when typing in an input/textarea so native field undo wins.
   useEffect(() => {
     if (!active) return;
+    const ROTATE_TAP = Math.PI / 24; // 7.5° per tap
+    const ROTATE_HOLD_RATE = Math.PI; // 180°/sec while held
+    const held: { q: boolean; r: boolean } = { q: false, r: false };
+    let raf: number | null = null;
+    let lastT = 0;
+    let strokeOpen = false;
+
+    const stopHold = () => {
+      if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+      }
+      if (strokeOpen) {
+        store.getState().endRotateStroke();
+        strokeOpen = false;
+      }
+    };
+
+    const tick = (now: number) => {
+      raf = null;
+      const ed = store.getState();
+      if (ed.selectedId === null) {
+        stopHold();
+        return;
+      }
+      const dt = (now - lastT) / 1000;
+      lastT = now;
+      const dir = (held.q ? -1 : 0) + (held.r ? 1 : 0);
+      if (dir === 0) {
+        stopHold();
+        return;
+      }
+      ed.rotateSelected(dir * ROTATE_HOLD_RATE * dt);
+      raf = requestAnimationFrame(tick);
+    };
+
     const onKey = (e: KeyboardEvent) => {
       const ed = store.getState();
       const tag = (e.target as HTMLElement | null)?.tagName;
@@ -154,6 +193,25 @@ export const EditorPanel = ({
         ed.redo();
         return;
       }
+      if (!inField && !mod && (e.key === "q" || e.key === "Q" || e.key === "r" || e.key === "R")) {
+        if (ed.selectedId === null) return;
+        e.preventDefault();
+        // Browser auto-repeat is ignored — rAF drives the hold rotation at a
+        // stable rate. The initial press still applies one tap step.
+        if (e.repeat) return;
+        const key = e.key.toLowerCase() as "q" | "r";
+        if (!strokeOpen) {
+          ed.beginRotateStroke();
+          strokeOpen = true;
+        }
+        held[key] = true;
+        ed.rotateSelected((key === "q" ? -1 : 1) * ROTATE_TAP);
+        if (raf === null) {
+          lastT = performance.now();
+          raf = requestAnimationFrame(tick);
+        }
+        return;
+      }
       if (e.key === "Escape") {
         if (ed.placingUrl) ed.setPlacing(ed.placingUrl);
         else if (ed.selectedId !== null) ed.select(null);
@@ -163,8 +221,30 @@ export const EditorPanel = ({
         ed.deleteSelected();
       }
     };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === "q" || k === "r") {
+        held[k] = false;
+        if (!held.q && !held.r) stopHold();
+      }
+    };
+
+    const onBlur = () => {
+      held.q = false;
+      held.r = false;
+      stopHold();
+    };
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+      stopHold();
+    };
   }, [active, store]);
 
   const catalog = useMemo(() => buildCatalog(), []);
@@ -410,6 +490,7 @@ export const EditorPanel = ({
               type="button"
               style={btn()}
               onClick={() => store.getState().rotateSelected(-Math.PI / 12)}
+              title="Rotate counter-clockwise (or hold Q)"
             >
               Rotate ⟲
             </button>
@@ -417,6 +498,7 @@ export const EditorPanel = ({
               type="button"
               style={btn()}
               onClick={() => store.getState().rotateSelected(Math.PI / 12)}
+              title="Rotate clockwise (or hold R)"
             >
               Rotate ⟳
             </button>

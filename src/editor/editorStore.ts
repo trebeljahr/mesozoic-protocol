@@ -62,7 +62,7 @@ const canEditPlaceAt = (
   x: number,
   y: number,
   candidateRadius: number,
-  ignorePropId?: string | null,
+  ignorePropIds?: ReadonlySet<string> | null,
 ): boolean => {
   const w = useGame.getState().world;
   const pos = { x, y };
@@ -99,7 +99,7 @@ const canEditPlaceAt = (
     if (distSq(o.pos, pos) < r * r) return false;
   }
   for (const p of w.props) {
-    if (p.id === ignorePropId) continue;
+    if (ignorePropIds?.has(p.id)) continue;
     const r = propRadius(p.url, p.scale) + candidateRadius;
     if (distSq(p.pos, pos) < r * r) return false;
   }
