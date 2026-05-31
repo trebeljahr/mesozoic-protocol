@@ -193,7 +193,13 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
   onActivate: () => {
     // Drop any in-flight gameplay selection so map clicks belong to the
     // editor, not tower placement / robot move orders.
-    useGame.getState().clearSelection();
+    const g = useGame.getState();
+    g.clearSelection();
+    // Editing the level means the run is on hold — pause the sim so waves
+    // don't spawn / enemies don't move / abilities don't tick while the
+    // author is placing props. Only flip running → paused so a won/lost run
+    // keeps its terminal state.
+    if (g.world.status === "running") g.togglePause();
   },
   onOverrideChange: reloadLevel,
   onClear: reloadLevel,

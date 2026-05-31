@@ -3,6 +3,7 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_TREE_URLS } from "../biomes";
+import { useEditor } from "../editor/editorStore";
 import type { Tree } from "../sim/types";
 import { meshXZRadii, TREE_REMOVE_COST, TREE_TARGET_HEIGHT, TREE_VARIANTS } from "../sim/world";
 import { useGame } from "../store";
@@ -325,6 +326,7 @@ const TreeHitTargets = ({
     const tree = trees[e.instanceId];
     if (!tree) return;
     e.stopPropagation();
+    if (useEditor.getState().active) return;
     useGame.getState().selectTree(tree.id);
   };
 

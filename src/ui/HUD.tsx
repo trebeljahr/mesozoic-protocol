@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useEditor } from "../editor/editorStore";
 import { getLevelOrdinal } from "../levels";
 import { effectiveTowerCost } from "../sim/metaSkills";
 import type { TowerKind } from "../sim/types";
@@ -107,6 +108,9 @@ export const HUD = () => {
   // NewEnemyAlert auto-pauses the world but the pause-menu screen
   // should NOT render underneath it — the dossier is its own modal.
   const newEnemyAlertVisible = useGame((s) => s.newEnemyQueue.length > 0);
+  // Editor pauses the world on activation, which would otherwise pop the
+  // PauseMenu underneath the editor chrome — suppress it here.
+  const editorActive = useEditor((s) => s.active);
   const selectedTowerId = useGame((s) => s.ui.selectedTowerId);
   const inspectedEnemyKind = useGame((s) => s.ui.inspectedEnemyKind);
   const selectedTreeId = useGame((s) => s.selectedTreeId);
@@ -170,6 +174,11 @@ export const HUD = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Level editor open → swallow gameplay hotkeys. Wave-spawn, hero
+      // abilities, pause toggle and tower-kind digits are all gameplay
+      // actions that have no meaning while the run is on hold. Esc still
+      // routes through the editor's own listener (it owns close).
+      if (useEditor.getState().active) return;
       if (e.code === "Space") {
         e.preventDefault();
         callWaveEarly();
@@ -476,7 +485,8 @@ export const HUD = () => {
         !compendiumOpen &&
         !levelIntroVisible &&
         !newEnemyAlertVisible &&
-        !difficultyPickerOpen && <PauseMenu onResume={togglePause} />}
+        !difficultyPickerOpen &&
+        !editorActive && <PauseMenu onResume={togglePause} />}
     </div>
   );
 };

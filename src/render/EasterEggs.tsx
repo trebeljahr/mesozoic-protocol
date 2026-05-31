@@ -10,6 +10,7 @@ import {
   type EasterEggVisual,
   PRELOAD_URLS,
 } from "../easterEggs";
+import { useEditor } from "../editor/editorStore";
 import type { EasterEgg } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
 import { EASTER_EGG_DESPAWN_FADE, useGame } from "../store";
@@ -778,6 +779,7 @@ const EasterEggMesh = ({ egg, def }: { egg: EasterEgg; def: EasterEggDef }) => {
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    if (useEditor.getState().active) return;
     // Snapshot the visible egg pos at click time. Outer-group world pos
     // maps back to game space as (x, -z). Passed through so the burst
     // anchors to what the user clicked, not the sim-integrated egg.pos

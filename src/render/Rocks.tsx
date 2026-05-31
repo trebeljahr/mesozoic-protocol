@@ -3,6 +3,7 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_LAYERS, type Biome } from "../biomes";
+import { useEditor } from "../editor/editorStore";
 import type { Rock } from "../sim/types";
 import { meshXZRadii, ROCK_REMOVE_COST } from "../sim/world";
 import { useGame } from "../store";
@@ -283,6 +284,7 @@ const RockHitTargets = ({
     const rock = rocks[e.instanceId];
     if (!rock) return;
     e.stopPropagation();
+    if (useEditor.getState().active) return;
     useGame.getState().selectRock(rock.id);
   };
 

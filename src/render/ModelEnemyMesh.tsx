@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { audio } from "../audio/AudioManager";
+import { useEditor } from "../editor/editorStore";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { smoothDirection } from "../sim/path";
 import type { BossVariant, EnemyKind, World } from "../sim/types";
@@ -666,6 +667,10 @@ export const ModelEnemyMesh = ({
   });
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (useEditor.getState().active) {
+      e.stopPropagation();
+      return;
+    }
     const state = useGame.getState();
     if (isDeadEnemyBodyHit(e.object)) {
       e.stopPropagation();
@@ -720,6 +725,11 @@ export const ModelEnemyMesh = ({
   // contextmenu (which would normally issue an orderRobotMove) doesn't
   // also fire — the player asked for info, not a move order.
   const handleContextMenu = (e: ThreeEvent<MouseEvent>) => {
+    if (useEditor.getState().active) {
+      e.nativeEvent.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     const state = useGame.getState();
     if (isDeadEnemyBodyHit(e.object)) {
       e.nativeEvent.preventDefault();

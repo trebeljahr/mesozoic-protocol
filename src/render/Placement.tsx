@@ -2,6 +2,7 @@ import { type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { audio } from "../audio/AudioManager";
+import { useEditor } from "../editor/editorStore";
 import { GAMEPAD_STICK_DEADZONE, scaleGamepadAxis, useGamepadInput } from "../input/gamepad";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { effectiveTowerCost } from "../sim/metaSkills";
@@ -149,7 +150,8 @@ export const Placement = () => {
       state.creditsOpen ||
       state.difficultyPickerOpen ||
       state.levelIntroVisible ||
-      state.newEnemyQueue.length > 0
+      state.newEnemyQueue.length > 0 ||
+      useEditor.getState().active
     ) {
       return;
     }
@@ -242,6 +244,7 @@ export const Placement = () => {
   };
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    if (useEditor.getState().active) return;
     if (isTouchEvent(e)) {
       lastTouchInputAtRef.current = Date.now();
       // Multi-touch (pinch/zoom) belongs to camera — don't fight it
@@ -260,6 +263,7 @@ export const Placement = () => {
   };
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (useEditor.getState().active) return;
     if (isTouchEvent(e)) {
       lastTouchInputAtRef.current = Date.now();
       touchPointersRef.current.add(e.nativeEvent.pointerId);
@@ -293,6 +297,7 @@ export const Placement = () => {
   };
 
   const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    if (useEditor.getState().active) return;
     if (!isTouchEvent(e)) return;
     lastTouchInputAtRef.current = Date.now();
 
@@ -414,6 +419,7 @@ export const Placement = () => {
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    if (useEditor.getState().active) return;
     if (Date.now() < suppressClickUntilRef.current) return;
     handleGroundTap(eventPoint(e));
   };
@@ -426,6 +432,7 @@ export const Placement = () => {
   const onContextMenu = (e: ThreeEvent<MouseEvent>) => {
     e.nativeEvent.preventDefault();
     e.stopPropagation();
+    if (useEditor.getState().active) return;
     const state = useGame.getState();
     if (state.world.robot.dashAim) {
       state.cancelRobotDashAim();

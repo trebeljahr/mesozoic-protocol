@@ -3,6 +3,7 @@ import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { useEditor } from "../editor/editorStore";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { ROBOT_SPECS } from "../sim/robotVariants";
 import { clamp01 } from "../sim/vec2";
@@ -377,6 +378,10 @@ export const ModelRobotMesh = () => {
   });
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
+    if (useEditor.getState().active) {
+      e.stopPropagation();
+      return;
+    }
     const state = useGame.getState();
     const robotHitIndex = e.intersections.findIndex(
       (hit) => hit.object.userData.robotProxy === true,
