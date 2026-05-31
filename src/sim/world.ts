@@ -60,6 +60,7 @@ import type {
   Explosion,
   GameEvent,
   Outpost,
+  PlacedEasterEgg,
   PlacedProp,
   Projectile,
   ProjectileKind,
@@ -542,6 +543,53 @@ const buildEasterEggs = (
   return { eggs: [], nextId: firstId };
 };
 
+// Translate the editor's authored placements into runtime egg state. Static
+// defs become live entries on `eggs`; motion defs become schedule entries
+// that fire at a deterministic offset (10s + index*8s so multiple authored
+// tumbleweeds don't all enter on the same frame). Triggered-on-level eggs
+// are dropped so finished surprises don't loop on reload. Authored defs
+// that resolve to no EASTER_EGG_BY_ID entry (stale defId in a saved blob)
+// are silently skipped — surfacing the warning anywhere would noise up the
+// console during ordinary edits.
+const buildAuthoredEasterEggs = (
+  authored: PlacedEasterEgg[],
+  firstId: number,
+  triggeredEggsOnLevel: ReadonlySet<string>,
+): { eggs: EasterEgg[]; nextId: number; schedule: EasterEggScheduleEntry[] } => {
+  const eggs: EasterEgg[] = [];
+  const schedule: EasterEggScheduleEntry[] = [];
+  let nextId = firstId;
+  let motionIndex = 0;
+  for (const a of authored) {
+    if (triggeredEggsOnLevel.has(a.defId)) continue;
+    const def = EASTER_EGG_BY_ID[a.defId];
+    if (!def) continue;
+    if (def.motion) {
+      const earliest = def.scheduled?.earliestSec ?? 10;
+      schedule.push({
+        defId: a.defId,
+        triggerTime: earliest + motionIndex * 8,
+        authoredStart: { pos: { x: a.pos.x, y: a.pos.y }, rotY: a.rotY },
+      });
+      motionIndex++;
+      continue;
+    }
+    eggs.push({
+      id: nextId++,
+      defId: a.defId,
+      pos: { x: a.pos.x, y: a.pos.y },
+      rotY: a.rotY,
+      clickCount: 0,
+      triggered: false,
+      vel: null,
+      despawnAt: null,
+      spin: 0,
+      rollPitch: 0,
+    });
+  }
+  return { eggs, nextId, schedule };
+};
+
 const buildEasterEggSchedule = (
   biome: Biome,
   seed: number,
@@ -730,6 +778,7 @@ export const createWorld = (
   let editorProps: PlacedProp[] = [];
   let editorRivers: River[] = [];
   let editorBridges: AutoBridge[] = [];
+  let editorAuthoredEggs: PlacedEasterEgg[] = [];
   let overrideActive = false;
   let proceduralSeed = 0;
   let erasedProcedural: Set<string> = new Set();
@@ -745,6 +794,9 @@ export const createWorld = (
           material: river.material ?? "water",
         }));
         editorBridges = Array.isArray(edit.bridges) ? (edit.bridges as AutoBridge[]) : [];
+        editorAuthoredEggs = Array.isArray(edit.easterEggs)
+          ? (edit.easterEggs as PlacedEasterEgg[])
+          : [];
         overrideActive = edit.override === true;
         proceduralSeed =
           typeof edit.proceduralSeed === "number" && Number.isFinite(edit.proceduralSeed)
@@ -758,6 +810,7 @@ export const createWorld = (
       editorProps = [];
       editorRivers = [];
       editorBridges = [];
+      editorAuthoredEggs = [];
       overrideActive = false;
       proceduralSeed = 0;
       erasedProcedural = new Set();
@@ -793,24 +846,46 @@ export const createWorld = (
     ? { rocks: [], nextId: afterTrees }
     : buildRocks(biome, paths, trees, afterTrees, flow, proceduralKey, outposts);
   const rocks = filterErased(rawRocks);
-  const { eggs, nextId } = overrideActive
-    ? { eggs: [], nextId: afterRocks }
-    : buildEasterEggs(
-        biome,
-        paths,
-        trees,
-        rocks,
-        outposts,
-        proceduralKey * 2311 + 47,
-        afterRocks,
-        flow,
-        triggeredEggsOnLevel,
-      );
-  const easterEggSchedule = buildEasterEggSchedule(
-    biome,
-    proceduralKey * 5471 + 3,
-    triggeredEggsOnLevel,
-  );
+  // Author-placed eggs short-circuit the random per-level pick. Static eggs
+  // (no motion def) seed `easterEggs` directly at their authored pos/rotY;
+  // motion eggs (tumbleweed/rover/ghost trike) push schedule entries with
+  // an authored start so spawnMovingEasterEgg uses the chosen heading
+  // instead of a random map edge. Eggs already triggered on this level
+  // (per the persisted achievement tally) are skipped so a finished one
+  // doesn't respawn on every reload.
+  const hasAuthoredEggs = editorAuthoredEggs.length > 0;
+  let eggs: EasterEgg[];
+  let nextId: number;
+  let easterEggSchedule: EasterEggScheduleEntry[];
+  if (overrideActive && !hasAuthoredEggs) {
+    eggs = [];
+    nextId = afterRocks;
+    easterEggSchedule = [];
+  } else if (hasAuthoredEggs) {
+    const built = buildAuthoredEasterEggs(editorAuthoredEggs, afterRocks, triggeredEggsOnLevel);
+    eggs = built.eggs;
+    nextId = built.nextId;
+    easterEggSchedule = built.schedule;
+  } else {
+    const built = buildEasterEggs(
+      biome,
+      paths,
+      trees,
+      rocks,
+      outposts,
+      proceduralKey * 2311 + 47,
+      afterRocks,
+      flow,
+      triggeredEggsOnLevel,
+    );
+    eggs = built.eggs;
+    nextId = built.nextId;
+    easterEggSchedule = buildEasterEggSchedule(
+      biome,
+      proceduralKey * 5471 + 3,
+      triggeredEggsOnLevel,
+    );
+  }
   // Compose per-level hpScale × difficulty.hp into each wave's hpMul. The
   // spawner already respects spec.hpMul, so baking it once at creation
   // means the rest of the sim doesn't need to know about difficulty.
@@ -986,6 +1061,7 @@ export const createWorld = (
     runTowerKinds: {},
     easterEggs: eggs,
     easterEggSchedule,
+    authoredEasterEggs: editorAuthoredEggs,
     speedMul: difficulty.speed,
     goldKillMul: difficulty.goldKill,
     invincible: false,
@@ -1017,36 +1093,50 @@ export const isTowerKindAllowed = (world: World, kind: TowerKind): boolean => {
 };
 
 // Spawn a moving egg (tumbleweed/rover) at a random map edge heading toward
-// the opposite edge. Straight-line traversal with a short life.
-export const spawnMovingEasterEgg = (world: World, defId: string) => {
+// the opposite edge. Straight-line traversal with a short life. When the
+// caller supplies `override`, the authored start/heading is used verbatim
+// instead — lets the level editor place a tumbleweed at a specific clearing
+// heading in a chosen direction.
+export const spawnMovingEasterEgg = (
+  world: World,
+  defId: string,
+  override?: { pos: Vec2; rotY: number },
+) => {
   const def = EASTER_EGG_DEFS.find((d) => d.id === defId);
   if (!def?.motion) return;
   if (world.easterEggs.some((e) => e.defId === defId)) return; // already present
   const rng = Math.random;
-  // Pick a side (0: left, 1: right, 2: top, 3: bottom) and a perpendicular offset.
-  const side = Math.floor(rng() * 4);
-  // Spawn well outside the most-zoomed-out camera frustum so the model
-  // slides into view rather than popping in. CameraRig fits to roughly
-  // ±(MAP_WIDTH/2 + 4) on x and ±(MAP_HEIGHT/2 + 6) on z (mobile),
-  // plus a model half-extent. 12 covers the largest moving-egg model
-  // (rover, targetSize=1.8) with headroom for camera shake.
-  const margin = 12;
-  // Keep the perpendicular offset inside the visible playfield. 0.7
-  // widens the spread vs the prior 0.6 without clipping screen edges.
   let start: Vec2;
   let dir: Vec2;
-  if (side === 0) {
-    start = { x: -MAP_WIDTH / 2 - margin, y: (rng() - 0.5) * MAP_HEIGHT * 0.7 };
-    dir = { x: 1, y: 0 };
-  } else if (side === 1) {
-    start = { x: MAP_WIDTH / 2 + margin, y: (rng() - 0.5) * MAP_HEIGHT * 0.7 };
-    dir = { x: -1, y: 0 };
-  } else if (side === 2) {
-    start = { x: (rng() - 0.5) * MAP_WIDTH * 0.7, y: MAP_HEIGHT / 2 + margin };
-    dir = { x: 0, y: -1 };
+  if (override) {
+    start = { x: override.pos.x, y: override.pos.y };
+    // rotY = atan2(dx, -dy) per the convention used for the random pick
+    // below — invert it here to recover the heading vector.
+    dir = { x: Math.sin(override.rotY), y: -Math.cos(override.rotY) };
   } else {
-    start = { x: (rng() - 0.5) * MAP_WIDTH * 0.7, y: -MAP_HEIGHT / 2 - margin };
-    dir = { x: 0, y: 1 };
+    // Pick a side (0: left, 1: right, 2: top, 3: bottom) and a perpendicular offset.
+    const side = Math.floor(rng() * 4);
+    // Spawn well outside the most-zoomed-out camera frustum so the model
+    // slides into view rather than popping in. CameraRig fits to roughly
+    // ±(MAP_WIDTH/2 + 4) on x and ±(MAP_HEIGHT/2 + 6) on z (mobile),
+    // plus a model half-extent. 12 covers the largest moving-egg model
+    // (rover, targetSize=1.8) with headroom for camera shake.
+    const margin = 12;
+    // Keep the perpendicular offset inside the visible playfield. 0.7
+    // widens the spread vs the prior 0.6 without clipping screen edges.
+    if (side === 0) {
+      start = { x: -MAP_WIDTH / 2 - margin, y: (rng() - 0.5) * MAP_HEIGHT * 0.7 };
+      dir = { x: 1, y: 0 };
+    } else if (side === 1) {
+      start = { x: MAP_WIDTH / 2 + margin, y: (rng() - 0.5) * MAP_HEIGHT * 0.7 };
+      dir = { x: -1, y: 0 };
+    } else if (side === 2) {
+      start = { x: (rng() - 0.5) * MAP_WIDTH * 0.7, y: MAP_HEIGHT / 2 + margin };
+      dir = { x: 0, y: -1 };
+    } else {
+      start = { x: (rng() - 0.5) * MAP_WIDTH * 0.7, y: -MAP_HEIGHT / 2 - margin };
+      dir = { x: 0, y: 1 };
+    }
   }
   const speed = def.motion.speed;
   const egg: EasterEgg = {
@@ -1075,7 +1165,7 @@ export const updateEasterEggs = (world: World, dt: number) => {
     const remaining: EasterEggScheduleEntry[] = [];
     for (const entry of world.easterEggSchedule) {
       if (world.time >= entry.triggerTime) {
-        spawnMovingEasterEgg(world, entry.defId);
+        spawnMovingEasterEgg(world, entry.defId, entry.authoredStart);
       } else {
         remaining.push(entry);
       }

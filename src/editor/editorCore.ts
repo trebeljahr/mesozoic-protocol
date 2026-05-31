@@ -1,7 +1,15 @@
 import { nanoid } from "nanoid";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
-import type { AutoBridge, PlacedProp, River, RiverMaterial, RiverPoint, Vec2 } from "../sim/types";
+import type {
+  AutoBridge,
+  PlacedEasterEgg,
+  PlacedProp,
+  River,
+  RiverMaterial,
+  RiverPoint,
+  Vec2,
+} from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
 import { resolveBridges } from "./bridgeResolver";
 import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
@@ -152,6 +160,10 @@ export type EditorSource = {
   // persisted alongside the river polylines so they get stable ids,
   // material-themed palettes, and survive reloads.
   bridges: AutoBridge[];
+  // Author-placed easter eggs. Persisted alongside props/rivers; replaces
+  // the random per-level egg pick at world build when non-empty. Level
+  // adapter wires through; world-map adapter feeds an empty array.
+  easterEggs: PlacedEasterEgg[];
   proceduralSeed?: number;
   // Per-position keys identifying procedural trees/rocks/outposts the
   // author erased or overwrote (createWorld filters the seeded set
@@ -251,6 +263,20 @@ export type RiverToolState = {
   material: RiverMaterial;
 };
 
+// Easter-egg tool state. `active` flips the editor into egg-placement mode
+// (mutually exclusive with brush / river / prop placement). `placingDefId`
+// is the armed egg type — every map click drops a fresh PlacedEasterEgg at
+// the click pos with rotY=0. `selectedId` is the post-place selection for
+// editing existing eggs (set direction, delete). `settingDirection`, when
+// true, makes the next map click set the selected egg's rotY to the angle
+// from its position toward the click pos.
+export type EasterEggToolState = {
+  active: boolean;
+  placingDefId: string | null;
+  selectedId: string | null;
+  settingDirection: boolean;
+};
+
 const DEFAULT_BRUSH: BrushState = {
   active: false,
   presetId: null,
@@ -267,6 +293,13 @@ const DEFAULT_RIVER_TOOL: RiverToolState = {
   selectedRiverId: null,
   width: DEFAULT_RIVER_WIDTH,
   material: "water",
+};
+
+const DEFAULT_EASTER_EGG_TOOL: EasterEggToolState = {
+  active: false,
+  placingDefId: null,
+  selectedId: null,
+  settingDirection: false,
 };
 
 export type EditorStoreApi = {
@@ -341,6 +374,15 @@ export type EditorStoreApi = {
   deleteRiver: (id: string) => void;
   setRiverWidth: (width: number) => void;
   setRiverMaterial: (material: RiverMaterial) => void;
+  easterEggTool: EasterEggToolState;
+  setEasterEggToolActive: (on: boolean) => void;
+  setEasterEggPlacing: (defId: string | null) => void;
+  placeEasterEggAt: (x: number, y: number) => void;
+  selectEasterEgg: (id: string | null) => void;
+  beginSetEasterEggDirection: () => void;
+  setEasterEggDirectionAt: (x: number, y: number) => void;
+  setEasterEggRotation: (rotY: number) => void;
+  deleteEasterEgg: (id: string) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -373,6 +415,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         override: cur.override,
         rivers: cloneRivers(cur.rivers),
         bridges: cur.bridges.map((b) => ({ ...b })),
+        easterEggs: cur.easterEggs.map((e) => ({ ...e, pos: { ...e.pos } })),
         proceduralSeed: cur.proceduralSeed,
         erasedProcedural: cur.erasedProcedural ? [...cur.erasedProcedural] : undefined,
       };
@@ -407,6 +450,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         override: cur.override,
         rivers: cur.rivers,
         bridges: cur.bridges,
+        easterEggs: cur.easterEggs,
         proceduralSeed: cur.proceduralSeed,
         erasedProcedural: cur.erasedProcedural,
       });
@@ -427,6 +471,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         override: cur.override,
         rivers: cur.rivers,
         bridges: cur.bridges,
+        easterEggs: cur.easterEggs,
         proceduralSeed: cur.proceduralSeed,
         erasedProcedural: merged,
       });
@@ -448,6 +493,20 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         override: cur.override,
         rivers,
         bridges,
+        easterEggs: cur.easterEggs,
+        proceduralSeed: cur.proceduralSeed,
+      });
+    };
+
+    // Replace just the easterEggs array, keeping everything else unchanged.
+    const commitEasterEggs = (easterEggs: PlacedEasterEgg[]): void => {
+      const cur = adapter.getCurrent();
+      commit({
+        props: cur.props,
+        override: cur.override,
+        rivers: cur.rivers,
+        bridges: cur.bridges,
+        easterEggs,
         proceduralSeed: cur.proceduralSeed,
         erasedProcedural: cur.erasedProcedural,
       });
@@ -517,6 +576,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           brush: { ...s.brush, active: false, eraser: false },
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: false,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
         }));
       },
 
@@ -527,12 +593,19 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       setPlacing: (url) =>
         set((s) => ({
           // Clicking the armed asset again disarms back to select mode.
-          // Arming a url drops any active brush/river — they share the click plane.
+          // Arming a url drops any active brush/river/egg-tool — they share the click plane.
           placingUrl: s.placingUrl === url ? null : url,
           selectedId: null,
           moving: false,
           brush: { ...s.brush, active: false, eraser: false },
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: false,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
         })),
 
       placeAt: (x, y) => {
@@ -652,6 +725,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           override: on,
           rivers: cur.rivers,
           bridges: cur.bridges,
+          easterEggs: cur.easterEggs,
           proceduralSeed: cur.proceduralSeed,
           erasedProcedural: cur.erasedProcedural,
         });
@@ -670,6 +744,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           version: s.version + 1,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: false,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
         }));
         adapter.saveHistory?.(fresh);
         adapter.onClear?.();
@@ -686,6 +767,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             override: cur.override,
             rivers: [],
             bridges: [],
+            easterEggs: [],
             proceduralSeed: cur.proceduralSeed,
             erasedProcedural: cur.erasedProcedural,
           });
@@ -697,6 +779,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           version: s.version + 1,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
         }));
       },
 
@@ -711,6 +799,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             override: true,
             rivers: cur.rivers,
             bridges: cur.bridges,
+            easterEggs: cur.easterEggs,
             proceduralSeed: cur.proceduralSeed,
             erasedProcedural: [],
           });
@@ -741,6 +830,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           override: false,
           rivers: cur.rivers,
           bridges: cur.bridges,
+          easterEggs: cur.easterEggs,
           proceduralSeed: Date.now(),
           erasedProcedural: [],
         });
@@ -768,8 +858,15 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           placingUrl: null,
           selectedId: null,
           moving: false,
-          // Arming a brush disarms the river tool — both consume the click plane.
+          // Arming a brush disarms the river + egg tools — they share the click plane.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: false,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
         }));
       },
 
@@ -789,8 +886,15 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           placingUrl: null,
           selectedId: null,
           moving: false,
-          // Eraser shares the click plane with placement/river/scatter brush.
+          // Eraser shares the click plane with placement/river/egg/scatter brush.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: false,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
         }));
       },
 
@@ -967,7 +1071,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       setRiverToolActive: (on) => {
         if (on) adapter.onActivate?.();
         set((s) => ({
-          // Mutually exclusive with prop placement / move / brush.
+          // Mutually exclusive with prop placement / move / brush / egg tool.
           placingUrl: null,
           selectedId: null,
           moving: false,
@@ -979,6 +1083,15 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             // so a re-toggle still has the last-edited river highlighted.
             editingRiverId: on ? s.riverTool.editingRiverId : null,
           },
+          easterEggTool: on
+            ? {
+                ...s.easterEggTool,
+                active: false,
+                placingDefId: null,
+                selectedId: null,
+                settingDirection: false,
+              }
+            : s.easterEggTool,
         }));
       },
 
@@ -1173,6 +1286,120 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const cur = adapter.getCurrent();
         commitRivers(cur.rivers.map((r) => (r.id === targetId ? { ...r, material } : r)));
         set((s) => ({ riverTool: { ...s.riverTool, material } }));
+      },
+
+      easterEggTool: DEFAULT_EASTER_EGG_TOOL,
+
+      setEasterEggToolActive: (on) => {
+        // Mutually exclusive with every other click-plane tool — turning the
+        // egg tool on disarms placingUrl + brush + river so map clicks go
+        // through the egg handler.
+        set((s) => ({
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: on,
+            placingDefId: on ? s.easterEggTool.placingDefId : null,
+            selectedId: on ? s.easterEggTool.selectedId : null,
+            settingDirection: false,
+          },
+          placingUrl: on ? null : s.placingUrl,
+          selectedId: on ? null : s.selectedId,
+          moving: false,
+          brush: { ...s.brush, active: on ? false : s.brush.active, eraser: false },
+          riverTool: {
+            ...s.riverTool,
+            active: on ? false : s.riverTool.active,
+            editingRiverId: on ? null : s.riverTool.editingRiverId,
+            selectedRiverId: on ? null : s.riverTool.selectedRiverId,
+          },
+        }));
+      },
+
+      setEasterEggPlacing: (defId) =>
+        set((s) => ({
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: true,
+            placingDefId: s.easterEggTool.placingDefId === defId ? null : defId,
+            // Arming a fresh egg type clears any prior selection so the next
+            // click drops a new egg rather than relocating the selected one.
+            selectedId: null,
+            settingDirection: false,
+          },
+        })),
+
+      placeEasterEggAt: (x, y) => {
+        const tool = get().easterEggTool;
+        if (!tool.active || !tool.placingDefId) return;
+        const egg: PlacedEasterEgg = {
+          id: nanoid(8),
+          defId: tool.placingDefId,
+          pos: { x, y },
+          rotY: 0,
+        };
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitEasterEggs([...cur.easterEggs, egg]);
+        set((s) => ({
+          easterEggTool: { ...s.easterEggTool, selectedId: egg.id, settingDirection: false },
+        }));
+      },
+
+      selectEasterEgg: (id) =>
+        set((s) => ({
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: true,
+            selectedId: id,
+            placingDefId: null,
+            settingDirection: false,
+          },
+        })),
+
+      beginSetEasterEggDirection: () => {
+        if (get().easterEggTool.selectedId === null) return;
+        set((s) => ({ easterEggTool: { ...s.easterEggTool, settingDirection: true } }));
+      },
+
+      setEasterEggDirectionAt: (x, y) => {
+        const tool = get().easterEggTool;
+        if (!tool.settingDirection || tool.selectedId === null) return;
+        const cur = adapter.getCurrent();
+        const sel = cur.easterEggs.find((e) => e.id === tool.selectedId);
+        if (!sel) return;
+        // Heading from egg toward click pos. Same convention as
+        // spawnMovingEasterEgg: rotY = atan2(dx, -dy) so model-forward at
+        // rotY=0 points up the game-y axis (-z in render space).
+        const dx = x - sel.pos.x;
+        const dy = y - sel.pos.y;
+        if (dx * dx + dy * dy < 1e-4) return;
+        const rotY = Math.atan2(dx, -dy);
+        snapshotAndPush();
+        commitEasterEggs(cur.easterEggs.map((e) => (e.id === sel.id ? { ...e, rotY } : e)));
+        set((s) => ({ easterEggTool: { ...s.easterEggTool, settingDirection: false } }));
+      },
+
+      setEasterEggRotation: (rotY) => {
+        const tool = get().easterEggTool;
+        if (tool.selectedId === null) return;
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitEasterEggs(
+          cur.easterEggs.map((e) => (e.id === tool.selectedId ? { ...e, rotY } : e)),
+        );
+      },
+
+      deleteEasterEgg: (id) => {
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitEasterEggs(cur.easterEggs.filter((e) => e.id !== id));
+        set((s) => ({
+          easterEggTool: {
+            ...s.easterEggTool,
+            selectedId: s.easterEggTool.selectedId === id ? null : s.easterEggTool.selectedId,
+            settingDirection: false,
+          },
+        }));
       },
 
       undo: () => {

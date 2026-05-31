@@ -33,7 +33,11 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
   let bridges: AutoBridge[] = seed?.bridges ?? [];
   let override: boolean = seed?.override ?? false;
   return {
-    getCurrent: () => ({ props, override, rivers, bridges }),
+    // World-map editor has no easter-egg authoring (eggs are per-level), so
+    // the editor source feeds an empty array. The shared store still walks
+    // through the `easterEggs` field on every snapshot/commit, but it never
+    // grows.
+    getCurrent: () => ({ props, override, rivers, bridges, easterEggs: [] }),
     commit: (next) => {
       props = next.props;
       rivers = next.rivers;

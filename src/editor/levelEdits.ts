@@ -1,4 +1,4 @@
-import type { AutoBridge, PlacedProp, River } from "../sim/types";
+import type { AutoBridge, PlacedEasterEgg, PlacedProp, River } from "../sim/types";
 
 // Persistence for the dev-only level editor (src/editor). Hand-placed props
 // and the per-level "override procedural" flag are stored in localStorage,
@@ -30,6 +30,11 @@ export type LevelEdit = {
   // author erased or overwrote. Additive over v:1 — older blobs load with
   // []. createWorld filters procedural arrays through this set.
   erasedProcedural?: string[];
+  // Author-placed easter eggs. When present and non-empty, world.ts uses
+  // these verbatim instead of seeding a random egg from the biome filter.
+  // Additive over v:1 — older blobs without this field load with eggs
+  // defaulting to [].
+  easterEggs?: PlacedEasterEgg[];
 };
 
 const STORAGE_KEY = "mz:leveledits:v1";

@@ -110,7 +110,13 @@ export const CameraRig = () => {
   // pointer events — without this the brush stroke leaks into a camera
   // pan when the pointer crosses the drag threshold.
   const editorToolActive = useEditor(
-    (s) => s.active && (s.placingUrl !== null || s.moving || s.brush.active || s.riverTool.active),
+    (s) =>
+      s.active &&
+      (s.placingUrl !== null ||
+        s.moving ||
+        s.brush.active ||
+        s.riverTool.active ||
+        s.easterEggTool.active),
   );
   const toolOwnsPointerRef = useRef(editorToolActive);
   toolOwnsPointerRef.current = editorToolActive;

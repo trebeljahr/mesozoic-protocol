@@ -1,8 +1,10 @@
+import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { computeBridges, type FlowPalette } from "../flowGeometry";
+import { type Bridge, computeBridges, type FlowPalette } from "../flowGeometry";
 import { PATH_WIDTH } from "../level";
 import type { River, RiverMaterial, Vec2 } from "../sim/types";
+import { makeWaterMaterial } from "./waterShader";
 
 // Universal renderer for hand-painted rivers. Reads from a `rivers` prop
 // (caller-supplied) so both the per-level scene (world.rivers from useGame)
@@ -10,9 +12,11 @@ import type { River, RiverMaterial, Vec2 } from "../sim/types";
 // can use the same component. Each river becomes a flat water ribbon
 // extruded along a Catmull-Rom curve through its control points.
 //
-// Not dev-gated — rivers are part of the world data and ship in production
-// once authored. The editor that *creates* them is dev-only (src/editor),
-// but the visuals belong to the universal scene.
+// Material is the shared shader from waterShader.ts — same fresnel + ripple
+// + foam + bridge-wake treatment used by ForestWater for per-level forest
+// rivers — palette-themed per RiverMaterial (water/lava/toxic). The editor
+// preview now matches the gameplay look instead of falling back to a flat
+// meshStandardMaterial.
 
 // Lifted slightly above the ground plane so the ribbon doesn't z-fight with
 // the biome ground / placement plane. Matches the placement plane offset.
@@ -52,6 +56,11 @@ const MATERIALS: Record<RiverMaterial, FlowPalette> = {
 // laid out as a triangle strip along the spline: two vertices per sample
 // (left and right of the centerline at ±width/2). Caller disposes when
 // inputs change. Returns null if the river has fewer than two points.
+//
+// UV convention matches the shared water shader: U = along-length flow
+// coordinate (used for downstream-drift sampling), V = cross-ribbon (0 on
+// the left bank, 1 on the right). The river shader keys foam intensity on
+// abs(V - 0.5), so a swapped convention pushes foam down the centerline.
 const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
   const pts = river.points;
   if (pts.length < 2) return null;
@@ -93,12 +102,13 @@ const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
     positions[base + 3] = rx;
     positions[base + 4] = Y_OFFSET;
     positions[base + 5] = rz;
-    // U runs across the ribbon (0 left → 1 right), V along its length.
+    // U = along-length flow coord, V = cross-ribbon (0 left → 1 right).
+    // Matches ForestWater / waterShader expectations.
     const uBase = i * 4;
-    uvs[uBase + 0] = 0;
-    uvs[uBase + 1] = t;
-    uvs[uBase + 2] = 1;
-    uvs[uBase + 3] = t;
+    uvs[uBase + 0] = t;
+    uvs[uBase + 1] = 0;
+    uvs[uBase + 2] = t;
+    uvs[uBase + 3] = 1;
   }
 
   // Two triangles per segment between samples i and i+1.
@@ -125,10 +135,10 @@ const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
   return geom;
 };
 
-// Per-river mesh — owns its geometry + material so disposal is clean when
-// the river changes. Keyed on river.id by the parent so React unmounts on
-// delete.
-const RiverMesh = ({ river }: { river: River }) => {
+// Per-river mesh — owns its geometry so disposal is clean when the river
+// changes. Shares the parent-owned shader material so all rivers of the
+// same material run one uniform set (bridge wake list, time tick).
+const RiverMesh = ({ river, material }: { river: River; material: THREE.ShaderMaterial }) => {
   const geom = useMemo(() => buildRiverGeometry(river), [river]);
   useEffect(() => () => geom?.dispose(), [geom]);
   // Geometry can fail when a fresh river has <2 unique points (renderer
@@ -136,18 +146,57 @@ const RiverMesh = ({ river }: { river: River }) => {
   // store catches up.
   if (!geom) return null;
   return (
-    <mesh geometry={geom} renderOrder={1} receiveShadow={false} castShadow={false}>
-      <meshStandardMaterial
-        color={river.color ?? MATERIALS[river.material ?? "water"].fluidColor}
-        emissive={MATERIALS[river.material ?? "water"].fluidEmissive}
-        emissiveIntensity={MATERIALS[river.material ?? "water"].fluidEmissiveIntensity}
-        roughness={0.3}
-        metalness={0.05}
-        side={THREE.DoubleSide}
-        toneMapped={false}
-      />
-    </mesh>
+    <mesh
+      geometry={geom}
+      material={material}
+      renderOrder={1}
+      receiveShadow={false}
+      castShadow={false}
+    />
   );
+};
+
+// One animated shader material per RiverMaterial actually in use. useFrame
+// ticks uTime on every cached material so the water surface drifts at
+// gameplay frame-rate.
+const useRiverMaterials = (
+  rivers: River[],
+  bridges: Bridge[],
+): Map<RiverMaterial, THREE.ShaderMaterial> => {
+  // Only build materials for the river materials actually present in the
+  // scene. Editor sessions often only use water; building lava+toxic up
+  // front would waste a shader compile each.
+  const kinds = useMemo(() => {
+    const set = new Set<RiverMaterial>();
+    for (const r of rivers) set.add(r.material ?? "water");
+    return Array.from(set);
+  }, [rivers]);
+
+  const mats = useMemo(() => {
+    const m = new Map<RiverMaterial, THREE.ShaderMaterial>();
+    for (const k of kinds) {
+      m.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: false, bridges }));
+    }
+    return m;
+  }, [kinds, bridges]);
+
+  useEffect(
+    () => () => {
+      mats.forEach((mat) => {
+        mat.dispose();
+      });
+    },
+    [mats],
+  );
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    mats.forEach((mat) => {
+      mat.uniforms.uTime.value = t;
+    });
+  });
+
+  return mats;
 };
 
 // Prod-safe — rivers are world data, not editor surface. The renderer ships
@@ -171,15 +220,20 @@ export const Rivers = ({
   paths?: Vec2[][];
   autoBridges?: { length: number };
 }) => {
-  if (rivers.length === 0) return null;
   const showFallback = autoBridges.length === 0 && paths.length > 0;
-  const bridges = showFallback ? computeBridges(paths, rivers) : [];
+  const fallbackBridges = useMemo(
+    () => (showFallback ? computeBridges(paths, rivers) : []),
+    [showFallback, paths, rivers],
+  );
+  const bridges = fallbackBridges;
+  const materials = useRiverMaterials(rivers, bridges);
+  if (rivers.length === 0) return null;
   const bridgeWidth = PATH_WIDTH + 0.4;
   // Index every river by id so the fallback bridge palette can pick the
   // matching deck colour instead of hard-coding the water palette. Two
   // rivers can feed the same crossing — the first match wins (deterministic
   // per render since rivers are iterated in array order).
-  const paletteForBridge = (b: { pos: { x: number; y: number } }): typeof MATERIALS.water => {
+  const paletteForBridge = (b: { pos: { x: number; y: number } }): FlowPalette => {
     // Use the first river whose polyline passes near the bridge centre.
     // Same per-segment scan as isOnRiver but cheaper for the small bridge
     // list — typical maps have 0–4 bridges. Falls back to water.
@@ -206,10 +260,12 @@ export const Rivers = ({
   };
   return (
     <group>
-      {rivers.map((r) => (
-        <RiverMesh key={r.id} river={r} />
-      ))}
-      {bridges.map((b, i) => {
+      {rivers.map((r) => {
+        const mat = materials.get(r.material ?? "water");
+        if (!mat) return null;
+        return <RiverMesh key={r.id} river={r} material={mat} />;
+      })}
+      {fallbackBridges.map((b, i) => {
         const palette = paletteForBridge(b);
         return b.kind === "plaza" ? (
           <group

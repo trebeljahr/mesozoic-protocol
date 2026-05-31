@@ -10,6 +10,10 @@ import { clearAllLevels, exportAllLevelsJson, useEditor } from "./editorStore";
 // levels with confirm). Mounted in App.tsx behind import.meta.env.DEV.
 export const LevelEditorPanel = () => {
   const levelId = useGame((s) => s.world.levelId);
+  // Lock the asset palette + brush presets to this level's biome by default.
+  // EditorPanel exposes an "All biomes" toggle to escape the filter per
+  // session if the user wants to mix in a foreign biome's prop.
+  const biome = useGame((s) => s.world.biome);
 
   const onDownload = () => {
     downloadJson(`mz-level-${levelId}.json`, useEditor.getState().exportJson());
@@ -88,6 +92,7 @@ export const LevelEditorPanel = () => {
       }}
       exportButtons={exportButtons}
       clearButtons={clearButtons}
+      biomeFilter={biome}
     />
   );
 };

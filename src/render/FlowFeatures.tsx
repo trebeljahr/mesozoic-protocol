@@ -37,6 +37,7 @@ export const FlowFeatures = () => {
     <group>
       {isForest ? (
         <ForestWaterGroup
+          palette={palette}
           rivers={decorated.rivers}
           lakes={decorated.lakes}
           bridges={decorated.bridges}

@@ -62,6 +62,7 @@ const saveCurrentLevelEdit = (): void => {
     rivers: w.rivers,
     bridges: w.autoBridges,
     erasedProcedural: w.erasedProcedural.size > 0 ? [...w.erasedProcedural] : undefined,
+    easterEggs: w.authoredEasterEggs,
   });
 };
 
@@ -116,11 +117,12 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
       override: w.overrideActive,
       rivers: w.rivers,
       bridges: w.autoBridges,
+      easterEggs: w.authoredEasterEggs,
       proceduralSeed: w.proceduralSeed,
       erasedProcedural: w.erasedProcedural.size > 0 ? [...w.erasedProcedural] : undefined,
     };
   },
-  commit: ({ props, override, rivers, bridges, proceduralSeed, erasedProcedural }) => {
+  commit: ({ props, override, rivers, bridges, easterEggs, proceduralSeed, erasedProcedural }) => {
     const w = useGame.getState().world;
     const before = w.erasedProcedural;
     const after = new Set(erasedProcedural ?? []);
@@ -146,6 +148,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     w.overrideActive = override;
     w.rivers = rivers;
     w.autoBridges = bridges;
+    w.authoredEasterEggs = easterEggs;
     w.proceduralSeed = proceduralSeed ?? w.proceduralSeed;
     w.erasedProcedural = after;
     if (added.length > 0) {
@@ -166,6 +169,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     w.props = [];
     w.rivers = [];
     w.autoBridges = [];
+    w.authoredEasterEggs = [];
     w.overrideActive = true;
     w.erasedProcedural = new Set();
     // No bump here — onClear -> reloadLevel does it after the rebuild.
@@ -176,6 +180,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     w.props = [];
     w.rivers = [];
     w.autoBridges = [];
+    w.authoredEasterEggs = [];
     bumpGeometry();
     saveCurrentLevelEdit();
   },
@@ -245,6 +250,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
         props: w.props,
         rivers: w.rivers,
         bridges: w.autoBridges,
+        easterEggs: w.authoredEasterEggs,
       },
       null,
       2,
@@ -291,6 +297,7 @@ export const clearAllLevels = (): void => {
   w.props = [];
   w.rivers = [];
   w.autoBridges = [];
+  w.authoredEasterEggs = [];
   w.overrideActive = false;
   w.proceduralSeed = 0;
   w.erasedProcedural = new Set();

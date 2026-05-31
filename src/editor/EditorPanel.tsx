@@ -1,5 +1,6 @@
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import type { Biome, PropRole } from "../biomes";
+import { EASTER_EGG_BY_ID, EASTER_EGG_DEFS, type EasterEggDef } from "../easterEggs";
 import type { River } from "../sim/types";
 import { useBackNavigation } from "../ui/useBackNavigation";
 import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
@@ -12,6 +13,7 @@ import {
 } from "./brush";
 import {
   type BrushState,
+  type EasterEggToolState,
   type EditorStore,
   RIVER_MATERIALS,
   type RiverToolState,
@@ -55,11 +57,20 @@ export type EditorPanelProps = {
   clearButtons: FooterButton[];
   // Optional copy button — toggles to "Copied!" briefly after clipboard write.
   copyButton?: { title?: string; logExport: (json: string) => void };
+  // When set, the asset palette + brush preset list default to this biome's
+  // roster. Users can override per-session via the "All biomes" toggle. Pass
+  // null to disable filtering entirely (world-map editor — it spans every
+  // biome band, so there's no single "current" biome to filter on).
+  biomeFilter?: Biome | null;
 };
 
+type PresetGroup = { biome: Biome | "any"; label: string; presets: BrushPreset[] };
+
 // Group built-in presets by biome (undefined → "any"). Module-level since
-// the preset list is itself a module-level const.
-const PRESET_GROUPS: { biome: Biome | "any"; label: string; presets: BrushPreset[] }[] = [
+// the preset list is itself a module-level const. The runtime filter below
+// trims this down to the active biome's group (+ cross-biome) when the
+// editor passes a biomeFilter.
+const ALL_PRESET_GROUPS: PresetGroup[] = [
   {
     biome: "any",
     label: "Any biome",
@@ -94,6 +105,7 @@ export const EditorPanel = ({
   exportButtons,
   clearButtons,
   copyButton,
+  biomeFilter = null,
 }: EditorPanelProps): ReactElement => {
   const active = store((s) => s.active);
   const panelCollapsed = store((s) => s.panelCollapsed);
@@ -103,6 +115,7 @@ export const EditorPanel = ({
   const moving = store((s) => s.moving);
   const brush = store((s) => s.brush);
   const riverTool = store((s) => s.riverTool);
+  const easterEggTool = store((s) => s.easterEggTool);
   const version = store((s) => s.version);
   const toggleActive = store((s) => s.toggleActive);
   const setPanelCollapsed = store((s) => s.setPanelCollapsed);
@@ -114,6 +127,12 @@ export const EditorPanel = ({
 
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState(false);
+  // When biomeFilter is set, the asset palette + brush presets default to
+  // that biome's roster. The "All biomes" toggle escapes back to the full
+  // cross-biome list per session (state is component-local — it resets on
+  // editor close so a fresh open re-locks to the current biome).
+  const [showAllBiomes, setShowAllBiomes] = useState(false);
+  const effectiveBiome: Biome | null = biomeFilter && !showAllBiomes ? biomeFilter : null;
 
   // Browser/OS back gesture closes the editor — same behavior as the panel
   // close button. Re-uses the existing in-app navigation stack.
@@ -247,7 +266,15 @@ export const EditorPanel = ({
     };
   }, [active, store]);
 
-  const catalog = useMemo(() => buildCatalog(), []);
+  const catalog = useMemo(() => buildCatalog(effectiveBiome ?? undefined), [effectiveBiome]);
+
+  const presetGroups = useMemo<PresetGroup[]>(
+    () =>
+      effectiveBiome
+        ? ALL_PRESET_GROUPS.filter((g) => g.biome === "any" || g.biome === effectiveBiome)
+        : ALL_PRESET_GROUPS,
+    [effectiveBiome],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -418,9 +445,9 @@ export const EditorPanel = ({
         </div>
       </div>
 
-      <BrushSection store={store} brush={brush} />
+      <BrushSection store={store} brush={brush} presetGroups={presetGroups} />
 
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <button
           type="button"
           style={btn(riverTool.active)}
@@ -439,6 +466,16 @@ export const EditorPanel = ({
             Finish river
           </button>
         )}
+        {biomeFilter && (
+          <button
+            type="button"
+            style={btn(easterEggTool.active)}
+            onClick={() => store.getState().setEasterEggToolActive(!easterEggTool.active)}
+            title="Easter-egg placement — choose an egg type and click the map to drop it. Direction arrows show heading for moving eggs."
+          >
+            {easterEggTool.active ? "Egg ✓" : "Egg"}
+          </button>
+        )}
       </div>
 
       {riverTool.active && (
@@ -449,6 +486,10 @@ export const EditorPanel = ({
           selectedRiver={selectedRiver}
           bridgeCount={bridgesArr.length}
         />
+      )}
+
+      {easterEggTool.active && biomeFilter && (
+        <EasterEggSection store={store} tool={easterEggTool} biome={biomeFilter} />
       )}
 
       {brush.active ? (
@@ -536,20 +577,37 @@ export const EditorPanel = ({
         </div>
       )}
 
-      <input
-        type="text"
-        placeholder="Search assets…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{
-          padding: "5px 7px",
-          borderRadius: 5,
-          border: "1px solid #3a4150",
-          background: "#11151d",
-          color: "#e6e9ef",
-          opacity: brush.active ? 0.5 : 1,
-        }}
-      />
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <input
+          type="text"
+          placeholder="Search assets…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "5px 7px",
+            borderRadius: 5,
+            border: "1px solid #3a4150",
+            background: "#11151d",
+            color: "#e6e9ef",
+            opacity: brush.active ? 0.5 : 1,
+          }}
+        />
+        {biomeFilter && (
+          <button
+            type="button"
+            style={btn(showAllBiomes)}
+            onClick={() => setShowAllBiomes((s) => !s)}
+            title={
+              showAllBiomes
+                ? `Show only ${BIOME_LABEL[biomeFilter]} assets + brushes`
+                : `Show every biome's assets + brushes (currently ${BIOME_LABEL[biomeFilter]} only)`
+            }
+          >
+            {showAllBiomes ? "All biomes ✓" : `${BIOME_LABEL[biomeFilter]} only`}
+          </button>
+        )}
+      </div>
 
       <div
         style={{
@@ -644,7 +702,15 @@ export const EditorPanel = ({
 // Brush palette: preset buttons grouped by biome, radius/density/spacing
 // sliders, and a per-preset url filter (checkbox list of every variant in
 // the active preset).
-const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState }) => {
+const BrushSection = ({
+  store,
+  brush,
+  presetGroups,
+}: {
+  store: EditorStore;
+  brush: BrushState;
+  presetGroups: PresetGroup[];
+}) => {
   const setBrushPreset = store((s) => s.setBrushPreset);
   const setBrushEraser = store((s) => s.setBrushEraser);
   const setBrushParams = store((s) => s.setBrushParams);
@@ -713,7 +779,7 @@ const BrushSection = ({ store, brush }: { store: EditorStore; brush: BrushState 
       )}
       {open &&
         !eraserOn &&
-        PRESET_GROUPS.map((group) => (
+        presetGroups.map((group) => (
           <div key={group.biome} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
             <div style={{ color: "#8b93a3", fontSize: 10 }}>{group.label}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -1031,6 +1097,179 @@ const RiverControls = ({
         >
           Delete river
         </button>
+      )}
+    </div>
+  );
+};
+
+// Egg-tool panel. Lists every easter-egg def whose biomes[] includes the
+// current level biome (so the forest level only sees forest eggs, etc.),
+// plus the placement/select/delete controls for the currently authored
+// egg list on this level. Selected egg gets a "Set direction" affordance
+// — the next map click writes its rotY from (egg.pos → click) heading.
+const EasterEggSection = ({
+  store,
+  tool,
+  biome,
+}: {
+  store: EditorStore;
+  tool: EasterEggToolState;
+  biome: Biome;
+}) => {
+  // Subscribe to the editor's version counter so commits that mutate the
+  // authored egg list trigger a re-render here (the list itself is pulled
+  // imperatively via getCurrent below).
+  const version = store((s) => s.version);
+  void version;
+  const { easterEggs } = store.getState().getCurrent();
+  const matching = useMemo<EasterEggDef[]>(
+    () => EASTER_EGG_DEFS.filter((d) => d.biomes.includes(biome)),
+    [biome],
+  );
+  const selected = tool.selectedId
+    ? (easterEggs.find((e) => e.id === tool.selectedId) ?? null)
+    : null;
+  const selectedDef = selected ? (EASTER_EGG_BY_ID[selected.defId] ?? null) : null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: 8,
+        background: "#11151d",
+        border: "1px solid #2a313d",
+        borderRadius: 6,
+      }}
+    >
+      <div
+        style={{
+          color: "#8b93a3",
+          margin: 0,
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          fontSize: 10,
+        }}
+      >
+        Easter eggs · {biome}
+      </div>
+      {matching.length === 0 ? (
+        <div style={{ color: "#8b93a3" }}>No easter eggs match this biome.</div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {matching.map((d) => {
+            const on = tool.placingDefId === d.id;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                style={btn(on)}
+                title={`${d.id}${d.motion ? " (moves)" : ""} · click map to place`}
+                onClick={() => store.getState().setEasterEggPlacing(d.id)}
+              >
+                {on ? `${d.id} ✓` : d.id}
+                {d.motion ? " ↝" : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {selected && selectedDef ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: 6,
+            background: "#0d1118",
+            border: `1px solid ${tool.settingDirection ? "#ffae20" : "#2a313d"}`,
+            borderRadius: 5,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontWeight: 600 }}>
+              {selected.defId}
+              {selectedDef.motion ? " ↝" : ""}
+            </span>
+            <span style={{ color: "#8b93a3" }}>
+              ({selected.pos.x.toFixed(1)}, {selected.pos.y.toFixed(1)})
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              style={btn(tool.settingDirection)}
+              onClick={() => store.getState().beginSetEasterEggDirection()}
+              title={
+                selectedDef.motion
+                  ? "Set travel heading — next map click sets the direction the egg moves from its spawn position."
+                  : "Set facing — next map click rotates the static egg toward the click position."
+              }
+            >
+              {tool.settingDirection ? "Click map…" : "Set direction"}
+            </button>
+            <button
+              type="button"
+              style={btn()}
+              onClick={() => store.getState().setEasterEggRotation(0)}
+              title="Reset heading to north (game-y axis)"
+            >
+              ↥ Reset
+            </button>
+            <button
+              type="button"
+              style={dangerBtn}
+              onClick={() => store.getState().deleteEasterEgg(selected.id)}
+            >
+              Delete
+            </button>
+          </div>
+          {selectedDef.motion && (
+            <div style={{ color: "#8b93a3", fontSize: 11 }}>
+              Moves at speed {selectedDef.motion.speed}/s — spawns at the authored point traveling
+              along the arrow.
+            </div>
+          )}
+        </div>
+      ) : easterEggs.length === 0 ? (
+        <div style={{ color: "#8b93a3" }}>Pick an egg above, then click the map to drop it.</div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+            maxHeight: 160,
+            overflowY: "auto",
+          }}
+        >
+          {easterEggs.map((egg) => {
+            const def = EASTER_EGG_BY_ID[egg.defId];
+            return (
+              <button
+                key={egg.id}
+                type="button"
+                style={{
+                  ...btn(false),
+                  textAlign: "left",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 6,
+                }}
+                onClick={() => store.getState().selectEasterEgg(egg.id)}
+                title={`Select ${egg.defId} at (${egg.pos.x.toFixed(1)}, ${egg.pos.y.toFixed(1)})`}
+              >
+                <span>
+                  {egg.defId}
+                  {def?.motion ? " ↝" : ""}
+                </span>
+                <span style={{ color: "#8b93a3" }}>
+                  ({egg.pos.x.toFixed(0)}, {egg.pos.y.toFixed(0)})
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
     </div>
   );

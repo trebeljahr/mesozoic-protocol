@@ -1,4 +1,4 @@
-import type { AutoBridge, PlacedProp, River } from "../sim/types";
+import type { AutoBridge, PlacedEasterEgg, PlacedProp, River } from "../sim/types";
 
 // Undo/redo helpers for the dev-only editors. Pure helpers, no globals.
 // A snapshot captures the pre-mutation state; each mutating action pushes
@@ -16,6 +16,9 @@ export type Snapshot = {
   // Editor-managed bridges resolved from rivers × paths at commit time.
   // Captured here so undo/redo restores the same bridge ids the user saw.
   bridges: AutoBridge[];
+  // Author-placed easter eggs. Editor only — world-map adapter feeds an
+  // empty array since the world map doesn't seed eggs.
+  easterEggs: PlacedEasterEgg[];
   proceduralSeed?: number;
   // Per-position keys for procedural items the author erased/overwrote.
   // Captured so undo/redo restores the same procedural-decor mask.

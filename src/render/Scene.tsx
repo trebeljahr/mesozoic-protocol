@@ -13,6 +13,7 @@ import { CloningVats } from "./CloningVats";
 import { CoalTrail } from "./CoalTrail";
 import { Defer } from "./Defer";
 import { EasterEggs } from "./EasterEggs";
+import { EditorEasterEggMarkers } from "./EditorEasterEggMarkers";
 import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
 import { FlowFeatures } from "./FlowFeatures";
@@ -121,7 +122,12 @@ export const PlayScene = () => {
         )}
         <PlannerOverlay />
       </Defer>
-      {import.meta.env.DEV && <EditorProps />}
+      {import.meta.env.DEV && (
+        <>
+          <EditorProps />
+          <EditorEasterEggMarkers />
+        </>
+      )}
 
       <ModelEnemyMesh kind="raptor" url="/models/Velociraptor.glb" targetSize={1.6} />
       <ModelEnemyMesh kind="swarm" url="/models/Velociraptor.glb" targetSize={0.8} />

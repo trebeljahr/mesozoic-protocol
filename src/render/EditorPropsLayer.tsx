@@ -87,6 +87,7 @@ export const EditorPropsLayer = ({
   // both own pointerdown/move/up and need the cursor ring + click-plane gate.
   const brushMode = brushActive && (brushPresetId !== null || brushEraser);
   const riverTool = store((s) => s.riverTool);
+  const easterEggTool = store((s) => s.easterEggTool);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const gl = useThree((s) => s.gl);
   // Stable canvas DOM ref. Used by child pointerdown handlers for
@@ -106,7 +107,8 @@ export const EditorPropsLayer = ({
   const { props, rivers } = store.getState().getCurrent();
 
   const toolOwnsPointer =
-    active && (placingUrl !== null || moving || brushMode || riverTool.active);
+    active &&
+    (placingUrl !== null || moving || brushMode || riverTool.active || easterEggTool.active);
 
   // Keep the ref synced before any pointer handler can read it. useEffect
   // runs after commit, but the ref read inside handlers fires on the next
@@ -325,6 +327,20 @@ const EditorGroundPlane = ({
       const target = computeRiverCursor({ x, y }, ed);
       if (ed.riverTool.editingRiverId === null) ed.beginRiver(target.x, target.y);
       else ed.addRiverPoint(target.x, target.y);
+      return;
+    }
+    if (ed.easterEggTool.active) {
+      // Direction-setting mode wins over placing — a click after "Set
+      // direction" stamps the heading rather than dropping a new egg.
+      if (ed.easterEggTool.settingDirection && ed.easterEggTool.selectedId !== null) {
+        ed.setEasterEggDirectionAt(x, y);
+      } else if (ed.easterEggTool.placingDefId !== null) {
+        ed.placeEasterEggAt(x, y);
+      } else {
+        // Hit nothing meaningful — clear selection so the panel goes back to
+        // its "pick an egg type to place" state.
+        ed.selectEasterEgg(null);
+      }
       return;
     }
     if (ed.moving && ed.selectedId !== null) {

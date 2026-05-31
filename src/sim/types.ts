@@ -324,6 +324,22 @@ export type AutoBridge = {
   | { kind: "plaza"; pos: Vec2; radius: number }
 );
 
+// Author-placed easter egg. Persisted alongside props/rivers in the same
+// per-level edit blob. When any are present, the world build uses them
+// verbatim instead of seeding a random egg via the biome filter. `defId`
+// keys into EASTER_EGG_DEFS for the model + effect + reaction tuning.
+// `rotY` serves as both the static-egg facing rotation and, for motion
+// eggs (tumbleweed/rover/ghost trike), the heading the egg travels along
+// from its authored spawn position. Lets the author both place a static
+// landmark (e.g. the snow cabin in a specific clearing) and choreograph a
+// moving cameo (rover entering from the northwest, driving south-east).
+export type PlacedEasterEgg = {
+  id: string;
+  defId: string;
+  pos: Vec2;
+  rotY: number;
+};
+
 export type RobotVariant = "george" | "leela" | "mike" | "stan";
 
 // Slot index used by the HUD + key bindings (Q/W/E/R). Semantic ability
@@ -909,6 +925,13 @@ export type World = {
   runTowerKinds: Partial<Record<TowerKind, boolean>>;
   easterEggs: EasterEgg[];
   easterEggSchedule: EasterEggScheduleEntry[];
+  // Author-placed egg blueprints loaded from the level editor (dev tool).
+  // Non-empty when the level has authored eggs; drives both the initial
+  // `easterEggs` array (static eggs) and `easterEggSchedule` (motion eggs)
+  // at createWorld time, replacing the procedural random pick. Carried on
+  // the world so the editor's marker layer + editor adapter can read and
+  // mutate the authoring source without re-traversing localStorage.
+  authoredEasterEggs: PlacedEasterEgg[];
   // Per-run multipliers driven by the global difficulty setting. HP and
   // startGold are baked in at world-creation time; speed and goldKill are
   // applied per spawn / per kill so they live on World.
@@ -987,4 +1010,8 @@ export type EasterEgg = {
 export type EasterEggScheduleEntry = {
   defId: string;
   triggerTime: number; // world.time when this egg spawns
+  // Optional authored entry override. When set, spawnMovingEasterEgg uses
+  // these instead of the random map-edge pick — lets the editor choreograph
+  // a tumbleweed entering from a specific clearing along a chosen heading.
+  authoredStart?: { pos: Vec2; rotY: number };
 };

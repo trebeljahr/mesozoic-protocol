@@ -1036,3 +1036,16 @@ export const ALL_BIOME_URLS = [
   ...Object.values(BIOME_COSMETICS).flat(),
   ...Object.values(BIOME_STORY_PROPS).flat(),
 ];
+
+// All asset URLs that belong to a single biome — layers + trees + cosmetics +
+// story props. Used by the dev editor to filter its asset palette + brush
+// presets down to a single biome's roster so the user isn't scrolling past
+// 5 biomes worth of irrelevant trees while authoring a forest level.
+export const biomeAssetUrls = (biome: Biome): string[] => {
+  const urls = new Set<string>();
+  for (const layer of BIOME_LAYERS[biome]) for (const u of layer.urls) urls.add(u);
+  for (const u of BIOME_TREE_URLS[biome]) urls.add(u);
+  for (const u of BIOME_COSMETICS[biome]) urls.add(u);
+  for (const u of BIOME_STORY_PROPS[biome]) urls.add(u);
+  return Array.from(urls);
+};
