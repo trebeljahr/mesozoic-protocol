@@ -269,6 +269,8 @@ export type Outpost = {
 // createWorld on load. `url` is any GLB from the biome asset catalog;
 // `scale` multiplies the prop's role-normalized target size (1 = nominal);
 // `blocks` opts the prop into tower-placement blocking (canPlaceAt).
+// `groupId` (optional) marks shared membership in a multi-select group —
+// purely additive, older v:1 blobs without it round-trip with undefined.
 export type PlacedProp = {
   id: string;
   url: string;
@@ -276,6 +278,7 @@ export type PlacedProp = {
   scale: number;
   rot: number;
   blocks: boolean;
+  groupId?: string;
 };
 
 // Control point of a hand-painted river spline. Authored via the dev-only

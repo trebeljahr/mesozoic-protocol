@@ -65,6 +65,7 @@ export const EditLevelButton = ({ levelId }: Props) => (
           panelCollapsed: false,
           chromeHidden: true,
           placingUrl: null,
+          selectedIds: new Set(),
           selectedId: null,
           moving: false,
         });

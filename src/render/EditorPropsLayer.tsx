@@ -77,7 +77,7 @@ export const EditorPropsLayer = ({
 }: EditorPropsLayerProps): ReactElement => {
   const active = store((s) => s.active);
   const placingUrl = store((s) => s.placingUrl);
-  const selectedId = store((s) => s.selectedId);
+  const selectedIds = store((s) => s.selectedIds);
   const moving = store((s) => s.moving);
   const brushActive = store((s) => s.brush.active);
   const brushPresetId = store((s) => s.brush.presetId);
@@ -88,6 +88,9 @@ export const EditorPropsLayer = ({
   const brushMode = brushActive && (brushPresetId !== null || brushEraser);
   const riverTool = store((s) => s.riverTool);
   const easterEggTool = store((s) => s.easterEggTool);
+  const marqueeActive = store((s) => s.marqueeTool.active);
+  const marqueeRect = store((s) => s.marqueeTool.rect);
+  const placingStampId = store((s) => s.placingStampId);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const gl = useThree((s) => s.gl);
   // Stable canvas DOM ref. Used by child pointerdown handlers for
@@ -108,7 +111,13 @@ export const EditorPropsLayer = ({
 
   const toolOwnsPointer =
     active &&
-    (placingUrl !== null || moving || brushMode || riverTool.active || easterEggTool.active);
+    (placingUrl !== null ||
+      moving ||
+      brushMode ||
+      riverTool.active ||
+      easterEggTool.active ||
+      marqueeActive ||
+      placingStampId !== null);
 
   // Keep the ref synced before any pointer handler can read it. useEffect
   // runs after commit, but the ref read inside handlers fires on the next
@@ -137,7 +146,10 @@ export const EditorPropsLayer = ({
     return Array.from(m.entries());
   }, [version]);
 
-  const selected = selectedId !== null ? (props.find((p) => p.id === selectedId) ?? null) : null;
+  // Resolve every selected id to its live prop reference. Filter out misses
+  // (id present in the set but no matching prop) so a same-frame mutation
+  // that drops a prop doesn't crash the ring render.
+  const selectedProps = selectedIds.size === 0 ? [] : props.filter((p) => selectedIds.has(p.id));
 
   return (
     <group>
@@ -157,38 +169,45 @@ export const EditorPropsLayer = ({
           halfExtent={planeHalfExtent}
           brushMode={brushMode}
           brushRadius={brushRadius}
+          marqueeActive={marqueeActive}
           canvasRef={canvasRef}
         />
       )}
-      {active && !placingUrl && !brushMode && !riverTool.active && (
+      {active && !placingUrl && !brushMode && !riverTool.active && placingStampId === null && (
         <PropHitTargets store={store} props={props} version={version} />
       )}
+      {active && marqueeActive && marqueeRect && <MarqueeRectOverlay rect={marqueeRect} />}
 
-      {active && placingUrl && !moving && !brushMode && !riverTool.active && (
-        <HoverPreview url={placingUrl} halfExtent={planeHalfExtent} />
-      )}
+      {active &&
+        placingUrl &&
+        !moving &&
+        !brushMode &&
+        !riverTool.active &&
+        placingStampId === null && <HoverPreview url={placingUrl} halfExtent={planeHalfExtent} />}
 
-      {active && !brushMode && selected && (
-        <group position={[selected.pos.x, 0.1, -selected.pos.y]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={20}>
-            <ringGeometry
-              args={[
-                selectRadius(selected.url, selected.scale) - 0.06,
-                selectRadius(selected.url, selected.scale) + 0.12,
-                40,
-              ]}
-            />
-            <meshBasicMaterial
-              color="#ffd66a"
-              transparent
-              opacity={0.95}
-              side={THREE.DoubleSide}
-              depthTest={false}
-              depthWrite={false}
-            />
-          </mesh>
-        </group>
-      )}
+      {active &&
+        !brushMode &&
+        selectedProps.map((sel) => (
+          <group key={sel.id} position={[sel.pos.x, 0.1, -sel.pos.y]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={20}>
+              <ringGeometry
+                args={[
+                  selectRadius(sel.url, sel.scale) - 0.06,
+                  selectRadius(sel.url, sel.scale) + 0.12,
+                  40,
+                ]}
+              />
+              <meshBasicMaterial
+                color="#ffd66a"
+                transparent
+                opacity={0.95}
+                side={THREE.DoubleSide}
+                depthTest={false}
+                depthWrite={false}
+              />
+            </mesh>
+          </group>
+        ))}
 
       {active && riverTool.active && (
         <RiverEditOverlay
@@ -208,12 +227,14 @@ const EditorGroundPlane = ({
   halfExtent,
   brushMode,
   brushRadius,
+  marqueeActive,
   canvasRef,
 }: {
   store: EditorStore;
   halfExtent: { x: number; z: number };
   brushMode: boolean;
   brushRadius: number;
+  marqueeActive: boolean;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }) => {
   const geom = useMemo(
@@ -225,6 +246,12 @@ const EditorGroundPlane = ({
   const planeRef = useRef<THREE.Mesh | null>(null);
   const ringRef = useRef<THREE.Mesh | null>(null);
   const isDownRef = useRef(false);
+  // Mirror of isDownRef but for marquee gestures — keeps the brush isDownRef
+  // semantics intact and lets the marquee pointerup safety net know whether
+  // a gesture was in flight.
+  const isMarqueeRef = useRef(false);
+  // Last marquee move time, for throttling updateMarquee calls in pointermove.
+  const lastMarqueeRef = useRef(0);
   const lastPaintRef = useRef(0);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const capturePointerIdRef = useRef<number | null>(null);
@@ -270,6 +297,53 @@ const EditorGroundPlane = ({
     window.addEventListener("pointerup", onUp);
     return () => window.removeEventListener("pointerup", onUp);
   }, [brushMode, store]);
+
+  // Marquee-specific pointerup safety net. Mirrors the brush version above:
+  // if the pointer is released off-canvas or over UI we still want endMarquee
+  // to run so the rect overlay closes and the selection finalises. Read the
+  // additive flag from the native event so shift-on-release keeps working
+  // even when the release happens outside the editor plane.
+  useEffect(() => {
+    if (!marqueeActive) return;
+    const onUp = (e: PointerEvent) => {
+      if (isMarqueeRef.current) {
+        store.getState().endMarquee(e.shiftKey);
+        isMarqueeRef.current = false;
+      }
+      const canvas = captureCanvasRef.current;
+      const pid = capturePointerIdRef.current;
+      if (canvas && pid !== null) {
+        try {
+          canvas.releasePointerCapture(pid);
+        } catch {
+          // Capture may have already been released by the browser.
+        }
+      }
+      captureCanvasRef.current = null;
+      capturePointerIdRef.current = null;
+    };
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointerup", onUp);
+      // If marquee is disarmed mid-drag (toolbar toggle while pointer is
+      // down), release any in-flight capture and reset the ref so the next
+      // marquee gesture starts clean. Browser would eventually release on
+      // pointerup, but we may never see that pointerup if our listener is
+      // gone — explicit cleanup keeps the canvas pointer model honest.
+      const canvas = captureCanvasRef.current;
+      const pid = capturePointerIdRef.current;
+      if (canvas && pid !== null) {
+        try {
+          canvas.releasePointerCapture(pid);
+        } catch {
+          // Best-effort release.
+        }
+      }
+      captureCanvasRef.current = null;
+      capturePointerIdRef.current = null;
+      isMarqueeRef.current = false;
+    };
+  }, [marqueeActive, store]);
 
   // Track the pointer over the editor plane each frame so the brush cursor
   // ring follows the mouse. Hidden when the pointer is offscreen or not
@@ -318,6 +392,10 @@ const EditorGroundPlane = ({
     // Brush mode (scatter or eraser) owns pointerdown/move/up; suppress the
     // click action so a stroke that ends over the plane doesn't also deselect.
     if (ed.brush.active && (ed.brush.presetId !== null || ed.brush.eraser)) return;
+    // Marquee tool owns the drag — onClick still fires on bare clicks (no
+    // movement). Skip the background-clear path so a marquee tap doesn't
+    // wipe the selection that the just-finalised endMarquee produced.
+    if (ed.marqueeTool.active) return;
     const x = e.point.x;
     const y = -e.point.z;
     if (ed.riverTool.active) {
@@ -343,17 +421,54 @@ const EditorGroundPlane = ({
       }
       return;
     }
-    if (ed.moving && ed.selectedId !== null) {
-      ed.moveSelectedTo(x, y);
+    if (ed.placingStampId !== null) {
+      // Stamp paste — drop the armed stamp's children around the cursor as
+      // the target centroid. placeStampAt validates per-child + per-sibling
+      // collisions; a single conflict aborts the whole drop. Auto-selects
+      // the new group on success so the user can immediately tweak it.
+      ed.placeStampAt(x, y);
+      return;
+    }
+    if (ed.moving && ed.selectedIds.size > 0) {
+      // Multi-select uses centroid-relocate so the cluster preserves
+      // relative layout; single-select keeps the existing direct-target UX
+      // (the centroid IS the prop's position, so they're equivalent — but
+      // routing single-select through the dedicated action preserves the
+      // exact same call site / debug surface as before).
+      if (ed.selectedIds.size === 1) ed.moveSelectedTo(x, y);
+      else ed.moveSelectionToCentroid(x, y);
     } else if (ed.placingUrl) {
       ed.placeAt(x, y);
-    } else {
-      ed.select(null);
+    } else if (!e.nativeEvent.shiftKey) {
+      // Background click without shift clears the selection. With shift held
+      // we leave the selection intact so users can pick more props after
+      // missing a target (and so a future shift-drag marquee can use the
+      // background plane as its drag origin).
+      ed.clearSelection();
     }
   };
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    // Marquee branch — open a drag rect, capture the canvas pointer so
+    // pointermove/up keep flowing if the pointer drifts off the bounded mesh.
+    if (marqueeActive) {
+      const ed = store.getState();
+      ed.beginMarquee(e.point.x, -e.point.z);
+      isMarqueeRef.current = true;
+      lastMarqueeRef.current = performance.now();
+      const canvas = canvasRef.current;
+      if (canvas) {
+        try {
+          canvas.setPointerCapture(e.pointerId);
+          captureCanvasRef.current = canvas;
+          capturePointerIdRef.current = e.pointerId;
+        } catch {
+          // Best-effort capture; window-level pointerup still closes the marquee.
+        }
+      }
+      return;
+    }
     if (!brushMode) return;
     const ed = store.getState();
     ed.beginStroke();
@@ -379,6 +494,37 @@ const EditorGroundPlane = ({
   };
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    // Marquee drag-rect update. Throttled to PAINT_INTERVAL_MS so a rapid
+    // drag doesn't thrash the store; the overlay still redraws every store
+    // commit so the rectangle stays glued to the cursor.
+    if (marqueeActive && isMarqueeRef.current) {
+      e.stopPropagation();
+      const now = performance.now();
+      if (now - lastMarqueeRef.current >= PAINT_INTERVAL_MS) {
+        lastMarqueeRef.current = now;
+        // Cast against the unbounded math plane so a drag past the bounded
+        // mesh edge keeps the rect anchored to the actual world cursor.
+        const canvas = canvasRef.current;
+        const hit = canvas
+          ? raycastPlaneFromClient(
+              raycaster,
+              canvas,
+              e.nativeEvent.clientX,
+              e.nativeEvent.clientY,
+              camera,
+              paintPlaneRef.current,
+            )
+          : null;
+        if (hit) {
+          store.getState().updateMarquee(hit.x, -hit.z);
+        } else {
+          // Fallback: use the bounded mesh hit point if the math plane misses
+          // (camera near-parallel to ground). Better than dropping the frame.
+          store.getState().updateMarquee(e.point.x, -e.point.z);
+        }
+      }
+      return;
+    }
     if (brushMode && isDownRef.current) {
       e.stopPropagation();
       const now = performance.now();
@@ -418,6 +564,24 @@ const EditorGroundPlane = ({
 
   const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+    // Marquee branch — close the rect, finalise the selection (additive when
+    // shift is held at release time), and release the canvas pointer capture.
+    if (marqueeActive && isMarqueeRef.current) {
+      store.getState().endMarquee(e.nativeEvent.shiftKey);
+      isMarqueeRef.current = false;
+      const canvas = captureCanvasRef.current;
+      const pid = capturePointerIdRef.current;
+      if (canvas && pid !== null) {
+        try {
+          canvas.releasePointerCapture(pid);
+        } catch {
+          // Capture may have already been released by the browser.
+        }
+      }
+      captureCanvasRef.current = null;
+      capturePointerIdRef.current = null;
+      return;
+    }
     if (!brushMode) return;
     if (isDownRef.current) {
       store.getState().endStroke();
@@ -544,6 +708,73 @@ const HoverPreview = ({
           renderOrder={20}
         />
       ))}
+    </group>
+  );
+};
+
+// Marquee drag-rect overlay. Renders a translucent yellow fill quad at
+// y=0.07 with a brighter border loop at y=0.08 so the rectangle reads as a
+// selection box on top of the ground plane without z-fighting other editor
+// chrome (selection rings live at y=0.1, prop hit instances at y=0.09).
+// The geometry rebuilds every render from the current rect — single mesh,
+// small vertex count, cheap.
+const MarqueeRectOverlay = ({
+  rect,
+}: {
+  rect: { minX: number; minY: number; maxX: number; maxY: number };
+}): ReactElement => {
+  const width = Math.max(0.001, rect.maxX - rect.minX);
+  const height = Math.max(0.001, rect.maxY - rect.minY);
+  const centerX = (rect.minX + rect.maxX) / 2;
+  const centerY = (rect.minY + rect.maxY) / 2;
+  // World-space convention: editor stores y as world XZ "y" but renders at
+  // -y → -z. The selection rings, hit targets, and river overlays all use
+  // the same flip, so the rect overlay follows suit.
+  const borderArr = new Float32Array([
+    rect.minX,
+    0.08,
+    -rect.minY,
+    rect.maxX,
+    0.08,
+    -rect.minY,
+    rect.maxX,
+    0.08,
+    -rect.maxY,
+    rect.minX,
+    0.08,
+    -rect.maxY,
+    rect.minX,
+    0.08,
+    -rect.minY,
+  ]);
+  return (
+    <group>
+      <mesh
+        position={[centerX, 0.07, -centerY]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        renderOrder={19}
+        raycast={noRaycast}
+      >
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial
+          color="#ffd66a"
+          transparent
+          opacity={0.18}
+          side={THREE.DoubleSide}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      <line>
+        <bufferGeometry
+          attach="geometry"
+          ref={(g) => {
+            if (!g) return;
+            g.setAttribute("position", new THREE.BufferAttribute(borderArr, 3));
+          }}
+        />
+        <lineBasicMaterial color="#ffd66a" transparent opacity={0.95} depthTest={false} />
+      </line>
     </group>
   );
 };
@@ -826,10 +1057,18 @@ const PropHitTargets = ({
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (e.instanceId == null) return;
+    // Bounds-check against same-frame mutations — a delete or stroke during
+    // the same tick can shrink `props` after the instancedMesh was
+    // measured, leaving an out-of-range instanceId in the click event.
+    if (e.instanceId >= props.length) return;
     const p = props[e.instanceId];
     if (!p) return;
     e.stopPropagation();
-    store.getState().select(p.id);
+    // Shift-click toggles the id in/out of the selection without disturbing
+    // other members; plain click replaces. Mode is wired straight to the
+    // store's mode-aware `select`.
+    const mode = e.nativeEvent.shiftKey ? "toggle" : "replace";
+    store.getState().select(p.id, mode);
   };
 
   if (props.length === 0) return null;

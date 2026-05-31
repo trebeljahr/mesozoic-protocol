@@ -70,11 +70,20 @@ const canEditPlaceAt = (
   x: number,
   y: number,
   candidateRadius: number,
-  ignorePropIds?: ReadonlySet<string> | null,
+  // Widened from a plain ReadonlySet to also accept a single id string and a
+  // mutable Set — single-string callers (moveSelectedTo, placeAt) and
+  // group/stamp Set callers take the same path through the normalisation
+  // below.
+  ignorePropId?: string | ReadonlySet<string> | null,
 ): boolean => {
   const w = useGame.getState().world;
   const pos = { x, y };
   if (Math.abs(x) > MAP_WIDTH / 2 || Math.abs(y) > MAP_HEIGHT / 2) return false;
+  // Normalise the ignore arg so the prop-loop just calls .has(). Single-string
+  // callers (moveSelectedTo, placeAt) and Set callers (future group/stamp
+  // validation) take the same code path.
+  const ignoreSet =
+    ignorePropId instanceof Set ? ignorePropId : ignorePropId ? new Set([ignorePropId]) : null;
   const pathRadius = PATH_WIDTH * 0.5 + candidateRadius;
   for (const path of w.paths) {
     for (let i = 0; i < path.length - 1; i++) {
@@ -99,7 +108,7 @@ const canEditPlaceAt = (
   // overlaps via the erased-procedural mask. Paths/flow/rivers/towers stay
   // as hard blockers because they're never erased that way.
   for (const p of w.props) {
-    if (ignorePropIds?.has(p.id)) continue;
+    if (ignoreSet?.has(p.id)) continue;
     const r = propRadius(p.url, p.scale) + candidateRadius;
     if (distSq(p.pos, pos) < r * r) return false;
   }

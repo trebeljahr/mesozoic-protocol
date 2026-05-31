@@ -22,6 +22,16 @@ import {
   type Snapshot,
   undoHistory,
 } from "./history";
+import {
+  computeCentroid,
+  expandSelectionByGroup,
+  pointInRect,
+  type Rect,
+  rectFromCorners,
+  rotatePointAround,
+  scalePointAround,
+} from "./selectionCore";
+import { addStamp, getStamp, removeStamp, type Stamp, type StampChild } from "./stampLibrary";
 
 // Shared dev-only editor store factory. The level editor and world-map editor
 // run the same UX (palette + selection + transform + brush + variants + river
@@ -196,7 +206,11 @@ export type EditorAdapter = {
     x: number,
     y: number,
     candidateRadius: number,
-    ignorePropIds?: ReadonlySet<string> | null,
+    // Widened to accept a single id, a (Readonly)Set of ids, or null. Single-
+    // string callers (placeAt, moveSelectedTo) and Set callers (marquee /
+    // group / stamp validation) take the same code path inside the adapter,
+    // which normalises to a Set before the prop loop.
+    ignorePropId?: string | ReadonlySet<string> | null,
   ) => boolean;
   // Snapshot of the adapter's seeded procedural items (trees/rocks/
   // outposts on the level editor; undefined on world-map). Called by the
@@ -302,12 +316,40 @@ const DEFAULT_EASTER_EGG_TOOL: EasterEggToolState = {
   settingDirection: false,
 };
 
+// Marquee drag-rect state. `active` arms the tool (toggle button in the
+// panel) and disables placing / brush / river (they share the click plane).
+// `rect` holds the in-progress drag rectangle as normalised world-space AABB
+// while the user is dragging — null between drags. `anchor` carries the
+// press point so updateMarquee can rebuild the normalised AABB from
+// (anchor, current) regardless of drag direction (drag-back-across-press
+// works correctly because rectFromCorners normalises every call).
+export type MarqueeToolState = {
+  active: boolean;
+  rect: Rect | null;
+  anchor: Vec2 | null;
+};
+
+const DEFAULT_MARQUEE_TOOL: MarqueeToolState = {
+  active: false,
+  rect: null,
+  anchor: null,
+};
+
 export type EditorStoreApi = {
   active: boolean;
   panelCollapsed: boolean;
   chromeHidden: boolean;
   // Asset url armed for placement — each map click drops one. null = select mode.
   placingUrl: string | null;
+  // Authoritative multi-select set. Single-pick is just `selectedIds` with
+  // size <= 1; the `selectedId` field below is a derived mirror kept in sync
+  // on every mutation so unmigrated single-id readers stay green during the
+  // transition to bulk operations.
+  selectedIds: Set<string>;
+  // Derived: first id in `selectedIds`, or null when empty. Every setter
+  // that touches `selectedIds` also writes this field so subscribers using
+  // `s.selectedId` re-render without needing to consume the Set directly.
+  // First-in-set is deterministic in JS — insertion order is preserved.
   selectedId: string | null;
   // When true the next map click relocates the selected prop.
   moving: boolean;
@@ -326,6 +368,28 @@ export type EditorStoreApi = {
   rotateStrokeOpen: boolean;
   rotateStrokePushed: boolean;
   riverTool: RiverToolState;
+  // Marquee drag-rect tool. Mutually exclusive with placing / brush / river
+  // — arming any of those drops marquee and vice versa. While `active` is
+  // false the rect is always null; while `active` is true the rect tracks
+  // the in-progress drag (null between gestures).
+  marqueeTool: MarqueeToolState;
+  // Stamp armed for placement — when non-null, each map click drops the
+  // stamp's children at the cursor (centroid-anchored). Mutually exclusive
+  // with placingUrl / brush / river / moving / marquee. The id refers to a
+  // stamp in the global library (loadStampLibrary().stamps); the resolution
+  // is lazy inside placeStampAt so a stamp deleted mid-arm is a no-op rather
+  // than a crash.
+  placingStampId: string | null;
+  // Bumped on every stamp-library mutation (save/delete) so EditorPanel's
+  // catalog useMemo invalidates and re-merges stamp entries into the palette
+  // without subscribing to localStorage. Lives on the store so both editors
+  // (level + world map) see the same monotonically-increasing counter — a
+  // stamp saved on one editor's panel surfaces in the other's palette as
+  // soon as the user toggles their store's version (next interaction).
+  // Intentionally NOT pushed onto the undo stack — stamps are tool config,
+  // not map data, and Ctrl+Z restoring a deleted stamp would be surprising
+  // behaviour.
+  stampLibraryVersion: number;
   // Authoritative read of the underlying props/override/rivers. Defers to
   // the adapter so callers don't need to know whether state lives on the
   // store itself (world map) or on useGame.world (level editor).
@@ -340,15 +404,53 @@ export type EditorStoreApi = {
   setChromeHidden: (hidden: boolean) => void;
   setPlacing: (url: string | null) => void;
   placeAt: (x: number, y: number) => void;
-  select: (id: string | null) => void;
+  // Single-arg call (legacy back-compat): `select(id)` = replace; `select(null)` = clear.
+  // `mode='add'` unions into existing selection; `mode='toggle'` flips one id
+  // in/out (shift-click semantics). Passing `null` ignores `mode` and clears.
+  select: (id: string | null, mode?: "replace" | "add" | "toggle") => void;
+  // Bulk replacement (or addition) — used by marquee in a later step but
+  // also fine to call directly for any "select N props" path.
+  selectMany: (ids: string[], mode?: "replace" | "add") => void;
+  // Drop selection without touching `moving` (kept for callers that want a
+  // pure clear distinct from `select(null)`, e.g. background click).
+  clearSelection: () => void;
   beginMove: () => void;
   moveSelectedTo: (x: number, y: number) => void;
   deleteSelected: () => void;
+  // Bulk delete every prop in `selectedIds` as one snapshotAndPush. Safe to
+  // call with size 0/1 — falls through to no-op / single-delete equivalents.
+  deleteSelection: () => void;
+  // Stamp a freshly minted groupId onto every prop in `selectedIds`. Reuses
+  // a single nanoid(8) across all members so they share identity. Existing
+  // groupIds are overwritten — re-grouping a mixed selection unifies them.
+  // Selection is preserved post-mutation (the same ids stay selected, just
+  // now sharing a groupId so a subsequent single-click on any member
+  // expands back to the whole group). One snapshotAndPush.
+  groupSelection: () => void;
+  // Clear groupId on every prop in `selectedIds`. No-op for ungrouped
+  // members. One snapshotAndPush.
+  ungroupSelection: () => void;
   rotateSelected: (deltaRad: number) => void;
   beginRotateStroke: () => void;
   endRotateStroke: () => void;
   scaleSelected: (mul: number) => void;
   toggleSelectedBlocks: () => void;
+  // Bulk transforms around the selection's centroid. Each is one
+  // snapshotAndPush + one commitProps; all-or-nothing — if any member would
+  // land in an invalid spot (path / river / colliding prop), the whole
+  // gesture is rejected and nothing commits. Pre-existing groupId on each
+  // member is preserved so groups survive transforms intact. Safe to call
+  // with size 0/1: size 0 is a no-op; size 1 still works but the centroid
+  // collapses to that single prop's position so rotate/scale become
+  // identity for position (rot/scale on the prop itself still update).
+  moveSelectionBy: (dx: number, dy: number) => void;
+  // `targetCentroid` is the world-space point the user wants the cluster's
+  // centroid to land on. We compute the delta off the current centroid and
+  // shift every member by it — preserves relative layout exactly. Mirrors
+  // single-prop `moveSelectedTo` UX (click map to relocate).
+  moveSelectionToCentroid: (x: number, y: number) => void;
+  rotateSelectionAroundCentroid: (deltaRad: number) => void;
+  scaleSelectionAroundCentroid: (mul: number) => void;
   setOverride: (on: boolean) => void;
   clear: () => void;
   clearManual: () => void;
@@ -362,7 +464,42 @@ export type EditorStoreApi = {
   beginStroke: () => void;
   paintAt: (x: number, y: number) => void;
   endStroke: () => void;
+  // Stamps. saveSelectionAsStamp captures the current selection into a new
+  // stamp in the global library (localStorage key mz:stamplib:v1). Children
+  // are stored centroid-normalised so re-dropping at any cursor position
+  // preserves the authored layout. NOT pushed to undo — stamps are tool
+  // config, not map data. `label` comes from a window.prompt in the panel.
+  // No-op below 1 selected prop (a "stamp" of nothing isn't useful).
+  saveSelectionAsStamp: (label: string) => void;
+  // Remove a stamp from the global library. NOT pushed to undo. Caller
+  // (EditorPanel) gates with a window.confirm before calling.
+  deleteStamp: (stampId: string) => void;
+  // Arm a stamp for placement. `setPlacingStamp(id)` arms; `setPlacingStamp(null)`
+  // or passing the already-armed id disarms. Mutually exclusive with every
+  // other click-plane tool — arming drops placingUrl / brush / river /
+  // marquee / moving and clears the current selection (matches setPlacing's
+  // contract). The id is resolved against loadStampLibrary().stamps inside
+  // placeStampAt, so a stamp deleted while armed becomes a no-op drop.
+  setPlacingStamp: (stampId: string | null) => void;
+  // Drop the armed stamp at world (x, y) with the cursor treated as the
+  // target centroid — every child's final position is (x + child.relPos.x,
+  // y + child.relPos.y). All-or-nothing: any child colliding with a path /
+  // river / existing prop / earlier-in-batch sibling aborts the whole drop
+  // (no partial commits). On a successful drop: mint a fresh groupId,
+  // snapshotAndPush once, commit the props in a single batch, and set the
+  // selection to the newly minted ids so the user can immediately drag /
+  // rotate / re-save the cluster. No-op when not armed.
+  placeStampAt: (x: number, y: number) => void;
   setRiverToolActive: (on: boolean) => void;
+  // Marquee gestures. `setMarqueeActive` toggles the tool (mutually
+  // exclusive with placing/brush/river). `beginMarquee`/`updateMarquee`/
+  // `endMarquee` form one drag — endMarquee finalises selectedIds from
+  // every prop whose pos lies inside the rect's AABB (additive when
+  // shift held on release).
+  setMarqueeActive: (on: boolean) => void;
+  beginMarquee: (x: number, y: number) => void;
+  updateMarquee: (x: number, y: number) => void;
+  endMarquee: (additive: boolean) => void;
   beginRiver: (x: number, y: number) => void;
   addRiverPoint: (x: number, y: number) => void;
   finishRiver: () => void;
@@ -397,6 +534,25 @@ const STROKE_CLEAR = {
   strokeOpen: false,
   strokePushed: false,
 } as const;
+
+// Reset both the authoritative Set and the derived single-id mirror in
+// one shape — every "drop the current selection" site (toggleActive,
+// setPlacing, brush toggles, undo/redo, …) spreads this so the two fields
+// can never drift apart. Factory (not a shared const) because each clear
+// must produce a fresh Set — sharing one instance would let any future
+// in-place mutation in the store leak into every other cleared state.
+const clearSelectionFields = (): { selectedIds: Set<string>; selectedId: null } => ({
+  selectedIds: new Set<string>(),
+  selectedId: null,
+});
+
+// Derive the single-id mirror from a Set. Empty -> null, otherwise the
+// first id (insertion-order, which JS Sets preserve deterministically).
+const firstOf = (ids: Set<string>): string | null => {
+  if (ids.size === 0) return null;
+  for (const id of ids) return id;
+  return null;
+};
 
 const cloneRivers = (rs: River[]): River[] =>
   rs.map((r) => ({ ...r, points: r.points.map((p) => ({ ...p })) }));
@@ -549,7 +705,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       panelCollapsed: false,
       chromeHidden: false,
       placingUrl: null,
-      selectedId: null,
+      ...clearSelectionFields(),
       moving: false,
       version: 0,
       history: adapter.loadHistory?.() ?? { past: [], future: [] },
@@ -558,6 +714,9 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       rotateStrokeOpen: false,
       rotateStrokePushed: false,
       riverTool: DEFAULT_RIVER_TOOL,
+      marqueeTool: DEFAULT_MARQUEE_TOOL,
+      placingStampId: null,
+      stampLibraryVersion: 0,
 
       getCurrent: () => adapter.getCurrent(),
 
@@ -571,7 +730,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           panelCollapsed: false,
           chromeHidden: next,
           placingUrl: null,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           brush: { ...s.brush, active: false, eraser: false },
           ...STROKE_CLEAR,
@@ -583,6 +742,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             selectedId: null,
             settingDirection: false,
           },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         }));
       },
 
@@ -595,7 +756,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           // Clicking the armed asset again disarms back to select mode.
           // Arming a url drops any active brush/river/egg-tool — they share the click plane.
           placingUrl: s.placingUrl === url ? null : url,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           brush: { ...s.brush, active: false, eraser: false },
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
@@ -606,6 +767,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             selectedId: null,
             settingDirection: false,
           },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         })),
 
       placeAt: (x, y) => {
@@ -651,10 +814,78 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         );
         const kept = overlap.size > 0 ? cur.props.filter((p) => !overlap.has(p.id)) : cur.props;
         commitPropsAndErasedProcedural([...kept, prop], procOverlap);
-        set({ selectedId: prop.id });
+        // Auto-select the freshly placed prop. Mirror the single id into both
+        // the authoritative Set and the derived single-id field so legacy
+        // subscribers and bulk-op readers see the same selection.
+        set({ selectedIds: new Set([prop.id]), selectedId: prop.id });
       },
 
-      select: (id) => set({ selectedId: id, moving: false }),
+      // Mode-aware select. Default mode 'replace' keeps single-id back-compat
+      // (every legacy single-arg call still works as before). 'add' unions
+      // the id into the existing Set; 'toggle' flips it in/out (shift-click
+      // semantics in PropHitTargets). Passing id=null always clears, even
+      // when mode is non-default — there's no useful interpretation of
+      // "add nothing" / "toggle nothing".
+      //
+      // Group expansion: 'replace' and 'toggle' both honour groupId — if the
+      // clicked prop carries a groupId, every sibling sharing that groupId is
+      // pulled into the seed. Ungrouped props expand to themselves only.
+      // 'add' deliberately keeps single-id semantics so a user can still
+      // build precise mixed selections via the API; the marquee / shift-
+      // click UX paths use 'toggle' or 'replace' and so do expand.
+      select: (id, mode = "replace") => {
+        if (id === null) {
+          set({ ...clearSelectionFields(), moving: false });
+          return;
+        }
+        const propsArr = adapter.getCurrent().props;
+        if (mode === "replace") {
+          const expanded = expandSelectionByGroup(propsArr, new Set([id]));
+          set({ selectedIds: expanded, selectedId: firstOf(expanded), moving: false });
+          return;
+        }
+        const cur = get().selectedIds;
+        if (mode === "add") {
+          if (cur.has(id)) return;
+          const next = new Set(cur);
+          next.add(id);
+          set({ selectedIds: next, selectedId: firstOf(next), moving: false });
+          return;
+        }
+        // toggle — group-aware. If the clicked prop has a groupId and any
+        // sibling in that group is currently selected, treat the group as
+        // a unit and toggle the whole group in/out. Otherwise toggle just
+        // the id (preserves shift-click semantics for ungrouped props and
+        // for picking-additional-singletons paths).
+        const clicked = propsArr.find((p) => p.id === id);
+        const gid = clicked?.groupId;
+        const next = new Set(cur);
+        if (gid !== undefined) {
+          const groupMembers = propsArr.filter((p) => p.groupId === gid).map((p) => p.id);
+          const allSelected = groupMembers.every((mid) => next.has(mid));
+          if (allSelected) {
+            for (const mid of groupMembers) next.delete(mid);
+          } else {
+            for (const mid of groupMembers) next.add(mid);
+          }
+        } else if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        set({ selectedIds: next, selectedId: firstOf(next), moving: false });
+      },
+
+      selectMany: (ids, mode = "replace") => {
+        const base = mode === "add" ? new Set(get().selectedIds) : new Set<string>();
+        for (const id of ids) base.add(id);
+        set({ selectedIds: base, selectedId: firstOf(base), moving: false });
+      },
+
+      // Match the legacy `select(null)` semantics by also dropping the
+      // pending move — `moving` is only meaningful while a single prop is
+      // selected, so a clear has no target left to relocate.
+      clearSelection: () => set({ ...clearSelectionFields(), moving: false }),
 
       beginMove: () => {
         if (get().selectedId === null) return;
@@ -690,7 +921,54 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         snapshotAndPush();
         const cur = adapter.getCurrent();
         commitProps(cur.props.filter((p) => p.id !== id));
-        set({ selectedId: null, moving: false });
+        set({ ...clearSelectionFields(), moving: false });
+      },
+
+      deleteSelection: () => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitProps(cur.props.filter((p) => !ids.has(p.id)));
+        set({ ...clearSelectionFields(), moving: false });
+      },
+
+      groupSelection: () => {
+        const ids = get().selectedIds;
+        // Single-prop "group" is meaningless — there's nothing to bind to.
+        // Refuse below 2 to keep the action self-evidently useful.
+        if (ids.size < 2) return;
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        const gid = nanoid(8);
+        commitProps(cur.props.map((p) => (ids.has(p.id) ? { ...p, groupId: gid } : p)));
+        // Selection unchanged — same ids stay selected, now sharing groupId.
+        // Re-write the mirror to flush subscribers even though the Set
+        // identity isn't strictly different; safe to skip and not needed.
+      },
+
+      ungroupSelection: () => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        const cur = adapter.getCurrent();
+        // Avoid a no-op snapshot when every selected prop is already
+        // ungrouped — keeps the undo stack clean.
+        const anyGrouped = cur.props.some((p) => ids.has(p.id) && p.groupId !== undefined);
+        if (!anyGrouped) return;
+        snapshotAndPush();
+        commitProps(
+          cur.props.map((p) => {
+            if (!ids.has(p.id)) return p;
+            if (p.groupId === undefined) return p;
+            // Strip groupId. Use destructuring rest to drop the key cleanly
+            // rather than setting it to undefined (which would still serialise
+            // as { groupId: undefined } in some flows — the levelEdits blob
+            // uses JSON.stringify which already drops undefined, but the
+            // destructuring form keeps the in-memory shape clean too).
+            const { groupId: _drop, ...rest } = p;
+            return rest;
+          }),
+        );
       },
 
       rotateSelected: (deltaRad) => {
@@ -717,6 +995,157 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       scaleSelected: (mul) => mutateSelected((p) => ({ ...p, scale: clampScale(p.scale * mul) })),
       toggleSelectedBlocks: () => mutateSelected((p) => ({ ...p, blocks: !p.blocks })),
 
+      // Shift every selected prop by (dx, dy). Validates per-member with
+      // Set-aware canPlaceAt so members landing on a path/river/another
+      // (non-selected) prop reject the whole gesture. Same-selection members
+      // are ignored during validation via the Set so a cluster sliding past
+      // its own footprint can't self-collide. One snapshotAndPush.
+      moveSelectionBy: (dx, dy) => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        if (dx === 0 && dy === 0) return;
+        const cur = adapter.getCurrent();
+        // Build the next positions first so canPlaceAt can validate against
+        // the post-move geometry. Reject the whole gesture if any landing
+        // spot fails — partial moves would leave the group split.
+        const updates = new Map<string, { x: number; y: number }>();
+        for (const p of cur.props) {
+          if (!ids.has(p.id)) continue;
+          updates.set(p.id, { x: p.pos.x + dx, y: p.pos.y + dy });
+        }
+        if (adapter.canPlaceAt) {
+          for (const p of cur.props) {
+            const next = updates.get(p.id);
+            if (!next) continue;
+            const r = propRadius(p.url, p.scale);
+            if (!adapter.canPlaceAt(next.x, next.y, r, ids)) return;
+          }
+        }
+        snapshotAndPush();
+        commitProps(
+          cur.props.map((p) => {
+            const next = updates.get(p.id);
+            return next ? { ...p, pos: next } : p;
+          }),
+        );
+      },
+
+      // Convenience wrapper — click-to-pick-target-centroid UX. Computes the
+      // delta from current centroid to the target and delegates to
+      // moveSelectionBy so the validation + snapshot semantics stay identical.
+      moveSelectionToCentroid: (x, y) => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        const cur = adapter.getCurrent();
+        const centroid = computeCentroid(cur.props, ids);
+        const dx = x - centroid.x;
+        const dy = y - centroid.y;
+        if (dx === 0 && dy === 0) {
+          // Still drop the pending move so the click "consumed" the gesture.
+          set({ moving: false });
+          return;
+        }
+        // Inline the same logic as moveSelectionBy so we don't push two
+        // snapshots when invoked back-to-back from a UI handler — but reuse
+        // the per-member validation pattern verbatim.
+        const updates = new Map<string, { x: number; y: number }>();
+        for (const p of cur.props) {
+          if (!ids.has(p.id)) continue;
+          updates.set(p.id, { x: p.pos.x + dx, y: p.pos.y + dy });
+        }
+        if (adapter.canPlaceAt) {
+          for (const p of cur.props) {
+            const next = updates.get(p.id);
+            if (!next) continue;
+            const r = propRadius(p.url, p.scale);
+            if (!adapter.canPlaceAt(next.x, next.y, r, ids)) return;
+          }
+        }
+        snapshotAndPush();
+        commitProps(
+          cur.props.map((p) => {
+            const next = updates.get(p.id);
+            return next ? { ...p, pos: next } : p;
+          }),
+        );
+        set({ moving: false });
+      },
+
+      // Rotate every selected prop's position around the cluster centroid
+      // and fold the delta into each prop's own `rot` so individual prop
+      // orientations follow the cluster spin. Validates each member's new
+      // landing spot; rejects whole gesture on any collision. One snapshot.
+      rotateSelectionAroundCentroid: (deltaRad) => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        if (deltaRad === 0) return;
+        const cur = adapter.getCurrent();
+        const centroid = computeCentroid(cur.props, ids);
+        // Pre-compute next positions so canPlaceAt sees the final shape.
+        const updates = new Map<string, { x: number; y: number }>();
+        for (const p of cur.props) {
+          if (!ids.has(p.id)) continue;
+          updates.set(p.id, rotatePointAround(p.pos, centroid, deltaRad));
+        }
+        if (adapter.canPlaceAt) {
+          for (const p of cur.props) {
+            const next = updates.get(p.id);
+            if (!next) continue;
+            const r = propRadius(p.url, p.scale);
+            if (!adapter.canPlaceAt(next.x, next.y, r, ids)) return;
+          }
+        }
+        snapshotAndPush();
+        commitProps(
+          cur.props.map((p) => {
+            const next = updates.get(p.id);
+            if (!next) return p;
+            return { ...p, pos: next, rot: p.rot + deltaRad };
+          }),
+        );
+      },
+
+      // Scale every selected prop's distance from the centroid by `mul` and
+      // multiply each prop's own `scale` so silhouettes grow/shrink in
+      // lockstep with the layout spread. Per-member scale is clamped to
+      // [MIN_SCALE, MAX_SCALE]; the position scale itself is unclamped (a
+      // cluster spread of `mul=0.2` is still a valid layout). Validates each
+      // landing spot — rejects the whole gesture on any collision.
+      scaleSelectionAroundCentroid: (mul) => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        if (mul === 1 || mul <= 0) return;
+        const cur = adapter.getCurrent();
+        const centroid = computeCentroid(cur.props, ids);
+        const updates = new Map<string, { pos: { x: number; y: number }; scale: number }>();
+        for (const p of cur.props) {
+          if (!ids.has(p.id)) continue;
+          updates.set(p.id, {
+            pos: scalePointAround(p.pos, centroid, mul),
+            scale: clampScale(p.scale * mul),
+          });
+        }
+        if (adapter.canPlaceAt) {
+          for (const p of cur.props) {
+            const next = updates.get(p.id);
+            if (!next) continue;
+            // Validate against the new (scaled) silhouette — a cluster
+            // growing by 1.5× pushes outward AND each silhouette swells, so
+            // both contribute to the candidate radius.
+            const r = propRadius(p.url, next.scale);
+            if (!adapter.canPlaceAt(next.pos.x, next.pos.y, r, ids)) return;
+          }
+        }
+        snapshotAndPush();
+        commitProps(
+          cur.props.map((p) => {
+            const next = updates.get(p.id);
+            if (!next) return p;
+            return { ...p, pos: next.pos, scale: next.scale };
+          }),
+        );
+      },
+
       setOverride: (on) => {
         snapshotAndPush();
         const cur = adapter.getCurrent();
@@ -729,7 +1158,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           proceduralSeed: cur.proceduralSeed,
           erasedProcedural: cur.erasedProcedural,
         });
-        set({ selectedId: null, moving: false, placingUrl: null });
+        set({
+          ...clearSelectionFields(),
+          moving: false,
+          placingUrl: null,
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
+        });
         adapter.onOverrideChange?.();
       },
 
@@ -737,7 +1172,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         adapter.clear();
         const fresh: History = { past: [], future: [] };
         set((s) => ({
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           placingUrl: null,
           history: fresh,
@@ -751,6 +1186,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             selectedId: null,
             settingDirection: false,
           },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         }));
         adapter.saveHistory?.(fresh);
         adapter.onClear?.();
@@ -773,7 +1210,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           });
         }
         set((s) => ({
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           placingUrl: null,
           version: s.version + 1,
@@ -785,6 +1222,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             selectedId: null,
             settingDirection: false,
           },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         }));
       },
 
@@ -805,10 +1244,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           });
         }
         set((s) => ({
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           placingUrl: null,
           version: s.version + 1,
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         }));
       },
 
@@ -817,10 +1258,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         if (adapter.reloadProcedural) {
           adapter.reloadProcedural();
           set((s) => ({
-            selectedId: null,
+            ...clearSelectionFields(),
             moving: false,
             placingUrl: null,
             version: s.version + 1,
+            marqueeTool: DEFAULT_MARQUEE_TOOL,
+            placingStampId: null,
           }));
           return;
         }
@@ -856,7 +1299,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             customUrls: null,
           },
           placingUrl: null,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           // Arming a brush disarms the river + egg tools — they share the click plane.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
@@ -867,6 +1310,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             selectedId: null,
             settingDirection: false,
           },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         }));
       },
 
@@ -884,7 +1329,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             customUrls: null,
           },
           placingUrl: null,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           // Eraser shares the click plane with placement/river/egg/scatter brush.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
@@ -895,6 +1340,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             selectedId: null,
             settingDirection: false,
           },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+          placingStampId: null,
         }));
       },
 
@@ -983,7 +1430,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           openStrokeEntry();
           commitPropsAndErasedProcedural(next, newErased);
           if (s.selectedId !== null && !next.some((p) => p.id === s.selectedId)) {
-            set({ selectedId: null });
+            // Re-derive the mirror from a filtered Set so multi-select
+            // survives partial eraser overlaps (single-select unchanged).
+            const remaining = new Set<string>();
+            for (const id of s.selectedIds) {
+              if (next.some((p) => p.id === id)) remaining.add(id);
+            }
+            set({ selectedIds: remaining, selectedId: firstOf(remaining) });
           }
           return;
         }
@@ -1068,12 +1521,185 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         set(STROKE_CLEAR);
       },
 
+      // Capture the current selection into a new stamp. Children are stored
+      // centroid-normalised (relPos = pos - centroid) so the authored layout
+      // survives any re-drop position. The stamp's role is the role of the
+      // child closest to the centroid — that picks the palette bucket so a
+      // tree-heavy "campsite" lands under Trees rather than spawning a new
+      // "Stamps" tab. Intentionally NOT pushed onto the undo stack —
+      // stamps are tool config (saved to localStorage outside the per-level
+      // / world-map blobs), not map data; Ctrl+Z restoring a deleted stamp
+      // would be surprising.
+      saveSelectionAsStamp: (label) => {
+        const ids = get().selectedIds;
+        if (ids.size === 0) return;
+        const trimmed = label.trim();
+        if (trimmed.length === 0) return;
+        const cur = adapter.getCurrent();
+        const selected = cur.props.filter((p) => ids.has(p.id));
+        if (selected.length === 0) return;
+        const centroid = computeCentroid(cur.props, ids);
+        // Pick the role of the child closest to the centroid — drives the
+        // palette bucket (so stamps slot in next to similar-role models).
+        // Squared distance keeps the comparison branch-free.
+        let nearest = selected[0];
+        let nearestDistSq = Number.POSITIVE_INFINITY;
+        for (const p of selected) {
+          const dx = p.pos.x - centroid.x;
+          const dy = p.pos.y - centroid.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < nearestDistSq) {
+            nearestDistSq = d2;
+            nearest = p;
+          }
+        }
+        const children: StampChild[] = selected.map((p) => ({
+          url: p.url,
+          relPos: { x: p.pos.x - centroid.x, y: p.pos.y - centroid.y },
+          scale: p.scale,
+          rot: p.rot,
+          blocks: p.blocks,
+        }));
+        const stamp: Stamp = {
+          id: nanoid(8),
+          label: trimmed,
+          role: classifyPropUrl(nearest.url),
+          childCount: children.length,
+          children,
+          createdAt: new Date().toISOString(),
+        };
+        addStamp(stamp);
+        set((s) => ({ stampLibraryVersion: s.stampLibraryVersion + 1 }));
+      },
+
+      // Remove a stamp from the global library. NOT pushed onto undo —
+      // matches saveSelectionAsStamp; the panel gates with a window.confirm.
+      // Bumping stampLibraryVersion invalidates EditorPanel's catalog memo
+      // so the swatch disappears on the next render.
+      deleteStamp: (stampId) => {
+        removeStamp(stampId);
+        set((s) => ({
+          stampLibraryVersion: s.stampLibraryVersion + 1,
+          // If the deleted stamp was armed, disarm it so a stale id isn't
+          // left dangling on the next click (placeStampAt would no-op via
+          // getStamp returning null, but disarming is the clean state).
+          placingStampId: s.placingStampId === stampId ? null : s.placingStampId,
+        }));
+      },
+
+      // Arm / disarm a stamp for placement. Mutually exclusive with every
+      // other click-plane tool — arming drops placingUrl / brush / river /
+      // marquee / moving and clears the current selection. Passing the
+      // already-armed id (or null) disarms. This mirrors setPlacing's
+      // toggle-on-rearm UX so a second click on a swatch disarms.
+      setPlacingStamp: (stampId) => {
+        set((s) => ({
+          placingStampId: s.placingStampId === stampId ? null : stampId,
+          placingUrl: null,
+          ...clearSelectionFields(),
+          moving: false,
+          brush: { ...s.brush, active: false, eraser: false },
+          riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          easterEggTool: {
+            ...s.easterEggTool,
+            active: false,
+            placingDefId: null,
+            selectedId: null,
+            settingDirection: false,
+          },
+          marqueeTool: DEFAULT_MARQUEE_TOOL,
+        }));
+      },
+
+      // Drop the armed stamp at (x, y). All-or-nothing: a single child
+      // colliding with a path / river / existing prop / earlier-in-batch
+      // sibling aborts the whole drop. The cursor IS the target centroid —
+      // every child's final position is (x + relPos.x, y + relPos.y),
+      // matching saveSelectionAsStamp's centroid-normalised storage.
+      //
+      // Same-batch siblings are validated via an `accepted` accumulator
+      // (mirrors paintAt's same-stroke collision pattern), since
+      // canPlaceAt iterates cur.props and can't see in-flight siblings.
+      //
+      // On success: mint a fresh groupId, one snapshotAndPush, one
+      // commitProps([...cur, ...stamped]), and set selectedIds to the new
+      // child ids so the user can immediately drag / rotate / re-save the
+      // dropped cluster. The armed stamp is left armed — the user can
+      // drop multiples by clicking repeatedly; Esc / re-clicking the
+      // swatch disarms.
+      placeStampAt: (x, y) => {
+        const stampId = get().placingStampId;
+        if (stampId === null) return;
+        const stamp = getStamp(stampId);
+        // Defend against a stamp that was deleted while armed (the disarm
+        // hook in deleteStamp handles the common case, but another tab
+        // could have removed the entry).
+        if (!stamp || stamp.children.length === 0) {
+          set({ placingStampId: null });
+          return;
+        }
+        const cur = adapter.getCurrent();
+        // Pre-mint a shared groupId and per-child ids so a successful drop
+        // can commit in one batch with stable identity. Children walk in
+        // stamp.children order: canPlaceAt validates each against cur.props
+        // (paths / rivers / pre-existing props) and a separate pairwise
+        // pass validates against accepted siblings (which aren't in
+        // cur.props yet, so canPlaceAt can't see them). This is the same
+        // accepted-accumulator pattern paintAt uses for same-stroke
+        // collision (editorCore.ts paintAt loop).
+        const groupId = nanoid(8);
+        const childIds: string[] = stamp.children.map(() => nanoid(8));
+        const accepted: PlacedProp[] = [];
+        for (let i = 0; i < stamp.children.length; i++) {
+          const child = stamp.children[i];
+          const finalX = x + child.relPos.x;
+          const finalY = y + child.relPos.y;
+          const radius = propRadius(child.url, child.scale);
+          if (adapter.canPlaceAt && !adapter.canPlaceAt(finalX, finalY, radius, null)) {
+            // Any collision with existing geometry aborts the whole drop.
+            return;
+          }
+          // Same-batch sibling collision check — required because canPlaceAt
+          // iterates cur.props, not our pending batch. Mirrors paintAt's
+          // same-stroke gate.
+          let siblingCollides = false;
+          for (const sib of accepted) {
+            const sumR = radius + propRadius(sib.url, sib.scale);
+            const dx = sib.pos.x - finalX;
+            const dy = sib.pos.y - finalY;
+            if (dx * dx + dy * dy < sumR * sumR) {
+              siblingCollides = true;
+              break;
+            }
+          }
+          if (siblingCollides) return;
+          accepted.push({
+            id: childIds[i],
+            url: child.url,
+            pos: { x: finalX, y: finalY },
+            scale: child.scale,
+            rot: child.rot,
+            blocks: child.blocks,
+            groupId,
+          });
+        }
+        if (accepted.length === 0) return;
+        snapshotAndPush();
+        commitProps([...cur.props, ...accepted]);
+        // Auto-select the freshly stamped group so the user can immediately
+        // drag / rotate / re-save without re-picking. Mirrors placeAt's
+        // post-drop selection behaviour. Leaves placingStampId armed so the
+        // user can drop multiples — Esc or re-clicking the swatch disarms.
+        const sel = new Set(childIds);
+        set({ selectedIds: sel, selectedId: firstOf(sel), moving: false });
+      },
+
       setRiverToolActive: (on) => {
         if (on) adapter.onActivate?.();
         set((s) => ({
           // Mutually exclusive with prop placement / move / brush / egg tool.
           placingUrl: null,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           brush: { ...s.brush, active: false, eraser: false },
           riverTool: {
@@ -1092,7 +1718,94 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
                 settingDirection: false,
               }
             : s.easterEggTool,
+          // Arming the river tool drops the marquee + any armed stamp paste —
+          // they share the click plane. Toggling off leaves them untouched
+          // (the user might have been mid-marquee on a separate gesture, but
+          // a river-tool toggle is a hard re-arm boundary in practice).
+          marqueeTool: on ? DEFAULT_MARQUEE_TOOL : s.marqueeTool,
+          placingStampId: on ? null : s.placingStampId,
         }));
+      },
+
+      setMarqueeActive: (on) => {
+        set((s) => ({
+          // Mutually exclusive with prop placement / move / brush / river /
+          // egg-tool — all five consume the click plane. Toggling marquee
+          // off drops the in-progress rect; toggling on clears any other
+          // armed tool.
+          placingUrl: on ? null : s.placingUrl,
+          moving: on ? false : s.moving,
+          brush: on ? { ...s.brush, active: false, eraser: false } : s.brush,
+          riverTool: on
+            ? { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null }
+            : s.riverTool,
+          easterEggTool: on
+            ? {
+                ...s.easterEggTool,
+                active: false,
+                placingDefId: null,
+                selectedId: null,
+                settingDirection: false,
+              }
+            : s.easterEggTool,
+          marqueeTool: { active: on, rect: null, anchor: null },
+          // Arming marquee disarms any stamp paste. Disarming marquee
+          // leaves placingStampId untouched (toolbar transitions between
+          // marquee → stamp are handled by setPlacingStamp itself).
+          placingStampId: on ? null : s.placingStampId,
+        }));
+      },
+
+      beginMarquee: (x, y) => {
+        // Stash the press point as the anchor and seed a degenerate rect at
+        // the same location. updateMarquee rebuilds the normalised AABB from
+        // (anchor, current) each move so drag-back-across-press works
+        // correctly without per-frame anchor inference.
+        set((s) => ({
+          marqueeTool: {
+            ...s.marqueeTool,
+            anchor: { x, y },
+            rect: { minX: x, minY: y, maxX: x, maxY: y },
+          },
+        }));
+      },
+
+      updateMarquee: (x, y) => {
+        const cur = get().marqueeTool;
+        if (!cur.active || !cur.anchor) return;
+        set((s) => {
+          const anchor = s.marqueeTool.anchor;
+          if (!anchor) return s;
+          return {
+            marqueeTool: {
+              ...s.marqueeTool,
+              rect: rectFromCorners(anchor.x, anchor.y, x, y),
+            },
+          };
+        });
+      },
+
+      endMarquee: (additive) => {
+        const cur = get().marqueeTool;
+        if (!cur.active) return;
+        const rect = cur.rect;
+        // Always close the rect (drop the in-progress overlay + anchor) —
+        // selection resolves below.
+        set((s) => ({ marqueeTool: { ...s.marqueeTool, rect: null, anchor: null } }));
+        if (!rect) return;
+        const props = adapter.getCurrent().props;
+        const hits = new Set<string>();
+        for (const p of props) {
+          if (pointInRect(p.pos, rect)) hits.add(p.id);
+        }
+        // Empty marquee + non-additive = clear selection.
+        if (hits.size === 0 && !additive) {
+          set({ ...clearSelectionFields(), moving: false });
+          return;
+        }
+        const base = additive ? new Set(get().selectedIds) : new Set<string>();
+        for (const id of hits) base.add(id);
+        set({ selectedIds: base, selectedId: firstOf(base), moving: false });
       },
 
       beginRiver: (x, y) => {
@@ -1292,8 +2005,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
 
       setEasterEggToolActive: (on) => {
         // Mutually exclusive with every other click-plane tool — turning the
-        // egg tool on disarms placingUrl + brush + river so map clicks go
-        // through the egg handler.
+        // egg tool on disarms placingUrl + brush + river + marquee + stamp
+        // so map clicks go through the egg handler.
         set((s) => ({
           easterEggTool: {
             ...s.easterEggTool,
@@ -1303,7 +2016,11 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             settingDirection: false,
           },
           placingUrl: on ? null : s.placingUrl,
-          selectedId: on ? null : s.selectedId,
+          // Clear prop selection (Set + derived mirror) when egg tool turns
+          // on so the egg-tool selection is the only live selection. When
+          // turning off, preserve the existing prop selection — the user
+          // might have toggled the egg tool by accident.
+          ...(on ? clearSelectionFields() : {}),
           moving: false,
           brush: { ...s.brush, active: on ? false : s.brush.active, eraser: false },
           riverTool: {
@@ -1312,6 +2029,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             editingRiverId: on ? null : s.riverTool.editingRiverId,
             selectedRiverId: on ? null : s.riverTool.selectedRiverId,
           },
+          marqueeTool: on ? DEFAULT_MARQUEE_TOOL : s.marqueeTool,
+          placingStampId: on ? null : s.placingStampId,
         }));
       },
 
@@ -1408,10 +2127,11 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         commit(result.restored);
         set((s) => ({
           history: result.next,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+          marqueeTool: { ...s.marqueeTool, rect: null, anchor: null },
         }));
         adapter.saveHistory?.(result.next);
       },
@@ -1422,10 +2142,11 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         commit(result.restored);
         set((s) => ({
           history: result.next,
-          selectedId: null,
+          ...clearSelectionFields(),
           moving: false,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+          marqueeTool: { ...s.marqueeTool, rect: null, anchor: null },
         }));
         adapter.saveHistory?.(result.next);
       },

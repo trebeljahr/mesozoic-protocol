@@ -193,11 +193,18 @@ export const WorldMapScene = () => {
       isMobile ? computeMobileFocus(progress, fitZoom, maxZoom, size.width, size.height) : null,
     [isMobile, progress, fitZoom, maxZoom, size.width, size.height],
   );
-  // Dev-only: when the world-map editor has a brush/river/place/move tool
-  // armed, the canvas pointer belongs to the editor. Mirror of CameraRig's
+  // Dev-only: when the world-map editor has a brush/river/place/move/marquee
+  // tool armed, the canvas pointer belongs to the editor. Mirror of CameraRig's
   // setup — see useMapGestures' drag gate for why this has to be a ref.
   const editorToolActive = useWorldMapEditor(
-    (s) => s.active && (s.placingUrl !== null || s.moving || s.brush.active || s.riverTool.active),
+    (s) =>
+      s.active &&
+      (s.placingUrl !== null ||
+        s.moving ||
+        s.brush.active ||
+        s.riverTool.active ||
+        s.marqueeTool.active ||
+        s.placingStampId !== null),
   );
   const toolOwnsPointerRef = useRef(editorToolActive);
   toolOwnsPointerRef.current = editorToolActive;

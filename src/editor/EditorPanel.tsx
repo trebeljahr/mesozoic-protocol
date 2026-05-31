@@ -3,7 +3,14 @@ import type { Biome, PropRole } from "../biomes";
 import { EASTER_EGG_BY_ID, EASTER_EGG_DEFS, type EasterEggDef } from "../easterEggs";
 import type { River } from "../sim/types";
 import { useBackNavigation } from "../ui/useBackNavigation";
-import { buildCatalog, type CatalogEntry, labelFor, ROLE_LABEL, ROLE_ORDER } from "./assetCatalog";
+import {
+  buildCatalog,
+  buildStampEntries,
+  type CatalogEntry,
+  labelFor,
+  ROLE_LABEL,
+  ROLE_ORDER,
+} from "./assetCatalog";
 import {
   BIOME_LABEL,
   BIOME_ORDER,
@@ -30,6 +37,8 @@ import {
   swatchBtn,
   swatchLabel,
 } from "./panelStyles";
+import { StampPreview } from "./StampPreview";
+import { loadStampLibrary } from "./stampLibrary";
 
 // Shared dev-only editor side-panel. Mounted in App.tsx behind
 // import.meta.env.DEV by two thin wrappers (LevelEditorPanel /
@@ -111,12 +120,17 @@ export const EditorPanel = ({
   const panelCollapsed = store((s) => s.panelCollapsed);
   const chromeHidden = store((s) => s.chromeHidden);
   const placingUrl = store((s) => s.placingUrl);
+  const selectedIds = store((s) => s.selectedIds);
   const selectedId = store((s) => s.selectedId);
+  const selectionSize = selectedIds.size;
   const moving = store((s) => s.moving);
   const brush = store((s) => s.brush);
   const riverTool = store((s) => s.riverTool);
   const easterEggTool = store((s) => s.easterEggTool);
+  const marqueeActive = store((s) => s.marqueeTool.active);
+  const placingStampId = store((s) => s.placingStampId);
   const version = store((s) => s.version);
+  const stampLibraryVersion = store((s) => s.stampLibraryVersion);
   const toggleActive = store((s) => s.toggleActive);
   const setPanelCollapsed = store((s) => s.setPanelCollapsed);
   const setChromeHidden = store((s) => s.setChromeHidden);
@@ -232,12 +246,20 @@ export const EditorPanel = ({
         return;
       }
       if (e.key === "Escape") {
-        if (ed.placingUrl) ed.setPlacing(ed.placingUrl);
-        else if (ed.selectedId !== null) ed.select(null);
+        // Step back through armed tools first, then selection, then close.
+        // Stamp paste sits ahead of placingUrl because both are "armed click
+        // tools" but the stamp arm is the more recently introduced surface
+        // and feels closer to the user's intent (just-clicked-a-swatch).
+        if (ed.placingStampId) ed.setPlacingStamp(null);
+        else if (ed.placingUrl) ed.setPlacing(ed.placingUrl);
+        else if (ed.marqueeTool.active) ed.setMarqueeActive(false);
+        else if (ed.selectedIds.size > 0) ed.clearSelection();
         else ed.toggleActive();
-      } else if ((e.key === "Delete" || e.key === "Backspace") && ed.selectedId !== null) {
+      } else if ((e.key === "Delete" || e.key === "Backspace") && ed.selectedIds.size > 0) {
         e.preventDefault();
-        ed.deleteSelected();
+        // deleteSelection covers both single- and multi-id cases as one
+        // undo entry; deleteSelected stays around for the single-prop card.
+        ed.deleteSelection();
       }
     };
 
@@ -276,9 +298,33 @@ export const EditorPanel = ({
     [effectiveBiome],
   );
 
+  // Stamp entries are merged in here (not into the base catalog) so stamps
+  // can be re-derived without rebuilding the atomic-model catalog. The
+  // explicit dep on stampLibraryVersion invalidates this memo whenever the
+  // store bumps the counter (save/delete), so the palette reflects library
+  // changes immediately. localStorage reads stay lazy — buildStampEntries
+  // runs only when this memo recomputes. The `void` reads the counter so
+  // the dep isn't flagged as "more than necessary" — the closure itself
+  // doesn't reference it (the source of truth is localStorage), but the
+  // counter is the invalidation signal.
+  const stampEntries = useMemo(() => {
+    void stampLibraryVersion;
+    return buildStampEntries(loadStampLibrary().stamps);
+  }, [stampLibraryVersion]);
+
+  // Resolve the armed stamp's catalog entry off the same derived list so the
+  // status label and ghost preview share one source of truth. Null when no
+  // stamp is armed (or the armed id no longer matches any library entry,
+  // e.g. mid-deletion).
+  const placingStamp =
+    placingStampId !== null
+      ? (stampEntries.find((e) => e.kind === "stamp" && e.stampId === placingStampId) ?? null)
+      : null;
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const items = q ? catalog.filter((c) => c.label.toLowerCase().includes(q)) : catalog;
+    const combined: CatalogEntry[] = [...catalog, ...stampEntries];
+    const items = q ? combined.filter((c) => c.label.toLowerCase().includes(q)) : combined;
     const byRole = new Map<PropRole, CatalogEntry[]>();
     for (const c of items) {
       const list = byRole.get(c.role) ?? [];
@@ -286,7 +332,7 @@ export const EditorPanel = ({
       byRole.set(c.role, list);
     }
     return ROLE_ORDER.filter((r) => byRole.has(r)).map((r) => [r, byRole.get(r)!] as const);
-  }, [query, catalog]);
+  }, [query, catalog, stampEntries]);
 
   if (!active) {
     return (
@@ -307,15 +353,25 @@ export const EditorPanel = ({
         : riverTool.selectedRiverId
           ? "River · selected"
           : "River"
-      : moving
-        ? "Move prop"
-        : placingUrl
-          ? `Placing · ${labelFor(placingUrl)}`
-          : selected
-            ? "Prop selected"
-            : selectedRiver
-              ? "River selected"
-              : "Select";
+      : placingStamp && placingStamp.kind === "stamp"
+        ? `Stamping · ${placingStamp.label} (×${placingStamp.childCount})`
+        : marqueeActive
+          ? selectionSize > 0
+            ? `Marquee · ${selectionSize} selected`
+            : "Marquee"
+          : moving
+            ? selectionSize > 1
+              ? `Move ${selectionSize} props · click target centroid`
+              : "Move prop"
+            : placingUrl
+              ? `Placing · ${labelFor(placingUrl)}`
+              : selectionSize > 1
+                ? `${selectionSize} props selected`
+                : selected
+                  ? "Prop selected"
+                  : selectedRiver
+                    ? "River selected"
+                    : "Select";
 
   const toggleUiLabel = chromeHidden ? "Show UI" : "Hide UI";
 
@@ -369,6 +425,30 @@ export const EditorPanel = ({
       () => {},
     );
     copyButton.logExport(json);
+  };
+
+  // Prompt the user for a label and save the current selection as a stamp.
+  // Cancel / empty input is a no-op (the store-side action also no-ops on
+  // empty trim, but the early return avoids a flashed "Saved" feeling for
+  // a cancelled dialog). Stamps don't go through undo — see editorCore's
+  // saveSelectionAsStamp comment for the rationale.
+  const onSaveAsStamp = () => {
+    const ed = store.getState();
+    if (ed.selectedIds.size === 0) return;
+    const defaultLabel = `Stamp ${ed.selectedIds.size}`;
+    const label = window.prompt("Stamp name:", defaultLabel);
+    if (label === null) return;
+    const trimmed = label.trim();
+    if (trimmed.length === 0) return;
+    ed.saveSelectionAsStamp(trimmed);
+  };
+
+  // Confirm + delete a stamp from the library. Right-click on a palette
+  // swatch fires this. Stamps don't go through undo, so the destructive
+  // confirm matters more than for in-map mutations.
+  const onDeleteStamp = (stampId: string, label: string) => {
+    if (!window.confirm(`Delete stamp "${label}"?`)) return;
+    store.getState().deleteStamp(stampId);
   };
 
   return (
@@ -456,6 +536,14 @@ export const EditorPanel = ({
         >
           {riverTool.active ? "River ✓" : "River"}
         </button>
+        <button
+          type="button"
+          style={btn(marqueeActive)}
+          onClick={() => store.getState().setMarqueeActive(!marqueeActive)}
+          title="Marquee — drag a rectangle on empty ground to select every prop inside. Shift on release adds to existing selection."
+        >
+          {marqueeActive ? "Marquee ✓" : "Marquee"}
+        </button>
         {riverTool.active && riverTool.editingRiverId !== null && (
           <button
             type="button"
@@ -498,6 +586,128 @@ export const EditorPanel = ({
             ? "Eraser active — click-drag the map to remove props in radius. Tap Eraser again to disarm."
             : "Brush active — click-drag the map to scatter. Tap the preset again to disarm."}
         </div>
+      ) : selectionSize > 1 ? (
+        (() => {
+          // Derive group state from the live props array. "Single group" =
+          // every selected member shares the same defined groupId. That's
+          // the only state where Ungroup is the natural action and Group
+          // would be a no-op rebind. Mixed / partial / ungrouped → Group is
+          // the natural action (it unifies into one fresh groupId).
+          const selectedPropsList = propsArr.filter((p) => selectedIds.has(p.id));
+          const firstGroupId = selectedPropsList[0]?.groupId;
+          const allSameGroup =
+            firstGroupId !== undefined &&
+            selectedPropsList.every((p) => p.groupId === firstGroupId);
+          return (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                padding: 8,
+                background: "#11151d",
+                border: "1px solid #2a313d",
+                borderRadius: 6,
+              }}
+            >
+              <div
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <span style={{ fontWeight: 600 }}>
+                  {allSameGroup ? `Grouped (${selectionSize})` : `${selectionSize} props selected`}
+                </span>
+                <span style={{ color: "#8b93a3" }}>Shift-click to add/remove</span>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  style={btn(moving)}
+                  onClick={() => store.getState().beginMove()}
+                  title="Move — click the map to relocate the cluster's centroid there; relative layout is preserved"
+                >
+                  {moving ? "Click map…" : "Move"}
+                </button>
+                <button
+                  type="button"
+                  style={dangerBtn}
+                  onClick={() => store.getState().deleteSelection()}
+                  title="Delete every selected prop as one undo entry"
+                >
+                  Delete
+                </button>
+                {allSameGroup ? (
+                  <button
+                    type="button"
+                    style={btn()}
+                    onClick={() => store.getState().ungroupSelection()}
+                    title="Clear groupId on every selected prop — single-click no longer expands to the group"
+                  >
+                    Ungroup
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    style={btn()}
+                    onClick={() => store.getState().groupSelection()}
+                    title="Bind every selected prop with a shared groupId — clicking any member will select the whole group"
+                  >
+                    Group
+                  </button>
+                )}
+                <button
+                  type="button"
+                  style={btn()}
+                  onClick={onSaveAsStamp}
+                  title="Save the selection to the global stamp library — re-droppable from the palette. Right-click a stamp swatch to delete it."
+                >
+                  Save as stamp
+                </button>
+                <button
+                  type="button"
+                  style={btn()}
+                  onClick={() => store.getState().clearSelection()}
+                  title="Clear selection (Esc)"
+                >
+                  Clear
+                </button>
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  style={btn()}
+                  onClick={() => store.getState().rotateSelectionAroundCentroid(-Math.PI / 12)}
+                  title="Rotate the cluster 15° counter-clockwise around its centroid"
+                >
+                  Rotate ⟲
+                </button>
+                <button
+                  type="button"
+                  style={btn()}
+                  onClick={() => store.getState().rotateSelectionAroundCentroid(Math.PI / 12)}
+                  title="Rotate the cluster 15° clockwise around its centroid"
+                >
+                  Rotate ⟳
+                </button>
+                <button
+                  type="button"
+                  style={btn()}
+                  onClick={() => store.getState().scaleSelectionAroundCentroid(1 / 1.15)}
+                  title="Shrink the cluster toward its centroid by 15%"
+                >
+                  Scale −
+                </button>
+                <button
+                  type="button"
+                  style={btn()}
+                  onClick={() => store.getState().scaleSelectionAroundCentroid(1.15)}
+                  title="Grow the cluster away from its centroid by 15%"
+                >
+                  Scale +
+                </button>
+              </div>
+            </div>
+          );
+        })()
       ) : selected ? (
         <div
           style={{
@@ -568,12 +778,39 @@ export const EditorPanel = ({
             />
             Blocks tower placement
           </label>
+          {selected.groupId !== undefined && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span style={{ color: "#8b93a3", fontSize: 11, flex: 1 }}>
+                In a group — single-click expands to all members.
+              </span>
+              <button
+                type="button"
+                style={btn()}
+                onClick={() => store.getState().ungroupSelection()}
+                title="Clear groupId on this prop (and any other selected members)"
+              >
+                Ungroup
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            style={btn()}
+            onClick={onSaveAsStamp}
+            title="Save this prop to the global stamp library — useful for re-using a tweaked rot/scale variant. Right-click a stamp swatch to delete it."
+          >
+            Save as stamp
+          </button>
         </div>
       ) : (
         <div style={{ color: "#8b93a3" }}>
-          {placingUrl
-            ? `Placing ${labelFor(placingUrl)} — click map to drop. Click asset again or Esc to stop.`
-            : "Pick an asset to place, or click a placed prop to select it."}
+          {placingStamp && placingStamp.kind === "stamp"
+            ? `Stamping ${placingStamp.label} (${placingStamp.childCount} props) — click map to drop centred on the cursor. Click swatch again or Esc to disarm.`
+            : placingUrl
+              ? `Placing ${labelFor(placingUrl)} — click map to drop. Click asset again or Esc to stop.`
+              : marqueeActive
+                ? "Marquee armed — drag the map to select props in a rectangle. Hold Shift on release to add to the current selection. Esc disarms."
+                : "Pick an asset to place, or click a placed prop to select it."}
         </div>
       )}
 
@@ -631,18 +868,35 @@ export const EditorPanel = ({
               {ROLE_LABEL[role]}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {items.map((c) => (
-                <button
-                  key={c.url}
-                  type="button"
-                  title={`${c.label}\n${c.url}`}
-                  style={swatchBtn(placingUrl === c.url)}
-                  onClick={() => store.getState().setPlacing(c.url)}
-                >
-                  <PropPreview url={c.url} size={56} />
-                  <span style={swatchLabel}>{c.label}</span>
-                </button>
-              ))}
+              {items.map((c) =>
+                c.kind === "model" ? (
+                  <button
+                    key={`model:${c.url}`}
+                    type="button"
+                    title={`${c.label}\n${c.url}`}
+                    style={swatchBtn(placingUrl === c.url)}
+                    onClick={() => store.getState().setPlacing(c.url)}
+                  >
+                    <PropPreview url={c.url} size={56} />
+                    <span style={swatchLabel}>{c.label}</span>
+                  </button>
+                ) : (
+                  <button
+                    key={`stamp:${c.stampId}`}
+                    type="button"
+                    title={`${c.label} (${c.childCount} props)\nClick to arm — then click the map to drop. Right-click to delete this stamp.`}
+                    style={swatchBtn(placingStampId === c.stampId)}
+                    onClick={() => store.getState().setPlacingStamp(c.stampId)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onDeleteStamp(c.stampId, c.label);
+                    }}
+                  >
+                    <StampPreview sampleUrls={c.sampleUrls} childCount={c.childCount} size={56} />
+                    <span style={swatchLabel}>{c.label}</span>
+                  </button>
+                ),
+              )}
             </div>
           </div>
         ))}

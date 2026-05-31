@@ -103,12 +103,12 @@ export const CameraRig = () => {
   const robotDashAiming = useGame((s) => s.ui.robotDashAiming);
   const size = useThree((s) => s.size);
 
-  // Dev-only: when the level editor's brush/river/place/move tool is
-  // armed, the canvas pointer belongs to the editor. We expose this as a
-  // ref to MapOrbitControls so the drag gate inside useMapGestures can
-  // synchronously bail before touching controls.enabled or replaying
-  // pointer events — without this the brush stroke leaks into a camera
-  // pan when the pointer crosses the drag threshold.
+  // Dev-only: when the level editor's brush/river/place/move/marquee/stamp/
+  // easter-egg tool is armed, the canvas pointer belongs to the editor. We
+  // expose this as a ref to MapOrbitControls so the drag gate inside
+  // useMapGestures can synchronously bail before touching controls.enabled
+  // or replaying pointer events — without this the brush stroke leaks into
+  // a camera pan when the pointer crosses the drag threshold.
   const editorToolActive = useEditor(
     (s) =>
       s.active &&
@@ -116,7 +116,9 @@ export const CameraRig = () => {
         s.moving ||
         s.brush.active ||
         s.riverTool.active ||
-        s.easterEggTool.active),
+        s.easterEggTool.active ||
+        s.marqueeTool.active ||
+        s.placingStampId !== null),
   );
   const toolOwnsPointerRef = useRef(editorToolActive);
   toolOwnsPointerRef.current = editorToolActive;
