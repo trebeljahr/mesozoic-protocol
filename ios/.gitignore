@@ -11,3 +11,10 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# Signing secrets
+*.p12
+*.mobileprovision
+*.cer
+AuthKey_*.p8
+ExportOptions.plist
