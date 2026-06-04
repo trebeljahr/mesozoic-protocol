@@ -196,9 +196,11 @@ export type EditorAdapter = {
   // renderers. Every mutation (place/move/rotate/scale/blocks/setOverride/
   // river edits/undo/redo/paint stroke) flows through here.
   commit: (next: EditorSource) => void;
-  // Drop persistence + reset the source to empty. Called by clear() before
-  // the factory wipes its own history and fires onClear (e.g. reloadLevel).
-  clear: () => void;
+  // Optional legacy escape hatch — store.clear() now goes through
+  // snapshotAndPush()+commit() so the wipe is undoable, and no adapter is
+  // expected to define this today. Kept on the type for adapters that
+  // might want a no-history nuke path.
+  clear?: () => void;
   clearManual?: () => void;
   clearProcedural?: () => void;
   reloadProcedural?: () => void;
@@ -1169,13 +1171,21 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       },
 
       clear: () => {
-        adapter.clear();
-        const fresh: History = { past: [], future: [] };
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commit({
+          props: [],
+          override: true,
+          rivers: [],
+          bridges: [],
+          easterEggs: [],
+          proceduralSeed: cur.proceduralSeed,
+          erasedProcedural: [],
+        });
         set((s) => ({
           ...clearSelectionFields(),
           moving: false,
           placingUrl: null,
-          history: fresh,
           version: s.version + 1,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
@@ -1189,7 +1199,6 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           marqueeTool: DEFAULT_MARQUEE_TOOL,
           placingStampId: null,
         }));
-        adapter.saveHistory?.(fresh);
         adapter.onClear?.();
       },
 

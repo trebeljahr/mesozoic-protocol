@@ -4,7 +4,7 @@ import { useWorldMapEditor } from "./worldMapEditorStore";
 
 // Dev-only world-map editor side panel. Thin wrapper over the shared
 // EditorPanel — supplies the world-map store, title, and footer buttons
-// (copy / download / clear all with confirm). Mounted in App.tsx behind
+// (copy / download / clear all (undoable)). Mounted in App.tsx behind
 // import.meta.env.DEV && screen === "worldMap". The override-procedural
 // checkbox is hidden because the world map has no procedural set-dressing
 // to suppress.
@@ -14,13 +14,6 @@ export const WorldMapEditorPanel = () => {
   };
 
   const onClearAll = () => {
-    if (
-      !window.confirm(
-        "Clear every hand-placed prop on the world map? This is irreversible (history is per-session).",
-      )
-    ) {
-      return;
-    }
     useWorldMapEditor.getState().clear();
   };
 
@@ -31,7 +24,7 @@ export const WorldMapEditorPanel = () => {
   const clearButtons: FooterButton[] = [
     {
       label: "Clear all",
-      title: "Wipe every hand-placed world-map prop (irreversible)",
+      title: "Wipe every hand-placed world-map prop. Undoable.",
       onClick: onClearAll,
     },
   ];

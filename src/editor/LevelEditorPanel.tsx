@@ -5,8 +5,8 @@ import { clearAllLevels, exportAllLevelsJson, useEditor } from "./editorStore";
 
 // Dev-only level-editor side panel. Thin wrapper over the shared EditorPanel —
 // supplies the level-editor store, per-level title, and the level-editor's
-// footer buttons (copy / download level / download all levels / reload
-// procedural / clear procedural / clear manual / clear level / clear all
+// footer buttons (copy / download level / download all levels / re-roll
+// procedural / clear procedural / clear hand-placed / clear all / clear all
 // levels with confirm). Mounted in App.tsx behind import.meta.env.DEV.
 export const LevelEditorPanel = () => {
   const levelId = useGame((s) => s.world.levelId);
@@ -45,33 +45,24 @@ export const LevelEditorPanel = () => {
 
   const clearButtons: FooterButton[] = [
     {
-      label: "Reload procedural",
-      title: `Pick a new procedural seed and regenerate procedural set-dressing on L${levelId} (hand-placed props preserved)`,
+      label: "Re-roll procedural",
+      title: `Pick a new procedural seed and regenerate procedural set-dressing on L${levelId} (hand-placed props preserved). Undoable.`,
       onClick: () => useEditor.getState().reloadProcedural(),
     },
     {
       label: "Clear procedural",
-      title: `Suppress procedural set-dressing on L${levelId} (hand-placed props preserved)`,
+      title: `Suppress procedural set-dressing on L${levelId} (hand-placed props preserved). Undoable.`,
       onClick: () => useEditor.getState().clearProcedural(),
     },
     {
-      label: "Clear manual",
-      title: `Wipe hand-placed props and rivers on L${levelId} (procedural set-dressing preserved)`,
+      label: "Clear hand-placed",
+      title: `Wipe hand-placed props and rivers on L${levelId} (procedural set-dressing preserved). Undoable.`,
       onClick: () => useEditor.getState().clearManual(),
     },
     {
-      label: "Clear level",
-      title: `Wipe BOTH hand-placed and procedural set-dressing on L${levelId} (path + base tower preserved)`,
-      onClick: () => {
-        if (
-          !window.confirm(
-            `Clear BOTH hand-placed and procedural set-dressing on L${levelId}? Path and base tower are preserved.`,
-          )
-        ) {
-          return;
-        }
-        useEditor.getState().clear();
-      },
+      label: "Clear all",
+      title: `Wipe BOTH hand-placed and procedural set-dressing on L${levelId} (path + base tower preserved). Undoable.`,
+      onClick: () => useEditor.getState().clear(),
     },
     {
       label: "Clear all levels",

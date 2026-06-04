@@ -173,17 +173,6 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     }
     bumpGeometry();
   },
-  clear: () => {
-    const w = useGame.getState().world;
-    w.props = [];
-    w.rivers = [];
-    w.autoBridges = [];
-    w.authoredEasterEggs = [];
-    w.overrideActive = true;
-    w.erasedProcedural = new Set();
-    // No bump here — onClear -> reloadLevel does it after the rebuild.
-    saveCurrentLevelEdit();
-  },
   clearManual: () => {
     const w = useGame.getState().world;
     w.props = [];

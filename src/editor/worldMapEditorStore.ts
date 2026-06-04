@@ -2,8 +2,8 @@ import { PAN_LIMIT_X, PAN_LIMIT_Z } from "../render/worldMapBounds";
 import type { AutoBridge, PlacedProp, River } from "../sim/types";
 import { distSq } from "../sim/vec2";
 import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./editorCore";
-import { clearWorldMapHistory, loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
-import { clearWorldMapEdit, loadWorldMapEdit, saveWorldMapEdit } from "./worldMapEdits";
+import { loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
+import { loadWorldMapEdit, saveWorldMapEdit } from "./worldMapEdits";
 
 // Inset from the pan-limit edge so a candidate placed at the very corner
 // can't sit half-off the editable area. Matches the spirit of the level
@@ -44,14 +44,6 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
       bridges = next.bridges;
       override = next.override;
       saveWorldMapEdit({ v: 1, override, props, rivers, bridges });
-    },
-    clear: () => {
-      clearWorldMapEdit();
-      clearWorldMapHistory();
-      props = [];
-      rivers = [];
-      bridges = [];
-      override = false;
     },
     // History persists alongside props/rivers so reloads keep the undo/redo
     // stacks. World-map history is a single global blob (no level scope).
