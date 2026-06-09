@@ -133,14 +133,14 @@ Common subcommands:
 
 ### iOS distribution — App Store Connect via CI
 
-Bundle ID is `com.extinctionprotocol.app` (matches the Tauri identifier — keep them in sync).
+Bundle ID is `com.mesozoicprotocol.app` (matches the Tauri identifier — keep them in sync).
 
 Automated in [.github/workflows/build-ios.yml](.github/workflows/build-ios.yml). Flow: build web bundle → `npx cap sync ios` → import distribution cert into a temp keychain → install provisioning profile → render `ExportOptions.plist` from [scripts/ios-ExportOptions.plist.template](scripts/ios-ExportOptions.plist.template) → `xcodebuild archive` → `xcodebuild -exportArchive` → upload .ipa to TestFlight via the App Store Connect API.
 
 **One-time Apple setup:**
 
 1. **Apple Developer Portal → Certificates** → create `Apple Distribution` certificate, download, import to Keychain, then export as `.p12` with a password (right-click the cert in Keychain Access → Export).
-2. **Identifiers** → register `com.extinctionprotocol.app` (Capabilities: Push if needed; default otherwise).
+2. **Identifiers** → register `com.mesozoicprotocol.app` (Capabilities: Push if needed; default otherwise).
 3. **Profiles** → create an `App Store` distribution profile bound to that ID + the distribution cert. Note the profile's `Name` field — must match `APPLE_PROVISIONING_PROFILE_NAME` exactly.
 4. **App Store Connect → Users and Access → Keys** → generate API key, role `App Manager`. Download the `AuthKey_<ID>.p8` (one-time only). Note Key ID + Issuer ID.
 5. **App Store Connect → My Apps** → create the app record (SKU, primary language, bundle ID) so TestFlight has a target.
@@ -173,7 +173,7 @@ Automated in [.github/workflows/build-android.yml](.github/workflows/build-andro
    ```bash
    base64 -i mesozoic-protocol.keystore | pbcopy   # → ANDROID_KEYSTORE_BASE64
    ```
-3. **Play Console** → create app, link package `com.extinctionprotocol.app`, configure the internal testing track.
+3. **Play Console** → create app, link package `com.mesozoicprotocol.app`, configure the internal testing track.
 4. **Play Console → Setup → API access** → link a Google Cloud project → create a service account → grant it `Release manager` (or narrower: `Release apps to testing tracks`). Download the service account JSON.
 5. **First release must be uploaded manually through the Play Console UI** so Google can validate the app and distribution terms can be accepted. Subsequent versions can flow through this workflow.
 

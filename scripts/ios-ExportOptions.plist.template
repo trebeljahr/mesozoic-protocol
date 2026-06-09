@@ -12,7 +12,7 @@
     <string>Apple Distribution</string>
     <key>provisioningProfiles</key>
     <dict>
-        <key>com.extinctionprotocol.app</key>
+        <key>com.mesozoicprotocol.app</key>
         <string>__APPLE_PROVISIONING_PROFILE_NAME__</string>
     </dict>
     <key>uploadSymbols</key>

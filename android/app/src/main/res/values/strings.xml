@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Extinction Protocol</string>
-    <string name="title_activity_main">Extinction Protocol</string>
-    <string name="package_name">com.extinctionprotocol.app</string>
-    <string name="custom_url_scheme">com.extinctionprotocol.app</string>
+    <string name="app_name">Mesozoic Protocol</string>
+    <string name="title_activity_main">Mesozoic Protocol</string>
+    <string name="package_name">com.mesozoicprotocol.app</string>
+    <string name="custom_url_scheme">com.mesozoicprotocol.app</string>
 </resources>

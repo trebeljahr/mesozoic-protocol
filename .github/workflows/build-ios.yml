@@ -14,7 +14,7 @@
 # Setup steps (one-time):
 #   1. Apple Developer Portal → Certificates → create "Apple Distribution" cert,
 #      download, import to Keychain, export as .p12 with a password.
-#   2. Identifiers → register `com.extinctionprotocol.app` if not already.
+#   2. Identifiers → register `com.mesozoicprotocol.app` if not already.
 #   3. Profiles → create App Store distribution profile for that ID + dist cert.
 #   4. App Store Connect → Users and Access → Keys → generate API key with
 #      "App Manager" role. Download the .p8 (one-time only) and note Key ID + Issuer ID.

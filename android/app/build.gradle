@@ -8,10 +8,10 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.extinctionprotocol.app"
+    namespace = "com.mesozoicprotocol.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.extinctionprotocol.app"
+        applicationId "com.mesozoicprotocol.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1") as Integer

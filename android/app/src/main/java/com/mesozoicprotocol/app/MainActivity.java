@@ -1,4 +1,4 @@
-package com.extinctionprotocol.app;
+package com.mesozoicprotocol.app;
 
 import com.getcapacitor.BridgeActivity;
 
