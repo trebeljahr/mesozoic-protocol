@@ -1,5 +1,9 @@
 # Distribution
 
+> **Automating this for a new repo?** [Hatchkit](https://hatchkit.trebeljahr.com) ships this exact pipeline as a one-shot command. Run `hatchkit signing org-init` once per machine (Apple .p12 / .p8, Play SA JSON, Azure SP) and then `hatchkit signing apply` from any project to wire build-{windows,ios,android}.yml + bundle ID rewrites + ASC Bundle ID / App record / Provisioning Profile creation + Android upload keystore + ~20 GitHub repo secrets. The vendor-side manual residue below is exactly what Hatchkit leaves you to do — the rest is automated.
+
+The rest of this doc remains the canonical manual fallback for anyone not using Hatchkit. Hatchkit copies these workflow files byte-for-byte (only the bundle ID, app name, pnpm version, and node version are templated).
+
 How to ship Mesozoic Protocol to desktop (Tauri / Steam) and mobile (Capacitor / iOS / Android).
 
 The web build is a static Vite bundle in `dist/`. Both shells just wrap that bundle:
