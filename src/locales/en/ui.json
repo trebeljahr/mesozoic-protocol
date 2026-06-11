@@ -409,7 +409,7 @@
     "endless": "ENDLESS",
     "mode": "Mode",
     "heroicMode": "Breach challenge mode",
-    "ironMode": "Lockdown challenge mode",
+    "ironMode": "Containment challenge mode",
     "build": "Build",
     "openBuildMenu": "Open build menu",
     "closeBuildMenu": "Close build menu",
@@ -498,7 +498,7 @@
     "spotHint": "Click inside the pulsing range ring to set the aim point. Press Spot again to re-aim.",
     "sell": "Sell · {{refund}}g",
     "confirmSell": "Confirm Sell · {{refund}}g",
-    "sellDisabled": "Lockdown · selling disabled",
+    "sellDisabled": "Containment · selling disabled",
     "upgrade": "Upgrade · {{cost}}g",
     "maxedOut": "Maxed Out",
     "stat": {

@@ -409,7 +409,7 @@
     "endless": "ENDLOS",
     "mode": "Modus",
     "heroicMode": "Ausbruch-Herausforderungsmodus",
-    "ironMode": "Sperrzone-Herausforderungsmodus",
+    "ironMode": "Eindämmungs-Herausforderungsmodus",
     "build": "Bauen",
     "openBuildMenu": "Baumenü öffnen",
     "closeBuildMenu": "Baumenü schließen",
@@ -498,7 +498,7 @@
     "spotHint": "In den pulsierenden Reichweitenring klicken, um den Zielpunkt zu setzen. Erneut Punkt drücken zum Neu-Zielen.",
     "sell": "Verkaufen · {{refund}}g",
     "confirmSell": "Verkauf bestätigen · {{refund}}g",
-    "sellDisabled": "Sperrzone · Verkauf deaktiviert",
+    "sellDisabled": "Eindämmung · Verkauf deaktiviert",
     "upgrade": "Verbessern · {{cost}}g",
     "maxedOut": "Maximal",
     "stat": {

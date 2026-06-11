@@ -136,13 +136,13 @@
   },
   "heroic_effort": {
     "name": "Heroic Effort",
-    "desc": "Clear any mission on Heroic mode.",
-    "hint": "Win a handcrafted Heroic run."
+    "desc": "Clear any mission on Breach mode.",
+    "hint": "Win a handcrafted Breach run."
   },
   "iron_will": {
     "name": "Iron Will",
-    "desc": "Clear any mission on Iron mode.",
-    "hint": "Win a one-life Iron run."
+    "desc": "Clear any mission on Containment mode.",
+    "hint": "Win a one-life Containment run."
   },
   "mass_production": {
     "name": "Mass Production",

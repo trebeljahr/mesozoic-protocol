@@ -141,8 +141,8 @@
   },
   "iron_will": {
     "name": "Eiserner Wille",
-    "desc": "Schließe eine Mission im Sperrzone-Modus ab.",
-    "hint": "Gewinne einen Ein-Leben-Lauf in der Sperrzone."
+    "desc": "Schließe eine Mission im Eindämmungs-Modus ab.",
+    "hint": "Gewinne einen Ein-Leben-Lauf in der Eindämmung."
   },
   "mass_production": {
     "name": "Massenproduktion",
