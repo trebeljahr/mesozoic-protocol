@@ -80,9 +80,47 @@ signtool sign /v /debug /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SH
 signtool verify /pa /v "path\to\some.exe"
 ```
 
-### Code signing — macOS (manual for now)
+### Code signing — macOS via Developer ID + notarization
 
-macOS Tauri signing is not yet automated. For Steam-only distribution it's optional. For a notarized .dmg outside Steam: Apple Developer ID Application cert, `APPLE_ID` + `APPLE_PASSWORD` (app-specific) + `APPLE_TEAM_ID` env vars, then `pnpm tauri build` notarizes automatically. See <https://tauri.app/distribute/sign/macos/>.
+Automated in [.github/workflows/build-macos.yml](.github/workflows/build-macos.yml). Reuses the iOS Apple Developer team enrollment and the App Store Connect API key — only one new cert per team (Developer ID Application).
+
+**Outside Mac App Store distribution** (Steam, itch.io, direct download). For Mac App Store you'd need a separate cert + sandbox entitlements + App Review — out of scope here.
+
+**One-time Apple setup** (additive to iOS work):
+
+1. <https://developer.apple.com/account/resources/certificates/list> → **+** → **Developer ID Application** → reuse the same CSR you used for the iOS Distribution cert, or generate a new one.
+2. Download `developerID_application.cer` → double-click to import into Keychain.
+3. **Keychain Access → login → My Certificates** → find `Developer ID Application: Ricos Labs LLC (<TEAM_ID>)` → right-click → Export as `DeveloperID.p12` with password.
+4. Base64-encode for the secret:
+   ```bash
+   base64 -i DeveloperID.p12 | pbcopy
+   ```
+5. Get the exact identity string for the third secret:
+   ```bash
+   security find-identity -v -p codesigning login.keychain | grep "Developer ID Application"
+   ```
+   Format: `Developer ID Application: Ricos Labs LLC (4BHY8H2J25)`.
+
+**New GitHub secrets** (3): `APPLE_DEVELOPER_ID_CERT_BASE64`, `APPLE_DEVELOPER_ID_CERT_PASSWORD`, `APPLE_DEVELOPER_ID_IDENTITY`.
+
+**Reuses existing secrets**: `APPLE_TEAM_ID`, `APPLE_KEYCHAIN_PASSWORD`, `APPSTORE_API_KEY_ID`, `APPSTORE_API_ISSUER_ID`, `APPSTORE_API_KEY_P8_BASE64`. Notarization uses the same ASC API key as TestFlight uploads — no second key needed.
+
+**Tauri config**: `bundle.macOS.entitlements` in [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) points at [src-tauri/entitlements.plist](src-tauri/entitlements.plist) — hardened runtime entitlements required for notarization. The current set allows JIT (WebKit needs it), unsigned executable memory, library validation bypass (for dynamically loaded Wry frameworks), and outbound network (Plausible). Tighten over time if you remove features.
+
+**Universal binary**: workflow builds `universal-apple-darwin` so the same DMG runs on Apple Silicon and Intel Macs. ~2× build time but one artifact covers everything.
+
+**Output**: `src-tauri/target/universal-apple-darwin/release/bundle/dmg/Mesozoic Protocol_<version>_universal.dmg`. Signed, notarized, stapled — Gatekeeper accepts on first launch with no warning.
+
+**Local signing** (same machine that has the cert imported and ASC API key on disk at `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`):
+```bash
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Ricos Labs LLC (4BHY8H2J25)"
+export APPLE_API_ISSUER=<issuer-uuid>
+export APPLE_API_KEY=<key-id>
+export APPLE_API_KEY_PATH=~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8
+pnpm tauri build --target universal-apple-darwin
+```
+
+**Distribution channels that accept this DMG**: Steam (signs are nice-to-have), **itch.io** (no extra signing required; notarization means users get no Gatekeeper warning), Humble, GOG, or your own download host. The DMG is universally distributable — no per-channel signing variant.
 
 ### Steam upload
 
@@ -210,6 +248,7 @@ git push origin v0.2.0
 That triggers:
 
 - [.github/workflows/build-windows.yml](.github/workflows/build-windows.yml) — signs MSI + setup.exe with Azure Trusted Signing, artifacts uploaded.
+- [.github/workflows/build-macos.yml](.github/workflows/build-macos.yml) — universal-binary `.app`/`.dmg`, signed with Developer ID, notarized, stapled.
 - [.github/workflows/build-ios.yml](.github/workflows/build-ios.yml) — archives and uploads to TestFlight (App Store Connect API).
 - [.github/workflows/build-android.yml](.github/workflows/build-android.yml) — signs AAB and uploads to Play Console internal track.
 
@@ -218,6 +257,28 @@ Each workflow is also `workflow_dispatch`-able from the Actions tab without tagg
 Manual residue:
 
 - Steam upload still goes through `steamcmd` (see above).
-- macOS Tauri build is not yet automated.
+- itch.io upload via `butler` is not yet automated — see "itch.io distribution" below to add it.
 - Promoting from TestFlight to public App Store release is manual (Apple's review).
 - Promoting from Play internal track to production is manual (or change the workflow `track` input).
+
+## itch.io distribution
+
+itch.io takes any binary — no per-store signing variant required. The Developer ID–signed + notarized DMG produced by `build-macos.yml` works as-is, and the Azure-signed `.msi`/`-setup.exe` from `build-windows.yml` work as-is. Users installing through the itch.io desktop app additionally get automatic updates.
+
+To automate uploads, add a `butler` step to each platform workflow:
+
+1. Get your itch.io API key from <https://itch.io/user/settings/api-keys> → store as GH secret `BUTLER_API_KEY`.
+2. Create the project at `<your-user>/mesozoic-protocol` on itch.io (one-time UI step).
+3. Append to each platform workflow:
+   ```yaml
+   - uses: KikimoraGames/itch-publish@v0.0.3
+     with:
+       butlerApiKey: ${{ secrets.BUTLER_API_KEY }}
+       gameData: <path-to-artifact>
+       itchUsername: <your-user>
+       itchGameId: mesozoic-protocol
+       buildChannel: osx          # or windows / linux / android
+       buildNumber: ${{ github.ref_name }}
+   ```
+
+Each `buildChannel` is a separate slot in itch.io's "Uploads" tab. Versioning uses the git tag.

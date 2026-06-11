@@ -72,7 +72,8 @@
     "homepage": "https://github.com/RicoTrebeljahr/mesozoic-protocol",
     "macOS": {
       "minimumSystemVersion": "10.15",
-      "exceptionDomain": ""
+      "exceptionDomain": "",
+      "entitlements": "entitlements.plist"
     },
     "windows": {
       "signCommand": "signtool sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib \"%AZURE_CODE_SIGNING_DLIB%\" /dmdf \"%AZURE_CODE_SIGNING_METADATA%\" \"%1\"",

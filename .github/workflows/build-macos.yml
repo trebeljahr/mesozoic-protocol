@@ -1,0 +1,131 @@
+# Tauri macOS build, signed with Developer ID Application + notarized.
+#
+# Required repo secrets:
+#   APPLE_TEAM_ID                       — 10-char team identifier (reused from iOS)
+#   APPLE_DEVELOPER_ID_CERT_BASE64      — base64 of `Developer ID Application` .p12 (NOT the iOS Apple Distribution cert)
+#   APPLE_DEVELOPER_ID_CERT_PASSWORD    — password for that .p12
+#   APPLE_DEVELOPER_ID_IDENTITY         — exact identity string, e.g. "Developer ID Application: Ricos Labs LLC (4BHY8H2J25)"
+#   APPLE_KEYCHAIN_PASSWORD             — reused from iOS; locks the temp keychain
+#   APPSTORE_API_KEY_ID                 — reused from iOS; notarization uses the same ASC API key
+#   APPSTORE_API_ISSUER_ID              — reused from iOS
+#   APPSTORE_API_KEY_P8_BASE64          — reused from iOS
+#
+# One-time Apple setup (in addition to what iOS already needed):
+#   1. developer.apple.com → Certificates → + → "Developer ID Application" → upload CSR.
+#      Note: this is a DIFFERENT cert from "Apple Distribution". You need both.
+#   2. Download, import to Keychain, export as .p12 with a password.
+#   3. Base64 the .p12 → APPLE_DEVELOPER_ID_CERT_BASE64.
+#   4. Identity string is printed by:
+#        security find-identity -v -p codesigning login.keychain
+#      Pick the line that starts with "Developer ID Application:".
+
+name: Build macOS
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_IDENTITY }}
+      APPLE_API_ISSUER: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+      APPLE_API_KEY: ${{ secrets.APPSTORE_API_KEY_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo target
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target
+          key: cargo-macos-${{ hashFiles('src-tauri/Cargo.lock') }}
+
+      - name: Import Developer ID certificate
+        env:
+          CERT_B64: ${{ secrets.APPLE_DEVELOPER_ID_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/macos-build.keychain"
+          echo -n "$CERT_B64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+      - name: Write ASC API key to disk for notarization
+        env:
+          API_KEY_B64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+        run: |
+          set -euo pipefail
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          echo -n "$API_KEY_B64" | base64 --decode > "$KEY_DIR/AuthKey_${API_KEY_ID}.p8"
+          echo "APPLE_API_KEY_PATH=$KEY_DIR/AuthKey_${API_KEY_ID}.p8" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build + sign + notarize (Tauri, universal binary)
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEVELOPER_ID_CERT_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASSWORD }}
+        run: pnpm tauri build --target universal-apple-darwin
+
+      - name: Verify signature + notarization
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find src-tauri/target/universal-apple-darwin/release/bundle/macos -maxdepth 2 -name "*.app" | head -1)
+          DMG_PATH=$(find src-tauri/target/universal-apple-darwin/release/bundle/dmg -maxdepth 1 -name "*.dmg" | head -1)
+          echo "App: $APP_PATH"
+          echo "DMG: $DMG_PATH"
+          codesign -dv --verbose=4 "$APP_PATH" 2>&1 | head -20
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl -a -vv -t install "$APP_PATH" || echo "::warning::spctl check failed — notarization stapling may be incomplete"
+          xcrun stapler validate "$APP_PATH" || echo "::warning::stapler validate failed on .app"
+          xcrun stapler validate "$DMG_PATH" || echo "::warning::stapler validate failed on .dmg"
+
+      - name: Clean up keychain + API key
+        if: always()
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+        run: |
+          security delete-keychain "$RUNNER_TEMP/macos-build.keychain" || true
+          rm -rf "$HOME/.appstoreconnect" || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-bundles
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
