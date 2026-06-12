@@ -131,20 +131,15 @@ export const DIFFICULTY_ACCENT: Record<Difficulty, DifficultyAccent> = {
 
 export const DEFAULT_DIFFICULTY: Difficulty = "medium";
 
-// v2 added mode-stars (breach + containment, originally named heroic +
-// iron). v1 saves auto-migrate: the old per-level number becomes
-// ModeStars.normal with breach + containment zeroed. v3 renamed the
-// in-memory hero fields to robot (activeHero → activeRobot etc.).
-// normalizeProgress accepts the legacy keys as fallback so v2 saves load
-// without wiping unlocked robots / XP / skill trees. v4 renamed the
-// challenge modes from heroic/iron to breach/containment; normalizeModeStars
-// copies the legacy keys into the new slots, and unlocked-achievement IDs
-// `heroic_effort` / `iron_will` are rewritten to `breach_holdout` /
-// `containment_holdout` so prior earners keep their badges.
-export const PROGRESS_VERSION = 4 as const;
+// v2 added mode-stars (breach + containment). v1 saves auto-migrate: the
+// old per-level number becomes ModeStars.normal with breach + containment
+// zeroed. v3 renamed the in-memory hero fields to robot (activeHero →
+// activeRobot etc.). normalizeProgress accepts the legacy keys as fallback
+// so v2 saves load without wiping unlocked robots / XP / skill trees.
+export const PROGRESS_VERSION = 3 as const;
 
 export type ProgressData = {
-  version: 4;
+  version: 3;
   starsByLevel: Record<number, ModeStars>;
   encountered: Partial<Record<EnemyKind, boolean>>;
   // Per-variant matriarch encounter set. The Compendium's matriarch
@@ -247,26 +242,22 @@ const isDifficulty = (v: unknown): v is Difficulty =>
 const isProgressLike = (parsed: unknown): parsed is Partial<ProgressData> => {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = (parsed as { version?: unknown }).version;
-  if (v !== 1 && v !== 2 && v !== 3 && v !== 4) return false;
+  if (v !== 1 && v !== 2 && v !== 3) return false;
   return typeof (parsed as { starsByLevel?: unknown }).starsByLevel === "object";
 };
 
 // Normalize a per-level entry from any historical shape into ModeStars.
 // v1 saves stored a bare 0|1|2|3 number per level; v2 stores ModeStars.
-// v4 renamed the challenge-mode keys from heroic/iron to breach/containment;
-// fall back to the legacy keys so prior earners keep their bonus stars.
 const normalizeModeStars = (raw: unknown): ModeStars => {
   if (typeof raw === "number") {
     const n = (Math.max(0, Math.min(3, Math.floor(raw))) | 0) as Stars;
     return { normal: n, breach: 0, containment: 0 };
   }
   if (raw && typeof raw === "object") {
-    const o = raw as Partial<ModeStars> & { heroic?: 0 | 1; iron?: 0 | 1 };
+    const o = raw as Partial<ModeStars>;
     const normal = (Math.max(0, Math.min(3, Math.floor(Number(o.normal ?? 0)))) | 0) as Stars;
-    const breachRaw = o.breach ?? o.heroic;
-    const containmentRaw = o.containment ?? o.iron;
-    const breach = (breachRaw === 1 ? 1 : 0) as 0 | 1;
-    const containment = (containmentRaw === 1 ? 1 : 0) as 0 | 1;
+    const breach = (o.breach === 1 ? 1 : 0) as 0 | 1;
+    const containment = (o.containment === 1 ? 1 : 0) as 0 | 1;
     return { normal, breach, containment };
   }
   return emptyModeStars();
@@ -317,29 +308,6 @@ const pickRecord = <K extends string, V>(
   return src ?? {};
 };
 
-// v3 → v4 migration for unlocked achievements: the challenge-mode
-// achievement IDs were renamed when Heroic / Iron became Breach /
-// Containment. Rewrite the legacy IDs so prior earners keep their badges;
-// if both old and new are present (impossible in practice but defensive)
-// the newer entry wins.
-const LEGACY_ACH_ID_MAP: Record<string, string> = {
-  heroic_effort: "breach_holdout",
-  iron_will: "containment_holdout",
-};
-
-const migrateUnlocked = (raw: unknown): Record<string, number> => {
-  if (!raw || typeof raw !== "object") return {};
-  const src = raw as Record<string, unknown>;
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(src)) {
-    if (typeof v !== "number") continue;
-    const target = LEGACY_ACH_ID_MAP[k] ?? k;
-    // Prefer the explicit new-id timestamp if both forms coexist.
-    if (out[target] === undefined) out[target] = v;
-  }
-  return out;
-};
-
 const normalizeProgress = (raw: Partial<ProgressData>): ProgressData => {
   const stats = raw.stats as Partial<ProgressStats> | undefined;
   const encountered = (raw.encountered as Partial<Record<EnemyKind, boolean>>) ?? {};
@@ -361,7 +329,10 @@ const normalizeProgress = (raw: Partial<ProgressData>): ProgressData => {
       killsTotal: typeof stats?.killsTotal === "number" ? stats.killsTotal : 0,
       winsTotal: typeof stats?.winsTotal === "number" ? stats.winsTotal : 0,
     },
-    unlocked: migrateUnlocked(raw.unlocked),
+    unlocked:
+      raw.unlocked && typeof raw.unlocked === "object"
+        ? (raw.unlocked as Record<string, number>)
+        : {},
     difficulty: isDifficulty(raw.difficulty) ? raw.difficulty : DEFAULT_DIFFICULTY,
     seenIntros:
       raw.seenIntros && typeof raw.seenIntros === "object"
