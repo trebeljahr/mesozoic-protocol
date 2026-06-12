@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mesozoic Protocol — Roguelite Tower Defense with a Piloted Hero Mech</title>
+<meta name="description" content="Pilot a hero mech alongside six tower types and hold thirty outposts against waves of dinosaurs and matriarch queens. Free in your browser — no ads, no microtransactions." />
+<meta name="robots" content="index,follow" />
+<link rel="canonical" href="https://protocol.trebeljahr.com/about" />
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/32x32.png" />
+<meta name="theme-color" content="#0b1016" />
+<meta property="og:site_name" content="Mesozoic Protocol" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Mesozoic Protocol — Roguelite Tower Defense with a Piloted Hero Mech" />
+<meta property="og:description" content="Pilot a hero mech alongside six tower types and hold thirty outposts against waves of dinosaurs and matriarch queens. Free in your browser." />
+<meta property="og:url" content="https://protocol.trebeljahr.com/about" />
+<meta property="og:image" content="https://protocol.trebeljahr.com/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Mesozoic Protocol — Roguelite Tower Defense with a Piloted Hero Mech" />
+<meta name="twitter:description" content="Pilot a hero mech alongside six tower types and hold thirty outposts against waves of dinosaurs and matriarch queens. Free in your browser." />
+<meta name="twitter:image" content="https://protocol.trebeljahr.com/og-image.png" />
+<style>
+  :root {
+    --bg: #0b1016;
+    --bg-raise: #0c1420;
+    --bg-deep: #060a10;
+    --ink: #c5cfda;
+    --ink-bright: #ffffff;
+    --cyan: #5ad6ff;
+    --cyan-soft: #9fd8ff;
+    --amber: #ffd66a;
+    --amber-deep: #ff8a3c;
+    --line: rgba(154, 196, 230, 0.14);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 500px at 50% -10%, rgba(90, 214, 255, 0.08), transparent 70%),
+      var(--bg);
+  }
+  a { color: var(--cyan-soft); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 1.25rem; }
+
+  header.hero { padding: 5rem 0 3.5rem; text-align: center; }
+  .kicker {
+    font-size: 0.78rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    line-height: 1.05;
+    letter-spacing: 0.06em;
+    margin: 0 0 1rem;
+    color: var(--ink-bright);
+    text-transform: uppercase;
+  }
+  .tagline {
+    font-size: clamp(1.05rem, 2.5vw, 1.3rem);
+    color: var(--cyan-soft);
+    max-width: 620px;
+    margin: 0 auto 2.25rem;
+  }
+  .cta-row { display: flex; gap: 0.85rem; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: 0.8rem 1.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    letter-spacing: 0.04em;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--amber), var(--amber-deep));
+    color: #1a1206;
+  }
+  .btn-secondary {
+    border: 1px solid var(--line);
+    color: var(--cyan-soft);
+    background: rgba(90, 214, 255, 0.06);
+  }
+  .sub-cta { margin-top: 1rem; font-size: 0.88rem; color: #8295a8; }
+
+  section { padding: 3rem 0; border-top: 1px solid var(--line); }
+  h2 {
+    font-size: 1.5rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-bright);
+    margin: 0 0 1.5rem;
+  }
+  h2::before { content: "// "; color: var(--cyan); }
+  .lede { max-width: 720px; font-size: 1.05rem; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--bg-raise);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.25rem 1.4rem;
+  }
+  .card h3 { margin: 0 0 0.5rem; font-size: 1.02rem; color: var(--amber); letter-spacing: 0.03em; }
+  .card p { margin: 0; font-size: 0.93rem; color: var(--ink); }
+
+  .pilot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; }
+  .pilot {
+    background: var(--bg-deep);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.2rem 1.3rem;
+  }
+  .pilot h3 { margin: 0; font-size: 1.15rem; color: var(--ink-bright); letter-spacing: 0.05em; text-transform: uppercase; }
+  .pilot .role { color: var(--cyan-soft); font-size: 0.85rem; margin: 0.15rem 0 0.7rem; }
+  .pilot .ult { font-size: 0.88rem; margin: 0; }
+  .pilot .ult strong { color: var(--amber); font-weight: 600; }
+  .pilot .bolts { font-size: 0.78rem; color: #8295a8; margin: 0.7rem 0 0; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .free-list { list-style: none; padding: 0; margin: 1rem 0 0; max-width: 720px; }
+  .free-list li { padding-left: 1.4rem; position: relative; margin-bottom: 0.5rem; }
+  .free-list li::before { content: "▸"; position: absolute; left: 0; color: var(--cyan); }
+
+  footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3.5rem; font-size: 0.88rem; color: #8295a8; }
+  footer .links { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  footer a { color: var(--cyan-soft); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Containment has failed</p>
+    <h1>Mesozoic Protocol</h1>
+    <p class="tagline">A single-player roguelite tower defense where you pilot a hero mech alongside your turrets and hold thirty outposts against waves of dinosaurs and matriarch queens.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/">Play free in your browser</a>
+      <a class="btn btn-secondary" href="/press">Press kit</a>
+    </div>
+    <p class="sub-cta">No download, no account, no ads, no microtransactions. Desktop and mobile builds are in preparation.</p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>The Premise</h2>
+    <p class="lede">A revival-biotech outpost lost containment. The specimens integrated the revival hardware into themselves — bone laced with scaffolding alloy, packs coordinating on frequencies that were never theirs — and they are no longer ours. The cloning rigs are still running inside the perimeter, because they were never designed to fail safe. From a fixed top-down camera, you pilot a hero mech alongside chains of sci-fi turrets and hold the line. Every run ends in extinction — yours or theirs.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What's in the Game</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>A hero you actually drive</h3>
+        <p>Four pilotable mechs with full QWER kits — dash, burst, self-buff, and a pilot-specific ultimate — fighting in real time on the same map as your towers.</p>
+      </div>
+      <div class="card">
+        <h3>Six tower types</h3>
+        <p>Pulse, Chain, Cryo, Mortar, Pyre, and Hive — a drone bay whose drones orbit assigned towers to boost their fire rate. Two upgrade paths each, three tiers per path.</p>
+      </div>
+      <div class="card">
+        <h3>Six matriarch queens</h3>
+        <p>Biome-themed bosses, each with her own model, resistance profile, and child-spawn stream. The raptor queen sheds juvenile swarms as she runs; the apex apatosaur ends the campaign.</p>
+      </div>
+      <div class="card">
+        <h3>Thirty outposts, six biomes</h3>
+        <p>Hand-designed levels across forest, snow, desert, wasteland, lava, and alien biomes. Eight enemy kinds with distinct speeds, HP, and resistances, layered with shield, heal, regen, elite, and fierce buff chips.</p>
+      </div>
+      <div class="card">
+        <h3>Heroic + Containment modifiers</h3>
+        <p>Each level grades up to three stars on Normal, plus a bonus star for Heroic (forbidden tower or rewritten waves) and one for Containment (one life, locked loadout, no selling). Five stars per level.</p>
+      </div>
+      <div class="card">
+        <h3>Persistent progression</h3>
+        <p>A meta-skill tree per tower kind and a skill tree per hero. Stars unlock permanent modifiers. Endless mode opens after the final outpost.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The Pilots</h2>
+    <div class="pilot-grid">
+      <div class="pilot">
+        <h3>George</h3>
+        <p class="role">Kinetic sniper — balanced</p>
+        <p class="ult"><strong>Bullet Storm</strong> — cranks fire rate to a frenzy.</p>
+        <p class="bolts">Unlocked from the start</p>
+      </div>
+      <div class="pilot">
+        <h3>Leela</h3>
+        <p class="role">Electric skirmisher — fast</p>
+        <p class="ult"><strong>Storm Surge</strong> — a self-centered chain-lightning storm.</p>
+        <p class="bolts">250 bolts</p>
+      </div>
+      <div class="pilot">
+        <h3>Mike</h3>
+        <p class="role">Flame — close range</p>
+        <p class="ult"><strong>Inferno Ring</strong> — expanding waves of fire.</p>
+        <p class="bolts">600 bolts</p>
+      </div>
+      <div class="pilot">
+        <h3>Stan</h3>
+        <p class="role">Heavy artillery</p>
+        <p class="ult"><strong>Annihilator Missile</strong> — one huge warhead.</p>
+        <p class="bolts">1,200 bolts</p>
+      </div>
+    </div>
+    <p style="margin-top:1rem; font-size:0.88rem; color:#8295a8;">Bolts are the in-game scrap currency, dropped per enemy kill.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Free and Open</h2>
+    <p class="lede">The full campaign is free to play in any modern browser, right here. There is no catch:</p>
+    <ul class="free-list">
+      <li>No ads, no microtransactions, no accounts, no paywalls.</li>
+      <li>Saves, settings, and unlocks live in your browser's local storage — nothing leaves your device.</li>
+      <li>Available in English, German, Brazilian Portuguese, and Simplified Chinese.</li>
+      <li>Desktop builds for Windows, macOS, and Linux, plus iOS and Android versions, are in preparation.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="/">Play</a>
+      <a href="/press">Press kit</a>
+      <a href="/privacy">Privacy</a>
+      <a href="mailto:mesozoic-protocol@ricoslabs.com">Contact</a>
+    </div>
+    <p>Built solo in Berlin by Rico Trebeljahr — Ricos Labs LLC. Made with TypeScript, React Three Fiber, and Tauri.</p>
+  </div>
+</footer>
+
+</body>
+</html>
