@@ -1,9 +1,13 @@
 // Privacy-friendly Plausible wrapper.
 //
 // The Plausible script is injected by the `<!--PLAUSIBLE-->` transform
-// in vite.config.ts, but only attaches on the configured production host.
-// track() mirrors that host check so local previews and native shells stay
-// silent.
+// in vite.config.ts, but only attaches on an allow-listed production
+// host. track() mirrors that host check so local previews and native
+// shells stay silent.
+//
+// Events from every allowed host report under the single canonical
+// data-domain (VITE_PLAUSIBLE_DOMAIN), so the legacy host and the play
+// subdomain share one Plausible site.
 
 type PlausibleProps = Record<string, string | number | boolean>;
 
@@ -13,10 +17,12 @@ declare global {
   }
 }
 
-const plausibleDomain = import.meta.env.VITE_PLAUSIBLE_DOMAIN ?? "protocol.trebeljahr.com";
+const allowedHosts = (
+  import.meta.env.VITE_PLAUSIBLE_HOSTS ?? "play.mesozoicprotocol.com,protocol.trebeljahr.com"
+).split(",");
 
 export const track = (event: string, props?: PlausibleProps): void => {
   if (typeof window === "undefined") return;
-  if (window.location.hostname !== plausibleDomain) return;
+  if (!allowedHosts.includes(window.location.hostname)) return;
   window.plausible?.(event, props ? { props } : undefined);
 };

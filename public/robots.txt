@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://protocol.trebeljahr.com/sitemap.xml
+Sitemap: https://mesozoicprotocol.com/sitemap.xml

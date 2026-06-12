@@ -4,10 +4,22 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Host split: the apex domain is the marketing site (landing, press,
+// privacy), the game lives on the play subdomain. The sitemap is served
+// from the same dist on every host, but robots.txt points crawlers at
+// the apex copy. The legacy host (protocol.trebeljahr.com) still serves
+// the game and is intentionally absent here — its pages canonicalize to
+// the URLs below.
 const seo = {
-  siteUrl: "https://protocol.trebeljahr.com",
+  siteUrl: "https://mesozoicprotocol.com",
+  gameUrl: "https://play.mesozoicprotocol.com",
   outputDir: path.resolve(__dirname, "../public"),
-  routes: [{ path: "/", changefreq: "monthly", priority: "1.0" }],
+  routes: [
+    { path: "/", changefreq: "monthly", priority: "1.0" },
+    { path: "/press", changefreq: "monthly", priority: "0.6" },
+    { path: "/privacy", changefreq: "yearly", priority: "0.3" },
+  ],
+  gameRoutes: [{ path: "/", changefreq: "monthly", priority: "0.9" }],
   lastmod: (process.env.SITEMAP_LASTMOD || new Date().toISOString()).slice(0, 10),
 };
 
@@ -24,18 +36,16 @@ const joinUrl = (base, urlPath) => {
   return `${cleanBase}${cleanPath}`;
 };
 
-const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${seo.routes
-  .map(
-    (route) => `  <url>
-    <loc>${escapeXml(joinUrl(seo.siteUrl, route.path))}</loc>
+const urlEntry = (base) => (route) => `  <url>
+    <loc>${escapeXml(joinUrl(base, route.path))}</loc>
     <lastmod>${seo.lastmod}</lastmod>
     <changefreq>${route.changefreq}</changefreq>
     <priority>${route.priority}</priority>
-  </url>`,
-  )
-  .join("\n")}
+  </url>`;
+
+const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${[...seo.routes.map(urlEntry(seo.siteUrl)), ...seo.gameRoutes.map(urlEntry(seo.gameUrl))].join("\n")}
 </urlset>
 `;
 

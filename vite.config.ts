@@ -152,13 +152,19 @@ const tailnetPortBanner = (port: number): PluginOption => ({
 
 export default defineConfig(async ({ command, mode }) => {
   const env = loadEnv(mode, ".", "");
-  const plausibleDomain = env.VITE_PLAUSIBLE_DOMAIN ?? "protocol.trebeljahr.com";
+  const plausibleDomain = env.VITE_PLAUSIBLE_DOMAIN ?? "play.mesozoicprotocol.com";
+  // Hosts where the loader attaches. Events from every allowed host
+  // report under the single canonical data-domain above, so the legacy
+  // host and the play subdomain share one Plausible site. Keep in sync
+  // with src/analytics.ts.
+  const plausibleHosts = (
+    env.VITE_PLAUSIBLE_HOSTS ?? "play.mesozoicprotocol.com,protocol.trebeljahr.com"
+  ).split(",");
   const plausibleScriptUrl =
     env.VITE_PLAUSIBLE_SCRIPT_URL ??
     "https://plausible.trebeljahr.com/js/script.file-downloads.hash.outbound-links.pageview-props.revenue.tagged-events.js";
   // Host-gated: the marker injects a loader, but it only appends the
-  // Plausible script when the current hostname matches the configured
-  // production domain.
+  // Plausible script when the current hostname is allow-listed.
   // The inline shim queues track() calls fired before the deferred
   // script attaches, so callers don't need to wait for load.
   // Build SHA injected into index.html as a `<meta>` tag so prod
@@ -172,12 +178,12 @@ export default defineConfig(async ({ command, mode }) => {
   const plausibleTag = plausibleDomain
     ? `<script>
       (function () {
-        var domain = ${JSON.stringify(plausibleDomain)};
-        if (location.hostname !== domain) return;
+        var hosts = ${JSON.stringify(plausibleHosts)};
+        if (hosts.indexOf(location.hostname) === -1) return;
         window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)};
         var script=document.createElement("script");
         script.defer=true;
-        script.dataset.domain=domain;
+        script.dataset.domain=${JSON.stringify(plausibleDomain)};
         script.src=${JSON.stringify(plausibleScriptUrl)};
         document.head.appendChild(script);
       })();
