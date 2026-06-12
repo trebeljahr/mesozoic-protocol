@@ -13,6 +13,7 @@
     "": "/about.html",
     "/press": "/press.html",
     "/privacy": "/privacy.html",
+    "/imprint": "/imprint.html",
   };
 
   for (const a of document.querySelectorAll('a[href^="https://"]')) {
