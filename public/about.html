@@ -126,6 +126,42 @@
   .free-list li { padding-left: 1.4rem; position: relative; margin-bottom: 0.5rem; }
   .free-list li::before { content: "▸"; position: absolute; left: 0; color: var(--cyan); }
 
+  .hero-shot { margin: 3rem auto 0; max-width: 860px; }
+  .hero-shot img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 48px rgba(90, 214, 255, 0.07);
+  }
+  .hero-shot figcaption { font-size: 0.8rem; color: #8295a8; margin-top: 0.65rem; }
+
+  .wide-shot { margin: 2.25rem auto 0; max-width: 860px; }
+  .wide-shot img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+  .wide-shot figcaption { font-size: 0.8rem; color: #8295a8; margin-top: 0.65rem; text-align: center; }
+
+  .shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.1rem; }
+  .shots figure { margin: 0; }
+  .shots a { display: block; }
+  .shots img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    transition: transform 0.15s ease;
+  }
+  .shots a:hover img { transform: scale(1.02); }
+  .shots figcaption { font-size: 0.8rem; color: #8295a8; margin-top: 0.5rem; }
+  .shots-note { margin-top: 1.25rem; font-size: 0.85rem; color: #8295a8; }
+
   footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3.5rem; font-size: 0.88rem; color: #8295a8; }
   footer .links { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
   footer a { color: var(--cyan-soft); text-decoration: none; }
@@ -144,6 +180,10 @@
       <a class="btn btn-secondary" href="https://mesozoicprotocol.com/press">Press kit</a>
     </div>
     <p class="sub-cta">No download, no account, no ads, no microtransactions. Desktop and mobile builds are in preparation.</p>
+    <figure class="hero-shot">
+      <img src="/screenshots/mesozoic-protocol-screenshot-01-forest-defense.jpg" alt="Top-down view of the Jungle Outpost: a raptor pack advancing along the dirt path toward turrets guarding the base" width="1920" height="1080" fetchpriority="high" />
+      <figcaption>Jungle Outpost, wave one — a raptor pack tests the perimeter.</figcaption>
+    </figure>
   </div>
 </header>
 
@@ -183,6 +223,55 @@
         <p>A meta-skill tree per tower kind and a skill tree per hero. Stars unlock permanent modifiers. Endless mode opens after the final outpost.</p>
       </div>
     </div>
+    <figure class="wide-shot">
+      <img src="/screenshots/mesozoic-protocol-screenshot-02-world-map.jpg" alt="The campaign world map: thirty numbered outposts connected by a winding golden route across six biome bands" width="1920" height="1080" loading="lazy" />
+      <figcaption>The campaign map — thirty outposts, six biomes, one route through all of them.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <div class="shots">
+      <figure>
+        <a href="/screenshots/mesozoic-protocol-screenshot-03-lava-firefight.jpg">
+          <img src="/screenshots/mesozoic-protocol-screenshot-03-lava-firefight-thumb.jpg" alt="Lava biome outpost: turret clusters with shield domes holding paths cut between glowing lava flows" width="960" height="540" loading="lazy" />
+        </a>
+        <figcaption>Lava biome — turret lines between the flows.</figcaption>
+      </figure>
+      <figure>
+        <a href="/screenshots/mesozoic-protocol-screenshot-04-alien-biome.jpg">
+          <img src="/screenshots/mesozoic-protocol-screenshot-04-alien-biome-thumb.jpg" alt="Alien biome outpost: twin looping paths over purple terrain dotted with cyan pools and crystal growths" width="960" height="540" loading="lazy" />
+        </a>
+        <figcaption>Alien biome — the last stretch of the campaign.</figcaption>
+      </figure>
+      <figure>
+        <a href="/screenshots/mesozoic-protocol-screenshot-05-desert-crossing.jpg">
+          <img src="/screenshots/mesozoic-protocol-screenshot-05-desert-crossing-thumb.jpg" alt="Desert biome outpost: two dirt roads crossing mid-map, tower domes covering both lanes" width="960" height="540" loading="lazy" />
+        </a>
+        <figcaption>Desert crossing — two lanes, one kill zone.</figcaption>
+      </figure>
+      <figure>
+        <a href="/screenshots/mesozoic-protocol-screenshot-06-snow-outpost.jpg">
+          <img src="/screenshots/mesozoic-protocol-screenshot-06-snow-outpost-thumb.jpg" alt="Snow biome outpost: a grey road winding through snowfield toward the base, hero mech on patrol" width="960" height="540" loading="lazy" />
+        </a>
+        <figcaption>Snow biome — long sightlines, cold math.</figcaption>
+      </figure>
+      <figure>
+        <a href="/screenshots/mesozoic-protocol-screenshot-07-wasteland-serpentine.jpg">
+          <img src="/screenshots/mesozoic-protocol-screenshot-07-wasteland-serpentine-thumb.jpg" alt="Wasteland biome outpost: a serpentine path snaking across cracked brown terrain past scattered turrets" width="960" height="540" loading="lazy" />
+        </a>
+        <figcaption>Wasteland — the serpentine buys you time. Spend it well.</figcaption>
+      </figure>
+      <figure>
+        <a href="/screenshots/mesozoic-protocol-screenshot-08-compendium.jpg">
+          <img src="/screenshots/mesozoic-protocol-screenshot-08-compendium-thumb.jpg" alt="Compendium screen: the raptor entry with HP, speed, damage, bounty stats and per-damage-type resistances" width="960" height="540" loading="lazy" />
+        </a>
+        <figcaption>The Compendium — every enemy, every resistance, catalogued.</figcaption>
+      </figure>
+    </div>
+    <p class="shots-note">Click any shot for full resolution. Capture-ready assets and more material in the <a href="https://mesozoicprotocol.com/press">press kit</a>.</p>
   </div>
 </section>
 
