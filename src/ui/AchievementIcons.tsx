@@ -692,8 +692,8 @@ export const IconEndlessSurvivor: FC<AchievementIconProps> = (p) => (
   </Svg>
 );
 
-export const IconHeroicEffort: FC<AchievementIconProps> = (p) => (
-  <Svg {...p} label="Heroic Effort">
+export const IconBreachHoldout: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="First Breach">
     {/* shield with laurel notch */}
     <path
       d="M12 2.5 L20 5.5 L20 12 C 20 17, 16.5 20.5, 12 22 C 7.5 20.5, 4 17, 4 12 L4 5.5 Z"
@@ -710,8 +710,8 @@ export const IconHeroicEffort: FC<AchievementIconProps> = (p) => (
   </Svg>
 );
 
-export const IconIronWill: FC<AchievementIconProps> = (p) => (
-  <Svg {...p} label="Iron Will">
+export const IconContainmentHoldout: FC<AchievementIconProps> = (p) => (
+  <Svg {...p} label="Held the Line">
     {/* anvil */}
     <path
       d="M3 8 L14 8 L14 10 C 14 11.5, 12 12, 10.5 12 L10.5 13 L19 13 C 19 15.5, 16.5 16.5, 13 16.5 L11 16.5 L11 18 L15 18 L15 20 L7 20 L7 18 L9 18 L9 12.5 C 6 12, 3 10.5, 3 8 Z"
@@ -1353,8 +1353,8 @@ export const ACHIEVEMENT_ICONS: Record<AchievementId, FC<AchievementIconProps>> 
   lab_specialist: IconLabSpecialist,
   lab_overlord: IconLabOverlord,
   endless_survivor: IconEndlessSurvivor,
-  heroic_effort: IconHeroicEffort,
-  iron_will: IconIronWill,
+  breach_holdout: IconBreachHoldout,
+  containment_holdout: IconContainmentHoldout,
   mass_production: IconMassProduction,
   tree_hugger: IconTreeHugger,
   diamond_in_the_rough: IconDiamondInTheRough,

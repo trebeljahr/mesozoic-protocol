@@ -134,13 +134,13 @@
     "desc": "Erreiche Welle 20 in einer Endlos-Arena.",
     "hint": "Überlebe tief im Endlos-Modus."
   },
-  "heroic_effort": {
-    "name": "Heldenhafter Einsatz",
+  "breach_holdout": {
+    "name": "Erster Ausbruch",
     "desc": "Schließe eine Mission im Ausbruch-Modus ab.",
     "hint": "Gewinne einen handgebauten Ausbruch-Lauf."
   },
-  "iron_will": {
-    "name": "Eiserner Wille",
+  "containment_holdout": {
+    "name": "Linie gehalten",
     "desc": "Schließe eine Mission im Eindämmungs-Modus ab.",
     "hint": "Gewinne einen Ein-Leben-Lauf in der Eindämmung."
   },

@@ -258,7 +258,7 @@ const summarizeMeta = (meta: AllMetaSkills, kind: TowerKind): string => {
 };
 
 // Default star budget per kind for level N: assume the player has cleared
-// every prior level with all 5 stars (3 normal + heroic + iron). Capped
+// every prior level with all 5 stars (3 normal + breach + containment). Capped
 // at 21 — the cost to fully max one tower's three-branch tree. Surplus
 // stars beyond 21 would be spent on OTHER kinds, not this one.
 const defaultTowerStarBudget = (levelId: number): number =>
@@ -809,7 +809,7 @@ const bestSetup = (
     const baseDps = baseDpsContribution(spec, paths.length, longestPath, baseCfg);
     for (const cfg of configs) {
       if (cfg.damage <= 0) continue;
-      // Honor mode rules so heroic forbids / iron loadouts don't get
+      // Honor mode rules so breach forbids / containment loadouts don't get
       // "cleared" by a tower the player literally can't place.
       if (forbidden.has(cfg.kind)) continue;
       if (lockedLoadout && !lockedLoadout.includes(cfg.kind)) continue;
@@ -873,7 +873,7 @@ const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "n
 
   // Replay the runtime spawn-mutation that injects a 0× resist holdout per
   // damage type the player can reach. Mode forbidden/locked sets gate
-  // which types qualify, so heroic/iron with reduced rosters get only the
+  // which types qualify, so breach/containment with reduced rosters get only the
   // immunities they can actually crack.
   const waves = opts.applyImmunityCoverage
     ? ensureImmunityCoverage(
@@ -1001,9 +1001,9 @@ const printLevel = (
   const modeTag =
     mode === "normal"
       ? ""
-      : mode === "heroic"
-        ? ` ${C.yellow}[HEROIC]${C.reset}`
-        : ` ${C.red}[IRON]${C.reset}`;
+      : mode === "breach"
+        ? ` ${C.yellow}[BREACH]${C.reset}`
+        : ` ${C.red}[CONTAINMENT]${C.reset}`;
   const rules: string[] = [];
   if (cfg.forbiddenTowers?.length) rules.push(`deny ${cfg.forbiddenTowers.join(",")}`);
   if (cfg.lockedLoadout?.length) rules.push(`loadout ${cfg.lockedLoadout.join(",")}`);
@@ -1196,7 +1196,7 @@ const parseDifficulty = (value: string | undefined): Difficulty => {
   process.exit(1);
 };
 const difficulty = parseDifficulty(difficultyArg?.split("=")[1]);
-// --mode=normal|heroic|iron|all — pick which modes the report iterates.
+// --mode=normal|breach|containment|all — pick which modes the report iterates.
 // Default is "all" so authors get feasibility for every defined variant
 // in one pass, with normal always shown first per level.
 const modeArg = args.find((a: string) => a.startsWith("--mode="));
@@ -1204,8 +1204,8 @@ const modeFilter: LevelMode[] = ((): LevelMode[] => {
   if (!modeArg) return LEVEL_MODES;
   const v = modeArg.split("=")[1];
   if (v === "all") return LEVEL_MODES;
-  if (v === "normal" || v === "heroic" || v === "iron") return [v];
-  console.error(`--mode must be normal | heroic | iron | all`);
+  if (v === "normal" || v === "breach" || v === "containment") return [v];
+  console.error(`--mode must be normal | breach | containment | all`);
   process.exit(1);
 })();
 const modesForLevel = (levelIdx: number): LevelMode[] => {

@@ -2,13 +2,13 @@
   "mode": {
     "label": {
       "normal": "Standard",
-      "heroic": "Ausbruch",
-      "iron": "Eindämmung"
+      "breach": "Ausbruch",
+      "containment": "Eindämmung"
     },
     "tagline": {
       "normal": "Die vorgesehene Kampagne",
-      "heroic": "Härtere Wellen. Türme gesperrt.",
-      "iron": "Ein Leben. Feste Ausrüstung. Kein Verkauf."
+      "breach": "Härtere Wellen. Türme gesperrt.",
+      "containment": "Ein Leben. Feste Ausrüstung. Kein Verkauf."
     }
   },
   "difficulty": {

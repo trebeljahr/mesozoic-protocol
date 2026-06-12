@@ -45,8 +45,8 @@ export type AchievementId =
   | "lab_specialist"
   | "lab_overlord"
   | "endless_survivor"
-  | "heroic_effort"
-  | "iron_will"
+  | "breach_holdout"
+  | "containment_holdout"
   | "mass_production"
   | "tree_hugger"
   | "diamond_in_the_rough"
@@ -119,8 +119,8 @@ const VISIBLE_IDS: AchievementId[] = [
   "lab_specialist",
   "lab_overlord",
   "endless_survivor",
-  "heroic_effort",
-  "iron_will",
+  "breach_holdout",
+  "containment_holdout",
   "mass_production",
 ];
 
@@ -236,9 +236,9 @@ const satisfies = (id: AchievementId, p: ProgressData, w: World, ev: GameEvent |
     case "flawless":
       return ev !== null && ev.type === "game-over" && ev.won && w.lives >= w.startLives;
     case "triple_star":
-      // Three-star wording assumes the normal-mode 0-3 grading. Heroic /
-      // iron are binary (clear = 1 star), so the achievement only fires
-      // for full-lives normal clears.
+      // Three-star wording assumes the normal-mode 0-3 grading. Breach /
+      // containment are binary (clear = 1 star), so the achievement only
+      // fires for full-lives normal clears.
       return (
         ev !== null &&
         ev.type === "game-over" &&
@@ -304,10 +304,10 @@ const satisfies = (id: AchievementId, p: ProgressData, w: World, ev: GameEvent |
       return ALL_TOWER_KINDS.every((k) => towerKindLabMaxed(p, k));
     case "endless_survivor":
       return w.endless !== null && w.wave >= ENDLESS_SURVIVOR_WAVE;
-    case "heroic_effort":
-      return ev !== null && ev.type === "game-over" && ev.won && w.mode === "heroic";
-    case "iron_will":
-      return ev !== null && ev.type === "game-over" && ev.won && w.mode === "iron";
+    case "breach_holdout":
+      return ev !== null && ev.type === "game-over" && ev.won && w.mode === "breach";
+    case "containment_holdout":
+      return ev !== null && ev.type === "game-over" && ev.won && w.mode === "containment";
     case "mass_production": {
       const counts: Partial<Record<TowerKind, number>> = {};
       for (const t of w.towers) counts[t.kind] = (counts[t.kind] ?? 0) + 1;

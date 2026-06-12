@@ -16,12 +16,12 @@ export type Stars = 0 | 1 | 2 | 3;
 export type SlotId = 1 | 2 | 3;
 
 // Per-level mode: orthogonal to Difficulty. Normal is the base 3-star
-// campaign; Heroic + Iron are KR-style challenge variants with handcrafted
+// campaign; Breach + Containment are challenge variants with handcrafted
 // waves and rules. Each adds one bonus star per level on top of normal's
 // three (max 5 stars per level).
-export type LevelMode = "normal" | "heroic" | "iron";
+export type LevelMode = "normal" | "breach" | "containment";
 
-export const LEVEL_MODES: LevelMode[] = ["normal", "heroic", "iron"];
+export const LEVEL_MODES: LevelMode[] = ["normal", "breach", "containment"];
 
 // English label/tagline source is the en i18n catalog (src/locales/en/
 // modes.json). Localized pickers read the same keys via react-i18next; these
@@ -31,15 +31,15 @@ export const LEVEL_MODE_LABEL: Record<LevelMode, string> = enModes.mode.label;
 export const LEVEL_MODE_TAGLINE: Record<LevelMode, string> = enModes.mode.tagline;
 
 // Per-level mode-star record. Normal still grades 0-3 from lives saved;
-// heroic + iron are binary (clear = 1 bonus star). Sum across all modes
-// gives a single level's contribution to totalStars (max 5).
+// breach + containment are binary (clear = 1 bonus star). Sum across all
+// modes gives a single level's contribution to totalStars (max 5).
 export type ModeStars = {
   normal: Stars;
-  heroic: 0 | 1;
-  iron: 0 | 1;
+  breach: 0 | 1;
+  containment: 0 | 1;
 };
 
-export const emptyModeStars = (): ModeStars => ({ normal: 0, heroic: 0, iron: 0 });
+export const emptyModeStars = (): ModeStars => ({ normal: 0, breach: 0, containment: 0 });
 
 export type ProgressStats = {
   killsTotal: number;
@@ -131,15 +131,20 @@ export const DIFFICULTY_ACCENT: Record<Difficulty, DifficultyAccent> = {
 
 export const DEFAULT_DIFFICULTY: Difficulty = "medium";
 
-// v2 added mode-stars (heroic + iron). v1 saves auto-migrate: the old
-// per-level number becomes ModeStars.normal with heroic + iron zeroed.
-// v3 renamed the in-memory hero fields to robot (activeHero → activeRobot
-// etc.). normalizeProgress accepts the legacy keys as fallback so v2
-// saves load without wiping unlocked robots / XP / skill trees.
-export const PROGRESS_VERSION = 3 as const;
+// v2 added mode-stars (breach + containment, originally named heroic +
+// iron). v1 saves auto-migrate: the old per-level number becomes
+// ModeStars.normal with breach + containment zeroed. v3 renamed the
+// in-memory hero fields to robot (activeHero → activeRobot etc.).
+// normalizeProgress accepts the legacy keys as fallback so v2 saves load
+// without wiping unlocked robots / XP / skill trees. v4 renamed the
+// challenge modes from heroic/iron to breach/containment; normalizeModeStars
+// copies the legacy keys into the new slots, and unlocked-achievement IDs
+// `heroic_effort` / `iron_will` are rewritten to `breach_holdout` /
+// `containment_holdout` so prior earners keep their badges.
+export const PROGRESS_VERSION = 4 as const;
 
 export type ProgressData = {
-  version: 3;
+  version: 4;
   starsByLevel: Record<number, ModeStars>;
   encountered: Partial<Record<EnemyKind, boolean>>;
   // Per-variant matriarch encounter set. The Compendium's matriarch
@@ -176,10 +181,10 @@ export type ProgressData = {
   // a given map it never spawns there again, even before the achievement
   // unlocks globally. Keyed `${levelId}:${eggId}`.
   triggeredEasterEggs: Record<string, true>;
-  // One-shot flag for the "you unlocked Heroic + Iron modes" world-map
-  // explainer. Heroic + Iron are gated per-level by a normal 3-star
-  // clear, but the explanation only needs to surface the first time the
-  // player crosses that gate on any level.
+  // One-shot flag for the "you unlocked Breach + Containment modes"
+  // world-map explainer. Breach + Containment are gated per-level by a
+  // normal 3-star clear, but the explanation only needs to surface the
+  // first time the player crosses that gate on any level.
   seenModesUnlockExplainer?: true;
   // Best wave reached per endless arena + difficulty. Key is
   // `${mapId}:${difficulty}` (see endlessBestKey). Local-only; there is
@@ -242,23 +247,27 @@ const isDifficulty = (v: unknown): v is Difficulty =>
 const isProgressLike = (parsed: unknown): parsed is Partial<ProgressData> => {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = (parsed as { version?: unknown }).version;
-  if (v !== 1 && v !== 2 && v !== 3) return false;
+  if (v !== 1 && v !== 2 && v !== 3 && v !== 4) return false;
   return typeof (parsed as { starsByLevel?: unknown }).starsByLevel === "object";
 };
 
 // Normalize a per-level entry from any historical shape into ModeStars.
 // v1 saves stored a bare 0|1|2|3 number per level; v2 stores ModeStars.
+// v4 renamed the challenge-mode keys from heroic/iron to breach/containment;
+// fall back to the legacy keys so prior earners keep their bonus stars.
 const normalizeModeStars = (raw: unknown): ModeStars => {
   if (typeof raw === "number") {
     const n = (Math.max(0, Math.min(3, Math.floor(raw))) | 0) as Stars;
-    return { normal: n, heroic: 0, iron: 0 };
+    return { normal: n, breach: 0, containment: 0 };
   }
   if (raw && typeof raw === "object") {
-    const o = raw as Partial<ModeStars>;
+    const o = raw as Partial<ModeStars> & { heroic?: 0 | 1; iron?: 0 | 1 };
     const normal = (Math.max(0, Math.min(3, Math.floor(Number(o.normal ?? 0)))) | 0) as Stars;
-    const heroic = (o.heroic === 1 ? 1 : 0) as 0 | 1;
-    const iron = (o.iron === 1 ? 1 : 0) as 0 | 1;
-    return { normal, heroic, iron };
+    const breachRaw = o.breach ?? o.heroic;
+    const containmentRaw = o.containment ?? o.iron;
+    const breach = (breachRaw === 1 ? 1 : 0) as 0 | 1;
+    const containment = (containmentRaw === 1 ? 1 : 0) as 0 | 1;
+    return { normal, breach, containment };
   }
   return emptyModeStars();
 };
@@ -270,7 +279,7 @@ const normalizeStarsMap = (raw: unknown): Record<number, ModeStars> => {
     const id = Number(k);
     if (!Number.isFinite(id)) continue;
     const m = normalizeModeStars(v);
-    if (m.normal === 0 && m.heroic === 0 && m.iron === 0) continue;
+    if (m.normal === 0 && m.breach === 0 && m.containment === 0) continue;
     out[id] = m;
   }
   return out;
@@ -308,6 +317,29 @@ const pickRecord = <K extends string, V>(
   return src ?? {};
 };
 
+// v3 → v4 migration for unlocked achievements: the challenge-mode
+// achievement IDs were renamed when Heroic / Iron became Breach /
+// Containment. Rewrite the legacy IDs so prior earners keep their badges;
+// if both old and new are present (impossible in practice but defensive)
+// the newer entry wins.
+const LEGACY_ACH_ID_MAP: Record<string, string> = {
+  heroic_effort: "breach_holdout",
+  iron_will: "containment_holdout",
+};
+
+const migrateUnlocked = (raw: unknown): Record<string, number> => {
+  if (!raw || typeof raw !== "object") return {};
+  const src = raw as Record<string, unknown>;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (typeof v !== "number") continue;
+    const target = LEGACY_ACH_ID_MAP[k] ?? k;
+    // Prefer the explicit new-id timestamp if both forms coexist.
+    if (out[target] === undefined) out[target] = v;
+  }
+  return out;
+};
+
 const normalizeProgress = (raw: Partial<ProgressData>): ProgressData => {
   const stats = raw.stats as Partial<ProgressStats> | undefined;
   const encountered = (raw.encountered as Partial<Record<EnemyKind, boolean>>) ?? {};
@@ -329,10 +361,7 @@ const normalizeProgress = (raw: Partial<ProgressData>): ProgressData => {
       killsTotal: typeof stats?.killsTotal === "number" ? stats.killsTotal : 0,
       winsTotal: typeof stats?.winsTotal === "number" ? stats.winsTotal : 0,
     },
-    unlocked:
-      raw.unlocked && typeof raw.unlocked === "object"
-        ? (raw.unlocked as Record<string, number>)
-        : {},
+    unlocked: migrateUnlocked(raw.unlocked),
     difficulty: isDifficulty(raw.difficulty) ? raw.difficulty : DEFAULT_DIFFICULTY,
     seenIntros:
       raw.seenIntros && typeof raw.seenIntros === "object"
@@ -427,16 +456,16 @@ const ensureMigrated = () => {
 };
 
 // Total stars summed across every level × every mode. Normal contributes
-// 0-3, heroic + iron contribute 0-1 each, so each level caps at 5.
+// 0-3, breach + containment contribute 0-1 each, so each level caps at 5.
 export const totalStars = (p: ProgressData): number => {
   let sum = 0;
-  for (const m of Object.values(p.starsByLevel)) sum += m.normal + m.heroic + m.iron;
+  for (const m of Object.values(p.starsByLevel)) sum += m.normal + m.breach + m.containment;
   return sum;
 };
 
-// A level counts as "cleared" once normal has at least one star — heroic
-// and iron can only be attempted after normal is fully starred, so they
-// can't backfill this count.
+// A level counts as "cleared" once normal has at least one star — breach
+// and containment can only be attempted after normal is fully starred, so
+// they can't backfill this count.
 const levelsClearedCount = (p: ProgressData): number => {
   let n = 0;
   for (const m of Object.values(p.starsByLevel)) if (m.normal > 0) n++;
@@ -501,8 +530,8 @@ export const starsForLives = (lives: number): Stars => {
 };
 
 // Mode-aware star resolution from a finished run. Normal grades on lives;
-// heroic + iron are binary win/lose. Iron clears imply 0 leaks because
-// the run had one life — no extra logic needed.
+// breach + containment are binary win/lose. Containment clears imply 0
+// leaks because the run had one life — no extra logic needed.
 export const starsForRun = (mode: LevelMode, lives: number, won: boolean): number => {
   if (!won) return 0;
   if (mode === "normal") return starsForLives(lives);
@@ -519,11 +548,11 @@ export const getStars = (p: ProgressData, levelId: number): Stars =>
 
 export const levelTotalStars = (p: ProgressData, levelId: number): number => {
   const m = getModeStars(p, levelId);
-  return m.normal + m.heroic + m.iron;
+  return m.normal + m.breach + m.containment;
 };
 
 // True once the player has earned 3 normal-mode stars on any level —
-// the moment Heroic + Iron become available somewhere.
+// the moment Breach + Containment become available somewhere.
 export const hasUnlockedChallengeModes = (p: ProgressData): boolean => {
   for (const m of Object.values(p.starsByLevel)) if (m.normal >= 3) return true;
   return false;
@@ -573,10 +602,11 @@ export const isLevelUnlocked = (levelId: number, p: ProgressData): boolean => {
 };
 
 // Mode availability gating on a level the player has already unlocked.
-//   normal         → as soon as the level itself is unlocked
-//   heroic + iron  → both unlock once normal is 3-starred on this level
-// Heroic + iron are siblings (not a chain) so the player picks whichever
-// challenge fits the mood, not whichever they grind to first.
+//   normal                      → as soon as the level itself is unlocked
+//   breach + containment        → both unlock once normal is 3-starred
+//                                 on this level
+// Breach + containment are siblings (not a chain) so the player picks
+// whichever challenge fits the mood, not whichever they grind to first.
 export const isModeUnlocked = (p: ProgressData, levelId: number, mode: LevelMode): boolean => {
   if (!isLevelUnlocked(levelId, p)) return false;
   if (mode === "normal") return true;
@@ -595,12 +625,12 @@ export const recordLevelResult = (
     const s = (Math.max(0, Math.min(3, Math.floor(stars))) | 0) as Stars;
     if (s <= prev.normal) return p;
     next = { ...prev, normal: s };
-  } else if (mode === "heroic") {
-    if (stars < 1 || prev.heroic >= 1) return p;
-    next = { ...prev, heroic: 1 };
+  } else if (mode === "breach") {
+    if (stars < 1 || prev.breach >= 1) return p;
+    next = { ...prev, breach: 1 };
   } else {
-    if (stars < 1 || prev.iron >= 1) return p;
-    next = { ...prev, iron: 1 };
+    if (stars < 1 || prev.containment >= 1) return p;
+    next = { ...prev, containment: 1 };
   }
   return { ...p, starsByLevel: { ...p.starsByLevel, [levelId]: next } };
 };

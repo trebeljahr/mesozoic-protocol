@@ -9,20 +9,20 @@ import { useGame } from "../store";
 
 const MODE_ACCENT: Record<LevelMode, { text: string; border: string; tint: string }> = {
   normal: { text: "text-blue", border: "border-blue", tint: "bg-tint-blue" },
-  heroic: { text: "text-orange", border: "border-orange", tint: "bg-[rgba(255,178,102,0.12)]" },
-  iron: { text: "text-red", border: "border-red", tint: "bg-tint-red" },
+  breach: { text: "text-orange", border: "border-orange", tint: "bg-[rgba(255,178,102,0.12)]" },
+  containment: { text: "text-red", border: "border-red", tint: "bg-tint-red" },
 };
 
 const MODE_GLOW: Record<LevelMode, string> = {
   normal: "shadow-[0_0_24px_rgba(159,216,255,0.22)]",
-  heroic: "shadow-[0_0_24px_rgba(255,178,102,0.26)]",
-  iron: "shadow-[0_0_28px_rgba(255,90,122,0.30)]",
+  breach: "shadow-[0_0_24px_rgba(255,178,102,0.26)]",
+  containment: "shadow-[0_0_28px_rgba(255,90,122,0.30)]",
 };
 
 const MODE_ICON: Record<LevelMode, string> = {
   normal: "◆",
-  heroic: "✦",
-  iron: "▣",
+  breach: "✦",
+  containment: "▣",
 };
 
 export const ModePicker = () => {
@@ -194,7 +194,7 @@ const Row = ({ label, value }: { label: string; value: string }) => (
 
 // Human-readable summary of the mode's rules. Reads the resolved
 // ModeConfig directly so it stays accurate even if levels override
-// defaults in unusual ways (e.g. iron with a 2-tower locked loadout).
+// defaults in unusual ways (e.g. containment with a 2-tower locked loadout).
 const describeMode = (
   mode: LevelMode,
   _level: { id: number; name: string },
@@ -207,7 +207,7 @@ const describeMode = (
   t: TFunction,
 ): { label: string; value: string }[] => {
   const rows: { label: string; value: string }[] = [];
-  if (mode === "iron") {
+  if (mode === "containment") {
     rows.push({ label: t("modePicker.lives"), value: cfg.singleLife ? "1" : "20" });
     if (cfg.noSelling)
       rows.push({ label: t("modePicker.selling"), value: t("modePicker.disabled") });

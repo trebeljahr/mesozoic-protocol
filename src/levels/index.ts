@@ -11,22 +11,22 @@ import type {
   WaveSpec,
 } from "../sim/types";
 
-// Per-mode override block. Heroic + iron each get their own handcrafted
-// wave script and starting gold, plus rule flags that the sim consumes
-// at world creation. Normal mode reuses the top-level level fields.
+// Per-mode override block. Breach + containment each get their own
+// handcrafted wave script and starting gold, plus rule flags that the sim
+// consumes at world creation. Normal mode reuses the top-level level fields.
 export type ModeConfig = {
   startGold: number;
   waves: WaveSpec[];
-  // Heroic mode: tower kinds the player may not place this level. UI
+  // Breach mode: tower kinds the player may not place this level. UI
   // hides them from the picker; runtime placement double-checks.
   forbiddenTowers?: TowerKind[];
-  // Iron mode: only these tower kinds may be placed (everything else is
-  // forbidden). Empty/undefined = no loadout restriction.
+  // Containment mode: only these tower kinds may be placed (everything
+  // else is forbidden). Empty/undefined = no loadout restriction.
   lockedLoadout?: TowerKind[];
-  // Iron mode: lives = 1. Any leak ends the run.
+  // Containment mode: lives = 1. Any leak ends the run.
   singleLife?: boolean;
-  // Iron mode: sell button disabled — no eco recovery, every placement
-  // is committed for the run.
+  // Containment mode: sell button disabled — no eco recovery, every
+  // placement is committed for the run.
   noSelling?: boolean;
   // Optional short blurb shown on the level intro card under the mode
   // badge. One sentence; the picker shows LEVEL_MODE_TAGLINE generically.
@@ -50,8 +50,8 @@ export type LevelConfig = {
   countScale?: number;
   // Biome is inferred from nodePos via biomeForPos() — there is no per-level
   // override. See src/biomes.ts for zone definitions.
-  heroic?: ModeConfig;
-  iron?: ModeConfig;
+  breach?: ModeConfig;
+  containment?: ModeConfig;
 };
 
 // Resolve which ModeConfig the sim should use for a given mode. Normal
@@ -59,8 +59,8 @@ export type LevelConfig = {
 // rest of the engine can stay mode-agnostic — every world is built from
 // the resolved ModeConfig + the level's path/nodePos.
 export const resolveLevelMode = (level: LevelConfig, mode: LevelMode): ModeConfig => {
-  if (mode === "heroic" && level.heroic) return level.heroic;
-  if (mode === "iron" && level.iron) return level.iron;
+  if (mode === "breach" && level.breach) return level.breach;
+  if (mode === "containment" && level.containment) return level.containment;
   return { startGold: level.startGold, waves: level.waves };
 };
 
@@ -82,12 +82,13 @@ export const scaleWaveCounts = (waves: WaveSpec[], countScale: number): WaveSpec
 };
 
 // True if a given level actually defines content for the requested
-// challenge mode. Normal is always defined; heroic/iron must be authored
-// per level. The mode picker uses this to grey out unfinished modes.
+// challenge mode. Normal is always defined; breach/containment must be
+// authored per level. The mode picker uses this to grey out unfinished
+// modes.
 export const levelHasMode = (level: LevelConfig, mode: LevelMode): boolean => {
   if (mode === "normal") return true;
-  if (mode === "heroic") return !!level.heroic;
-  return !!level.iron;
+  if (mode === "breach") return !!level.breach;
+  return !!level.containment;
 };
 
 const p = (...coords: number[]): Vec2[] => {
@@ -405,13 +406,13 @@ export const LEVELS: LevelConfig[] = [
       mixed({ raptor: 12, swarm: 10, allosaur: 2 }),
       mixed({ raptor: 14, swarm: 10, allosaur: 3 }),
     ],
-    // Heroic: no pulse rifle. The cheap kinetic spammer is the obvious
+    // Breach: no pulse rifle. The cheap kinetic spammer is the obvious
     // L1 opener; denying it forces chain (electric) as the primary
     // single-target answer, with flame for swarm cleanup. Extra gold
     // covers the higher per-tower cost. Waves trade one of the intro
     // beats for an armored introduction so the build choice matters by
     // mid-run.
-    heroic: {
+    breach: {
       startGold: 340,
       forbiddenTowers: ["pulse"],
       tagline: "Pulse Rifle confiscated. Chain or burn.",
@@ -428,12 +429,12 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 14, swarm: 18, allosaur: 4, stego: 2 }),
       ],
     },
-    // Iron: one life, no selling, chain + flame only. Big gold bank to
+    // Containment: one life, no selling, chain + flame only. Big gold bank to
     // place the opening defenses before the first wave commits — every
     // placement is permanent so wrong spots cost the run. The wave list
-    // skips the gentle intros: the player committed to iron and the
+    // skips the gentle intros: the player committed to containment and the
     // map opens at "swarm cleanup matters" pressure.
-    iron: {
+    containment: {
       startGold: 820,
       lockedLoadout: ["chain", "flame"],
       singleLife: true,
@@ -471,7 +472,7 @@ export const LEVELS: LevelConfig[] = [
       mixed({ raptor: 16, swarm: 12, allosaur: 4, stego: 1 }),
       mixed({ raptor: 18, swarm: 12, allosaur: 4, stego: 2 }),
     ],
-    heroic: {
+    breach: {
       tagline: "No flame. Hatchlings come in waves.",
       forbiddenTowers: ["flame"],
       startGold: 320,
@@ -488,7 +489,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 22, swarm: 26, allosaur: 5, stego: 2 }),
       ],
     },
-    iron: {
+    containment: {
       tagline: "Pulse and mortar only. One life.",
       lockedLoadout: ["pulse", "mortar"],
       singleLife: true,
@@ -525,7 +526,7 @@ export const LEVELS: LevelConfig[] = [
       mixed({ raptor: 18, swarm: 14, allosaur: 4, stego: 2 }),
       chaos({ raptor: 16, swarm: 18, allosaur: 4, stego: 2 }),
     ],
-    heroic: {
+    breach: {
       tagline: "No mortar. The canyon fills with armor.",
       forbiddenTowers: ["mortar"],
       startGold: 350,
@@ -542,7 +543,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 22, swarm: 24, allosaur: 6, stego: 3, armored: 2 }),
       ],
     },
-    iron: {
+    containment: {
       tagline: "Chain and cryo only. No selling, one life.",
       lockedLoadout: ["chain", "cryo"],
       singleLife: true,
@@ -579,7 +580,7 @@ export const LEVELS: LevelConfig[] = [
       mixed({ raptor: 18, swarm: 14, allosaur: 4, stego: 2 }),
       chaos({ raptor: 18, swarm: 22, allosaur: 5, stego: 2 }),
     ],
-    heroic: {
+    breach: {
       tagline: "No chain. Swarms close in from both sides.",
       forbiddenTowers: ["chain"],
       startGold: 360,
@@ -596,7 +597,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 24, swarm: 32, allosaur: 6, stego: 3, armored: 2 }),
       ],
     },
-    iron: {
+    containment: {
       tagline: "Cryo and flame only. No selling, one life.",
       lockedLoadout: ["cryo", "flame"],
       singleLife: true,
@@ -637,7 +638,7 @@ export const LEVELS: LevelConfig[] = [
       // the pack as coming from the queen, not from spawn zero.
       bossWave("raptor", { raptor: 6, allosaur: 2 }, 1, 0.55),
     ],
-    heroic: {
+    breach: {
       tagline: "No pulse. The Matriarch brings her heavy kin.",
       forbiddenTowers: ["pulse"],
       startGold: 380,
@@ -671,7 +672,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       tagline: "Mortar and hive only. The Matriarch is the test.",
       lockedLoadout: ["mortar", "hive"],
       singleLife: true,
@@ -711,7 +712,7 @@ export const LEVELS: LevelConfig[] = [
       mixed({ raptor: 22, swarm: 16, allosaur: 5, stego: 3, armored: 1 }),
       chaos({ raptor: 20, swarm: 24, allosaur: 6, stego: 3, armored: 2 }),
     ],
-    heroic: {
+    breach: {
       startGold: 300,
       tagline: "Flame is forbidden. The ridge bites back.",
       forbiddenTowers: ["flame"],
@@ -732,7 +733,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 48, swarm: 90, allosaur: 16, stego: 11, armored: 10, titan: 3 }),
       ],
     },
-    iron: {
+    containment: {
       startGold: 400,
       tagline: "Kinetic vow: pulse + chain only. One life. No sells.",
       lockedLoadout: ["pulse", "chain"],
@@ -770,7 +771,7 @@ export const LEVELS: LevelConfig[] = [
       heavy({ armored: 6, stego: 4, allosaur: 3 }),
       chaos({ raptor: 22, swarm: 26, allosaur: 6, stego: 3, armored: 2 }),
     ],
-    heroic: {
+    breach: {
       startGold: 340,
       tagline: "Pyre denied. Hold the flats with chain and steel.",
       forbiddenTowers: ["flame"],
@@ -791,7 +792,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 36, swarm: 60, allosaur: 14, stego: 8, armored: 6, titan: 2 }),
       ],
     },
-    iron: {
+    containment: {
       startGold: 520,
       tagline: "Cold + chain only. One life, no sells.",
       lockedLoadout: ["cryo", "chain"],
@@ -853,7 +854,7 @@ export const LEVELS: LevelConfig[] = [
         [1, { raptor: 14, swarm: 14, para: 3, allosaur: 3, armored: 2 }],
       ),
     ],
-    heroic: {
+    breach: {
       startGold: 380,
       tagline: "Mortar's gone. Both lanes need precision.",
       forbiddenTowers: ["mortar"],
@@ -894,7 +895,7 @@ export const LEVELS: LevelConfig[] = [
         ),
       ],
     },
-    iron: {
+    containment: {
       startGold: 620,
       tagline: "Drone & bounce: hive + chain. One life, no sells.",
       lockedLoadout: ["hive", "chain"],
@@ -946,7 +947,7 @@ export const LEVELS: LevelConfig[] = [
       mixed({ raptor: 24, swarm: 18, allosaur: 7, stego: 4 }),
       chaos({ raptor: 26, swarm: 30, allosaur: 8, stego: 5, armored: 3 }),
     ],
-    heroic: {
+    breach: {
       startGold: 360,
       tagline: "Pulse rifles seized. Crack the heavies cold.",
       forbiddenTowers: ["pulse"],
@@ -967,7 +968,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 38, swarm: 64, allosaur: 13, stego: 8, armored: 6, titan: 2 }),
       ],
     },
-    iron: {
+    containment: {
       startGold: 560,
       tagline: "Pyre & frost: flame + cryo. One life, no sells.",
       lockedLoadout: ["flame", "cryo"],
@@ -1014,7 +1015,7 @@ export const LEVELS: LevelConfig[] = [
         trickleStream(0, ["swarm", "raptor", "allosaur"], 1.0, 1.6, 18),
       ]),
     ],
-    heroic: {
+    breach: {
       startGold: 460,
       tagline: "No mortar against the plated queen",
       // Mortar's the easy answer to plated stegos — yank it. Chain is
@@ -1062,7 +1063,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       startGold: 480,
       tagline: "One life. Pulse, chain, cryo, hive. Crack the queen.",
       // Anti-plate loadout: chain shreds matriarch + shielded packs,
@@ -1078,7 +1079,7 @@ export const LEVELS: LevelConfig[] = [
         heavy({ armored: 7, stego: 4, allosaur: 4 }),
         chaos({ raptor: 22, swarm: 28, allosaur: 8, stego: 4, armored: 3 }),
         mixed({ raptor: 26, swarm: 20, allosaur: 10, stego: 6, armored: 3 }),
-        // Iron's boss is the same Stegosaur Matriarch, slightly leaner
+        // Containment's boss is the same Stegosaur Matriarch, slightly leaner
         // entourage to compensate for the locked loadout — chain still
         // does the work, hive amps it, cryo buys time, pulse mops trickle.
         bossWave("stego", { allosaur: 4, armored: 2, titan: 1 }, 1, 0.7, 0, [
@@ -1122,7 +1123,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ),
     ],
-    heroic: {
+    breach: {
       startGold: 450,
       tagline: "No chain — pop shields the hard way",
       // Chain trivializes shielded packs; deny it and force pulse focus
@@ -1162,7 +1163,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       startGold: 420,
       tagline: "One life. Pulse, cryo, mortar, hive. No chain.",
       // Force a focus-burst comp — pulse cracks shields, mortar splashes
@@ -1239,7 +1240,7 @@ export const LEVELS: LevelConfig[] = [
         [1, { raptor: 24, swarm: 32, allosaur: 12, stego: 10, armored: 8, titan: 3 }],
       ),
     ],
-    heroic: {
+    breach: {
       startGold: 500,
       tagline: "No pulse — crack shielded bricks the slow way",
       // Pulse is the obvious shield-cracker. Take it away and the
@@ -1313,7 +1314,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       startGold: 500,
       tagline: "One life. Chain, cryo, mortar, hive across both lanes.",
       // Two-path discipline: chain bounces between lanes when paths
@@ -1447,7 +1448,7 @@ export const LEVELS: LevelConfig[] = [
       },
       chaos({ raptor: 32, swarm: 44, allosaur: 14, stego: 10, armored: 9, titan: 3 }),
     ],
-    heroic: {
+    breach: {
       startGold: 450,
       tagline: "No mortar — pick off healers by hand",
       // Mortar splash trivializes clustered healing paras. Take it
@@ -1506,7 +1507,7 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 30, swarm: 40, allosaur: 13, stego: 8, armored: 7, titan: 3 }),
       ],
     },
-    iron: {
+    containment: {
       startGold: 460,
       tagline: "One life. Pulse, chain, flame, hive. Stop the healers.",
       // Anti-heal precision comp: pulse for burst-killing healers,
@@ -1613,12 +1614,12 @@ export const LEVELS: LevelConfig[] = [
         },
       ),
     ],
-    // Heroic — no mortar, no flame. The lesson level for regen + shielded
+    // Breach — no mortar, no flame. The lesson level for regen + shielded
     // healers becomes a precision-DPS exam: no AoE chip, no DoT crutch.
     // Cryo's slow + hive sentinel + chain bounces have to carry the
     // regen-armored bricks; pulse focus fire is the burst answer. Modest
     // gold bump because losing two whole tower kinds bites hard on its own.
-    heroic: {
+    breach: {
       startGold: 280,
       forbiddenTowers: ["mortar", "flame"],
       tagline: "Precision only — no splash, no burn.",
@@ -1627,7 +1628,7 @@ export const LEVELS: LevelConfig[] = [
         mixed({ raptor: 24, swarm: 20, allosaur: 9, stego: 4 }),
         rush(120, 26),
         heavy({ armored: 12, stego: 7, allosaur: 5 }),
-        // Heroic regen group — double the introduction count and stack a
+        // Breach regen group — double the introduction count and stack a
         // regen allosaur on top, so chain bounces don't quite outpace the
         // self-heal.
         {
@@ -1681,10 +1682,10 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 42, swarm: 58, allosaur: 17, stego: 11, armored: 10, titan: 4 }),
       ],
     },
-    // Iron — pulse + chain + cryo. No AoE, no DoT, no support drones.
+    // Containment — pulse + chain + cryo. No AoE, no DoT, no support drones.
     // Single life, no selling. You pick three turret kinds, you live or
     // die with them. Generous starting gold for the opening commitment.
-    iron: {
+    containment: {
       startGold: 420,
       lockedLoadout: ["pulse", "chain", "cryo"],
       singleLife: true,
@@ -1799,12 +1800,12 @@ export const LEVELS: LevelConfig[] = [
         ],
       },
     ],
-    // Heroic: no mortar. The explosive splash answer to the para
+    // Breach: no mortar. The explosive splash answer to the para
     // matriarch's child stream is gone, so the player must rely on
     // chain-bounce + flame DoT for AoE. Extra gold + a leaner wave
     // count keeps it tractable; the boss still appears at the end with
     // a denser child trickle to keep the pressure honest.
-    heroic: {
+    breach: {
       startGold: 540,
       forbiddenTowers: ["mortar"],
       tagline: "No Mortar. The matriarch's brood floods the lane.",
@@ -1843,7 +1844,7 @@ export const LEVELS: LevelConfig[] = [
             ...toSpawns({ raptor: 26, swarm: 32, allosaur: 11, stego: 7, armored: 5, titan: 1 }),
           ],
         },
-        // Heroic boss: same matriarch, denser entourage, faster child
+        // Breach boss: same matriarch, denser entourage, faster child
         // trickle. Without mortar splash the player needs chain bounce
         // tuned for boss + escort focus, plus flame DoT to clip the
         // shield-stripped paras coming out of her.
@@ -1864,13 +1865,13 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron: one life, locked to Chain + Cryo + Hive — no kinetic, no
+    // Containment: one life, locked to Chain + Cryo + Hive — no kinetic, no
     // explosive, no flame. Pure crowd-control: cryo slows the para
     // matriarch to a crawl while chain bounces clear her brood and
     // hive drones extend chain coverage to the second corridor. Big
     // gold pool because the whole defense must commit before wave 1
     // and never sell.
-    iron: {
+    containment: {
       startGold: 1100,
       lockedLoadout: ["chain", "cryo", "hive"],
       singleLife: true,
@@ -1945,12 +1946,12 @@ export const LEVELS: LevelConfig[] = [
         [1, { raptor: 26, swarm: 32, allosaur: 12, stego: 10, armored: 9, titan: 4 }],
       ),
     ],
-    // Heroic — no cryo, no hive. Lose the slow + the support drones,
+    // Breach — no cryo, no hive. Lose the slow + the support drones,
     // both crucial for an X-crossing where one stuck pack feeds the
     // other lane. Mortar splash + chain bounces have to clear before
     // the crossover floods. Heavies are uplifted, shielded armor lands
     // on both lanes, and the closer waves squeeze spacing.
-    heroic: {
+    breach: {
       startGold: 320,
       forbiddenTowers: ["cryo", "hive"],
       tagline: "Full-speed two-front war. No slow, no drones.",
@@ -2022,10 +2023,10 @@ export const LEVELS: LevelConfig[] = [
         ),
       ],
     },
-    // Iron — pulse + chain + mortar. Kinetic precision, chain bounces
+    // Containment — pulse + chain + mortar. Kinetic precision, chain bounces
     // for swarms, mortar for armor. No slow to buy time, no flame for
     // DoT, no hive for buffs. Single life, no selling.
-    iron: {
+    containment: {
       startGold: 460,
       lockedLoadout: ["pulse", "chain", "mortar"],
       singleLife: true,
@@ -2145,12 +2146,12 @@ export const LEVELS: LevelConfig[] = [
       ),
       chaos({ raptor: 44, swarm: 56, allosaur: 18, stego: 14, armored: 12, titan: 5 }),
     ],
-    // Heroic — no pulse, no hive. The kinetic workhorse and the drone
+    // Breach — no pulse, no hive. The kinetic workhorse and the drone
     // support both gone. Chain handles swarm waves, cryo + mortar must
     // anchor the armored push, flame chews the regen brick later.
     // Adds a heavy leader to several waves to sand off the resist
     // crutch, plus a regen-stego trickle that previously didn't exist.
-    heroic: {
+    breach: {
       startGold: 320,
       forbiddenTowers: ["pulse", "hive"],
       tagline: "No kinetic, no drones. Chain, cold, splash, burn.",
@@ -2196,10 +2197,10 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 46, swarm: 60, allosaur: 20, stego: 15, armored: 13, titan: 5 }),
       ],
     },
-    // Iron — chain + cryo + flame. No kinetic, no splash, no drones.
+    // Containment — chain + cryo + flame. No kinetic, no splash, no drones.
     // Chain bounces for swarm, cryo slows, flame chews regen and dense
     // packs. Single life, no selling.
-    iron: {
+    containment: {
       startGold: 420,
       lockedLoadout: ["chain", "cryo", "flame"],
       singleLife: true,
@@ -2242,12 +2243,12 @@ export const LEVELS: LevelConfig[] = [
       chaos({ raptor: 40, swarm: 52, allosaur: 18, stego: 13, armored: 10, titan: 4 }),
       chaos({ raptor: 48, swarm: 60, allosaur: 20, stego: 16, armored: 13, titan: 6 }),
     ],
-    // Heroic — no chain, no flame. The crowd-clear staples are gone:
+    // Breach — no chain, no flame. The crowd-clear staples are gone:
     // no electric bounce against swarms or shields, no DoT for regen
     // or dense packs. Pulse must headshot the leaders, mortar splash
     // chops the line, cryo buys cycle time, hive amplifies. Adds
     // heavy raptors and a shielded armored convoy to spike pressure.
-    heroic: {
+    breach: {
       startGold: 400,
       forbiddenTowers: ["chain", "flame"],
       tagline: "No bounce, no burn. Pulse, splash, slow.",
@@ -2292,10 +2293,10 @@ export const LEVELS: LevelConfig[] = [
         chaos({ raptor: 50, swarm: 64, allosaur: 22, stego: 17, armored: 14, titan: 6 }),
       ],
     },
-    // Iron — pulse + mortar + cryo. Kinetic + splash + slow, the
+    // Containment — pulse + mortar + cryo. Kinetic + splash + slow, the
     // classic anti-everything loadout. No support, no DoT, no electric.
     // Single life, no selling — the late-tier serpentine is unforgiving.
-    iron: {
+    containment: {
       startGold: 400,
       lockedLoadout: ["pulse", "mortar", "cryo"],
       singleLife: true,
@@ -2389,12 +2390,12 @@ export const LEVELS: LevelConfig[] = [
         [2, { raptor: 28, swarm: 34, allosaur: 12, stego: 10, armored: 9, titan: 4 }],
       ),
     ],
-    // Heroic: no mortar. Three converging lanes already make splash
+    // Breach: no mortar. Three converging lanes already make splash
     // king — yanking it forces pulse-DPS + chain-coverage to do the
     // tank work the splash circle was eating for free. Heavy waves
     // gain a shielded armored core and the chaos waves swap in a
     // heavy-raptor pack so single-leak coverage hurts more.
-    heroic: {
+    breach: {
       startGold: 600,
       tagline: "No mortar. Triple-front armor breach.",
       forbiddenTowers: ["mortar"],
@@ -2486,7 +2487,7 @@ export const LEVELS: LevelConfig[] = [
           [1, { armored: 14, stego: 7, allosaur: 5, titan: 2 }],
           [2, { armored: 14, stego: 7, allosaur: 5, titan: 2 }],
         ),
-        // Heroic finale: same chaos backbone, but with a stacked
+        // Breach finale: same chaos backbone, but with a stacked
         // titan per lane. Electric chain is the only single-tower answer
         // and it still has to be saturated across all three converging
         // entrances at once.
@@ -2504,12 +2505,12 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron: single life, no selling, locked to pulse / chain / cryo —
+    // Containment: single life, no selling, locked to pulse / chain / cryo —
     // three towers that together cover three lanes (one per path is
     // the obvious play). No mortar means no easy heavy clear and no
     // flame means swarms can't be deleted at a chokepoint. Big start
     // bank funds the opening tri-lane committment.
-    iron: {
+    containment: {
       startGold: 700,
       tagline: "Locked: pulse / chain / cryo. One life, no selling.",
       lockedLoadout: ["pulse", "chain", "cryo"],
@@ -2730,13 +2731,13 @@ export const LEVELS: LevelConfig[] = [
         ],
       },
     ],
-    // Heroic: no pulse. Pulse rifles are the apex-killer single-target
+    // Breach: no pulse. Pulse rifles are the apex-killer single-target
     // sustain — yank them and the two matriarchs become a real chase
     // problem. Chain still rings through the entourage, mortar
     // shreds the titan walls, cryo keeps the bosses honest. Heavy
     // waves arrive shielded; the matriarch wave brings a second
     // child-spawn cadence to keep the lanes busy.
-    heroic: {
+    breach: {
       startGold: 500,
       tagline: "No pulse. Twin matriarchs, no single-target king.",
       forbiddenTowers: ["pulse"],
@@ -2856,11 +2857,11 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron: locked to chain / mortar / cryo. No pulse, no flame, no
+    // Containment: locked to chain / mortar / cryo. No pulse, no flame, no
     // hive support — the toolkit is "ring damage, splash damage,
     // slows". Single life means the apex matriarch wave is the
     // payoff for surviving 16 waves; the loadout is built for it.
-    iron: {
+    containment: {
       startGold: 550,
       tagline: "Locked: chain / mortar / cryo. One life, no selling.",
       lockedLoadout: ["chain", "mortar", "cryo"],
@@ -2937,7 +2938,7 @@ export const LEVELS: LevelConfig[] = [
           [0, { raptor: 28, swarm: 36, para: 12, allosaur: 14, stego: 12, armored: 9, titan: 4 }],
           [1, { raptor: 28, swarm: 36, para: 12, allosaur: 14, stego: 12, armored: 9, titan: 4 }],
         ),
-        // Iron boss wave: twin matriarchs as the normal mode, but
+        // Containment boss wave: twin matriarchs as the normal mode, but
         // entourage trimmed so the locked chain/mortar/cryo loadout
         // can actually field enough coverage on two lanes.
         {
@@ -3050,13 +3051,13 @@ export const LEVELS: LevelConfig[] = [
         [2, { raptor: 26, swarm: 36, allosaur: 12, stego: 8, armored: 7, titan: 3 }],
       ),
     ],
-    // Heroic: no chain. Three parallel lanes with 16-unit separation
+    // Breach: no chain. Three parallel lanes with 16-unit separation
     // mean chain's bounce was buying free coverage between paths —
     // yank it and every lane needs its own dedicated coverage. Heavy
     // waves bring shielded armored that pulse can crack; the late
     // chaos waves swap in heavy-raptor batches to punish a single
     // dropped lane.
-    heroic: {
+    breach: {
       startGold: 700,
       tagline: "No chain. Three lanes, three coverage commits.",
       forbiddenTowers: ["chain"],
@@ -3153,7 +3154,7 @@ export const LEVELS: LevelConfig[] = [
           [1, { raptor: 24, swarm: 32, allosaur: 11, stego: 7, armored: 6, titan: 2 }],
           [2, { raptor: 24, swarm: 32, allosaur: 11, stego: 7, armored: 6, titan: 2 }],
         ),
-        // Heroic finale: heavy titans per lane, three lanes wide.
+        // Breach finale: heavy titans per lane, three lanes wide.
         // Without chain, the player must field per-lane towers that can
         // burst the heavy titan before it walks the field.
         {
@@ -3170,13 +3171,13 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron: locked to pulse / mortar / hive. Three lanes, three
+    // Containment: locked to pulse / mortar / hive. Three lanes, three
     // schools of tower. Pulse is the per-lane DPS anchor, mortar is
     // the chokepoint splash, hive provides drone uplift. No cryo
     // means tanks can't be held off — the player has to actually
     // out-DPS the wave. Big start bank because building three lanes
     // simultaneously eats gold.
-    iron: {
+    containment: {
       startGold: 750,
       tagline: "Locked: pulse / mortar / hive. One life, no selling.",
       lockedLoadout: ["pulse", "mortar", "hive"],
@@ -3393,12 +3394,12 @@ export const LEVELS: LevelConfig[] = [
         [3, { raptor: 24, swarm: 30, allosaur: 10, stego: 7, armored: 6, titan: 3 }],
       ),
     ],
-    // Heroic: no mortar. Four cross-paths already over-reward splash
+    // Breach: no mortar. Four cross-paths already over-reward splash
     // because the center is a free choke — yank mortar and the center
     // becomes a chain coil + pulse focus battle. Heavy waves bring
     // shielded armored on every lane; the swarm wave is flame-adapted
     // so the player can't sit on a flamethrower for free.
-    heroic: {
+    breach: {
       startGold: 600,
       tagline: "No mortar. Four-front siege without the splash crutch.",
       forbiddenTowers: ["mortar"],
@@ -3522,7 +3523,7 @@ export const LEVELS: LevelConfig[] = [
           [2, { raptor: 22, swarm: 28, allosaur: 9, stego: 6, armored: 5, titan: 2 }],
           [3, { raptor: 22, swarm: 28, allosaur: 9, stego: 6, armored: 5, titan: 2 }],
         ),
-        // Heroic finale: heavy titans on every lane plus the regular
+        // Breach finale: heavy titans on every lane plus the regular
         // chaos backbone.
         {
           archetype: "chaos",
@@ -3540,11 +3541,11 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron: locked to chain / cryo / flame. Chain rings through the
+    // Containment: locked to chain / cryo / flame. Chain rings through the
     // center cross, cryo holds tanks at the chokepoint, flame chews
     // the persistent swarm pressure. No pulse means no single-target
     // king to clean up titans — they have to be slowed and stripped.
-    iron: {
+    containment: {
       startGold: 800,
       tagline: "Locked: chain / cryo / flame. One life, no selling.",
       lockedLoadout: ["chain", "cryo", "flame"],
@@ -3693,13 +3694,13 @@ export const LEVELS: LevelConfig[] = [
       chaos({ raptor: 32, swarm: 38, allosaur: 14, stego: 10, armored: 9, titan: 5 }),
       heavy({ stego: 12, armored: 18, titan: 7 }),
     ],
-    // Heroic: no pulse. Single serpentine map with a titan in nearly
+    // Breach: no pulse. Single serpentine map with a titan in nearly
     // every heavy wave — pulse-T3 was deleting them for kinetic-loss
     // change. Yank pulse and the player has to lean on chain ring-
     // through (electric 1.6× on stego, 0.9× on titan) plus splash for
     // the mid-tier brick clear. Most heavies now include a heavy
     // titan, and the final wave is a regen-armored brick wall.
-    heroic: {
+    breach: {
       startGold: 550,
       tagline: "No pulse. Titans march without their kinetic king.",
       forbiddenTowers: ["pulse"],
@@ -3757,12 +3758,12 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron: locked to chain / mortar / cryo. No pulse means no single-
+    // Containment: locked to chain / mortar / cryo. No pulse means no single-
     // target king for the titans; no flame means swarm waves take real
     // time to clear. Chain rings through electric-vulnerable stego,
     // mortar shreds armored, cryo holds the brick walls. Single path
     // means coverage is trivial — the entire run is a DPS budget test.
-    iron: {
+    containment: {
       startGold: 550,
       tagline: "Locked: chain / mortar / cryo. One life, no selling.",
       lockedLoadout: ["chain", "mortar", "cryo"],
@@ -3797,7 +3798,7 @@ export const LEVELS: LevelConfig[] = [
     startGold: 180,
     nodePos: { x: 12, y: 18 },
     hpScale: 3.0,
-    heroic: {
+    breach: {
       // Pulse + Hive banned: no rifle precision against armored/titans,
       // no drone uplinks. Chain/cryo/mortar/flame have to carry every
       // role themselves. Weaves keep enemies in range for splashes.
@@ -3906,7 +3907,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       // Locked: chain (swarm + shields), mortar (armored splash), cryo
       // (slow the lane). No pulse rifle for clean burst, no sells.
       startGold: 480,
@@ -4084,7 +4085,7 @@ export const LEVELS: LevelConfig[] = [
     startGold: 250,
     nodePos: { x: 24, y: 15 },
     hpScale: 2.65,
-    heroic: {
+    breach: {
       // Mortar + Hive banned: no splash for the inner lanes, no drone
       // amplification. Each lane fights its own war. Triceratops
       // Matriarchs on the outer lanes still answer to pulse + cryo —
@@ -4239,7 +4240,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       // Locked: pulse (only good boss counter), cryo (slow + body), chain
       // (swarm + lane width via bounces). No flame DoT, no mortar splash,
       // no drone uplinks — the loadout has to read 5 lanes by itself.
@@ -4543,7 +4544,7 @@ export const LEVELS: LevelConfig[] = [
     startGold: 190,
     nodePos: { x: 21, y: 20 },
     hpScale: 3.1,
-    heroic: {
+    breach: {
       // Pulse + Cryo banned: no precision rifle for tanks, no slow to
       // buy time. Forces chain/mortar/flame/hive to carry both halves
       // of the split. Armored bodies become a DoT-and-splash problem.
@@ -4650,7 +4651,7 @@ export const LEVELS: LevelConfig[] = [
         ),
       ],
     },
-    iron: {
+    containment: {
       // Locked: mortar (armored splash), chain (swarm + shields), hive
       // (drone uplinks to amplify chain across the split). No cryo to
       // buy time, no pulse precision — the map's edges are unforgiving.
@@ -4828,7 +4829,7 @@ export const LEVELS: LevelConfig[] = [
     startGold: 240,
     nodePos: { x: 11, y: 25 },
     hpScale: 2.3,
-    heroic: {
+    breach: {
       // Flame + Mortar banned: every AoE-vs-swarm staple is gone. Chain
       // bounces and pulse target priority have to clean each tide. The
       // map's two paths converge at the center, so a chain tower there
@@ -4917,7 +4918,7 @@ export const LEVELS: LevelConfig[] = [
         ),
       ],
     },
-    iron: {
+    containment: {
       // Locked: chain (electric vs swarm), pulse (anti-stego/anti-titan
       // burst), hive (drone uplinks to multiply chain). No cryo to slow,
       // no flame DoT, no mortar splash — sustain DPS from coverage alone.
@@ -5069,7 +5070,7 @@ export const LEVELS: LevelConfig[] = [
     startGold: 200,
     nodePos: { x: -1, y: 22 },
     hpScale: 3.5,
-    heroic: {
+    breach: {
       // Cryo + Hive banned: no slows to buy time, no drone uplinks to
       // amplify chain. Pure DPS-vs-DPS race. Onslaught's chaos waves
       // mean no archetype rest — every wave needs answers for armored,
@@ -5205,7 +5206,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       // Locked: pulse (high single-target precision), mortar (armored
       // splash on chaos packs), chain (swarm + electric on para/swarm).
       // No flame DoT, no cryo slow, no hive uplinks.
@@ -5426,7 +5427,7 @@ export const LEVELS: LevelConfig[] = [
     startGold: 210,
     nodePos: { x: -12, y: 26 },
     hpScale: 3.8,
-    heroic: {
+    breach: {
       // Pulse + Mortar banned: no rifle, no shells. The four-path map
       // already breaks coverage — losing two AoE staples forces tight
       // chain bounces and hive uplinks across the convergence point.
@@ -5611,7 +5612,7 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    iron: {
+    containment: {
       // Locked: chain (swarm + electric on para), cryo (slow the
       // armored stampedes), hive (drone uplinks amplify chain across
       // the convergence). No pulse rifle, no mortar splash, no flame.
@@ -6106,12 +6107,12 @@ export const LEVELS: LevelConfig[] = [
         ],
       },
     ],
-    // Heroic finale: no Hive. The drone-support meta that carries most
+    // Breach finale: no Hive. The drone-support meta that carries most
     // L30 builds is denied; the player must spread coverage across all
     // three lanes with the remaining five tower types. Bigger gold
     // pool to compensate for the loss of fire-rate amplification, and
     // a leaner 14-wave script that hits the apex finale faster.
-    heroic: {
+    breach: {
       startGold: 850,
       forbiddenTowers: ["hive"],
       tagline: "No Hive. Cover three lanes alone.",
@@ -6179,7 +6180,7 @@ export const LEVELS: LevelConfig[] = [
           [1, { raptor: 30, swarm: 38, para: 12, allosaur: 16, stego: 12, armored: 9, titan: 4 }],
           [2, { raptor: 30, swarm: 38, para: 12, allosaur: 16, stego: 12, armored: 9, titan: 4 }],
         ),
-        // Heroic finale matches the normal apex wave 1-for-1 — same
+        // Breach finale matches the normal apex wave 1-for-1 — same
         // three matriarchs, same trickle streams. The mode "challenge"
         // already comes from denying Hive across the whole map; making
         // the finale even harder on top would tip the run past the
@@ -6207,12 +6208,12 @@ export const LEVELS: LevelConfig[] = [
         },
       ],
     },
-    // Iron finale: one life, locked to the offensive trio — Pulse,
+    // Containment finale: one life, locked to the offensive trio — Pulse,
     // Chain, Mortar. No DoT (flame), no slowdown (cryo), no support
     // (hive). Pure damage management across three converging lanes
     // with an apex finale. Huge gold pool because the entire defense
     // commits at world creation and never sells.
-    iron: {
+    containment: {
       startGold: 2400,
       lockedLoadout: ["pulse", "chain", "mortar"],
       singleLife: true,
@@ -6255,7 +6256,7 @@ export const LEVELS: LevelConfig[] = [
           [1, { raptor: 24, swarm: 30, para: 8, allosaur: 12, stego: 8, armored: 6, titan: 2 }],
           [2, { raptor: 24, swarm: 30, para: 8, allosaur: 12, stego: 8, armored: 6, titan: 2 }],
         ),
-        // Iron finale: only two apex queens (one less than normal) so
+        // Containment finale: only two apex queens (one less than normal) so
         // the no-sell, single-life constraint stays survivable. Trickle
         // streams trimmed to two passes per lane.
         {

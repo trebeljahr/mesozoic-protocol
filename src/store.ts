@@ -133,7 +133,7 @@ export type LastResult = {
   startingLives: number;
   mode: LevelMode;
   // Number of stars awarded *this run* for the mode. Normal is 0-3,
-  // heroic/iron are 0 or 1.
+  // breach/containment are 0 or 1.
   stars: number;
   // Best run for the same mode (max of prior and current).
   bestStars: number;
@@ -550,7 +550,7 @@ type GameStore = {
   selectSlot: (id: SlotId) => void;
   deleteSlot: (id: SlotId) => void;
 
-  // Default mode is "normal" — heroic/iron are passed in by the mode
+  // Default mode is "normal" — breach/containment are passed in by the mode
   // picker. The store keeps no separate selectedMode; the active mode
   // lives on World.mode and on lastResult.mode so cross-screen reads
   // (HUD chip, results screen, etc.) stay in sync.
@@ -568,7 +568,7 @@ type GameStore = {
   clearCompendiumInitialSection: () => void;
   setAchievementsOpen: (open: boolean) => void;
   setCreditsOpen: (open: boolean) => void;
-  // One-shot "you unlocked Heroic + Iron modes" world-map dialog.
+  // One-shot "you unlocked Breach + Containment modes" world-map dialog.
   // Visibility is derived in WorldMapUI (any normal-3-star clear AND
   // !progress.seenModesUnlockExplainer); this setter persists the
   // dismissed flag so the dialog never reappears on this slot.
@@ -929,8 +929,8 @@ export const useGame = create<GameStore>((set, get) => ({
     const enter = () => {
       const cur = get();
       const { engine, progress } = cur;
-      // Resolve the requested mode. Caller defaults to "normal"; heroic /
-      // iron must both be unlocked AND defined on the level (the picker
+      // Resolve the requested mode. Caller defaults to "normal"; breach /
+      // containment must both be unlocked AND defined on the level (the picker
       // already enforces this, but reject defensively in case startLevel
       // is invoked from elsewhere — e.g. retry after the level was patched).
       let mode: LevelMode = modeArg ?? "normal";
@@ -1069,7 +1069,7 @@ export const useGame = create<GameStore>((set, get) => ({
       return;
     }
     const id = s.selectedLevelId ?? 1;
-    // Retry preserves the mode the player was in — restarting an Iron
+    // Retry preserves the mode the player was in — restarting a Containment
     // attempt should keep the one-life + locked loadout, not silently
     // drop back to normal.
     s.startLevel(id, s.world.mode);
@@ -1489,9 +1489,9 @@ export const useGame = create<GameStore>((set, get) => ({
             const prev =
               mode === "normal"
                 ? prevModeStars.normal
-                : mode === "heroic"
-                  ? prevModeStars.heroic
-                  : prevModeStars.iron;
+                : mode === "breach"
+                  ? prevModeStars.breach
+                  : prevModeStars.containment;
             const improved = ev.won && stars > prev;
             if (improved) progress = recordLevelResult(progress, w.levelId, mode, stars);
             if (ev.won) {
@@ -2230,7 +2230,7 @@ export const useGame = create<GameStore>((set, get) => ({
     if (w.status !== "running") return;
     // Mode rule check before spending gold. The HUD greys out denied
     // kinds, but a stale picker selection (e.g. the player armed a kind
-    // before opening the heroic/iron run) is rejected here so rules
+    // before opening the breach/containment run) is rejected here so rules
     // can't be bypassed mid-run.
     if (!isTowerKindAllowed(w, s.selectedKind)) {
       emit(w, { type: "place-failed", reason: "spot" });
@@ -2338,7 +2338,7 @@ export const useGame = create<GameStore>((set, get) => ({
     if (s.world.selectedTowerId === null) return;
     const t = s.world.towerById.get(s.world.selectedTowerId);
     if (!t) return;
-    // Iron mode disables selling entirely — every placement is committed
+    // Containment mode disables selling entirely — every placement is committed
     // for the run. The UI hides the sell button, but reject defensively.
     if (s.world.sellingDisabled) return;
     sellTower(s.world, t);
@@ -2756,17 +2756,17 @@ export const useGame = create<GameStore>((set, get) => ({
       ...s.progress,
       starsByLevel: { ...s.progress.starsByLevel },
     };
-    // Debug only touches the normal-mode star slot. Heroic + iron stars
-    // are preserved if already earned so toggling normal back to 0 in
+    // Debug only touches the normal-mode star slot. Breach + containment
+    // stars are preserved if already earned so toggling normal back to 0 in
     // the debug menu doesn't nuke a player's challenge clears.
     const prev = s.progress.starsByLevel[levelId];
-    if (stars === 0 && (!prev || (prev.heroic === 0 && prev.iron === 0))) {
+    if (stars === 0 && (!prev || (prev.breach === 0 && prev.containment === 0))) {
       delete next.starsByLevel[levelId];
     } else {
       next.starsByLevel[levelId] = {
         normal: stars,
-        heroic: prev?.heroic ?? 0,
-        iron: prev?.iron ?? 0,
+        breach: prev?.breach ?? 0,
+        containment: prev?.containment ?? 0,
       };
     }
     if (spentMetaStars(next.metaSkills) > totalStars(next)) {
@@ -2815,8 +2815,8 @@ export const useGame = create<GameStore>((set, get) => ({
       const prev = s.progress.starsByLevel[level.id];
       next.starsByLevel[level.id] = {
         normal: 3,
-        heroic: prev?.heroic ?? 0,
-        iron: prev?.iron ?? 0,
+        breach: prev?.breach ?? 0,
+        containment: prev?.containment ?? 0,
       };
     }
     const res = checkAchievements(next, s.world, null);

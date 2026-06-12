@@ -46,16 +46,16 @@ const STAR_SLOTS = ["slot-left", "slot-center", "slot-right"] as const;
 // and were illegible against the terrain). Three render states
 // (locked / unlocked / cleared) are chosen at the call site.
 const MODE_BADGE: Record<
-  "heroic" | "iron",
+  "breach" | "containment",
   { Icon: typeof IconBreach; text: string; border: string; bg: string }
 > = {
-  heroic: {
+  breach: {
     Icon: IconBreach,
     text: "text-orange",
     border: "border-orange",
     bg: "bg-[rgba(60,30,5,0.92)]",
   },
-  iron: {
+  containment: {
     Icon: IconLockdown,
     text: "text-red",
     border: "border-red",
@@ -81,11 +81,11 @@ export const LevelNode = ({ level }: Props) => {
 
   // Mode picker opens only when at least one challenge mode is both
   // authored on this level AND unlocked for the player. Early-game
-  // levels without heroic/iron content go straight into normal so the
-  // player isn't prompted with a one-option modal.
+  // levels without breach/containment content go straight into normal so
+  // the player isn't prompted with a one-option modal.
   const modePickerAvailable =
     unlocked &&
-    (["heroic", "iron"] as LevelMode[]).some(
+    (["breach", "containment"] as LevelMode[]).some(
       (m) => levelHasMode(level, m) && isModeUnlocked(progress, level.id, m),
     );
   const modeStars = getModeStars(progress, level.id);
@@ -97,7 +97,7 @@ export const LevelNode = ({ level }: Props) => {
   // a 3-star Standard run, open to attempt, or already beaten.
   const challengeBadges =
     unlocked && hasUnlockedChallengeModes(progress)
-      ? (["heroic", "iron"] as const)
+      ? (["breach", "containment"] as const)
           .filter((m) => levelHasMode(level, m))
           .map((m) => ({
             mode: m,

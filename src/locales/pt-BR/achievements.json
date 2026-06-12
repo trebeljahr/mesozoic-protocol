@@ -134,13 +134,13 @@
     "desc": "Reach wave 20 in an Endless arena.",
     "hint": "Survive deep into Endless mode."
   },
-  "heroic_effort": {
-    "name": "Heroic Effort",
+  "breach_holdout": {
+    "name": "First Breach",
     "desc": "Clear any mission on Breach mode.",
     "hint": "Win a handcrafted Breach run."
   },
-  "iron_will": {
-    "name": "Iron Will",
+  "containment_holdout": {
+    "name": "Held the Line",
     "desc": "Clear any mission on Containment mode.",
     "hint": "Win a one-life Containment run."
   },

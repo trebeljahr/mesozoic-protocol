@@ -253,8 +253,8 @@
     "subtitle": "Three stars cleared — new ways to play",
     "close": "Got it",
     "body": "Three-starring a level now unlocks two new modes for it. Pick them from a level's mode menu on the world map. Each mode beaten adds one bonus star to the level, up to a max of 5.",
-    "detailHeroic": "Tougher waves and a denied tower slot. Pick from the level's mode menu — clearing earns a bonus star.",
-    "detailIron": "One life. A locked loadout. No selling. The campaign's hardest variant — clearing earns a bonus star."
+    "detailBreach": "Tougher waves and a denied tower slot. Pick from the level's mode menu — clearing earns a bonus star.",
+    "detailContainment": "One life. A locked loadout. No selling. The campaign's hardest variant — clearing earns a bonus star."
   },
   "boss": {
     "eyebrow": "Threat detected",
@@ -408,8 +408,8 @@
     "outpost": "OUTPOST",
     "endless": "ENDLESS",
     "mode": "Mode",
-    "heroicMode": "Breach challenge mode",
-    "ironMode": "Containment challenge mode",
+    "breachMode": "Breach challenge mode",
+    "containmentMode": "Containment challenge mode",
     "build": "Build",
     "openBuildMenu": "Open build menu",
     "closeBuildMenu": "Close build menu",

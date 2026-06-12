@@ -1,12 +1,12 @@
 /**
  * Mode feasibility validator — runs the wave-feasibility numbers against
- * a level's heroic or iron mode override block.
+ * a level's breach or containment mode override block.
  *
- *   npx tsx scripts/mode-feasibility.ts <level-id> heroic
- *   npx tsx scripts/mode-feasibility.ts <level-id> iron
+ *   npx tsx scripts/mode-feasibility.ts <level-id> breach
+ *   npx tsx scripts/mode-feasibility.ts <level-id> containment
  *
  * Reads the mode block from the level config (must export the new
- * heroic/iron fields), and reuses the same DPS-vs-HP math as
+ * breach/containment fields), and reuses the same DPS-vs-HP math as
  * wave-feasibility.ts. Tower kinds in `forbiddenTowers` or outside
  * `lockedLoadout` are excluded from the candidate-config search so the
  * feasibility number reflects the actual restricted loadout.
@@ -53,8 +53,8 @@ type ModeConfig = {
 };
 
 type LevelWithModes = (typeof LEVELS)[number] & {
-  heroic?: ModeConfig;
-  iron?: ModeConfig;
+  breach?: ModeConfig;
+  containment?: ModeConfig;
 };
 
 const specStats = (s: EnemySpec) =>
@@ -230,7 +230,7 @@ const effectiveDpsVsWave = (
 
 // ------- Robot modeling -------
 //
-// Mirrors scripts/wave-feasibility.ts so the heroic/iron clear-check sees
+// Mirrors scripts/wave-feasibility.ts so the breach/containment clear-check sees
 // the same robot contribution as the per-level feasibility report. The robot
 // is a fixed (free) DPS contribution once a variant is selected — no gold
 // trade-off — so we maximise DPS unconditionally within the skill budget.
@@ -490,7 +490,10 @@ declare const process: { argv: string[]; exit(code: number): never };
 
 const args = process.argv.slice(2);
 const levelArg = args.find((a) => /^\d+$/.test(a));
-const modeArg = args.find((a) => a === "heroic" || a === "iron") as "heroic" | "iron" | undefined;
+const modeArg = args.find((a) => a === "breach" || a === "containment") as
+  | "breach"
+  | "containment"
+  | undefined;
 const robotArg = args.find((a) => a.startsWith("--robot="));
 const robotSkillsArg = args.find((a) => a.startsWith("--robot-skills="));
 const noRobot = args.includes("--no-robot");
@@ -504,7 +507,7 @@ const parseRobotVariant = (value: string | undefined): RobotVariant => {
 
 if (!levelArg || !modeArg) {
   console.error(
-    "Usage: npx tsx scripts/mode-feasibility.ts <level-id> heroic|iron " +
+    "Usage: npx tsx scripts/mode-feasibility.ts <level-id> breach|containment " +
       "[--robot=george|leela|mike|stan] [--robot-skills=N] [--no-robot]",
   );
   process.exit(1);

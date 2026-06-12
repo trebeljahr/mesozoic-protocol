@@ -253,8 +253,8 @@
     "subtitle": "Drei Sterne geschafft — neue Spielweisen",
     "close": "Verstanden",
     "body": "Ein Level mit drei Sternen abzuschließen schaltet nun zwei neue Modi dafür frei. Wähle sie aus dem Modus-Menü eines Levels auf der Weltkarte. Jeder geschlagene Modus fügt dem Level einen Bonusstern hinzu, bis zu maximal 5.",
-    "detailHeroic": "Zähere Wellen und ein gesperrter Turm-Slot. Wähle aus dem Modus-Menü des Levels — Abschluss bringt einen Bonusstern.",
-    "detailIron": "Ein Leben. Eine gesperrte Ausrüstung. Kein Verkauf. Die härteste Variante der Kampagne — Abschluss bringt einen Bonusstern."
+    "detailBreach": "Zähere Wellen und ein gesperrter Turm-Slot. Wähle aus dem Modus-Menü des Levels — Abschluss bringt einen Bonusstern.",
+    "detailContainment": "Ein Leben. Eine gesperrte Ausrüstung. Kein Verkauf. Die härteste Variante der Kampagne — Abschluss bringt einen Bonusstern."
   },
   "boss": {
     "eyebrow": "Bedrohung erkannt",
@@ -408,8 +408,8 @@
     "outpost": "AUSSENPOSTEN",
     "endless": "ENDLOS",
     "mode": "Modus",
-    "heroicMode": "Ausbruch-Herausforderungsmodus",
-    "ironMode": "Eindämmungs-Herausforderungsmodus",
+    "breachMode": "Ausbruch-Herausforderungsmodus",
+    "containmentMode": "Eindämmungs-Herausforderungsmodus",
     "build": "Bauen",
     "openBuildMenu": "Baumenü öffnen",
     "closeBuildMenu": "Baumenü schließen",

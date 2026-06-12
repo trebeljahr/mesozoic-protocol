@@ -27,7 +27,7 @@ export const ResultsScreen = () => {
   const startLevel = useGame((s) => s.startLevel);
 
   const nextLevel = result ? LEVELS.find((l) => l.id === result.levelId + 1) : undefined;
-  // Heroic/iron don't gate next-level unlock (normal 3-star already did), so
+  // Breach/containment don't gate next-level unlock (normal 3-star already did), so
   // surfacing "Unlocked: X" + a Next Level button after a challenge run reads
   // as nonsense. Only normal mode advances along the campaign spine.
   const showNext =
@@ -139,7 +139,7 @@ export const ResultsScreen = () => {
         </div>
         <div className="text-[13px] tracking-uber uppercase text-fg-dim mb-5">
           {result.mode !== "normal" && (
-            <span className={result.mode === "heroic" ? "text-orange mr-2" : "text-red mr-2"}>
+            <span className={result.mode === "breach" ? "text-orange mr-2" : "text-red mr-2"}>
               {t(`modes:mode.label.${result.mode}`)} ·
             </span>
           )}
@@ -200,7 +200,7 @@ const ResultRow = ({ label, value }: { label: string; value: React.ReactNode }) 
   </div>
 );
 
-// Single-icon badge used in place of the 3-star row for heroic/iron
+// Single-icon badge used in place of the 3-star row for breach/containment
 // runs. Earned = bright + glowing, unearned = dim outline so the player
 // sees what they still owe on this map.
 const ModeBadge = ({
@@ -208,14 +208,14 @@ const ModeBadge = ({
   earned,
   compact = false,
 }: {
-  mode: "heroic" | "iron";
+  mode: "breach" | "containment";
   earned: boolean;
   compact?: boolean;
 }) => {
   const { t } = useTranslation();
-  const icon = mode === "heroic" ? "✦" : "▣";
-  const colorClass = mode === "heroic" ? "text-orange" : "text-red";
-  const borderClass = mode === "heroic" ? "border-orange" : "border-red";
+  const icon = mode === "breach" ? "✦" : "▣";
+  const colorClass = mode === "breach" ? "text-orange" : "text-red";
+  const borderClass = mode === "breach" ? "border-orange" : "border-red";
   const size = compact ? "text-sm px-1.5 py-0.5" : "text-2xl px-3 py-1";
   return (
     <span

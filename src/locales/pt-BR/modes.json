@@ -2,13 +2,13 @@
   "mode": {
     "label": {
       "normal": "Standard",
-      "heroic": "Breach",
-      "iron": "Containment"
+      "breach": "Breach",
+      "containment": "Containment"
     },
     "tagline": {
       "normal": "The intended campaign",
-      "heroic": "Tougher waves. Towers denied.",
-      "iron": "One life. Locked loadout. No selling."
+      "breach": "Tougher waves. Towers denied.",
+      "containment": "One life. Locked loadout. No selling."
     }
   },
   "difficulty": {

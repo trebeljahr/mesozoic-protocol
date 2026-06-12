@@ -71,8 +71,8 @@ export const WorldMapUI = () => {
   const setEndlessPickerOpen = useGame((s) => s.setEndlessPickerOpen);
   const goToSlots = useGame((s) => s.goToSlots);
   const [menuOpen, setMenuOpen] = useState(false);
-  // One-shot explainer for Heroic + Iron once the player has earned 3
-  // stars on any level. Skipped if the slot has already dismissed it.
+  // One-shot explainer for Breach + Containment once the player has earned
+  // 3 stars on any level. Skipped if the slot has already dismissed it.
   const showModesUnlocked =
     !progress.seenModesUnlockExplainer && hasUnlockedChallengeModes(progress);
   const endlessUnlocked = hasUnlockedEndless(progress);
@@ -98,7 +98,7 @@ export const WorldMapUI = () => {
   const hoveredStars = hovered ? getStars(progress, hovered.id) : 0;
 
   const total = totalStars(progress);
-  // Each level caps at 5 stars: 3 normal + 1 heroic + 1 iron. The
+  // Each level caps at 5 stars: 3 normal + 1 breach + 1 containment. The
   // mode-totals are gated behind clearing normal first, so this max is
   // the theoretical ceiling once every level has been three-starred
   // and both challenge modes completed.

@@ -56,7 +56,7 @@ export const TowerPanel = () => {
   const status = useGame((s) => s.ui.status);
   const isMobile = useIsMobile();
   const [infoOpen, setInfoOpen] = useState(false);
-  // Iron mode disables selling; we still render the panel so upgrades
+  // Containment mode disables selling; we still render the panel so upgrades
   // and targeting modes are reachable. SellFooter hides itself when
   // sellDisabled is true.
   const sellDisabled = useGame((s) => s.world.sellingDisabled);

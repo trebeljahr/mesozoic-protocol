@@ -3,15 +3,15 @@ import { useGame } from "../store";
 import { MenuOverlay } from "./MenuOverlay";
 
 const MODE_ACCENT = {
-  heroic: { text: "text-orange", border: "border-orange", tint: "bg-[rgba(255,178,102,0.10)]" },
-  iron: { text: "text-red", border: "border-red", tint: "bg-tint-red" },
+  breach: { text: "text-orange", border: "border-orange", tint: "bg-[rgba(255,178,102,0.10)]" },
+  containment: { text: "text-red", border: "border-red", tint: "bg-tint-red" },
 } as const;
 
-const MODE_ICON = { heroic: "✦", iron: "▣" } as const;
+const MODE_ICON = { breach: "✦", containment: "▣" } as const;
 
-const MODE_DETAIL_KEY: Record<"heroic" | "iron", string> = {
-  heroic: "modesUnlocked.detailHeroic",
-  iron: "modesUnlocked.detailIron",
+const MODE_DETAIL_KEY: Record<"breach" | "containment", string> = {
+  breach: "modesUnlocked.detailBreach",
+  containment: "modesUnlocked.detailContainment",
 };
 
 export const ModesUnlockedModal = () => {
@@ -28,7 +28,7 @@ export const ModesUnlockedModal = () => {
     >
       <p className="text-[13px] leading-snug text-fg-muted mb-4">{t("modesUnlocked.body")}</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {(["heroic", "iron"] as const).map((mode) => {
+        {(["breach", "containment"] as const).map((mode) => {
           const accent = MODE_ACCENT[mode];
           return (
             <div

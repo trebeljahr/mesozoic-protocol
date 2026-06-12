@@ -946,7 +946,7 @@ export type World = {
   invincible: boolean;
   flowFeatures: import("../flowGeometry").FlowFeatures | null;
   robot: Robot;
-  // Per-run challenge-mode tags. Heroic + iron set these from their
+  // Per-run challenge-mode tags. Breach + containment set these from their
   // ModeConfig; normal runs all default to permissive. The sim and HUD
   // read these directly without re-resolving the mode config each tick.
   mode: import("../progress").LevelMode;

@@ -911,7 +911,7 @@ export const createWorld = (
     scaledWaves,
     availableDamageTypes(modeForbidden, modeLocked),
   );
-  // Iron mode caps lives at 1; every other mode starts at the full HQ
+  // Containment mode caps lives at 1; every other mode starts at the full HQ
   // life pool. The runtime never tops these up, so this is the only
   // place the value is set per run.
   const startingLives = modeConfig.singleLife ? 1 : STARTING_LIVES;
