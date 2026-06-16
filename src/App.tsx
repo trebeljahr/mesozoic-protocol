@@ -3,6 +3,7 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { KernelSize } from "postprocessing";
 import { lazy, Suspense, useEffect } from "react";
 import { useAudioBridge } from "./audio/useAudioBridge";
+import { isDebug, isHeadlessCapture } from "./debug";
 import { useEditor } from "./editor/editorStore";
 import { LevelEditorPanel } from "./editor/LevelEditorPanel";
 import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
@@ -255,10 +256,17 @@ export const App = () => {
     <>
       {!sceneBlockingModalOpen && (
         <ErrorBoundary fallback={(error, reset) => <CanvasFailure error={error} reset={reset} />}>
+          {/* preserveDrawingBuffer lets debug sessions read the canvas via
+              toDataURL for press screenshots; costs a buffer copy per frame,
+              so keep it out of normal play. Dead-codes out of prod builds. */}
           <Canvas
             shadows
             dpr={dprCap}
-            gl={{ antialias: true, powerPreference: "high-performance" }}
+            gl={{
+              antialias: true,
+              powerPreference: "high-performance",
+              preserveDrawingBuffer: isDebug,
+            }}
             onCreated={({ gl }) => {
               // WebGL context-loss safety net. preventDefault on the lost
               // event tells the browser we're willing to receive a restore;
@@ -358,7 +366,9 @@ export const App = () => {
       {screen === "playing" && !modalOpen && !hideLevelChrome && <NewEnemyAlert />}
       {!hideEditorChrome && <AchievementToast />}
       {!hideEditorChrome && <LandscapeNudge />}
-      {import.meta.env.DEV && screen === "playing" && !modalOpen && <LevelEditorPanel />}
+      {import.meta.env.DEV && !isHeadlessCapture && screen === "playing" && !modalOpen && (
+        <LevelEditorPanel />
+      )}
       {import.meta.env.DEV && screen === "worldMap" && !sceneBlockingModalOpen && (
         <WorldMapEditorPanel />
       )}

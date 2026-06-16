@@ -12,7 +12,7 @@
 
 import { Text } from "@react-three/drei";
 import { useEffect, useState } from "react";
-import { isDebug } from "../debug";
+import { showDebugOverlays } from "../debug";
 import {
   fetchPlannerTrace,
   type PlannerPlannedTower,
@@ -133,7 +133,7 @@ const formatPlanLabel = (
 };
 
 export const PlannerOverlay = () => {
-  if (!isDebug) return null;
+  if (!showDebugOverlays) return null;
   return <PlannerOverlayInner />;
 };
 

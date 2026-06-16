@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { isDebug } from "../debug";
+import { showDebugOverlays } from "../debug";
 import { fetchPlannerTrace, type PlannerTrace, type PlannerWaveAction } from "../debugPlannerTrace";
 import { useGame } from "../store";
 
@@ -21,7 +21,7 @@ const describeAction = (a: PlannerWaveAction): string => {
 };
 
 export const PlannerHud = () => {
-  if (!isDebug) return null;
+  if (!showDebugOverlays) return null;
   return <PlannerHudInner />;
 };
 
