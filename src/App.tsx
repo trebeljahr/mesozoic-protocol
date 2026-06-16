@@ -369,9 +369,10 @@ export const App = () => {
       {import.meta.env.DEV && !isHeadlessCapture && screen === "playing" && !modalOpen && (
         <LevelEditorPanel />
       )}
-      {import.meta.env.DEV && screen === "worldMap" && !sceneBlockingModalOpen && (
-        <WorldMapEditorPanel />
-      )}
+      {import.meta.env.DEV &&
+        !isHeadlessCapture &&
+        screen === "worldMap" &&
+        !sceneBlockingModalOpen && <WorldMapEditorPanel />}
     </>
   );
 };

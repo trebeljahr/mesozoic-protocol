@@ -14,10 +14,6 @@ yarn.lock
 .vscode/*
 !.vscode/extensions.json
 
-# Press screenshots: full-res PNGs are regenerable via
-# `node scripts/capture-screenshots.mjs` — keep the lighter JPEGs in git,
-# not the multi-MB PNG masters.
-press-assets/*.png
 .idea
 
 # TypeScript composite project outputs
