@@ -64,7 +64,12 @@
       scene.add(new THREE.AmbientLight("#ffffff", 0.35));
 
       const draco = new DRACOLoader();
-      draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+      // Same vendored decoder the app uses (see public/draco/README.md), so
+      // this authoring page contributes no Google CDN reference to the
+      // shipped dist/. It still needs the network for the esm.sh three
+      // imports above — it is a one-off icon authoring tool, opened by hand,
+      // never loaded by the game itself.
+      draco.setDecoderPath("/draco/");
       const loader = new GLTFLoader();
       loader.setDRACOLoader(draco);
       loader.load(

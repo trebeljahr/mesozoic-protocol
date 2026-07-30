@@ -1,3 +1,7 @@
+// Must be first: points drei's `useGLTF` at the vendored Draco decoder in
+// public/draco before any render module's top-level `useGLTF.preload(...)`
+// runs, so no model load can fall through to Google's CDN default.
+import "./dracoSetup";
 import { Canvas } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { KernelSize } from "postprocessing";
@@ -25,6 +29,7 @@ import { PlannerHud } from "./ui/PlannerHud";
 import { ResultsScreen } from "./ui/ResultsScreen";
 import { SaveSlots } from "./ui/SaveSlots";
 import { Splash } from "./ui/Splash";
+import { UpdateNotice } from "./ui/UpdateNotice";
 import { useBackNavigation } from "./ui/useBackNavigation";
 import { enterFullscreen, isFullscreen, loadFullscreenPref } from "./ui/useFullscreen";
 import { useInputModeSignal } from "./ui/useInputMode";
@@ -366,6 +371,10 @@ export const App = () => {
       {screen === "playing" && !modalOpen && !hideLevelChrome && <NewEnemyAlert />}
       {!hideEditorChrome && <AchievementToast />}
       {!hideEditorChrome && <LandscapeNudge />}
+      {/* Deliberately not in the splash/slots early returns above: mounting
+          here means the desktop update check cannot start until the player is
+          past the entry flow and the heavy first loads are done. */}
+      {!hideEditorChrome && <UpdateNotice />}
       {import.meta.env.DEV && !isHeadlessCapture && screen === "playing" && !modalOpen && (
         <LevelEditorPanel />
       )}

@@ -90,9 +90,16 @@ jobs:
           mkdir -p "$FLAT_DIR"
           # .app bundles are directories and are already contained in the DMG,
           # so only the distributable installers are collected here.
+          #
+          # `*.app.tar.gz` is the macOS auto-updater payload. It has to be a
+          # Release asset because latest.json points the updater at
+          # /releases/download/<tag>/<name>; the other two platforms update
+          # from the -setup.exe and the AppImage, which are already here. The
+          # matching `.sig` files are not attached — their contents are inlined
+          # into latest.json, which is what the updater reads.
           find "$ART_DIR" -type f \
             \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' \
-               -o -name '*.AppImage' -o -name '*.deb' \) \
+               -o -name '*.AppImage' -o -name '*.deb' -o -name '*.app.tar.gz' \) \
             -exec cp -n {} "$FLAT_DIR"/ \;
           count=$(find "$FLAT_DIR" -type f | wc -l | tr -d ' ')
           if [ "$count" -eq 0 ]; then
@@ -104,6 +111,41 @@ jobs:
           ls -lah "$FLAT_DIR"
           cat "$FLAT_DIR/SHA256SUMS.txt"
 
+      # Only needed by the two updater-manifest steps below; no pnpm install,
+      # scripts/ci/make-updater-manifest.mjs is dependency-free.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # latest.json is what `plugins.updater.endpoints` points at. Attaching it
+      # to the Release makes
+      #   https://github.com/<owner>/<repo>/releases/latest/download/latest.json
+      # serve it — and /releases/latest resolves to the newest NON-prerelease,
+      # so tagging a beta as a prerelease keeps it out of everyone's updater.
+      #
+      # Soft-skips on the ground truth (did the builds actually emit
+      # signatures?) rather than on secret presence, so this can never
+      # disagree with what build-*.yml did.
+      - name: Generate updater manifest
+        id: manifest
+        env:
+          ART_DIR: ${{ runner.temp }}/artifacts
+          FLAT_DIR: ${{ runner.temp }}/flat
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(find "$ART_DIR" -type f -name '*.sig' -print -quit)" ]; then
+            echo "::notice::No updater signatures in the build artifacts — skipping latest.json. See DISTRIBUTION.md → \"Auto-update\" for the one-time activation."
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node scripts/ci/make-updater-manifest.mjs \
+            --artifacts "$ART_DIR" \
+            --tag "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --out "$FLAT_DIR/latest.json"
+          echo "generated=true" >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -114,6 +156,14 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: ${{ runner.temp }}/flat/*
+
+      # GitHub rewrites release asset names (spaces become dots), so the URLs
+      # in latest.json are predicted, not observed. A wrong prediction produces
+      # a manifest of 404s that nobody notices until users stop getting
+      # updates. Check it against the Release that was just published.
+      - name: Verify updater manifest URLs resolve
+        if: steps.manifest.outputs.generated == 'true'
+        run: node scripts/ci/make-updater-manifest.mjs --verify "${{ runner.temp }}/flat/latest.json"
 
       # Hand the grouped artifacts to the itch job so it does not have to
       # repeat the wait-and-download.
@@ -189,6 +239,12 @@ jobs:
           set -euo pipefail
           BUTLER="$RUNNER_TEMP/butler/butler"
           pushed=0
+
+          # The Tauri updater payload and its signature are not itch uploads —
+          # the itch app runs its own differential updates, and shipping a
+          # second copy of the macOS bundle on the `osx` channel just doubles
+          # the download.
+          find "$ART_DIR" -type f \( -name '*.sig' -o -name '*.app.tar.gz' \) -delete
 
           push_channel() {
             local channel="$1" dir="$2"

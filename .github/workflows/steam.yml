@@ -14,6 +14,18 @@
 #                               Leave unset (recommended) so builds upload but
 #                               are promoted by hand in the Steamworks dashboard.
 #
+# Auto-updater carve-out: a Steam build must never self-update. A Tauri update
+# overwrites files SteamPipe owns, so the next "Verify integrity of game files"
+# silently reverts it, and the perMachine NSIS installer would land a second
+# copy next to Steam's. The updater is gated on the `updater` Cargo feature,
+# which is opt-in and only passed by the installer builds — but this workflow
+# does not build anything, it reuses the `*-portable` artifacts from the very
+# same `tauri build` runs that produce the installers, so the depot binary IS
+# the installer binary. The enforcement that actually applies here is the
+# runtime Steam check in src-tauri/src/updater.rs, which refuses to register
+# the plugin when SteamAppId / steam_appid.txt / a `steamapps` path segment is
+# present. See DISTRIBUTION.md → "Auto-update".
+#
 # Uses game-ci/steam-deploy rather than driving steamcmd directly: the fiddly
 # part of a Steam upload in CI is not the depot layout, it is getting steamcmd
 # past Steam Guard non-interactively (the config.vdf dance, the sentry file,
@@ -125,6 +137,20 @@ jobs:
 
           find "$DEPOT_DIR/linux" -type f -exec chmod +x {} \;
           find "$DEPOT_DIR/macos" -type d -name MacOS -exec sh -c 'chmod +x "$1"/*' _ {} \;
+
+          # A depot holds the runnable game, never an installer and never an
+          # updater payload. If one of those ever shows up here, an
+          # upload-artifact glob upstream widened and Steam would ship players
+          # a file they have to run by hand.
+          strays=$(find "$DEPOT_DIR" -type f \
+            \( -name '*.msi' -o -name '*-setup.exe' -o -name '*.AppImage' \
+               -o -name '*.deb' -o -name '*.dmg' -o -name '*.app.tar.gz' \
+               -o -name '*.sig' \))
+          if [ -n "$strays" ]; then
+            echo "::error::installer or updater artifacts leaked into the Steam depots:"
+            echo "$strays"
+            exit 1
+          fi
 
           echo "--- depot contents ---"
           find "$DEPOT_DIR" -maxdepth 3 | sort

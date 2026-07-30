@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { DRACO_DECODER_PATH } from "../dracoSetup";
 
 // Shared "render a 3D model to a PNG once, then serve as <img>" plumbing
 // used by every UI surface that wants a model thumbnail (EnemyIcon,
@@ -26,9 +27,10 @@ const getLoader = (): GLTFLoader => {
   loader = new GLTFLoader();
   // Most of the shipped game assets use Draco mesh compression; without
   // a DRACOLoader the parse fails. Drei's useGLTF wires this up by
-  // default — we mirror it with the same upstream decoder path.
+  // default — we mirror it, pointing at the same vendored decoder (see
+  // src/dracoSetup.ts) rather than Google's CDN so icon bakes work offline.
   const draco = new DRACOLoader();
-  draco.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
+  draco.setDecoderPath(DRACO_DECODER_PATH);
   loader.setDRACOLoader(draco);
   return loader;
 };

@@ -545,5 +545,16 @@
       "regen": "Reg.",
       "regenTitle": "Regeneration — heilt {{rate}} HP/Sek., pausiert {{pause}}s nach Schaden"
     }
+  },
+  "update": {
+    "eyebrow": "Update verfügbar",
+    "title": "Version {{version}}",
+    "body": "Die Installation startet das Spiel neu. Dein Fortschritt wird vorher gespeichert.",
+    "install": "Installieren",
+    "retry": "Wiederholen",
+    "later": "Später",
+    "downloading": "Wird geladen…",
+    "downloadingPct": "Wird geladen… {{pct}}%",
+    "failed": "Das Update konnte nicht installiert werden."
   }
 }

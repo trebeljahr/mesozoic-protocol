@@ -1,16 +1,70 @@
-/* Display font: Rajdhani is a clean, slightly geometric sans-serif —
-   reads as "sci-fi UI" without going full chrome-and-rivets. We only
-   pull 500 / 600 / 700 because all uses are bold-ish headings; body
-   text stays on the system stack for readability and zero-cost render.
-   `display=swap` keeps first paint on the fallback while Rajdhani
-   loads. */
-@import url("https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap");
-
 /* Tailwind v4. The legacy hand-written CSS lives in @layer components
    (bottom of file) so utilities cascade above it. Preflight is left enabled
    — anywhere it conflicts with hand-written rules, the hand-written rule
    wins via the components layer. */
 @import "tailwindcss";
+
+/* Display font: Rajdhani is a clean, slightly geometric sans-serif —
+   reads as "sci-fi UI" without going full chrome-and-rivets. We only
+   pull 500 / 600 / 700 because all uses are bold-ish headings; body
+   text stays on the system stack for readability and zero-cost render.
+   `font-display: swap` keeps first paint on the fallback while Rajdhani
+   loads.
+
+   Self-hosted, not fetched from fonts.googleapis.com. Three reasons:
+   the Capacitor/Tauri shells ship a "no network activity" store
+   declaration and a CDN @import would make that false (plus it hands
+   the player's IP to Google — the standard GDPR objection to hot-linked
+   Google Fonts); the font has to render with the device offline; and
+   the Tauri CSP (`style-src 'self' 'unsafe-inline'`) blocked the remote
+   @import outright, so desktop was silently falling back to a system
+   font while web and mobile were not.
+
+   Latin subset only. Rajdhani also publishes latin-ext and devanagari
+   cuts, but nothing we ship renders from them: en / de / pt-BR / zh-CN
+   between them use no codepoint in the latin-ext ranges (German
+   umlauts, ß and ô all live below U+0100), and zh-CN's Han characters
+   have no coverage in Rajdhani at all — they already fall back to the
+   system stack. Shipping the unused cuts would be ~21 kB of bytes that
+   never paint a glyph.
+
+   Files are the unmodified woff2 cuts Google serves, kept under their
+   original name per OFL 1.1; the license text sits next to them in
+   public/fonts/OFL.txt. Loaded from /fonts/… (not bundled) so the
+   emitted CSS is host-agnostic and the same URL resolves under the
+   `capacitor://` and `tauri://` origins. */
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/rajdhani-latin-500.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/rajdhani-latin-600.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/rajdhani-latin-700.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 @theme {
   /* === Surfaces === */

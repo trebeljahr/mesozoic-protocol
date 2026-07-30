@@ -147,29 +147,51 @@ uses the same rust toolchain and cargo caching pattern as `build-macos.yml`.
 Artifacts: `linux-bundles` (AppImage + `.deb`, for the GitHub Release and
 itch.io) and `linux-portable` (the raw executable, for the Steam depot).
 
-### Code signing — Windows via Azure Trusted Signing
+### Code signing — Windows via Azure Artifact Signing
 
 Steam distributes through its own DRM and doesn't require notarization, but unsigned binaries trigger Gatekeeper / SmartScreen warnings if a user runs the bundle outside Steam.
 
-Windows signing is wired through **Azure Trusted Signing** — Microsoft's managed signing service that replaces EV USB tokens. Cert lives in Azure, `signtool.exe` calls the Trusted Signing dlib with a service-principal token. CI runs in [.github/workflows/build-windows.yml](.github/workflows/build-windows.yml).
+Windows signing is wired through **Azure Artifact Signing** — Microsoft's managed signing service, no hardware token. The cert lives in Azure and `signtool.exe` calls the signing dlib with a service-principal token. CI runs in [.github/workflows/build-windows.yml](.github/workflows/build-windows.yml).
 
-**Eligibility & cost:** Trusted Signing requires verifiable business (3+ years for Public Trust certs that dismiss SmartScreen on first run) or individual validation. ~$9.99/month + per-signature fees on volume tier. Under-3-year orgs get Private Trust profiles only — those still sign, but don't bypass SmartScreen.
+> **Renamed January 2026.** The service was called **Trusted Signing** until 2026-01-14. Docs moved from `/azure/trusted-signing/` to [`/azure/artifact-signing/`](https://learn.microsoft.com/en-us/azure/artifact-signing/overview), the CLI extension is now `az extension add --name artifact-signing`, and the GitHub Action is `Azure/artifact-signing-action@v2` (the old `Azure/trusted-signing-action` repo still exists but is unmaintained). The resource provider is still `Microsoft.CodeSigning`, and the dlib path and `http://timestamp.acs.microsoft.com` are unchanged — **the `signCommand` in `tauri.conf.json` needs no edit.** Only names in prose changed.
+
+**Prerequisites — done.** Ricos Labs LLC has its D-U-N-S number and Azure organization identity validation has been submitted/approved. The notes below are kept for re-reference and for anyone rebuilding this from scratch.
+
+**Eligibility & cost:** ~$9.99/month for the Basic SKU (5,000 signatures/month; a Tauri release signs 3–6 files, so this is wildly oversized). Requires a **paid** Azure subscription — free, trial, and sponsored subscriptions are unsupported. Public Trust certificates are available to organizations in the US, Canada, EU, UK, Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway, and Israel; individual (non-organization) validation is US/Canada only. Identity validation takes **1–20 business days and cannot be expedited**.
+
+> An earlier version of this document claimed Public Trust required 3+ years of verifiable business history. That requirement existed during public preview and does not appear in any current Microsoft documentation — not the quickstart, the FAQ, or the code-signing-options page. It appears to have been dropped at GA, though Microsoft never published a statement saying so.
+
+**The billing account is load-bearing.** Legal name and address on the certificate are pulled read-only from the Azure billing profile, and an "Individual" billing account cannot validate an organization identity. The billing account must be registered to `Ricos Labs LLC` with exactly the name and address you want on the cert.
 
 **One-time Azure setup:**
 
-1. Azure Portal → create `Microsoft.CodeSigning/codeSigningAccounts` resource. Pick region near CI runners (e.g. `westus2`).
-2. Submit **Identity Validation** (LLC docs, EIN, address proof for business; gov ID for individual). Approval: hours to days.
-3. Create a **Certificate Profile** — `Public Trust` if eligible, else `Private Trust`. Subject CN = `Ricos Labs LLC`. Note the profile name + endpoint URL (`https://<region>.codesigning.azure.net`).
+1. Azure Portal → create `Microsoft.CodeSigning/codeSigningAccounts` resource. Pick a region near the CI runners (e.g. `westus2`).
+2. Submit **Identity Validation** (LLC docs, EIN, address proof; a representative also completes personal Verified-ID). The primary email verification link **expires in 7 days and cannot be resent**. Documents must be issued within the last 12 months; three attempts allowed.
+3. Create a **Certificate Profile** — `Public Trust`. Subject CN = `Ricos Labs LLC`. Note the profile name + endpoint URL (`https://<region>.codesigning.azure.net`).
 4. Create a service principal for CI:
    ```bash
-   az ad sp create-for-rbac --name "mesozoic-trusted-signing" --skip-assignment
+   az ad sp create-for-rbac --name "mesozoic-artifact-signing" --skip-assignment
    az role assignment create \
      --assignee <APP_ID> \
      --role "Trusted Signing Certificate Profile Signer" \
      --scope "/subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.CodeSigning/codeSigningAccounts/<ACCOUNT>"
    ```
+   (The role name still says "Trusted Signing" — the RBAC role was not renamed with the service.)
 
-**Tauri integration:** `src-tauri/tauri.conf.json` sets `bundle.windows.signCommand` to invoke `signtool` with `/dlib` pointing at the Trusted Signing client DLL and `/dmdf` at a JSON metadata file. CI installs the dlib via NuGet (`Microsoft.Trusted.Signing.Client`) and writes the metadata file at runtime.
+**Tauri integration:** `src-tauri/tauri.conf.json` sets `bundle.windows.signCommand` to invoke `signtool` with `/dlib` pointing at the signing client DLL and `/dmdf` at a JSON metadata file. CI installs the dlib via NuGet (`Microsoft.Trusted.Signing.Client`) and writes the metadata file at runtime.
+
+#### What signing does and does not buy you
+
+**Nothing dismisses SmartScreen on first download. Not even an EV certificate.** Microsoft, verbatim, on [SmartScreen reputation for Windows app developers](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation): *"EV certificates no longer bypass SmartScreen… Paying a premium for EV solely to avoid SmartScreen warnings is no longer justified."* Their own comparison table puts Artifact Signing, a $150–300/yr OV cert, and a $400+/yr EV cert in the same bucket. Artifact Signing will never issue EV certificates and Microsoft states there is no plan to.
+
+What actually happens: reputation accrues against **both** the file hash and the publisher identity. Per-hash reputation resets on every release; per-identity reputation carries over. Microsoft's own estimate for a new publisher is *"several weeks and hundreds of clean installs from a wide audience."* There is no consumer submission path to accelerate it.
+
+Consequences for this project:
+
+- **Sign every release with the same identity and never rotate it.** Rotating throws away the only reputation signal that persists across builds.
+- **Never modify a binary after `signtool` runs.** The updater `.sig` is generated over the already-signed installer — that order is correct, don't invert it.
+- **Steam is the escape hatch.** Steam-installed builds never touch SmartScreen's download path. Direct downloads will show the warning for the first several weeks regardless, so the download page should say so and name the publisher to verify.
+- Windows 11's Smart App Control can supersede SmartScreen entirely, and unlike SmartScreen it applies to all executables, not just downloaded ones.
 
 **Required GitHub secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TS_ACCOUNT`, `AZURE_TS_PROFILE`, `AZURE_TS_ENDPOINT`. (Upgrade to OIDC later by configuring a federated identity credential on the Azure AD app and dropping the client secret.)
 
@@ -417,6 +439,22 @@ The size table lives in `STORE_TARGETS` in [scripts/store-screenshots.mjs](scrip
 
 The capture drives `?capture=1`, which is gated on `import.meta.env.DEV` — so it needs a dev server, not `vite preview` against a production `dist/`.
 
+### Console declarations — the answers that depend on code
+
+The full submission walkthrough (form-by-form, with wait times) lives in the vault as `mesozoic-protocol-store-submission-checklist.md`. What belongs *here* is the set of console answers that are only true because of how the code is built — change the code and these become false declarations, not just stale notes.
+
+| Declaration | Answer | What makes it true |
+| --- | --- | --- |
+| Apple App Privacy | **No data collected** | Nothing leaves the device. Apple's definition: *"Data that is processed only on device is not 'collected'."* localStorage, Capacitor Preferences, and a WebView rendering bundled assets are all outside it. |
+| Play Data safety | **No data collected** | Same. Mandatory to fill in even at zero collection. |
+| Apple age rating: **Unrestricted Web Access** | **No** | The WebView loads only bundled assets and `capacitor.config.ts` sets no `server.allowNavigation`. Answering Yes forces a 16+ rating. **Add an allowNavigation entry and this answer becomes a lie.** |
+| Play: Advertising ID | **Not used** | No dependency declares `com.google.android.gms.permission.AD_ID`. Re-check the *merged* manifest after adding any Capacitor plugin — a transitive dep injecting it contradicts "no data collected". |
+| Apple export compliance | Exempt | `ITSAppUsesNonExemptEncryption = false` in `Info.plist`. Only true while no dependency ships its own crypto. This is a regulatory statement, not a UI shortcut — re-audit per release. |
+| Apple review notes | "runs entirely offline, no network activity" | Requires zero runtime requests to any external host. Verify with a proxy in airplane mode before each submission. |
+| Play target API level | 36 | `android/variables.gradle`. API 36 became mandatory for new apps and updates on **2026-08-31**. |
+
+Two rating answers are judgment calls rather than code facts, recorded here so they stay consistent across releases: Apple **13+** (frequent cartoon/fantasy violence, frequent weapons — under-declaring to reach 9+ is a common rejection and Apple can re-rate unilaterally), and Play target audience **13+ and up only** (selecting any band under 13 triggers Google Play's Families Policy and a separate, heavier review).
+
 ### Save data on native
 
 `localStorage` inside a WKWebView is evictable cache: iOS can clear it under disk pressure or when the app is offloaded, and the player loses their campaign without ever uninstalling.
@@ -521,3 +559,239 @@ repo stays green before the itch.io project exists. To enable it:
 - Promoting from the Play internal track to production is manual (or change the workflow's `track` dispatch input).
 - Setting an uploaded Steam build live on a branch is manual in the Steamworks dashboard, unless you set the `STEAM_RELEASE_BRANCH` repo variable.
 - The one-time vendor setup — Steamworks app + depots, the itch.io project, Apple/Play app records, Azure identity validation — is manual by nature. Each is documented in its section above.
+
+## Auto-update (Tauri updater)
+
+Direct downloads — the DMG, the `-setup.exe`, the AppImage — have no update
+path of their own. Steam and the itch.io app update their own copies; a GitHub
+Release does not. [tauri-plugin-updater](https://v2.tauri.app/plugin/updater/)
+closes that gap: the app asks a signed JSON manifest whether a newer version
+exists, and installs it in place.
+
+**None of it is switched on yet, and nothing here needs it to be.** The signing
+keypair is secret material that has to be generated by hand, so every piece
+below is wired but inert, and the whole thing turns on with one commit plus two
+repository secrets.
+
+### The activation gate
+
+`bundle.createUpdaterArtifacts` is deliberately *not* in
+[src-tauri/tauri.conf.json](src-tauri/tauri.conf.json). With it set there,
+`tauri build` fails outright whenever `TAURI_SIGNING_PRIVATE_KEY` is unset,
+which would turn every current CI run red months before the key exists.
+
+Instead the updater config lives in a separate overlay,
+[src-tauri/tauri.updater.conf.json](src-tauri/tauri.updater.conf.json), holding
+only `bundle.createUpdaterArtifacts` and the `plugins.updater` block
+(`pubkey`, `endpoints`, `windows.installMode`). The three desktop workflows
+merge it in with `tauri build --config …` — Tauri applies extra `--config`
+files as an [RFC 7396](https://datatracker.ietf.org/doc/html/rfc7396) merge
+patch, so it adds those two keys and leaves the rest of `bundle` (icons,
+signing command, NSIS settings) untouched.
+
+[scripts/ci/updater-gate.sh](scripts/ci/updater-gate.sh) decides, per build,
+whether to pass that flag. It requires **both**:
+
+- the `TAURI_SIGNING_PRIVATE_KEY` secret to be set, and
+- the overlay's `pubkey` to no longer be the shipped placeholder.
+
+If either is missing it prints a `::notice::` and the build proceeds without
+the updater — the same soft-skip idiom as `steam.yml` and the itch job. When
+both are present it emits `--config src-tauri/tauri.updater.conf.json
+--features updater`, so the compiled code and the config can never disagree:
+one gate turns on both. It also fails loudly if the overlay carries a real
+pubkey but no endpoints, or if a `github.com` endpoint names a different
+repository than the one publishing the release.
+
+### One-time activation
+
+1. Generate the keypair. It never leaves your machine and never enters the repo:
+
+   ```bash
+   pnpm tauri signer generate -w ~/.tauri/mesozoic-protocol.key
+   ```
+
+   That writes `~/.tauri/mesozoic-protocol.key` (private, password-protected)
+   and `~/.tauri/mesozoic-protocol.key.pub` (public). Give it a password —
+   Tauri prompts for one, and CI passes it through as a secret.
+
+2. **Back the private key up off-machine, exactly like the Android upload
+   keystore.** Losing it is unrecoverable in a specific and permanent way:
+   every already-installed copy of the game only trusts updates signed by that
+   key. A new key cannot sign for the old one, so every existing install is
+   orphaned — those players never see another update and have to download and
+   install a fresh build by hand. There is no revocation, no override, no
+   support channel to appeal to. Treat it like the keystore: a password manager
+   attachment plus one offline copy.
+
+3. Add two repository secrets under **Settings → Secrets and variables →
+   Actions**:
+
+   | Secret | Value |
+   | --- | --- |
+   | `TAURI_SIGNING_PRIVATE_KEY` | the entire contents of `~/.tauri/mesozoic-protocol.key` |
+   | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | the password you set in step 1 |
+
+   Both names are read directly by Tauri from the process environment; they are
+   not configurable.
+
+4. Paste the public key into
+   [src-tauri/tauri.updater.conf.json](src-tauri/tauri.updater.conf.json),
+   replacing `REPLACE_ME_RUN_TAURI_SIGNER_GENERATE`:
+
+   ```bash
+   cat ~/.tauri/mesozoic-protocol.key.pub
+   ```
+
+   While you are in that file, confirm `plugins.updater.endpoints` points at
+   the repository that actually publishes the releases. The gate script
+   cross-checks it against `GITHUB_REPOSITORY` and fails the build on a
+   mismatch, but only once the updater is live.
+
+5. Commit and tag as usual. The first tagged release built with the key is the
+   one that starts publishing `latest.json`; its installers are the first ones
+   that can self-update. Copies installed before that point have no updater
+   compiled in and never will — they are a manual-reinstall cohort.
+
+### How an update is found and applied
+
+`plugins.updater.endpoints` points at
+
+```
+https://github.com/<owner>/<repo>/releases/latest/download/latest.json
+```
+
+`/releases/latest/` resolves to the newest release **that is not marked as a
+prerelease**, so tagging a beta as a prerelease keeps it out of every player's
+updater automatically. (`release.yml` currently publishes with
+`prerelease: false`; flip that input when you want a build that is downloadable
+but not offered as an update.)
+
+[scripts/ci/make-updater-manifest.mjs](scripts/ci/make-updater-manifest.mjs)
+generates `latest.json` in `release.yml` from the `.sig` files the platform
+builds produced, and attaches it to the Release alongside the installers. It is
+dependency-free Node and runnable by hand:
+
+```bash
+node scripts/ci/make-updater-manifest.mjs \
+  --artifacts <dir-of-gathered-build-artifacts> \
+  --tag v0.2.0 --repo <owner>/<repo> --out latest.json
+```
+
+Four details in that script are load-bearing:
+
+- **`signature` is the contents of the `.sig` file, not a path to it.** The
+  `.sig` files themselves are not attached to the Release; they only exist to
+  be inlined here.
+- **Tauri validates every platform entry before it compares versions.** One
+  malformed entry breaks updates for every platform, not just its own — so the
+  script emits a platform only when it has both the payload and its signature,
+  and fails the release outright rather than publishing a half manifest.
+- **There is no `darwin-universal` key.** The macOS build is a universal
+  binary, so the same `.app.tar.gz` is listed under both `darwin-x86_64` and
+  `darwin-aarch64`; the running app picks the key matching its own arch.
+- **Windows updates from the NSIS `-setup.exe`, not the `.msi`.** The MSI stays
+  in the Release for policy deployment, but the NSIS installer's
+  `installMode: "passive"` handles the unattended in-place upgrade on its own,
+  where the MSI path would need elevation prompts and msiexec argument
+  juggling. It is a download, not an update channel.
+
+GitHub rewrites release asset names (spaces become dots), so the URLs in
+`latest.json` are predicted rather than observed. `release.yml` therefore runs
+`make-updater-manifest.mjs --verify` against the published Release and fails if
+any URL does not resolve — a manifest full of 404s is otherwise invisible until
+players quietly stop receiving updates.
+
+The updater signature is generated over the *already code-signed* artifact on
+both platforms that have one: the notarized+stapled macOS `.app` and the
+Trusted-Signing-signed NSIS installer. An installed update passes Gatekeeper
+and SmartScreen exactly like a fresh download does.
+
+### Steam and the itch.io app do not self-update
+
+A Tauri update overwrites files SteamPipe owns. The next "Verify integrity of
+game files" silently reverts it, and the `perMachine` NSIS installer would land
+a second copy next to Steam's. Two layers keep that from happening:
+
+- **Compile time** — the plugin sits behind the `updater` Cargo feature, which
+  is opt-in and not in `default`. A build that forgets the flag ships with no
+  self-update machinery at all. The inverse default (a `steam` feature that
+  *disables* it) would mean every build that forgets a flag ships a
+  self-updater, including the depot; this direction fails safe.
+- **Run time** — [src-tauri/src/updater.rs](src-tauri/src/updater.rs) refuses to
+  register the plugin when it sees `SteamAppId` / `SteamGameId` /
+  `SteamOverlayGameId` / `SteamClientLaunch` in the environment, a
+  `steam_appid.txt` next to the executable, or a `steamapps` path segment.
+
+The runtime layer is the one that actually applies today, and it is not
+decorative. `steam.yml` does not build anything: it reuses the `*-portable`
+artifacts from the very same `tauri build` runs that produce the installers, so
+the depot binary *is* the installer binary and the compile-time feature cannot
+tell them apart. Splitting them would mean a second full Rust build (plus a
+second notarization on macOS) per release. If that trade ever becomes worth it,
+the change is a separate no-feature build step feeding a `*-portable-steam`
+artifact.
+
+`steam.yml` also asserts that no installer or updater artifact leaked into a
+depot, and `release.yml` strips `.sig` / `.app.tar.gz` before handing the
+artifacts to butler — the itch.io app runs its own differential updates and has
+no use for the Tauri payload.
+
+### Save data and the Windows force-exit
+
+Windows installers terminate the app mid-install (`std::process::exit(0)`), so
+the frontend gets no ordinary shutdown. `updater_check` installs an
+`UpdaterBuilder::on_before_exit` hook that emits `updater://before-exit` and
+blocks for 600 ms before the process dies;
+[src/updater.ts](src/updater.ts) listens for it and re-persists the active save
+slot, and also persists once before the download even starts.
+
+Be clear about what that does and does not guarantee. Progress writes in this
+game are already synchronous and write-through — every mutation routes through
+`persistProgress` in [src/store.ts](src/store.ts) straight into localStorage —
+so there is no dirty buffer to flush and the hook is a backstop, not a rescue.
+What it cannot promise is durability: there is no API to make a WebView fsync
+its storage, the event is delivered asynchronously, and 600 ms is a heuristic.
+The realistic failure mode is losing the last few seconds of play, not a save
+file; and it only exists on Windows, because macOS and Linux swap the bundle in
+place and return normally.
+
+The flow is driven from Rust commands (`updater_check` / `updater_install`)
+rather than the plugin's JavaScript API, for two reasons. The plugin's own
+`download_and_install` command hardcodes its `on_before_exit` hook, so there is
+no way to attach the one above. And capability permissions cannot be
+conditioned on a Cargo feature: putting `updater:allow-check` in
+[src-tauri/capabilities/default.json](src-tauri/capabilities/default.json)
+fails the build with *"Permission updater:allow-check not found"* whenever the
+feature is off — exactly the state the repo has to stay green in. App-defined
+commands are not ACL-checked (Tauri v2 only resolves the ACL for
+`plugin:`-prefixed commands), so the capability file needs no changes at all.
+
+### The update prompt
+
+[src/ui/UpdateNotice.tsx](src/ui/UpdateNotice.tsx) is a small corner card built
+from the existing `overlay-card` / `btn` classes. It is mounted next to
+`AchievementToast` in [src/App.tsx](src/App.tsx) — deliberately *not* in the
+splash/slot early returns, so the check cannot start until the player is past
+the entry flow. On top of that it waits 12 s and then asks for an idle
+callback, so the network round trip and signature parse never contend with
+shader compilation or model loading. One check per app run.
+
+On the web build and inside the Capacitor shells the Tauri globals do not
+exist, `src/updater.ts` short-circuits before the dynamic `@tauri-apps/api`
+import, and the component renders nothing. The bindings are their own Vite
+chunk (`tauri`), so a browser visitor never downloads them.
+
+### Testing it before a real release
+
+`pnpm tauri build --config src-tauri/tauri.updater.conf.json --features updater`
+reproduces exactly what CI does once activated, and needs
+`TAURI_SIGNING_PRIVATE_KEY` + `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` exported in
+the shell. To exercise the full loop, point `plugins.updater.endpoints` at a
+local file server serving a hand-written `latest.json`, install a build with a
+lower version, and run it.
+
+One gotcha worth knowing: the Tauri CLI refuses to build when the
+`@tauri-apps/api` npm package and the `tauri` Rust crate are on different
+minor versions. `src-tauri/Cargo.lock` is the source of truth — if a `cargo
+update` moves the crate, bump the npm package to match in the same commit.

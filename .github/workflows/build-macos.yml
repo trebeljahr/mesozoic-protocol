@@ -168,11 +168,25 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Decides whether this build also produces the auto-updater payload and
+      # its signature. Soft-skips with a ::notice:: until the signing keypair
+      # exists — see scripts/ci/updater-gate.sh and DISTRIBUTION.md.
+      - name: Auto-updater activation gate
+        id: updater
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: bash scripts/ci/updater-gate.sh
+
+      # The updater tarball is packed from the already-signed, notarized and
+      # stapled .app, so the update a user installs passes Gatekeeper exactly
+      # like a fresh DMG download does.
       - name: Build + sign + notarize (Tauri, universal binary)
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_DEVELOPER_ID_CERT_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASSWORD }}
-        run: pnpm tauri build --target universal-apple-darwin
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build --target universal-apple-darwin ${{ steps.updater.outputs.args }}
 
       - name: Verify signature + notarization
         run: |
@@ -201,4 +215,13 @@ jobs:
           path: |
             src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+          # `if-no-files-found` is evaluated over all patterns together, so the
+          # updater globs matching nothing (not activated yet) is fine.
+          #
+          # NOTE for steam.yml: it locates the .app with `find -maxdepth 6 -name
+          # '*.app' -type d`, so the added globs cannot confuse it — they are
+          # files, not directories, and do not change the common path prefix
+          # upload-artifact strips.
           if-no-files-found: error

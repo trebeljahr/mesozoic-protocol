@@ -545,5 +545,16 @@
       "regen": "Regen",
       "regenTitle": "Regen — heals {{rate}} HP/sec, paused for {{pause}}s after damage"
     }
+  },
+  "update": {
+    "eyebrow": "Update available",
+    "title": "Version {{version}}",
+    "body": "Installing restarts the game. Your progress is saved first.",
+    "install": "Install & restart",
+    "retry": "Try again",
+    "later": "Later",
+    "downloading": "Downloading…",
+    "downloadingPct": "Downloading… {{pct}}%",
+    "failed": "The update could not be installed."
   }
 }

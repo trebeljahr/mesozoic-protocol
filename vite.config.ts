@@ -38,6 +38,37 @@ const UI_HEAVY_CHUNK_PACKAGES = [
   "/node_modules/zustand/",
 ];
 
+// drei hardcodes Google's Draco CDN as `useGLTF`'s default decoder path.
+// src/dracoSetup.ts overrides it at runtime, but the literal still ends up
+// minified into the `three` chunk — a dead string that is also a live
+// regression risk: anything that manages to call `useGLTF` before that
+// override evaluates would silently fetch the decoder from gstatic, breaking
+// every model load offline and contradicting the stores' "no network
+// activity" declaration. Rewriting the default to the vendored path at build
+// time removes the fallback entirely, so `grep -r gstatic dist/` stays empty
+// and there is nothing left to regress to.
+const DREI_DRACO_CDN_DEFAULT = /https:\/\/www\.gstatic\.com\/draco\/versioned\/decoders\/[\d.]+\//g;
+const DREI_GLTF_MODULE = "@react-three/drei/core/Gltf";
+const LOCAL_DRACO_PATH = "/draco/"; // keep in sync with src/dracoSetup.ts
+
+const localDracoDefault = (): PluginOption => ({
+  name: "local-draco-default",
+  apply: "build",
+  transform(code: string, id: string) {
+    if (!id.replaceAll("\\", "/").includes(DREI_GLTF_MODULE)) return null;
+    if (!DREI_DRACO_CDN_DEFAULT.test(code)) {
+      // A drei upgrade moved or renamed the default. Fail the build rather
+      // than quietly shipping whatever the new default is.
+      throw new Error(
+        `[local-draco-default] Expected a Draco CDN default in ${DREI_GLTF_MODULE}, found none. ` +
+          `Re-check drei's useGLTF decoder path handling and update this plugin.`,
+      );
+    }
+    DREI_DRACO_CDN_DEFAULT.lastIndex = 0;
+    return { code: code.replace(DREI_DRACO_CDN_DEFAULT, LOCAL_DRACO_PATH), map: null };
+  },
+});
+
 type HatchkitViteModule = {
   localDev?: (options: { slug: string }) => PluginOption;
 };
@@ -74,6 +105,14 @@ const manualChunks = (id: string): string | undefined => {
 
   if (matchesAnyPackage(normalizedId, UI_HEAVY_CHUNK_PACKAGES)) {
     return "ui-heavy";
+  }
+
+  // The Tauri IPC bindings are behind a dynamic import in src/updater.ts and
+  // are only reachable inside the desktop shell. Falling through to `vendor`
+  // would pull them into the eagerly-loaded bundle every web visitor
+  // downloads, for code that can never run there.
+  if (normalizedId.includes("/node_modules/@tauri-apps/")) {
+    return "tauri";
   }
 
   return "vendor";
@@ -209,6 +248,7 @@ export default defineConfig(async ({ command, mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      localDracoDefault(),
       {
         name: "plausible-html",
         transformIndexHtml(html: string) {

@@ -11,6 +11,20 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0b1016" />
     <meta name="application-name" content="Mesozoic Protocol" />
+    <!-- Only the 700 cut is preloaded: it is the one weight the first screen
+         paints (the main-menu title). 500 and 600 are in-game UI and load on
+         demand, so preloading them would just be bytes fetched before the
+         menu that needs them. The self-hosted @font-face rules live in
+         src/index.css, which the bundler emits as a separate stylesheet —
+         without this hint the font is a two-hop discovery (HTML → CSS → woff2)
+         and the title visibly swaps in late. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/rajdhani-latin-700.woff2"
+      crossorigin
+    />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/32x32.png" />
     <link rel="icon" type="image/png" sizes="128x128" href="/icons/128x128.png" />
     <link rel="canonical" href="https://play.mesozoicprotocol.com/" />

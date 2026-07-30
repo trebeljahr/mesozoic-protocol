@@ -106,8 +106,20 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Decides whether this build also produces the auto-updater payload and
+      # its signature. Soft-skips with a ::notice:: until the signing keypair
+      # exists — see scripts/ci/updater-gate.sh and DISTRIBUTION.md.
+      - name: Auto-updater activation gate
+        id: updater
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: bash scripts/ci/updater-gate.sh
+
       - name: Build (Tauri)
-        run: pnpm tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build ${{ steps.updater.outputs.args }}
 
       - name: Verify bundles were produced
         run: |
@@ -127,6 +139,9 @@ jobs:
           path: |
             src-tauri/target/release/bundle/appimage/*.AppImage
             src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig
+          # `if-no-files-found` is evaluated over all patterns together, so the
+          # .sig glob matching nothing (updater not activated yet) is fine.
           if-no-files-found: error
 
       # A Steam depot ships the game directory, not a package — Steam does the

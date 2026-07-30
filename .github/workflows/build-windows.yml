@@ -155,8 +155,24 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Decides whether this build also produces the auto-updater payload and
+      # its signature. Soft-skips with a ::notice:: until the signing keypair
+      # exists — see scripts/ci/updater-gate.sh and DISTRIBUTION.md.
+      - name: Auto-updater activation gate
+        id: updater
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: bash scripts/ci/updater-gate.sh
+
+      # The updater signature is generated over the already Trusted-Signing-
+      # signed installer, so an installed update carries the same signature a
+      # fresh download does.
       - name: Build + sign (Tauri)
-        run: pnpm tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri build ${{ steps.updater.outputs.args }}
 
       - name: Verify signatures
         shell: pwsh
@@ -175,6 +191,11 @@ jobs:
           path: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+          # `if-no-files-found` is evaluated over all patterns together, so the
+          # .sig glob matching nothing (updater not activated yet) is fine.
+          # Only the NSIS signature is collected — the manifest updates from
+          # the NSIS installer, not the MSI. See scripts/ci/make-updater-manifest.mjs.
           if-no-files-found: error
 
       # A Steam depot ships the game directory, not an installer — Steam does
