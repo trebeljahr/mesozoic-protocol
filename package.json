@@ -17,12 +17,21 @@
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "check:enemy-text": "tsx scripts/check-enemy-text.ts",
     "check:i18n": "tsx scripts/check-i18n.ts",
+    "typecheck": "tsc -b",
+    "sync:native-assets": "node scripts/sync-native-assets.mjs",
+    "screenshots:store": "node scripts/store-screenshots.mjs",
+    "screenshots:store:list": "node scripts/store-screenshots.mjs --list",
+    "version:sync": "node scripts/sync-version.mjs",
+    "version:check": "node scripts/sync-version.mjs --check",
     "prepare": "husky"
   },
   "dependencies": {
     "@capacitor/core": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
     "@react-three/postprocessing": "^2.19.1",
@@ -60,7 +69,8 @@
     "three-stdlib": "^2.36.1",
     "tsx": "^4.22.3",
     "typescript": "^5.6.2",
-    "vite": "^5.4.8"
+    "vite": "^5.4.8",
+    "vitest": "^3.2.7"
   },
   "pnpm": {
     "overrides": {

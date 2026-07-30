@@ -1,0 +1,68 @@
+# Fast, unsigned correctness gate.
+#
+# Runs on every push to main, every PR, and every `v*` tag. This is the cheap
+# check that catches the boring failures — a type error, a lint regression, a
+# version number that only got bumped in three of the five places — before the
+# expensive signed platform builds spend 40 minutes discovering the same thing
+# four times over.
+#
+# The signed build workflows do NOT depend on this workflow. Each of them
+# carries its own `preflight` job with the same lint/typecheck/version checks
+# (plus a secret-presence check that only makes sense per platform), so that a
+# build workflow stays self-contained and dispatchable on its own. See the
+# rationale note in DISTRIBUTION.md.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint (biome)
+        run: pnpm lint
+
+      # NOT `tsc -b --noEmit`: tsconfig.node.json is a composite referenced
+      # project, and TypeScript rejects `--noEmit` for those (TS6310
+      # "Referenced project may not disable emit"). Plain `tsc -b` is the
+      # correct non-emitting invocation here — the root project already sets
+      # "noEmit": true, so the only output is tsconfig.node.json's declaration
+      # build into the gitignored .tsbuild/ directory. This mirrors exactly
+      # what the `build` script (`tsc -b && vite build`) runs.
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      - name: Version declarations agree
+        run: node scripts/sync-version.mjs --check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build web bundle
+        run: pnpm build

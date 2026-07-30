@@ -1,0 +1,146 @@
+# Steam upload for a `v*` tag.
+#
+# Soft-skips (notice + exit 0) until Steamworks is actually set up, so this can
+# live on main before the Steam Direct app exists. It becomes active once all
+# of the following are configured:
+#
+#   vars.STEAM_APP_ID    — repository variable, the numeric Steam App ID
+#   STEAM_USERNAME       — secret, the Steamworks build account username
+#   STEAM_CONFIG_VDF     — secret, base64 of a Steam Guard-authenticated
+#                          config.vdf (see steam/README.md for how to produce it)
+#
+# Optional:
+#   vars.STEAM_RELEASE_BRANCH — Steam beta branch to set live automatically.
+#                               Leave unset (recommended) so builds upload but
+#                               are promoted by hand in the Steamworks dashboard.
+#
+# Uses game-ci/steam-deploy rather than driving steamcmd directly: the fiddly
+# part of a Steam upload in CI is not the depot layout, it is getting steamcmd
+# past Steam Guard non-interactively (the config.vdf dance, the sentry file,
+# steamcmd's habit of exiting 0 on some failures). That action encapsulates
+# exactly that, is maintained, and is what the rest of the ecosystem uses. The
+# vdf templates in steam/ cover the manual `steamcmd +run_app_build` path and
+# document the depot IDs.
+
+name: Steam
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v* tag to upload
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read   # required to download the platform build artifacts
+
+concurrency:
+  group: steam-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Secrets cannot be evaluated in a job-level `if:`, so the gate is its own
+  # job that exports a plain output.
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          STEAM_APP_ID: ${{ vars.STEAM_APP_ID }}
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${STEAM_APP_ID:-}" ]     || missing+=("vars.STEAM_APP_ID")
+          [ -n "${STEAM_USERNAME:-}" ]   || missing+=("secrets.STEAM_USERNAME")
+          [ -n "${STEAM_CONFIG_VDF:-}" ] || missing+=("secrets.STEAM_CONFIG_VDF")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::notice::Steam upload skipped — not configured yet: ${missing[*]}. See steam/README.md for the one-time Steamworks setup."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+  upload:
+    needs: gate
+    if: needs.gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve tag and commit
+        id: ref
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for desktop builds and download their artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ steps.ref.outputs.sha }}
+          WORKFLOWS: build-macos.yml build-windows.yml build-linux.yml
+          OUT_DIR: ${{ runner.temp }}/artifacts
+        run: bash scripts/ci/gather-build-artifacts.sh
+
+      # Steam depots contain the runnable game directory. The `*-portable`
+      # artifacts are the unpacked builds; the macOS depot uses the .app from
+      # macos-bundles.
+      #
+      # GitHub artifacts do not preserve the POSIX executable bit, so the
+      # binaries come back as mode 644 and Steam would ship an unlaunchable
+      # build. Restoring it here is not optional.
+      - name: Stage depot contents
+        env:
+          ART_DIR: ${{ runner.temp }}/artifacts
+          DEPOT_DIR: ${{ runner.temp }}/depots
+        run: |
+          set -euo pipefail
+          mkdir -p "$DEPOT_DIR/windows" "$DEPOT_DIR/macos" "$DEPOT_DIR/linux"
+
+          cp -R "$ART_DIR/windows-portable/." "$DEPOT_DIR/windows/"
+          cp -R "$ART_DIR/linux-portable/."   "$DEPOT_DIR/linux/"
+
+          # upload-artifact strips the common prefix of its `path:` globs, so
+          # the bundle currently lands at macos-bundles/macos/<name>.app —
+          # depth 3. The bound is generous on purpose: adding one more glob to
+          # the macOS upload step would shift that prefix and silently move
+          # the bundle deeper.
+          APP_DIR=$(find "$ART_DIR" -maxdepth 6 -name '*.app' -type d | head -1)
+          test -n "$APP_DIR" || { echo "::error::no .app bundle found in the macOS artifact"; exit 1; }
+          cp -R "$APP_DIR" "$DEPOT_DIR/macos/"
+
+          find "$DEPOT_DIR/linux" -type f -exec chmod +x {} \;
+          find "$DEPOT_DIR/macos" -type d -name MacOS -exec sh -c 'chmod +x "$1"/*' _ {} \;
+
+          echo "--- depot contents ---"
+          find "$DEPOT_DIR" -maxdepth 3 | sort
+
+      # depotNPath maps to depot ID <appId> + N, which matches the depot IDs
+      # Steamworks creates by default. If your depot IDs differ, use the
+      # steam/*.vdf templates with steamcmd instead — see steam/README.md.
+      - name: Upload to Steam
+        uses: game-ci/steam-deploy@v3
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: ${{ vars.STEAM_APP_ID }}
+          buildDescription: ${{ steps.ref.outputs.tag }}
+          rootPath: ${{ runner.temp }}/depots
+          depot1Path: windows
+          depot2Path: macos
+          depot3Path: linux
+          releaseBranch: ${{ vars.STEAM_RELEASE_BRANCH }}

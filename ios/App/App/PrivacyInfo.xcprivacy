@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Apple privacy manifest. Without it, uploads to App Store Connect
+	     bounce with ITMS-91053 ("Missing API declaration"). The two
+	     declarations below cover the required-reason APIs the Capacitor
+	     runtime touches; the game itself adds none.
+
+	     No data leaves the device from the native shell: the Plausible
+	     loader in src/analytics.ts refuses to run unless the hostname
+	     matches VITE_PLAUSIBLE_DOMAIN, which never holds inside the
+	     WKWebView. Keep that true, or this manifest and the App Store
+	     privacy labels both become lies. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- Capacitor stores its bridge/plugin state in UserDefaults. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- The local web server reads timestamps of bundled assets
+			     inside the app container when serving the Vite build. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

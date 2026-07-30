@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (android:dataExtractionRules). Same intent as
+  backup_rules.xml, split across the two transfer channels the platform
+  now distinguishes:
+
+  - cloud-backup: Google Drive Auto Backup. Save data only.
+  - device-transfer: direct device-to-device migration. Same set — the
+    player expects their campaign to come across either way.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="app_webview" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="file" path="app_webview/Default/GPUCache" />
+        <exclude domain="file" path="app_webview/GPUCache" />
+        <exclude domain="root" path="cache" />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="app_webview" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="file" path="app_webview/Default/GPUCache" />
+        <exclude domain="file" path="app_webview/GPUCache" />
+        <exclude domain="root" path="cache" />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,29 @@
+// macOS depot — template. Replace <DEPOT_ID_MACOS>.
+//
+// Contents: the `Mesozoic Protocol.app` bundle produced by
+// `.github/workflows/build-macos.yml` (universal binary, Developer ID signed
+// and notarized). NOT the .dmg — a depot ships the .app itself.
+//
+// If you build this depot from a downloaded CI artifact rather than from a
+// local `pnpm tauri build`, restore the executable bit on
+// `Mesozoic Protocol.app/Contents/MacOS/*` first: GitHub artifacts do not
+// preserve POSIX permissions and Steam would ship an unlaunchable bundle.
+
+"DepotBuildConfig"
+{
+	"DepotID"	"<DEPOT_ID_MACOS>"
+
+	// Relative to "contentroot" in app_build.vdf.
+	"ContentRoot"	"macos"
+
+	"FileMapping"
+	{
+		"LocalPath"	"*"
+		"DepotPath"	"."
+		"recursive"	"1"
+	}
+
+	"FileExclusion"	"steam_appid.txt"
+	"FileExclusion"	"*.dSYM"
+	"FileExclusion"	".DS_Store"
+}

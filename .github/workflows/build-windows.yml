@@ -27,7 +27,80 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Cheap gate on a Linux runner: catch a missing secret, a type error, or a
+  # half-applied version bump in ~90s instead of after a full Rust build plus
+  # a Trusted Signing round trip. Mirrors ci.yml plus the secret check
+  # specific to this workflow.
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # An empty Azure secret produces a metadata.json with blank fields and
+      # signtool fails with an unhelpful HRESULT. Assert presence up front.
+      # Names only are printed — never values.
+      - name: Verify required secrets are present
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TS_ACCOUNT: ${{ secrets.AZURE_TS_ACCOUNT }}
+          AZURE_TS_PROFILE: ${{ secrets.AZURE_TS_PROFILE }}
+          AZURE_TS_ENDPOINT: ${{ secrets.AZURE_TS_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          # AZURE_CLIENT_SECRET stays in this list until the OIDC upgrade
+          # described in the header comment is done; drop it from `required`
+          # at the same time you add `id-token: write`.
+          required=(
+            AZURE_TENANT_ID
+            AZURE_CLIENT_ID
+            AZURE_CLIENT_SECRET
+            AZURE_TS_ACCOUNT
+            AZURE_TS_PROFILE
+            AZURE_TS_ENDPOINT
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            [ -n "${!name:-}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing or empty repo secret(s): ${missing[*]}"
+            echo "Set them under Settings → Secrets and variables → Actions."
+            echo "The header comment in this workflow file explains what each one is."
+            exit 1
+          fi
+          echo "All ${#required[@]} required secrets are present."
+
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint (biome)
+        run: pnpm lint
+
+      # See ci.yml for why this is `tsc -b` and not `tsc -b --noEmit`.
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      # tauri.conf.json's version ends up in the MSI/NSIS filenames and in the
+      # installer's ProductVersion, so drift produces a mislabelled installer.
+      - name: Version declarations agree
+        run: node scripts/sync-version.mjs --check
+
+      - name: Unit tests
+        run: pnpm test
+
   build:
+    needs: preflight
     runs-on: windows-latest
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -102,4 +175,14 @@ jobs:
           path: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+
+      # A Steam depot ships the game directory, not an installer — Steam does
+      # the installing. This is the unpacked build for .github/workflows/steam.yml.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: |
+            src-tauri/target/release/mesozoic-protocol.exe
+            src-tauri/target/release/*.dll
           if-no-files-found: error

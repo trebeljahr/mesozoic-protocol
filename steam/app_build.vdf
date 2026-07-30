@@ -1,0 +1,50 @@
+// Steam build script template — the manual `steamcmd` path.
+//
+// CI does not read this file: .github/workflows/steam.yml drives
+// game-ci/steam-deploy, which generates an equivalent script from its inputs.
+// This template exists so you can (a) upload by hand without CI, and
+// (b) have the depot IDs written down somewhere.
+//
+// Usage:
+//   1. Copy to app_build_<APP_ID>.vdf and replace every <PLACEHOLDER>.
+//   2. Build all three platforms and put the unpacked output where each
+//      depot vdf's FileMapping LocalPath points.
+//   3. steamcmd +login <user> +run_app_build /abs/path/app_build_<APP_ID>.vdf +quit
+//
+// The copies you fill in are gitignored (see .gitignore) — they contain your
+// real App ID and local absolute paths.
+
+"appbuild"
+{
+	"appid"	"<APP_ID>"
+
+	// Shows up in the Steamworks "Builds" list. Use the git tag.
+	"desc"	"<VERSION>"
+
+	// Where steamcmd writes build logs and its chunk cache. Relative to this file.
+	"buildoutput"	"../steam-build-output"
+
+	// Depot ContentRoot paths are resolved relative to this. Point it at the
+	// directory holding the per-platform build output.
+	"contentroot"	"../dist-desktop"
+
+	// Branch to set live automatically after a successful upload.
+	// Leave EMPTY to upload without promoting anything — you then flip the
+	// build live in the Steamworks dashboard. Never set this to "default":
+	// that publishes straight to everyone with no review step.
+	"setlive"	""
+
+	// 1 = validate the build without uploading. Useful for a dry run.
+	"preview"	"0"
+
+	// Only needed if you are uploading a build for an app you do not own
+	// outright (publisher setups). Leave empty otherwise.
+	"local"	""
+
+	"depots"
+	{
+		"<DEPOT_ID_WINDOWS>"	"depot_windows.vdf"
+		"<DEPOT_ID_MACOS>"	"depot_macos.vdf"
+		"<DEPOT_ID_LINUX>"	"depot_linux.vdf"
+	}
+}

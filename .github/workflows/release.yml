@@ -1,0 +1,212 @@
+# Permanent release: collect the desktop build artifacts for a `v*` tag,
+# publish them as a GitHub Release, then push them to itch.io.
+#
+# Why this exists: workflow artifacts expire after 90 days (and are only
+# reachable to people who can see the Actions tab). A GitHub Release is
+# permanent and public, which is what a download page, a Steam depot job, or
+# anyone verifying a build actually needs.
+#
+# Waiting, not racing: the platform builds are triggered independently by the
+# same tag push, so when this starts they are typically still queued. This
+# workflow polls until all three desktop builds have concluded and then
+# publishes. If ANY of them failed, it publishes nothing and fails loudly —
+# a Release that quietly contains Windows and Linux but not macOS looks
+# complete and is not. Re-run this workflow after fixing the failing build.
+#
+# Scope: only the desktop artifacts (.dmg / .msi / -setup.exe / .AppImage /
+# .deb) go into the Release. iOS and Android are deliberately NOT waited on:
+# their outputs are store submissions (TestFlight / Play internal track), not
+# downloadable assets, and an App Review hiccup should not block the desktop
+# release.
+#
+# Optional repo secrets / variables:
+#   BUTLER_API_KEY   — itch.io API key (itch.io/user/settings/api-keys).
+#                      Absent → the itch job soft-skips, workflow stays green.
+#   vars.ITCH_USER   — itch.io account name that owns the project.
+#   vars.ITCH_GAME   — itch.io project slug (defaults to mesozoic-protocol).
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v* tag to (re)publish
+        required: true
+        type: string
+
+permissions:
+  contents: write   # required to create the GitHub Release
+  actions: read     # required to list/download the platform build artifacts
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Generous: the macOS universal build plus notarization is the long pole.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve tag and commit
+        id: ref
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.ref_name }}"
+          SHA="$(git rev-parse HEAD)"
+          {
+            echo "tag=$TAG"
+            echo "sha=$SHA"
+            echo "version=${TAG#v}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG ($SHA)"
+
+      - name: Wait for desktop builds and download their artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ steps.ref.outputs.sha }}
+          WORKFLOWS: build-macos.yml build-windows.yml build-linux.yml
+          OUT_DIR: ${{ runner.temp }}/artifacts
+        run: bash scripts/ci/gather-build-artifacts.sh
+
+      # The Release gets a flat list of files; itch.io needs them grouped by
+      # platform. Keep both: `flat/` for the Release, the per-artifact
+      # directories under `artifacts/` for butler.
+      - name: Collect release assets
+        id: assets
+        env:
+          ART_DIR: ${{ runner.temp }}/artifacts
+          FLAT_DIR: ${{ runner.temp }}/flat
+        run: |
+          set -euo pipefail
+          mkdir -p "$FLAT_DIR"
+          # .app bundles are directories and are already contained in the DMG,
+          # so only the distributable installers are collected here.
+          find "$ART_DIR" -type f \
+            \( -name '*.dmg' -o -name '*.msi' -o -name '*-setup.exe' \
+               -o -name '*.AppImage' -o -name '*.deb' \) \
+            -exec cp -n {} "$FLAT_DIR"/ \;
+          count=$(find "$FLAT_DIR" -type f | wc -l | tr -d ' ')
+          if [ "$count" -eq 0 ]; then
+            echo "::error::All builds succeeded but no installer artifacts were found — check the upload-artifact paths in the build workflows."
+            exit 1
+          fi
+          ( cd "$FLAT_DIR" && sha256sum ./* > SHA256SUMS.txt )
+          echo "--- release assets ---"
+          ls -lah "$FLAT_DIR"
+          cat "$FLAT_DIR/SHA256SUMS.txt"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ref.outputs.tag }}
+          name: ${{ steps.ref.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: ${{ runner.temp }}/flat/*
+
+      # Hand the grouped artifacts to the itch job so it does not have to
+      # repeat the wait-and-download.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/artifacts
+          retention-days: 7
+          if-no-files-found: error
+
+  # itch.io upload. Soft-skips (notice + exit 0) until the itch.io project
+  # exists and BUTLER_API_KEY is set, so the repo stays green before then.
+  itch:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check itch.io configuration
+        id: gate
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_USER: ${{ vars.ITCH_USER }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BUTLER_API_KEY:-}" ]; then
+            echo "::notice::BUTLER_API_KEY is not set — skipping itch.io upload. Add the secret (itch.io → Settings → API keys) to enable it."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "${ITCH_USER:-}" ]; then
+            echo "::notice::Repository variable ITCH_USER is not set — skipping itch.io upload. Set it to the itch.io account that owns the project."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve version
+        if: steps.gate.outputs.enabled == 'true'
+        id: ref
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag || github.ref_name }}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Install butler
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          curl -sSfL -o "$RUNNER_TEMP/butler.zip" \
+            https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q -o "$RUNNER_TEMP/butler.zip" -d "$RUNNER_TEMP/butler"
+          chmod +x "$RUNNER_TEMP/butler/butler"
+          "$RUNNER_TEMP/butler/butler" -V
+
+      # One channel per platform — each is a separate slot in itch.io's
+      # "Uploads" tab, and the itch.io desktop app uses the channel name to
+      # pick the right download and to offer differential updates.
+      - name: Push builds to itch.io
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          ITCH_USER: ${{ vars.ITCH_USER }}
+          ITCH_GAME: ${{ vars.ITCH_GAME || 'mesozoic-protocol' }}
+          VERSION: ${{ steps.ref.outputs.version }}
+          ART_DIR: ${{ runner.temp }}/artifacts
+        run: |
+          set -euo pipefail
+          BUTLER="$RUNNER_TEMP/butler/butler"
+          pushed=0
+
+          push_channel() {
+            local channel="$1" dir="$2"
+            if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
+              echo "::warning::no artifacts for channel '$channel' at $dir — skipping"
+              return
+            fi
+            echo "pushing $dir → $ITCH_USER/$ITCH_GAME:$channel (v$VERSION)"
+            "$BUTLER" push "$dir" "$ITCH_USER/$ITCH_GAME:$channel" --userversion "$VERSION"
+            pushed=$((pushed + 1))
+          }
+
+          push_channel osx     "$ART_DIR/macos-bundles"
+          push_channel windows "$ART_DIR/windows-bundles"
+          push_channel linux   "$ART_DIR/linux-bundles"
+
+          if [ "$pushed" -eq 0 ]; then
+            echo "::error::butler was configured but nothing was uploaded."
+            exit 1
+          fi
+          "$BUTLER" status "$ITCH_USER/$ITCH_GAME"

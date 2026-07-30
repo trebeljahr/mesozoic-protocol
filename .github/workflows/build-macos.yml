@@ -34,7 +34,80 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Cheap gate on a Linux runner: catch a missing secret, a type error, or a
+  # half-applied version bump in ~90s instead of after a universal-binary
+  # Rust build and a notarization round trip. Mirrors ci.yml plus the secret
+  # check specific to this workflow.
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # An empty cert secret decodes to a zero-byte .p12 and fails deep inside
+      # `security import`. Assert presence up front. Names only — never values.
+      - name: Verify required secrets are present
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_DEVELOPER_ID_CERT_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERT_BASE64 }}
+          APPLE_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASSWORD }}
+          APPLE_DEVELOPER_ID_IDENTITY: ${{ secrets.APPLE_DEVELOPER_ID_IDENTITY }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+          APPSTORE_API_KEY_P8_BASE64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+        run: |
+          set -euo pipefail
+          required=(
+            APPLE_TEAM_ID
+            APPLE_DEVELOPER_ID_CERT_BASE64
+            APPLE_DEVELOPER_ID_CERT_PASSWORD
+            APPLE_DEVELOPER_ID_IDENTITY
+            APPLE_KEYCHAIN_PASSWORD
+            APPSTORE_API_KEY_ID
+            APPSTORE_API_ISSUER_ID
+            APPSTORE_API_KEY_P8_BASE64
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            [ -n "${!name:-}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing or empty repo secret(s): ${missing[*]}"
+            echo "Set them under Settings → Secrets and variables → Actions."
+            echo "The header comment in this workflow file explains what each one is."
+            exit 1
+          fi
+          echo "All ${#required[@]} required secrets are present."
+
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint (biome)
+        run: pnpm lint
+
+      # See ci.yml for why this is `tsc -b` and not `tsc -b --noEmit`.
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      # tauri.conf.json's version ends up in the DMG filename, so a drifted
+      # version produces a mislabelled release artifact.
+      - name: Version declarations agree
+        run: node scripts/sync-version.mjs --check
+
+      - name: Unit tests
+        run: pnpm test
+
   build:
+    needs: preflight
     runs-on: macos-15
     timeout-minutes: 60
     env:

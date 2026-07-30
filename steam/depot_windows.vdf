@@ -1,0 +1,29 @@
+// Windows depot — template. Replace <DEPOT_ID_WINDOWS>.
+//
+// Contents: the unpacked Tauri release build, i.e. what
+// `.github/workflows/build-windows.yml` uploads as the `windows-portable`
+// artifact (mesozoic-protocol.exe + any sibling DLLs). NOT the .msi or the
+// NSIS -setup.exe — Steam does the installing itself; an installer inside a
+// depot would ship the player an installer they have to run by hand.
+
+"DepotBuildConfig"
+{
+	"DepotID"	"<DEPOT_ID_WINDOWS>"
+
+	// Relative to "contentroot" in app_build.vdf.
+	"ContentRoot"	"windows"
+
+	"FileMapping"
+	{
+		"LocalPath"	"*"
+		"DepotPath"	"."
+		"recursive"	"1"
+	}
+
+	// Never ship these. steam_appid.txt is a local-development-only file that
+	// makes the Steamworks SDK attach outside Steam; shipping it breaks the
+	// real launch path.
+	"FileExclusion"	"steam_appid.txt"
+	"FileExclusion"	"*.pdb"
+	"FileExclusion"	"*.log"
+}

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup rules for Android 11 and below (android:fullBackupContent).
+
+  Without an explicit ruleset the platform backs up essentially the whole
+  data directory, caches included, and the game had no say in it. Save data
+  lives in the WebView's localStorage (app_webview/), so that directory is
+  the one thing worth carrying to a new device; everything else is either
+  regenerable or churn that would bloat the backup quota.
+-->
+<full-backup-content>
+    <include domain="file" path="app_webview" />
+    <include domain="sharedpref" path="." />
+    <exclude domain="file" path="app_webview/Default/GPUCache" />
+    <exclude domain="file" path="app_webview/GPUCache" />
+    <exclude domain="root" path="cache" />
+    <exclude domain="external" path="." />
+</full-backup-content>

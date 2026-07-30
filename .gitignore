@@ -22,9 +22,22 @@ vite.config.d.ts
 vite.config.js
 .tsbuild/
 
+# Store-submission screenshots (scripts/store-screenshots.mjs).
+# Large exact-size PNGs, hand-uploaded to App Store Connect / Play Console.
+# Not served by the site, so deliberately outside public/ and out of git.
+store-screenshots/
+
 # Tauri
 src-tauri/target
 src-tauri/gen
+
+# Steam. steam_appid.txt is a local-dev-only file (single line: the App ID)
+# that makes the Steamworks SDK attach outside Steam — shipping it breaks the
+# retail launch path, so it must never be committed. The filled-in copies of
+# the steam/*.vdf templates carry the real App ID and local absolute paths.
+steam_appid.txt
+steam/app_build_*.vdf
+steam-build-output/
 # Override global `Icon?` glob (matches macOS resource fork) so generated icon
 # directories stay tracked.
 !src-tauri/icons/

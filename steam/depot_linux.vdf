@@ -1,0 +1,28 @@
+// Linux depot — template. Replace <DEPOT_ID_LINUX>.
+//
+// Contents: the unpacked Tauri release binary, i.e. what
+// `.github/workflows/build-linux.yml` uploads as the `linux-portable`
+// artifact. The AppImage and .deb from the same build are for itch.io and
+// direct download; a Steam depot wants the plain executable, and Steam's own
+// Linux runtime supplies the rest.
+//
+// Restore the executable bit if you assembled this from a CI artifact —
+// GitHub artifacts do not preserve it.
+
+"DepotBuildConfig"
+{
+	"DepotID"	"<DEPOT_ID_LINUX>"
+
+	// Relative to "contentroot" in app_build.vdf.
+	"ContentRoot"	"linux"
+
+	"FileMapping"
+	{
+		"LocalPath"	"*"
+		"DepotPath"	"."
+		"recursive"	"1"
+	}
+
+	"FileExclusion"	"steam_appid.txt"
+	"FileExclusion"	"*.debug"
+}

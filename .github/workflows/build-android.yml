@@ -45,7 +45,74 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Cheap gate: catch a missing secret, a type error, or a half-applied version
+  # bump before gradle starts. An empty ANDROID_KEYSTORE_BASE64 decodes to a
+  # zero-byte file and surfaces as an opaque "keystore was tampered with"
+  # gradle error 10 minutes later — assert presence up front instead.
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Names only are printed — never values.
+      - name: Verify required secrets are present
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          required=(
+            ANDROID_KEYSTORE_BASE64
+            ANDROID_KEYSTORE_PASSWORD
+            ANDROID_KEY_ALIAS
+            ANDROID_KEY_PASSWORD
+            PLAY_SERVICE_ACCOUNT_JSON
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            [ -n "${!name:-}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing or empty repo secret(s): ${missing[*]}"
+            echo "Set them under Settings → Secrets and variables → Actions."
+            echo "The header comment in this workflow file explains what each one is."
+            exit 1
+          fi
+          echo "All ${#required[@]} required secrets are present."
+
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint (biome)
+        run: pnpm lint
+
+      # See ci.yml for why this is `tsc -b` and not `tsc -b --noEmit`.
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      # Android's versionName comes from the tag rather than a file, so this
+      # mainly asserts the env-var wiring in android/app/build.gradle is intact
+      # and that the tag being built matches the rest of the repo.
+      - name: Version declarations agree
+        run: node scripts/sync-version.mjs --check
+
+      - name: Unit tests
+        run: pnpm test
+
   build:
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
