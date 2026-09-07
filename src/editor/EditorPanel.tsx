@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import type { Biome, PropRole } from "../biomes";
 import { EASTER_EGG_BY_ID, EASTER_EGG_DEFS, type EasterEggDef } from "../easterEggs";
@@ -27,7 +28,9 @@ import {
   isSelfIntersecting,
   type LakeToolState,
   MAX_LAKE_RADIUS,
+  MAX_SCALE,
   MIN_LAKE_RADIUS,
+  MIN_SCALE,
   RIVER_MATERIALS,
   type RiverToolState,
 } from "./editorCore";
@@ -98,6 +101,108 @@ const ALL_PRESET_GROUPS: PresetGroup[] = [
   })).filter((g) => g.presets.length > 0),
 ];
 
+const DEG = 180 / Math.PI;
+const RAD = Math.PI / 180;
+
+// Size + yaw controls, shared by the "arming an asset" card (where they set
+// the transform the next click will commit) and the single-selection card
+// (where they edit the prop in place). Rotation is yaw only — around the
+// vertical axis out of the ground — so a prop can never end up leaning.
+// Both a slider and a numeric box are offered: the slider for eyeballing,
+// the box for typing an exact 1.75× / 45° when matching an existing prop.
+const TransformControls = ({
+  scale,
+  rotRad,
+  onScale,
+  onRot,
+  onReset,
+}: {
+  scale: number;
+  rotRad: number;
+  onScale: (scale: number) => void;
+  onRot: (rad: number) => void;
+  onReset: () => void;
+}): ReactElement => {
+  const deg = Math.round(rotRad * DEG);
+  const numBox: CSSProperties = {
+    width: 52,
+    padding: "3px 5px",
+    borderRadius: 4,
+    border: "1px solid #3a4150",
+    background: "#0d1017",
+    color: "#e6e9ef",
+    font: "11px/1.2 system-ui, sans-serif",
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={sliderRow}>
+        <span style={{ color: "#8b93a3" }}>Size</span>
+        <input
+          type="range"
+          min={MIN_SCALE}
+          max={MAX_SCALE}
+          step={0.05}
+          value={scale}
+          onChange={(e) => onScale(Number(e.target.value))}
+        />
+        <input
+          type="number"
+          min={MIN_SCALE}
+          max={MAX_SCALE}
+          step={0.05}
+          value={Number(scale.toFixed(2))}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v)) onScale(v);
+          }}
+          style={numBox}
+          title={`Scale multiplier (${MIN_SCALE}–${MAX_SCALE}). 1 = the model's nominal size.`}
+        />
+      </div>
+      <div style={sliderRow}>
+        <span style={{ color: "#8b93a3" }}>Rotation</span>
+        <input
+          type="range"
+          min={0}
+          max={360}
+          step={1}
+          value={deg}
+          onChange={(e) => onRot(Number(e.target.value) * RAD)}
+        />
+        <input
+          type="number"
+          min={0}
+          max={360}
+          step={1}
+          value={deg}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v)) onRot(v * RAD);
+          }}
+          style={numBox}
+          title="Yaw in degrees around the vertical axis (0–360)."
+        />
+      </div>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {[0, 90, 180, 270].map((d) => (
+          <button
+            key={d}
+            type="button"
+            style={btn(deg === d)}
+            onClick={() => onRot(d * RAD)}
+            title={`Snap yaw to ${d}°`}
+          >
+            {d}°
+          </button>
+        ))}
+        <button type="button" style={btn()} onClick={onReset} title="Back to size 1, yaw 0">
+          Reset
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const ROLE_ICON: Record<PropRole, string> = {
   building: "HQ",
   tree: "TR",
@@ -126,6 +231,8 @@ export const EditorPanel = ({
   const panelCollapsed = store((s) => s.panelCollapsed);
   const chromeHidden = store((s) => s.chromeHidden);
   const placingUrl = store((s) => s.placingUrl);
+  const placeScale = store((s) => s.placeScale);
+  const placeRot = store((s) => s.placeRot);
   const selectedIds = store((s) => s.selectedIds);
   const selectedId = store((s) => s.selectedId);
   const selectionSize = selectedIds.size;
@@ -186,12 +293,15 @@ export const EditorPanel = ({
   // Ctrl/Meta+Z undoes, Ctrl+Shift+Z / Ctrl+Y redoes. Q/R rotate the selected
   // prop — tap = small step, hold = continuous rotation (rAF-driven so the
   // speed doesn't depend on OS auto-repeat rate). A held rotation collapses
-  // into one undo entry via the rotateStroke gate. Skip undo/redo shortcuts
-  // when typing in an input/textarea so native field undo wins.
+  // into one undo entry via the rotateStroke gate. With nothing selected but
+  // an asset armed, Q/R spin the placement ghost instead (no undo entry —
+  // it's tool config, not map data), and [ / ] step its size. Skip undo/redo
+  // shortcuts when typing in an input/textarea so native field undo wins.
   useEffect(() => {
     if (!active) return;
     const ROTATE_TAP = Math.PI / 24; // 7.5° per tap
     const ROTATE_HOLD_RATE = Math.PI; // 180°/sec while held
+    const SCALE_STEP = 1.1; // per [ / ] tap
     const held: { q: boolean; r: boolean } = { q: false, r: false };
     let raf: number | null = null;
     let lastT = 0;
@@ -208,13 +318,24 @@ export const EditorPanel = ({
       }
     };
 
+    // Q/R target the selection when there is one, and otherwise the armed
+    // placement ghost. Returns false when neither is live so the hold loop
+    // can stop itself.
+    const applyRotate = (delta: number): boolean => {
+      const ed = store.getState();
+      if (ed.selectedId !== null) {
+        ed.rotateSelected(delta);
+        return true;
+      }
+      if (ed.placingUrl !== null) {
+        ed.nudgePlaceRot(delta);
+        return true;
+      }
+      return false;
+    };
+
     const tick = (now: number) => {
       raf = null;
-      const ed = store.getState();
-      if (ed.selectedId === null) {
-        stopHold();
-        return;
-      }
       const dt = (now - lastT) / 1000;
       lastT = now;
       const dir = (held.q ? -1 : 0) + (held.r ? 1 : 0);
@@ -222,7 +343,10 @@ export const EditorPanel = ({
         stopHold();
         return;
       }
-      ed.rotateSelected(dir * ROTATE_HOLD_RATE * dt);
+      if (!applyRotate(dir * ROTATE_HOLD_RATE * dt)) {
+        stopHold();
+        return;
+      }
       raf = requestAnimationFrame(tick);
     };
 
@@ -242,19 +366,34 @@ export const EditorPanel = ({
         ed.redo();
         return;
       }
+      if (!inField && !mod && (e.key === "[" || e.key === "]")) {
+        // Size step. Selection wins; otherwise resize the placement ghost.
+        const mul = e.key === "[" ? 1 / SCALE_STEP : SCALE_STEP;
+        if (ed.selectedId !== null) {
+          e.preventDefault();
+          ed.scaleSelected(mul);
+        } else if (ed.placingUrl !== null) {
+          e.preventDefault();
+          ed.setPlaceScale(ed.placeScale * mul);
+        }
+        return;
+      }
       if (!inField && !mod && (e.key === "q" || e.key === "Q" || e.key === "r" || e.key === "R")) {
-        if (ed.selectedId === null) return;
+        if (ed.selectedId === null && ed.placingUrl === null) return;
         e.preventDefault();
         // Browser auto-repeat is ignored — rAF drives the hold rotation at a
         // stable rate. The initial press still applies one tap step.
         if (e.repeat) return;
         const key = e.key.toLowerCase() as "q" | "r";
-        if (!strokeOpen) {
+        // The rotate-stroke gate only matters for selection edits (it
+        // collapses the hold into one undo entry). Ghost rotation writes no
+        // history, so leave the gate closed in that case.
+        if (!strokeOpen && ed.selectedId !== null) {
           ed.beginRotateStroke();
           strokeOpen = true;
         }
         held[key] = true;
-        ed.rotateSelected((key === "q" ? -1 : 1) * ROTATE_TAP);
+        applyRotate((key === "q" ? -1 : 1) * ROTATE_TAP);
         if (raf === null) {
           lastT = performance.now();
           raf = requestAnimationFrame(tick);
@@ -617,6 +756,44 @@ export const EditorPanel = ({
         <EasterEggSection store={store} tool={easterEggTool} biome={biomeFilter} />
       )}
 
+      {/* Placement transform. Rendered independently of the selection card
+          below, because placeAt auto-selects the prop it just dropped — if
+          this lived in the same ternary chain, the controls would vanish
+          after every single drop, which is exactly when the author wants to
+          dial in a different size for the next one. */}
+      {!brush.active && placingUrl && !(placingStamp && placingStamp.kind === "stamp") && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: 8,
+            background: "#11151d",
+            border: "1px solid #2a313d",
+            borderRadius: 6,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontWeight: 600 }}>Placing {labelFor(placingUrl)}</span>
+            <span style={{ color: "#8b93a3" }}>
+              ×{placeScale.toFixed(2)} · {Math.round((placeRot * 180) / Math.PI)}°
+            </span>
+          </div>
+          <div style={{ color: "#8b93a3", fontSize: 11 }}>
+            Click map to drop. Size/rotation stick across drops, so the same model can go down
+            several times at different sizes. Q/R spin the ghost, [ / ] resize it. Click the asset
+            again or Esc to stop.
+          </div>
+          <TransformControls
+            scale={placeScale}
+            rotRad={placeRot}
+            onScale={(v) => store.getState().setPlaceScale(v)}
+            onRot={(v) => store.getState().setPlaceRot(v)}
+            onReset={() => store.getState().resetPlaceTransform()}
+          />
+        </div>
+      )}
+
       {brush.active ? (
         <div style={{ color: "#8b93a3" }}>
           {brush.eraser
@@ -807,6 +984,16 @@ export const EditorPanel = ({
               Scale +
             </button>
           </div>
+          <TransformControls
+            scale={selected.scale}
+            rotRad={selected.rot}
+            onScale={(v) => store.getState().setSelectedScale(v)}
+            onRot={(v) => store.getState().setSelectedRotation(v)}
+            onReset={() => {
+              store.getState().setSelectedScale(1);
+              store.getState().setSelectedRotation(0);
+            }}
+          />
           <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
             <input
               type="checkbox"
@@ -843,10 +1030,10 @@ export const EditorPanel = ({
         <div style={{ color: "#8b93a3" }}>
           {placingStamp && placingStamp.kind === "stamp"
             ? `Stamping ${placingStamp.label} (${placingStamp.childCount} props) — click map to drop centred on the cursor. Click swatch again or Esc to disarm.`
-            : placingUrl
-              ? `Placing ${labelFor(placingUrl)} — click map to drop. Click asset again or Esc to stop.`
-              : marqueeActive
-                ? "Marquee armed — drag the map to select props in a rectangle. Hold Shift on release to add to the current selection. Esc disarms."
+            : marqueeActive
+              ? "Marquee armed — drag the map to select props in a rectangle. Hold Shift on release to add to the current selection. Esc disarms."
+              : placingUrl
+                ? null
                 : "Pick an asset to place, or click a placed prop to select it."}
         </div>
       )}

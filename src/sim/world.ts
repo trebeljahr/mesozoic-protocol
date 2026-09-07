@@ -44,6 +44,7 @@ import {
 import { levelLandscape } from "./levelLandscape";
 import { prependLeadInToBounds, samplePath, smoothPath } from "./path";
 import { poissonDiskSample } from "./poisson";
+import { sanitizePlacedProps } from "./propTransform";
 import { mulberry32 } from "./random";
 import { rollDinoBoltDrop } from "./robotBolts";
 import {
@@ -830,7 +831,9 @@ export const createWorld = (
         typeof window !== "undefined" ? window.localStorage.getItem("mz:leveledits:v1") : null;
       const edit = raw ? JSON.parse(raw)?.[String(level.id)] : null;
       if (edit) {
-        editorProps = (Array.isArray(edit.props) ? edit.props : []) as PlacedProp[];
+        editorProps = sanitizePlacedProps(
+          Array.isArray(edit.props) ? (edit.props as PlacedProp[]) : [],
+        );
         editorRivers = (Array.isArray(edit.rivers) ? edit.rivers : []).map((river: River) => ({
           ...river,
           material: river.material ?? "water",

@@ -85,6 +85,8 @@ export const EditorPropsLayer = ({
 }: EditorPropsLayerProps): ReactElement => {
   const active = store((s) => s.active);
   const placingUrl = store((s) => s.placingUrl);
+  const placeScale = store((s) => s.placeScale);
+  const placeRot = store((s) => s.placeRot);
   const selectedIds = store((s) => s.selectedIds);
   const moving = store((s) => s.moving);
   const brushActive = store((s) => s.brush.active);
@@ -197,7 +199,14 @@ export const EditorPropsLayer = ({
         !brushMode &&
         !riverTool.active &&
         !lakeTool.active &&
-        placingStampId === null && <HoverPreview url={placingUrl} halfExtent={planeHalfExtent} />}
+        placingStampId === null && (
+          <HoverPreview
+            url={placingUrl}
+            halfExtent={planeHalfExtent}
+            scale={placeScale}
+            rotY={placeRot}
+          />
+        )}
 
       {active &&
         !brushMode &&
@@ -722,18 +731,22 @@ const EditorGroundPlane = ({
 // GLB scene's materials with transparent=true so the preview is visibly a
 // preview (not a duplicate of an already-placed prop), and reuses the same
 // world-frame geometry + grounding math the InstancedGroup placement path
-// uses so where you see the ghost is exactly where the click would drop it.
-// rotY is fixed at 0 because new props always place at rot=0 — the per-prop
-// rotation handles (Q/R, UI buttons) take over once selected.
+// uses so where you see the ghost is exactly where the click would drop it —
+// including the authored placement scale + yaw, so what you see under the
+// cursor is the silhouette placeAt will commit.
 const _hoverPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const _hoverHit = new THREE.Vector3();
 
 const HoverPreview = ({
   url,
   halfExtent,
+  scale,
+  rotY,
 }: {
   url: string;
   halfExtent: { x: number; z: number };
+  scale: number;
+  rotY: number;
 }): ReactElement | null => {
   const { scene } = useGLTF(url);
   const source = useMemo(() => collectMeshSource(scene), [scene]);
@@ -768,9 +781,16 @@ const HoverPreview = ({
       g.visible = false;
       return;
     }
-    const s = TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] / source.maxDim;
-    g.position.set(hit.x - source.centerX * s, -source.minY * s, hit.z - source.centerZ * s);
-    g.rotation.set(0, 0, 0);
+    // Mirrors InstancedGroup's matrix build: uniform scale, yaw about the
+    // vertical axis, and a recentre offset that has to be rotated by the
+    // same yaw so the model stays centred on the cursor as it spins.
+    const s = (TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] / source.maxDim) * scale;
+    const cos = Math.cos(rotY);
+    const sin = Math.sin(rotY);
+    const centerX = (source.centerX * cos - source.centerZ * sin) * s;
+    const centerZ = (source.centerX * sin + source.centerZ * cos) * s;
+    g.position.set(hit.x - centerX, -source.minY * s, hit.z - centerZ);
+    g.rotation.set(0, rotY, 0);
     g.scale.setScalar(s);
     g.visible = true;
   });

@@ -6,6 +6,7 @@ import {
   propGroundRadius,
   TARGET_SIZE_BY_ROLE,
 } from "../biomes";
+import { clampPropScale, MAX_PROP_SCALE, MIN_PROP_SCALE, normalizeYaw } from "../sim/propTransform";
 import type {
   AuthoredLake,
   AutoBridge,
@@ -61,9 +62,11 @@ import { addStamp, getStamp, removeStamp, type Stamp, type StampChild } from "./
 const BLOCKING_ROLES = new Set(["building", "tree", "bush", "rock"]);
 const defaultBlocks = (url: string): boolean => BLOCKING_ROLES.has(classifyPropUrl(url));
 
-const MIN_SCALE = 0.15;
-const MAX_SCALE = 6;
-const clampScale = (s: number): number => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+// Re-exported so the panel can bound its scale slider with the same
+// numbers the store clamps to.
+export const MIN_SCALE = MIN_PROP_SCALE;
+export const MAX_SCALE = MAX_PROP_SCALE;
+const clampScale = clampPropScale;
 
 // Effective half-footprint of a placed prop in world units. Single source of
 // truth shared by canPlaceAt (level + world map) and brush sampling so the
@@ -591,6 +594,14 @@ export type EditorStoreApi = {
   chromeHidden: boolean;
   // Asset url armed for placement — each map click drops one. null = select mode.
   placingUrl: string | null;
+  // Transform applied to the NEXT prop dropped by placeAt (and previewed by
+  // the hover ghost). Sticky across arms so the author can drop the same
+  // model five times at the same odd size without re-dialling it, and
+  // across a re-arm of a different model so "everything in this cluster is
+  // 1.4×" survives switching between two tree URLs.
+  placeScale: number;
+  // Yaw in radians about the vertical axis. Props have no pitch/roll.
+  placeRot: number;
   // Authoritative multi-select set. Single-pick is just `selectedIds` with
   // size <= 1; the `selectedId` field below is a derived mirror kept in sync
   // on every mutation so unmigrated single-id readers stay green during the
@@ -654,6 +665,14 @@ export type EditorStoreApi = {
   setPanelCollapsed: (collapsed: boolean) => void;
   setChromeHidden: (hidden: boolean) => void;
   setPlacing: (url: string | null) => void;
+  setPlaceScale: (scale: number) => void;
+  // Absolute yaw for the placement ghost. Wrapped into [0, 2π).
+  setPlaceRot: (rad: number) => void;
+  // Nudge the placement yaw by a delta — used by the panel's rotate buttons
+  // and the scroll-wheel-over-map gesture while an asset is armed.
+  nudgePlaceRot: (deltaRad: number) => void;
+  // Back to scale 1 / yaw 0.
+  resetPlaceTransform: () => void;
   placeAt: (x: number, y: number) => void;
   // Single-arg call (legacy back-compat): `select(id)` = replace; `select(null)` = clear.
   // `mode='add'` unions into existing selection; `mode='toggle'` flips one id
@@ -685,6 +704,12 @@ export type EditorStoreApi = {
   beginRotateStroke: () => void;
   endRotateStroke: () => void;
   scaleSelected: (mul: number) => void;
+  // Absolute transform setters for the selected prop — what the panel's
+  // size/rotation sliders and numeric inputs drive. The multiplicative
+  // `scaleSelected` / delta-based `rotateSelected` stay for the +/- buttons
+  // and the Q/R hold gesture.
+  setSelectedScale: (scale: number) => void;
+  setSelectedRotation: (rad: number) => void;
   toggleSelectedBlocks: () => void;
   // Bulk transforms around the selection's centroid. Each is one
   // snapshotAndPush + one commitProps; all-or-nothing — if any member would
@@ -1013,6 +1038,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
       panelCollapsed: false,
       chromeHidden: false,
       placingUrl: null,
+      placeScale: 1,
+      placeRot: 0,
       ...clearSelectionFields(),
       moving: false,
       version: 0,
@@ -1060,6 +1087,11 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
 
       setChromeHidden: (hidden) => set({ chromeHidden: hidden }),
 
+      setPlaceScale: (scale) => set({ placeScale: clampScale(scale) }),
+      setPlaceRot: (rad) => set({ placeRot: normalizeYaw(rad) }),
+      nudgePlaceRot: (deltaRad) => set((s) => ({ placeRot: normalizeYaw(s.placeRot + deltaRad) })),
+      resetPlaceTransform: () => set({ placeScale: 1, placeRot: 0 }),
+
       setPlacing: (url) =>
         set((s) => ({
           // Clicking the armed asset again disarms back to select mode.
@@ -1082,12 +1114,15 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         })),
 
       placeAt: (x, y) => {
-        const url = get().placingUrl;
+        const { placingUrl: url, placeScale, placeRot } = get();
         if (!url) return;
-        const radius = propRadius(url, 1);
+        // Both footprints follow the authored size — a 3× boulder has to
+        // clear three times the space, against other props and against the
+        // adapter's hard blockers (paths / towers / bounds) alike.
+        const radius = propRadius(url, placeScale);
         // Only the ground-contact disc bulldozes anything. For a tree that's
         // the trunk, not the crown and not the selection circle.
-        const groundR = propGroundRadius(url, 1);
+        const groundR = propGroundRadius(url, placeScale);
         const cur = adapter.getCurrent();
         const overlap = new Set<string>();
         const cleared = new Set<string>();
@@ -1117,8 +1152,8 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           id: nanoid(8),
           url,
           pos: { x, y },
-          scale: 1,
-          rot: 0,
+          scale: placeScale,
+          rot: placeRot,
           blocks: defaultBlocks(url),
         };
         snapshotAndPush();
@@ -1295,11 +1330,15 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           snapshotAndPush();
         }
         const cur = adapter.getCurrent();
-        commitProps(cur.props.map((p) => (p.id === id ? { ...p, rot: p.rot + deltaRad } : p)));
+        commitProps(
+          cur.props.map((p) => (p.id === id ? { ...p, rot: normalizeYaw(p.rot + deltaRad) } : p)),
+        );
       },
       beginRotateStroke: () => set({ rotateStrokeOpen: true, rotateStrokePushed: false }),
       endRotateStroke: () => set({ rotateStrokeOpen: false, rotateStrokePushed: false }),
       scaleSelected: (mul) => mutateSelected((p) => ({ ...p, scale: clampScale(p.scale * mul) })),
+      setSelectedScale: (scale) => mutateSelected((p) => ({ ...p, scale: clampScale(scale) })),
+      setSelectedRotation: (rad) => mutateSelected((p) => ({ ...p, rot: normalizeYaw(rad) })),
       toggleSelectedBlocks: () => mutateSelected((p) => ({ ...p, blocks: !p.blocks })),
 
       // Shift every selected prop by (dx, dy). Validates per-member with

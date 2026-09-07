@@ -1,3 +1,4 @@
+import { sanitizePlacedProps } from "../sim/propTransform";
 import type { AuthoredLake, AutoBridge, PlacedProp, River } from "../sim/types";
 
 // Persistence for the dev-only world-map editor (src/editor). Hand-placed
@@ -40,7 +41,13 @@ export const loadWorldMapEdit = (): WorldMapEdit | null => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as WorldMapEdit;
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    // Blobs written before scale/rot were author-editable can omit either
+    // field; sanitize on the way in so the renderer never sees NaN.
+    return {
+      ...parsed,
+      props: sanitizePlacedProps(Array.isArray(parsed.props) ? parsed.props : []),
+    };
   } catch {
     return null;
   }
