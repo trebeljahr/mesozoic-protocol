@@ -1,7 +1,17 @@
 import { PAN_LIMIT_X, PAN_LIMIT_Z } from "../render/worldMapBounds";
+import { worldMapOutpostItems } from "../render/worldMapOutpostPlan";
+import { worldMapProceduralItems } from "../render/worldMapPropPlan";
 import type { AuthoredLake, AutoBridge, PlacedProp, River } from "../sim/types";
 import { distSq } from "../sim/vec2";
-import { createEditorStore, type EditorStore, isOnLake, isOnRiver, propRadius } from "./editorCore";
+import { useGame } from "../store";
+import {
+  createEditorStore,
+  type EditorStore,
+  isOnLake,
+  isOnRiver,
+  type ProceduralItem,
+  propRadius,
+} from "./editorCore";
 import { loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
 import { loadWorldMapEdit, saveWorldMapEdit } from "./worldMapEdits";
 
@@ -34,19 +44,49 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
   // Additive field — older v:1 blobs without bridges load with [].
   let bridges: AutoBridge[] = seed?.bridges ?? [];
   let override: boolean = seed?.override ?? false;
+  // Keys of generated world-map decor (BiomeProps clusters) the author
+  // removed — by clicking one, by the eraser brush, or by placing a prop
+  // on top of it. Additive field; older v:1 blobs load with [].
+  let erasedProcedural: string[] = seed?.erasedProcedural ?? [];
   return {
     // World-map editor has no easter-egg authoring (eggs are per-level), so
     // the editor source feeds an empty array. The shared store still walks
     // through the `easterEggs` field on every snapshot/commit, but it never
     // grows.
-    getCurrent: () => ({ props, override, rivers, lakes, bridges, easterEggs: [] }),
+    getCurrent: () => ({
+      props,
+      override,
+      rivers,
+      lakes,
+      bridges,
+      easterEggs: [],
+      erasedProcedural,
+    }),
     commit: (next) => {
       props = next.props;
       rivers = next.rivers;
       lakes = next.lakes;
       bridges = next.bridges;
       override = next.override;
-      saveWorldMapEdit({ v: 1, override, props, rivers, lakes, bridges });
+      erasedProcedural = next.erasedProcedural ?? [];
+      saveWorldMapEdit({ v: 1, override, props, rivers, lakes, bridges, erasedProcedural });
+    },
+    // The world map's seeded set-dressing — the per-level-node prop clusters
+    // plus the scattered modular colonies. Exposing it here is what lets the
+    // shared editor core treat generated decor as removable content: the
+    // eraser brush, a plain click on a prop, and placement auto-bulldoze all
+    // route through the erased-procedural mask, which persists with the rest
+    // of the blob. Already-erased items are pruned so callers see a live
+    // snapshot.
+    getProceduralItems: (): ProceduralItem[] => {
+      if (override) return [];
+      const items = [
+        ...worldMapProceduralItems(useGame.getState().progress),
+        ...worldMapOutpostItems(),
+      ];
+      if (erasedProcedural.length === 0) return items;
+      const erased = new Set(erasedProcedural);
+      return items.filter((it) => !erased.has(it.key));
     },
     // History persists alongside props/rivers so reloads keep the undo/redo
     // stacks. World-map history is a single global blob (no level scope).
@@ -97,6 +137,7 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
           rivers,
           lakes,
           bridges,
+          erasedProcedural,
         },
         null,
         2,

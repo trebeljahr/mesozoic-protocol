@@ -728,6 +728,13 @@ export type EditorStoreApi = {
   rotateSelectionAroundCentroid: (deltaRad: number) => void;
   scaleSelectionAroundCentroid: (mul: number) => void;
   setOverride: (on: boolean) => void;
+  // Live snapshot of the adapter's seeded set-dressing (already-erased items
+  // pruned out). Render layers use it to draw click targets so an author can
+  // remove generated decor the same way they remove hand-placed props.
+  proceduralItems: () => ProceduralItem[];
+  // Extend the erased-procedural mask by `keys`. One snapshotAndPush, so a
+  // mis-click is undoable. Keys already in the mask are ignored.
+  eraseProcedural: (keys: string[]) => void;
   clear: () => void;
   clearManual: () => void;
   clearProcedural: () => void;
@@ -1513,6 +1520,18 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           placingStampId: null,
         });
         adapter.onOverrideChange?.();
+      },
+
+      proceduralItems: () => adapter.getProceduralItems?.() ?? [],
+
+      eraseProcedural: (keys) => {
+        if (keys.length === 0) return;
+        const cur = adapter.getCurrent();
+        const already = new Set(cur.erasedProcedural ?? []);
+        const fresh = keys.filter((k) => !already.has(k));
+        if (fresh.length === 0) return;
+        snapshotAndPush();
+        commitPropsAndErasedProcedural(cur.props, fresh);
       },
 
       clear: () => {

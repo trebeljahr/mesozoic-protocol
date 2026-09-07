@@ -9,6 +9,7 @@ import {
   type EditorStore,
   findLakeMouth,
   isPlaceholderRiver,
+  type ProceduralItem,
   RIVER_EDGE_HOVER_SNAP_THRESHOLD,
   snapIntoLake,
   snapToEdgeIfNear,
@@ -190,7 +191,12 @@ export const EditorPropsLayer = ({
         !brushMode &&
         !riverTool.active &&
         !lakeTool.active &&
-        placingStampId === null && <PropHitTargets store={store} props={props} version={version} />}
+        placingStampId === null && (
+          <>
+            <PropHitTargets store={store} props={props} version={version} />
+            <ProceduralHitTargets store={store} version={version} />
+          </>
+        )}
       {active && marqueeActive && marqueeRect && <MarqueeRectOverlay rect={marqueeRect} />}
 
       {active &&
@@ -1324,6 +1330,81 @@ const PropHitTargets = ({
       ref={ref}
       args={[geom, material, props.length]}
       renderOrder={19}
+      onClick={onClick}
+    />
+  );
+};
+
+// Click targets for the adapter's SEEDED set-dressing (procedural trees /
+// rocks / outposts in a level, the world map's per-node prop clusters).
+// Those meshes are instanced with raycasting disabled and carry no
+// PlacedProp id, so before this layer existed the only way to remove one
+// was the eraser brush — a plain click did nothing, which read as "the
+// generated stuff can't be deleted". Clicking a target here extends the
+// erased-procedural mask instead of selecting, which is what persists the
+// removal across a save/reload.
+//
+// Sits marginally below PropHitTargets (y 0.085 vs 0.09) so that where a
+// hand-placed prop overlaps generated decor the hand-placed one is the
+// nearer intersection and wins the click.
+const PROCEDURAL_HIT_Y = 0.085;
+
+const ProceduralHitTargets = ({ store, version }: { store: EditorStore; version: number }) => {
+  const ref = useRef<THREE.InstancedMesh | null>(null);
+  const geom = useMemo(() => new THREE.CircleGeometry(1, 24), []);
+  const material = useMemo(
+    () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+    [],
+  );
+  useEffect(
+    () => () => {
+      geom.dispose();
+      material.dispose();
+    },
+    [geom, material],
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version is the intended invalidation key
+  const items = useMemo<ProceduralItem[]>(
+    () => store.getState().proceduralItems(),
+    [store, version],
+  );
+
+  useEffect(() => {
+    const im = ref.current;
+    if (!im) return;
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      dummy.position.set(it.x, PROCEDURAL_HIT_Y, -it.y);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      // Footprint radii are tuned for collision, not for clicking — a small
+      // rock's is well under a comfortable click target, so floor it.
+      dummy.scale.setScalar(Math.max(0.5, it.r));
+      dummy.updateMatrix();
+      im.setMatrixAt(i, dummy.matrix);
+    }
+    im.count = items.length;
+    im.instanceMatrix.needsUpdate = true;
+  }, [items]);
+
+  const onClick = (e: ThreeEvent<MouseEvent>) => {
+    if (e.instanceId == null) return;
+    if (e.instanceId >= items.length) return;
+    const it = items[e.instanceId];
+    if (!it) return;
+    e.stopPropagation();
+    store.getState().eraseProcedural([it.key]);
+  };
+
+  if (items.length === 0) return null;
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: r3f instanced mesh, not a DOM element
+    <instancedMesh
+      ref={ref}
+      args={[geom, material, items.length]}
+      renderOrder={18}
       onClick={onClick}
     />
   );

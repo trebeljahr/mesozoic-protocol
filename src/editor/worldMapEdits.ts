@@ -13,10 +13,15 @@ import type { AuthoredLake, AutoBridge, PlacedProp, River } from "../sim/types";
 
 export type WorldMapEdit = {
   v: 1;
-  // Reserved for a future "suppress procedural BiomeProps on the world map"
-  // toggle. Currently unused — render layer ignores it.
+  // Suppresses the generated BiomeProps layer wholesale (set by the
+  // editor's "Clear all", lifted by "Restore generated"). Dev-only, like
+  // the hand-placed props themselves.
   override: boolean;
   props: PlacedProp[];
+  // Position-derived keys of individual generated props the author removed
+  // (click, eraser brush, or overwritten by a placement). Additive over
+  // v:1 — older blobs without this field load with [].
+  erasedProcedural?: string[];
   // Hand-painted rivers from the river tool. Additive over v:1 — older
   // blobs without this field load with rivers defaulting to [].
   rivers?: River[];

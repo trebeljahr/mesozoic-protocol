@@ -4,10 +4,8 @@ import { useWorldMapEditor } from "./worldMapEditorStore";
 
 // Dev-only world-map editor side panel. Thin wrapper over the shared
 // EditorPanel — supplies the world-map store, title, and footer buttons
-// (copy / download / clear all (undoable)). Mounted in App.tsx behind
-// import.meta.env.DEV && screen === "worldMap". The override-procedural
-// checkbox is hidden because the world map has no procedural set-dressing
-// to suppress.
+// (copy / download / clear all / restore generated). Mounted in App.tsx
+// behind import.meta.env.DEV && screen === "worldMap".
 export const WorldMapEditorPanel = () => {
   const onDownload = () => {
     downloadJson("mz-worldmap.json", useWorldMapEditor.getState().exportJson());
@@ -24,8 +22,15 @@ export const WorldMapEditorPanel = () => {
   const clearButtons: FooterButton[] = [
     {
       label: "Clear all",
-      title: "Wipe every hand-placed world-map prop. Undoable.",
+      title:
+        "Wipe every hand-placed world-map prop AND suppress the generated per-node clusters. Undoable.",
       onClick: onClearAll,
+    },
+    {
+      label: "Restore generated",
+      title:
+        "Bring back the generated per-node clusters, including individually erased ones. Undoable.",
+      onClick: () => useWorldMapEditor.getState().reloadProcedural(),
     },
   ];
 
