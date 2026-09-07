@@ -1,7 +1,7 @@
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import type { Biome, PropRole } from "../biomes";
 import { EASTER_EGG_BY_ID, EASTER_EGG_DEFS, type EasterEggDef } from "../easterEggs";
-import type { River } from "../sim/types";
+import type { AuthoredLake, River } from "../sim/types";
 import { useBackNavigation } from "../ui/useBackNavigation";
 import {
   buildCatalog,
@@ -20,8 +20,14 @@ import {
 } from "./brush";
 import {
   type BrushState,
+  DEFAULT_LAKE_RX,
+  DEFAULT_LAKE_RY,
   type EasterEggToolState,
   type EditorStore,
+  isSelfIntersecting,
+  type LakeToolState,
+  MAX_LAKE_RADIUS,
+  MIN_LAKE_RADIUS,
   RIVER_MATERIALS,
   type RiverToolState,
 } from "./editorCore";
@@ -126,6 +132,7 @@ export const EditorPanel = ({
   const moving = store((s) => s.moving);
   const brush = store((s) => s.brush);
   const riverTool = store((s) => s.riverTool);
+  const lakeTool = store((s) => s.lakeTool);
   const easterEggTool = store((s) => s.easterEggTool);
   const marqueeActive = store((s) => s.marqueeTool.active);
   const placingStampId = store((s) => s.placingStampId);
@@ -155,7 +162,16 @@ export const EditorPanel = ({
   });
 
   void version;
-  const { props: propsArr, rivers: riversArr, bridges: bridgesArr } = store.getState().getCurrent();
+  const {
+    props: propsArr,
+    rivers: riversArr,
+    lakes: lakesArr,
+    bridges: bridgesArr,
+  } = store.getState().getCurrent();
+  const selectedLake =
+    lakeTool.selectedLakeId !== null
+      ? (lakesArr.find((l) => l.id === lakeTool.selectedLakeId) ?? null)
+      : null;
   const selected = selectedId !== null ? (propsArr.find((p) => p.id === selectedId) ?? null) : null;
   const selectedRiver =
     riverTool.selectedRiverId !== null
@@ -347,31 +363,35 @@ export const EditorPanel = ({
     ? brush.eraser
       ? "Eraser"
       : `Brush${brush.presetId ? ` · ${getBrushPreset(brush.presetId)?.label ?? brush.presetId}` : ""}`
-    : riverTool.active
-      ? riverTool.editingRiverId
-        ? "River · drawing"
-        : riverTool.selectedRiverId
-          ? "River · selected"
-          : "River"
-      : placingStamp && placingStamp.kind === "stamp"
-        ? `Stamping · ${placingStamp.label} (×${placingStamp.childCount})`
-        : marqueeActive
-          ? selectionSize > 0
-            ? `Marquee · ${selectionSize} selected`
-            : "Marquee"
-          : moving
-            ? selectionSize > 1
-              ? `Move ${selectionSize} props · click target centroid`
-              : "Move prop"
-            : placingUrl
-              ? `Placing · ${labelFor(placingUrl)}`
-              : selectionSize > 1
-                ? `${selectionSize} props selected`
-                : selected
-                  ? "Prop selected"
-                  : selectedRiver
-                    ? "River selected"
-                    : "Select";
+    : lakeTool.active
+      ? lakeTool.selectedLakeId
+        ? "Lake · selected"
+        : "Lake"
+      : riverTool.active
+        ? riverTool.editingRiverId
+          ? "River · drawing"
+          : riverTool.selectedRiverId
+            ? "River · selected"
+            : "River"
+        : placingStamp && placingStamp.kind === "stamp"
+          ? `Stamping · ${placingStamp.label} (×${placingStamp.childCount})`
+          : marqueeActive
+            ? selectionSize > 0
+              ? `Marquee · ${selectionSize} selected`
+              : "Marquee"
+            : moving
+              ? selectionSize > 1
+                ? `Move ${selectionSize} props · click target centroid`
+                : "Move prop"
+              : placingUrl
+                ? `Placing · ${labelFor(placingUrl)}`
+                : selectionSize > 1
+                  ? `${selectionSize} props selected`
+                  : selected
+                    ? "Prop selected"
+                    : selectedRiver
+                      ? "River selected"
+                      : "Select";
 
   const toggleUiLabel = chromeHidden ? "Show UI" : "Hide UI";
 
@@ -538,6 +558,14 @@ export const EditorPanel = ({
         </button>
         <button
           type="button"
+          style={btn(lakeTool.active)}
+          onClick={() => store.getState().setLakeToolActive(!lakeTool.active)}
+          title="Lake tool — click the map to drop a water body. Drag its handle to move, shift-click to delete."
+        >
+          {lakeTool.active ? "Lake ✓" : "Lake"}
+        </button>
+        <button
+          type="button"
           style={btn(marqueeActive)}
           onClick={() => store.getState().setMarqueeActive(!marqueeActive)}
           title="Marquee — drag a rectangle on empty ground to select every prop inside. Shift on release adds to existing selection."
@@ -573,6 +601,15 @@ export const EditorPanel = ({
           editingRiver={editingRiver}
           selectedRiver={selectedRiver}
           bridgeCount={bridgesArr.length}
+        />
+      )}
+
+      {lakeTool.active && (
+        <LakeControls
+          store={store}
+          tool={lakeTool}
+          selectedLake={selectedLake}
+          lakeCount={lakesArr.length}
         />
       )}
 
@@ -915,7 +952,7 @@ export const EditorPanel = ({
           style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "space-between" }}
         >
           <span style={{ color: "#8b93a3" }}>
-            {propsArr.length} props · {riversArr.length} rivers
+            {propsArr.length} props · {riversArr.length} rivers · {lakesArr.length} lakes
           </span>
           <div style={{ display: "flex", gap: 6 }}>
             {copyButton && (
@@ -1363,11 +1400,35 @@ const RiverControls = ({
       </div>
       <div style={{ color: "#8b93a3", fontSize: 11 }}>
         {editingRiver
-          ? "Click map to add points. Finish river to commit. Shift-click a point to delete it."
+          ? "Click map to add points. Finish river to commit. Shift-click a point to delete it. Ends anchor to the map edge, or to a lake when you finish inside one."
           : selectedRiver
             ? `${selectedRiver.points.length} pts. Drag spheres to move. Shift-click to delete a point.`
             : "Click map to start a new river. Click an existing point to select that river."}
       </div>
+      {tool.warning && (
+        <button
+          type="button"
+          onClick={() => store.getState().clearRiverWarning()}
+          title="Dismiss"
+          style={{
+            textAlign: "left",
+            fontSize: 11,
+            color: "#ffb3ad",
+            background: "#3a1d1b",
+            border: "1px solid #6b2b26",
+            borderRadius: 4,
+            padding: "4px 6px",
+            cursor: "pointer",
+          }}
+        >
+          {tool.warning}
+        </button>
+      )}
+      {target && isSelfIntersecting(target.points) && (
+        <div style={{ fontSize: 11, color: "#ffb3ad" }}>
+          ⚠ This river crosses itself — drag a point out of the crossing to clean it up.
+        </div>
+      )}
       {selectedRiver && !editingRiver && (
         <button
           type="button"
@@ -1375,6 +1436,112 @@ const RiverControls = ({
           onClick={() => store.getState().deleteRiver(selectedRiver.id)}
         >
           Delete river
+        </button>
+      )}
+    </div>
+  );
+};
+
+// Lake-tool control panel. Sliders drive the selected lake (or, with nothing
+// selected, the defaults the next click will use). Move + delete live on the
+// map handle (drag / shift-click); this panel owns size, rotation, material,
+// and an explicit delete for the selected lake.
+const LakeControls = ({
+  store,
+  tool,
+  selectedLake,
+  lakeCount,
+}: {
+  store: EditorStore;
+  tool: LakeToolState;
+  selectedLake: AuthoredLake | null;
+  lakeCount: number;
+}) => {
+  const rx = selectedLake?.rx ?? tool.rx;
+  const ry = selectedLake?.ry ?? tool.ry;
+  const rot = selectedLake?.rot ?? tool.rot;
+  const material = selectedLake?.material ?? tool.material;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: 8,
+        background: "#11151d",
+        border: "1px solid #2a313d",
+        borderRadius: 6,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontWeight: 600 }}>{selectedLake ? "Lake selected" : "Lake tool"}</span>
+        <span style={{ color: "#8b93a3" }}>
+          {rx.toFixed(1)} × {ry.toFixed(1)}
+        </span>
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#8b93a3", minWidth: 40 }}>Width</span>
+        <input
+          type="range"
+          min={MIN_LAKE_RADIUS}
+          max={MAX_LAKE_RADIUS}
+          step={0.1}
+          value={rx}
+          onChange={(e) => store.getState().setLakeSize({ rx: Number(e.target.value) })}
+          style={{ flex: 1 }}
+        />
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#8b93a3", minWidth: 40 }}>Depth</span>
+        <input
+          type="range"
+          min={MIN_LAKE_RADIUS}
+          max={MAX_LAKE_RADIUS}
+          step={0.1}
+          value={ry}
+          onChange={(e) => store.getState().setLakeSize({ ry: Number(e.target.value) })}
+          style={{ flex: 1 }}
+        />
+      </label>
+      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#8b93a3", minWidth: 40 }}>Rotate</span>
+        <input
+          type="range"
+          min={0}
+          max={Math.PI}
+          step={0.01}
+          value={rot}
+          onChange={(e) => store.getState().setLakeRotation(Number(e.target.value))}
+          style={{ flex: 1 }}
+        />
+      </label>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#8b93a3", minWidth: 40 }}>Material</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {RIVER_MATERIALS.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              style={btn(material === m.id)}
+              onClick={() => store.getState().setLakeMaterial(m.id)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ color: "#8b93a3", fontSize: 11 }}>
+        {selectedLake
+          ? "Drag the handle to move. Shift-click it to delete. A river finished inside this lake anchors to it instead of the map edge."
+          : `Click the map to drop a lake (${DEFAULT_LAKE_RX} × ${DEFAULT_LAKE_RY} by default). ${lakeCount} placed.`}
+      </div>
+      {selectedLake && (
+        <button
+          type="button"
+          style={dangerBtn}
+          onClick={() => store.getState().deleteLake(selectedLake.id)}
+        >
+          Delete lake
         </button>
       )}
     </div>

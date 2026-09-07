@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
-import type { River } from "../sim/types";
+import type { AuthoredLake, River } from "../sim/types";
 import { Rivers } from "./Rivers";
 
 // World-map rivers wrapper. The world map renders rivers in both dev and
@@ -20,17 +20,21 @@ import { Rivers } from "./Rivers";
 
 const STORAGE_KEY = "mz:worldmapedit:v1";
 
-// One-shot read of authored world-map rivers from localStorage. No subscribe
-// — players don't edit the world map, so a snapshot at mount is correct.
-const readStoredRivers = (): River[] => {
-  if (typeof window === "undefined") return [];
+// One-shot read of the authored world-map water (rivers + lakes) from
+// localStorage. No subscribe — players don't edit the world map, so a
+// snapshot at mount is correct.
+const readStoredWater = (): { rivers: River[]; lakes: AuthoredLake[] } => {
+  if (typeof window === "undefined") return { rivers: [], lakes: [] };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as { rivers?: unknown };
-    return Array.isArray(parsed?.rivers) ? (parsed.rivers as River[]) : [];
+    if (!raw) return { rivers: [], lakes: [] };
+    const parsed = JSON.parse(raw) as { rivers?: unknown; lakes?: unknown };
+    return {
+      rivers: Array.isArray(parsed?.rivers) ? (parsed.rivers as River[]) : [],
+      lakes: Array.isArray(parsed?.lakes) ? (parsed.lakes as AuthoredLake[]) : [],
+    };
   } catch {
-    return [];
+    return { rivers: [], lakes: [] };
   }
 };
 
@@ -49,19 +53,19 @@ export const WorldMapRivers = () => {
 const DevWorldMapRivers = () => {
   const version = useWorldMapEditor((s) => s.version);
   void version;
-  const { rivers } = useWorldMapEditor.getState().getCurrent();
-  return <Rivers rivers={rivers} />;
+  const { rivers, lakes } = useWorldMapEditor.getState().getCurrent();
+  return <Rivers rivers={rivers} lakes={lakes} />;
 };
 
 // Prod path: snapshot localStorage once on mount. Re-reads on window focus
 // so a player who edits in a separate tab sees the update on returning —
 // cheap insurance, no event subscription needed otherwise.
 const ProdWorldMapRivers = () => {
-  const [rivers, setRivers] = useState<River[]>(() => readStoredRivers());
+  const [water, setWater] = useState(() => readStoredWater());
   useEffect(() => {
-    const refresh = () => setRivers(readStoredRivers());
+    const refresh = () => setWater(readStoredWater());
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, []);
-  return <Rivers rivers={rivers} />;
+  return <Rivers rivers={water.rivers} lakes={water.lakes} />;
 };

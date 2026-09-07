@@ -5,12 +5,16 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import {
+  anchorRiverEnd,
   type EditorStore,
-  projectToEdge,
+  findLakeMouth,
+  isPlaceholderRiver,
   RIVER_EDGE_HOVER_SNAP_THRESHOLD,
+  snapIntoLake,
   snapToEdgeIfNear,
+  wouldSelfIntersect,
 } from "../editor/editorCore";
-import type { PlacedProp, River, Vec2 } from "../sim/types";
+import type { AuthoredLake, PlacedProp, River, Vec2 } from "../sim/types";
 import { InstancedGroup } from "./InstancedGroup";
 import { collectMeshSource, type MeshSource } from "./meshSource";
 
@@ -91,6 +95,7 @@ export const EditorPropsLayer = ({
   // both own pointerdown/move/up and need the cursor ring + click-plane gate.
   const brushMode = brushActive && (brushPresetId !== null || brushEraser);
   const riverTool = store((s) => s.riverTool);
+  const lakeTool = store((s) => s.lakeTool);
   const easterEggTool = store((s) => s.easterEggTool);
   const marqueeActive = store((s) => s.marqueeTool.active);
   const marqueeRect = store((s) => s.marqueeTool.rect);
@@ -111,7 +116,7 @@ export const EditorPropsLayer = ({
   // a re-render dance.
   const toolOwnsPointerRef = useRef(false);
   void version;
-  const { props, rivers } = store.getState().getCurrent();
+  const { props, rivers, lakes } = store.getState().getCurrent();
 
   const toolOwnsPointer =
     active &&
@@ -119,6 +124,7 @@ export const EditorPropsLayer = ({
       moving ||
       brushMode ||
       riverTool.active ||
+      lakeTool.active ||
       easterEggTool.active ||
       marqueeActive ||
       placingStampId !== null);
@@ -177,9 +183,12 @@ export const EditorPropsLayer = ({
           canvasRef={canvasRef}
         />
       )}
-      {active && !placingUrl && !brushMode && !riverTool.active && placingStampId === null && (
-        <PropHitTargets store={store} props={props} version={version} />
-      )}
+      {active &&
+        !placingUrl &&
+        !brushMode &&
+        !riverTool.active &&
+        !lakeTool.active &&
+        placingStampId === null && <PropHitTargets store={store} props={props} version={version} />}
       {active && marqueeActive && marqueeRect && <MarqueeRectOverlay rect={marqueeRect} />}
 
       {active &&
@@ -187,6 +196,7 @@ export const EditorPropsLayer = ({
         !moving &&
         !brushMode &&
         !riverTool.active &&
+        !lakeTool.active &&
         placingStampId === null && <HoverPreview url={placingUrl} halfExtent={planeHalfExtent} />}
 
       {active &&
@@ -219,6 +229,19 @@ export const EditorPropsLayer = ({
           rivers={rivers}
           editingRiverId={riverTool.editingRiverId}
           selectedRiverId={riverTool.selectedRiverId}
+          canvasRef={canvasRef}
+        />
+      )}
+
+      {/* Lakes stay visible (dimmed) while the river tool is armed so the
+          author can aim a river at a lake mouth; handles are interactive
+          only under the lake tool itself. */}
+      {active && (lakeTool.active || riverTool.active) && (
+        <LakeEditOverlay
+          store={store}
+          lakes={lakes}
+          selectedLakeId={lakeTool.active ? lakeTool.selectedLakeId : null}
+          interactive={lakeTool.active}
           canvasRef={canvasRef}
         />
       )}
@@ -414,16 +437,20 @@ const EditorGroundPlane = ({
   const [, forceUpdate] = useState({});
   const cursorRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Apply the river-tool snap rules to a raw map-plane hit. Pre-click the
-  // start always projects to the nearest edge (rivers must originate
-  // off-map). Mid-stroke a point only snaps when within the hover
-  // threshold, so interior control points stay free of edge attraction.
-  // Returns the raw point unchanged when the adapter doesn't define
-  // bounds (world map editor).
+  // Apply the river-tool snap rules to a raw map-plane hit. A lake under
+  // the cursor always wins — a river's ends belong either to a lake or to
+  // the map edge. Pre-click, an unanchored start projects to the nearest
+  // edge (rivers must originate off-map); mid-stroke, interior points snap
+  // to the edge only within the hover threshold so they stay free of edge
+  // attraction. Returns the raw point when the adapter defines no bounds
+  // (world map editor) and no lake captures it.
   const computeRiverCursor = (raw: Vec2, ed: ReturnType<typeof store.getState>): Vec2 => {
+    const { lakes: liveLakes } = ed.getCurrent();
+    const mouth = findLakeMouth(liveLakes, raw.x, raw.y);
+    if (mouth) return snapIntoLake(mouth, raw);
     const bounds = ed.getMapBounds();
     if (!bounds) return raw;
-    if (ed.riverTool.editingRiverId === null) return projectToEdge(raw, bounds);
+    if (ed.riverTool.editingRiverId === null) return anchorRiverEnd(raw, liveLakes, bounds);
     return snapToEdgeIfNear(raw, bounds, RIVER_EDGE_HOVER_SNAP_THRESHOLD);
   };
 
@@ -446,6 +473,13 @@ const EditorGroundPlane = ({
       const target = computeRiverCursor({ x, y }, ed);
       if (ed.riverTool.editingRiverId === null) ed.beginRiver(target.x, target.y);
       else ed.addRiverPoint(target.x, target.y);
+      return;
+    }
+    if (ed.lakeTool.active) {
+      // Clicking bare ground with the lake tool armed drops a new lake;
+      // the per-lake handles (LakeEditOverlay) stop propagation so they
+      // select/drag instead of stacking a lake on top of themselves.
+      ed.placeLakeAt(x, y);
       return;
     }
     if (ed.easterEggTool.active) {
@@ -884,6 +918,10 @@ const RiverPreviewSegment = ({
   const cursor = cursorRef.current;
   if (!cursor) return null;
   const last = river.points[river.points.length - 1];
+  // Red preview = this click would make the river cross itself, and the
+  // store will refuse it. Showing the refusal before the click is the point:
+  // the author never gets a committed crossing to undo.
+  const crosses = !isPlaceholderRiver(river.points) && wouldSelfIntersect(river.points, cursor);
   const a: [number, number, number] = [last.x, 0.06, -last.y];
   const b: [number, number, number] = [cursor.x, 0.06, -cursor.y];
   return (
@@ -896,8 +934,149 @@ const RiverPreviewSegment = ({
           g.setAttribute("position", new THREE.BufferAttribute(arr, 3));
         }}
       />
-      <lineBasicMaterial color="#76d6ff" transparent opacity={0.85} depthTest={false} />
+      <lineBasicMaterial
+        color={crosses ? "#ff5f56" : "#76d6ff"}
+        transparent
+        opacity={0.85}
+        depthTest={false}
+      />
     </line>
+  );
+};
+
+// Per-lake overlay: a rim ring showing the ellipse the author is editing
+// plus a centre handle to select and drag it. Under the river tool the same
+// rings render non-interactive, so the author can see where a river will be
+// captured by a lake mouth.
+const LakeEditOverlay = ({
+  store,
+  lakes,
+  selectedLakeId,
+  interactive,
+  canvasRef,
+}: {
+  store: EditorStore;
+  lakes: AuthoredLake[];
+  selectedLakeId: string | null;
+  interactive: boolean;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+}) => {
+  if (lakes.length === 0) return null;
+  return (
+    <group>
+      {lakes.map((l) => (
+        <LakeHandle
+          key={l.id}
+          store={store}
+          lake={l}
+          isSelected={l.id === selectedLakeId}
+          interactive={interactive}
+          canvasRef={canvasRef}
+        />
+      ))}
+    </group>
+  );
+};
+
+const LakeHandle = ({
+  store,
+  lake,
+  isSelected,
+  interactive,
+  canvasRef,
+}: {
+  store: EditorStore;
+  lake: AuthoredLake;
+  isSelected: boolean;
+  interactive: boolean;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+}) => {
+  const dragging = useRef(false);
+  const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const capturePointerIdRef = useRef<number | null>(null);
+  const color = isSelected ? "#ffd66a" : interactive ? "#76d6ff" : "#3aa8d8";
+
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (!interactive) return;
+    // Swallow the event so the ground plane's click handler doesn't also
+    // drop a fresh lake under this one.
+    e.stopPropagation();
+    const ed = store.getState();
+    if (e.shiftKey) {
+      ed.deleteLake(lake.id);
+      return;
+    }
+    ed.selectLake(lake.id);
+    dragging.current = true;
+    ed.dragLakeStart();
+    const canvas = canvasRef.current;
+    if (canvas) {
+      try {
+        canvas.setPointerCapture(e.pointerId);
+        captureCanvasRef.current = canvas;
+        capturePointerIdRef.current = e.pointerId;
+      } catch {
+        // Best-effort capture.
+      }
+    }
+  };
+
+  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    store.getState().dragLake(lake.id, e.point.x, -e.point.z);
+  };
+
+  const onPointerUp = (e: ThreeEvent<PointerEvent>) => {
+    if (!dragging.current) return;
+    e.stopPropagation();
+    dragging.current = false;
+    store.getState().dragLakeEnd();
+    const canvas = captureCanvasRef.current;
+    const pid = capturePointerIdRef.current;
+    if (canvas && pid !== null) {
+      try {
+        canvas.releasePointerCapture(pid);
+      } catch {
+        // Capture may have already been released.
+      }
+    }
+    captureCanvasRef.current = null;
+    capturePointerIdRef.current = null;
+  };
+
+  return (
+    <group position={[lake.pos.x, 0.16, -lake.pos.y]}>
+      {/* Rim ring — scaled unit ring so the ellipse's rotation and half-axes
+          read directly off the lake record. */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, lake.rot]}
+        scale={[lake.rx, lake.ry, 1]}
+        renderOrder={21}
+        raycast={noRaycast}
+      >
+        <ringGeometry args={[0.97, 1.0, 64]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={interactive ? 0.95 : 0.5}
+          side={THREE.DoubleSide}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+      {interactive && (
+        <mesh
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          renderOrder={22}
+        >
+          <sphereGeometry args={[POINT_RADIUS, 16, 12]} />
+          <meshBasicMaterial color={color} depthTest={false} transparent opacity={0.95} />
+        </mesh>
+      )}
+    </group>
   );
 };
 

@@ -1,4 +1,4 @@
-import type { AutoBridge, PlacedProp, River } from "../sim/types";
+import type { AuthoredLake, AutoBridge, PlacedProp, River } from "../sim/types";
 
 // Persistence for the dev-only world-map editor (src/editor). Hand-placed
 // overworld props live in localStorage under a single key (the world map
@@ -19,6 +19,9 @@ export type WorldMapEdit = {
   // Hand-painted rivers from the river tool. Additive over v:1 — older
   // blobs without this field load with rivers defaulting to [].
   rivers?: River[];
+  // Hand-painted lakes from the lake tool. Additive over v:1 — older blobs
+  // without this field load with lakes defaulting to [].
+  lakes?: AuthoredLake[];
   // Editor-managed bridges resolved per commit from rivers × paths.
   // Additive over v:1 — older blobs without this field load with
   // bridges defaulting to []. The world map has no path geometry today

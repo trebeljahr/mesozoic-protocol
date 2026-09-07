@@ -6,6 +6,7 @@ import { useGame } from "../store";
 import {
   createEditorStore,
   type EditorStore,
+  isOnLake,
   isOnRiver,
   type ProceduralItem,
   propRadius,
@@ -60,6 +61,7 @@ const saveCurrentLevelEdit = (): void => {
     proceduralSeed: w.proceduralSeed,
     props: w.props,
     rivers: w.rivers,
+    lakes: w.lakes,
     bridges: w.autoBridges,
     erasedProcedural: w.erasedProcedural.size > 0 ? [...w.erasedProcedural] : undefined,
     easterEggs: w.authoredEasterEggs,
@@ -99,6 +101,9 @@ const canEditPlaceAt = (
   // Hand-painted rivers (river tool). Same per-segment scan as flowGeometry's
   // procedural rivers, just over the authored polylines.
   if (isOnRiver(w.rivers, x, y, candidateRadius)) return false;
+  // Authored lakes block placement the same way — props shouldn't float on
+  // an authored water body any more than on a river ribbon.
+  if (isOnLake(w.lakes, x, y, candidateRadius)) return false;
   for (const t of w.towers) {
     const r = TOWER_FOOTPRINT * 0.5 + candidateRadius;
     if (distSq(t.pos, pos) < r * r) return false;
@@ -125,13 +130,23 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
       props: w.props,
       override: w.overrideActive,
       rivers: w.rivers,
+      lakes: w.lakes,
       bridges: w.autoBridges,
       easterEggs: w.authoredEasterEggs,
       proceduralSeed: w.proceduralSeed,
       erasedProcedural: w.erasedProcedural.size > 0 ? [...w.erasedProcedural] : undefined,
     };
   },
-  commit: ({ props, override, rivers, bridges, easterEggs, proceduralSeed, erasedProcedural }) => {
+  commit: ({
+    props,
+    override,
+    rivers,
+    lakes,
+    bridges,
+    easterEggs,
+    proceduralSeed,
+    erasedProcedural,
+  }) => {
     const w = useGame.getState().world;
     const before = w.erasedProcedural;
     const after = new Set(erasedProcedural ?? []);
@@ -156,6 +171,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     w.props = props;
     w.overrideActive = override;
     w.rivers = rivers;
+    w.lakes = lakes;
     w.autoBridges = bridges;
     w.authoredEasterEggs = easterEggs;
     w.proceduralSeed = proceduralSeed ?? w.proceduralSeed;
@@ -177,6 +193,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     const w = useGame.getState().world;
     w.props = [];
     w.rivers = [];
+    w.lakes = [];
     w.autoBridges = [];
     w.authoredEasterEggs = [];
     bumpGeometry();
@@ -247,6 +264,7 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
         proceduralSeed: w.proceduralSeed,
         props: w.props,
         rivers: w.rivers,
+        lakes: w.lakes,
         bridges: w.autoBridges,
         easterEggs: w.authoredEasterEggs,
       },
@@ -294,6 +312,7 @@ export const clearAllLevels = (): void => {
   const w = useGame.getState().world;
   w.props = [];
   w.rivers = [];
+  w.lakes = [];
   w.autoBridges = [];
   w.authoredEasterEggs = [];
   w.overrideActive = false;

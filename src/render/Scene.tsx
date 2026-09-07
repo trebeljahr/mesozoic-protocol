@@ -235,5 +235,12 @@ const PlayRivers = () => {
   const version = useGame((s) => s.ui.treeVersion);
   void version;
   const world = useGame.getState().world;
-  return <Rivers rivers={world.rivers} paths={world.paths} autoBridges={world.autoBridges} />;
+  return (
+    <Rivers
+      rivers={world.rivers}
+      lakes={world.lakes}
+      paths={world.paths}
+      autoBridges={world.autoBridges}
+    />
+  );
 };

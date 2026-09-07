@@ -7,6 +7,7 @@ import {
   TARGET_SIZE_BY_ROLE,
 } from "../biomes";
 import type {
+  AuthoredLake,
   AutoBridge,
   PlacedEasterEgg,
   PlacedProp,
@@ -112,6 +113,171 @@ export const RIVER_EDGE_SNAP_THRESHOLD = 1.5;
 // mid-map control points sideways.
 export const RIVER_EDGE_HOVER_SNAP_THRESHOLD = 3.5;
 
+// ---------------------------------------------------------------------------
+// River self-intersection guard
+// ---------------------------------------------------------------------------
+// A ribbon extruded along a self-crossing polyline renders as a mess of
+// overlapping banks and doubled foam, so the editor refuses the edit that
+// would create the crossing instead of committing it and hoping the author
+// notices. Every entry point (append a point, drag a point, extend the tail
+// to the map edge) runs through these helpers.
+
+// Twice the signed area of triangle (a, b, c). Positive = counter-clockwise.
+const cross3 = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number =>
+  (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+
+// True when `p` lies on segment a→b, assuming the three are already collinear.
+const onSeg = (ax: number, ay: number, bx: number, by: number, px: number, py: number): boolean =>
+  Math.min(ax, bx) - 1e-9 <= px &&
+  px <= Math.max(ax, bx) + 1e-9 &&
+  Math.min(ay, by) - 1e-9 <= py &&
+  py <= Math.max(ay, by) + 1e-9;
+
+// True when segments a→b and c→d properly cross, or overlap while collinear.
+// Segments that merely touch at a shared endpoint are NOT a crossing — the
+// caller is expected to skip adjacent polyline segments, and a bare touch
+// between distant segments still reads fine as a ribbon.
+export const segmentsCross = (a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean => {
+  const d1 = cross3(c.x, c.y, d.x, d.y, a.x, a.y);
+  const d2 = cross3(c.x, c.y, d.x, d.y, b.x, b.y);
+  const d3 = cross3(a.x, a.y, b.x, b.y, c.x, c.y);
+  const d4 = cross3(a.x, a.y, b.x, b.y, d.x, d.y);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true;
+  }
+  // Collinear overlap — a tail folded back exactly along itself. Reads as a
+  // zero-width crease in the ribbon, so treat it as a crossing too.
+  const EPS = 1e-9;
+  if (Math.abs(d1) < EPS && onSeg(c.x, c.y, d.x, d.y, a.x, a.y)) return true;
+  if (Math.abs(d2) < EPS && onSeg(c.x, c.y, d.x, d.y, b.x, b.y)) return true;
+  if (Math.abs(d3) < EPS && onSeg(a.x, a.y, b.x, b.y, c.x, c.y)) return true;
+  if (Math.abs(d4) < EPS && onSeg(a.x, a.y, b.x, b.y, d.x, d.y)) return true;
+  return false;
+};
+
+// Cosine below which two consecutive segments count as a fold-back. The
+// polyline stays technically non-crossing when the tail doubles back at
+// 179°, but the extruded ribbon still overlaps itself, so treat a near-180°
+// reversal as an intersection.
+const FOLDBACK_COS = -0.985;
+
+// True when segment prev→last followed by last→next reverses hard enough
+// that the extruded ribbon would overlap itself at the joint.
+const foldsBack = (prev: Vec2, last: Vec2, next: Vec2): boolean => {
+  const ax = last.x - prev.x;
+  const ay = last.y - prev.y;
+  const bx = next.x - last.x;
+  const by = next.y - last.y;
+  const la = Math.hypot(ax, ay);
+  const lb = Math.hypot(bx, by);
+  if (la < 1e-6 || lb < 1e-6) return false;
+  return (ax * bx + ay * by) / (la * lb) <= FOLDBACK_COS;
+};
+
+// Index pair of the first self-crossing in `pts`, or null when the polyline
+// is clean. Adjacent segments are skipped (they legitimately share a point);
+// their joint is checked for fold-back instead.
+export const findSelfIntersection = (pts: RiverPoint[]): [number, number] | null => {
+  const segCount = pts.length - 1;
+  for (let i = 0; i < segCount; i++) {
+    if (i + 2 < pts.length && foldsBack(pts[i], pts[i + 1], pts[i + 2])) return [i, i + 1];
+    for (let j = i + 2; j < segCount; j++) {
+      if (segmentsCross(pts[i], pts[i + 1], pts[j], pts[j + 1])) return [i, j];
+    }
+  }
+  return null;
+};
+
+export const isSelfIntersecting = (pts: RiverPoint[]): boolean =>
+  pts.length >= 3 && findSelfIntersection(pts) !== null;
+
+// True when appending `next` to `pts` would make the polyline cross itself.
+// Only the new segment needs testing — everything before it was validated
+// when it was appended.
+export const wouldSelfIntersect = (pts: RiverPoint[], next: Vec2): boolean => {
+  if (pts.length < 2) return false;
+  const lastIdx = pts.length - 1;
+  const last = pts[lastIdx];
+  if (foldsBack(pts[lastIdx - 1], last, next)) return true;
+  // Skip the segment ending at `last` — it shares an endpoint with the new one.
+  for (let i = 0; i < lastIdx - 1; i++) {
+    if (segmentsCross(last, next, pts[i], pts[i + 1])) return true;
+  }
+  return false;
+};
+
+// ---------------------------------------------------------------------------
+// Lakes
+// ---------------------------------------------------------------------------
+// Lake half-axis clamp — same spirit as the river width clamp.
+export const MIN_LAKE_RADIUS = 0.8;
+export const MAX_LAKE_RADIUS = 40;
+export const DEFAULT_LAKE_RX = 6;
+export const DEFAULT_LAKE_RY = 4;
+export const clampLakeRadius = (r: number): number =>
+  Math.min(MAX_LAKE_RADIUS, Math.max(MIN_LAKE_RADIUS, r));
+
+// Normalised radial distance of (x, y) in the lake's local ellipse frame.
+// <1 inside, 1 on the rim, >1 outside. `pad` grows both half-axes first, so
+// `lakeNorm(l, x, y, r) <= 1` answers "does a disc of radius r touch the lake".
+export const lakeNorm = (l: AuthoredLake, x: number, y: number, pad = 0): number => {
+  const c = Math.cos(-l.rot);
+  const s = Math.sin(-l.rot);
+  const dx = x - l.pos.x;
+  const dy = y - l.pos.y;
+  const lx = dx * c - dy * s;
+  const ly = dx * s + dy * c;
+  const rx = Math.max(1e-6, l.rx + pad);
+  const ry = Math.max(1e-6, l.ry + pad);
+  return Math.hypot(lx / rx, ly / ry);
+};
+
+// True if (x, y) lies within `padding` world units of any authored lake.
+// The editor placement gate uses it so props can't be dropped on water,
+// mirroring isOnRiver for river ribbons.
+export const isOnLake = (lakes: AuthoredLake[], x: number, y: number, padding: number): boolean =>
+  lakes.some((l) => lakeNorm(l, x, y, padding) <= 1);
+
+// Extra reach, in world units, around a lake's rim where a river endpoint
+// is captured by the lake instead of by the map edge. Generous enough that
+// a click "at the shore" reliably anchors, tight enough that a river drawn
+// past a lake isn't yanked into it.
+export const LAKE_MOUTH_PAD = 2.0;
+
+// Fraction of the lake radius a captured river endpoint is pulled to. Well
+// inside the rim so the ribbon end disappears under the lake disc instead
+// of poking out of it.
+const LAKE_MOUTH_INSET = 0.72;
+
+// The lake whose mouth captures (x, y), or null. Nearest rim wins so two
+// overlapping lakes resolve deterministically.
+export const findLakeMouth = (lakes: AuthoredLake[], x: number, y: number): AuthoredLake | null => {
+  let best: AuthoredLake | null = null;
+  let bestNorm = Number.POSITIVE_INFINITY;
+  for (const l of lakes) {
+    const n = lakeNorm(l, x, y, LAKE_MOUTH_PAD);
+    if (n <= 1 && n < bestNorm) {
+      bestNorm = n;
+      best = l;
+    }
+  }
+  return best;
+};
+
+// Pull `p` to a point just inside the lake rim, along the ray from the lake
+// centre. Keeps the direction the author clicked from (so the river still
+// enters the lake where they aimed) while guaranteeing the ribbon end is
+// covered by the lake mesh.
+export const snapIntoLake = (l: AuthoredLake, p: Vec2): Vec2 => {
+  const dx = p.x - l.pos.x;
+  const dy = p.y - l.pos.y;
+  if (dx * dx + dy * dy < 1e-9) return { x: l.pos.x + l.rx * LAKE_MOUTH_INSET, y: l.pos.y };
+  const n = lakeNorm(l, p.x, p.y);
+  if (n <= LAKE_MOUTH_INSET) return { x: p.x, y: p.y };
+  const k = LAKE_MOUTH_INSET / n;
+  return { x: l.pos.x + dx * k, y: l.pos.y + dy * k };
+};
+
 export type MapBounds = { halfW: number; halfH: number };
 
 // Project `p` onto the nearest cardinal edge of the bounding rectangle,
@@ -176,10 +342,34 @@ export const extendToEdge = (prev: Vec2, last: Vec2, b: MapBounds): Vec2 | null 
   };
 };
 
+// True for the two-point stub beginRiver seeds on the first click (second
+// point offset by a hair so the Catmull-Rom fit has something to chew on).
+// The second click replaces it rather than appending.
+export const isPlaceholderRiver = (pts: RiverPoint[]): boolean =>
+  pts.length === 2 && pts[1].x === pts[0].x + 0.01 && pts[1].y === pts[0].y + 0.01;
+
+// Replace the tail point of a polyline.
+const replaceLast = (pts: RiverPoint[], p: Vec2): RiverPoint[] =>
+  pts.map((q, i) => (i === pts.length - 1 ? { x: p.x, y: p.y } : q));
+
+// Where a river endpoint actually lands: inside a lake when one captures the
+// point (rivers feed and drain lakes), otherwise on the nearest map edge.
+// Rivers have to enter and leave the playfield somewhere, so an endpoint is
+// never left floating mid-map. Adapters without bounds and without a nearby
+// lake (world-map editor) get the point back unchanged.
+export const anchorRiverEnd = (p: Vec2, lakes: AuthoredLake[], bounds: MapBounds | null): Vec2 => {
+  const mouth = findLakeMouth(lakes, p.x, p.y);
+  if (mouth) return snapIntoLake(mouth, p);
+  return bounds ? projectToEdge(p, bounds) : { x: p.x, y: p.y };
+};
+
 export type EditorSource = {
   props: PlacedProp[];
   override: boolean;
   rivers: River[];
+  // Hand-painted lakes from the lake tool. Persisted in the same blob as
+  // rivers; adapters that predate the tool feed [].
+  lakes: AuthoredLake[];
   // Editor-managed bridges resolved per commit from rivers × paths and
   // persisted alongside the river polylines so they get stable ids,
   // material-themed palettes, and survive reloads.
@@ -300,6 +490,24 @@ export type RiverToolState = {
   selectedRiverId: string | null;
   width: number;
   material: RiverMaterial;
+  // Set when the editor refuses an edit that would make the river cross
+  // itself, so the panel can say why nothing happened. Cleared by the next
+  // accepted point / drag / tool toggle.
+  warning: string | null;
+};
+
+// Lake-tool state. `active` flips the editor into lake mode (mutually
+// exclusive with every other click-plane tool): a map click drops a new
+// ellipse at the click position using the tool's current rx/ry/rot/material,
+// and clicking an existing lake's handle selects it for resize / rotate /
+// move / delete.
+export type LakeToolState = {
+  active: boolean;
+  selectedLakeId: string | null;
+  rx: number;
+  ry: number;
+  rot: number;
+  material: RiverMaterial;
 };
 
 // Easter-egg tool state. `active` flips the editor into egg-placement mode
@@ -333,7 +541,23 @@ const DEFAULT_RIVER_TOOL: RiverToolState = {
   selectedRiverId: null,
   width: DEFAULT_RIVER_WIDTH,
   material: "water",
+  warning: null,
 };
+
+const DEFAULT_LAKE_TOOL: LakeToolState = {
+  active: false,
+  selectedLakeId: null,
+  rx: DEFAULT_LAKE_RX,
+  ry: DEFAULT_LAKE_RY,
+  rot: 0,
+  material: "water",
+};
+
+// Copy for the two refusals the river tool can raise. Kept here so the
+// store and the panel can't drift on wording.
+const SELF_INTERSECT_MSG = "Point refused — the river would cross itself.";
+const DRAG_INTERSECT_MSG = "Drag refused — the river would cross itself.";
+const DELETE_INTERSECT_MSG = "Delete refused — the river would cross itself.";
 
 const DEFAULT_EASTER_EGG_TOOL: EasterEggToolState = {
   active: false,
@@ -394,6 +618,7 @@ export type EditorStoreApi = {
   rotateStrokeOpen: boolean;
   rotateStrokePushed: boolean;
   riverTool: RiverToolState;
+  lakeTool: LakeToolState;
   // Marquee drag-rect tool. Mutually exclusive with placing / brush / river
   // — arming any of those drops marquee and vice versa. While `active` is
   // false the rect is always null; while `active` is true the rect tracks
@@ -546,6 +771,24 @@ export type EditorStoreApi = {
   deleteRiver: (id: string) => void;
   setRiverWidth: (width: number) => void;
   setRiverMaterial: (material: RiverMaterial) => void;
+  // Dismiss the river tool's self-intersection warning without changing
+  // any geometry. Called by the panel's dismiss affordance.
+  clearRiverWarning: () => void;
+  // Lake tool. `setLakeToolActive` is the arm/disarm toggle (mutually
+  // exclusive with every other click-plane tool); `placeLakeAt` drops a new
+  // ellipse; drag/resize/rotate/material/delete mirror the river tool's
+  // per-selection editing surface. Each is one undo entry, except the drag
+  // which opens its entry at dragLakeStart.
+  setLakeToolActive: (on: boolean) => void;
+  placeLakeAt: (x: number, y: number) => void;
+  selectLake: (id: string | null) => void;
+  dragLakeStart: () => void;
+  dragLake: (id: string, x: number, y: number) => void;
+  dragLakeEnd: () => void;
+  setLakeSize: (size: { rx?: number; ry?: number }) => void;
+  setLakeRotation: (rot: number) => void;
+  setLakeMaterial: (material: RiverMaterial) => void;
+  deleteLake: (id: string) => void;
   easterEggTool: EasterEggToolState;
   setEasterEggToolActive: (on: boolean) => void;
   setEasterEggPlacing: (defId: string | null) => void;
@@ -592,6 +835,9 @@ const firstOf = (ids: Set<string>): string | null => {
 const cloneRivers = (rs: River[]): River[] =>
   rs.map((r) => ({ ...r, points: r.points.map((p) => ({ ...p })) }));
 
+const cloneLakes = (ls: AuthoredLake[]): AuthoredLake[] =>
+  ls.map((l) => ({ ...l, pos: { ...l.pos } }));
+
 // `makeAdapter` runs inside create() so adapters with internal mutable state
 // (e.g. the world-map adapter's seed/closure) initialise lazily — production
 // never runs it because the bound store is never read.
@@ -605,6 +851,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props: [...cur.props],
         override: cur.override,
         rivers: cloneRivers(cur.rivers),
+        lakes: cloneLakes(cur.lakes),
         bridges: cur.bridges.map((b) => ({ ...b })),
         easterEggs: cur.easterEggs.map((e) => ({ ...e, pos: { ...e.pos } })),
         proceduralSeed: cur.proceduralSeed,
@@ -640,6 +887,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props,
         override: cur.override,
         rivers: cur.rivers,
+        lakes: cur.lakes,
         bridges: cur.bridges,
         easterEggs: cur.easterEggs,
         proceduralSeed: cur.proceduralSeed,
@@ -661,6 +909,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props,
         override: cur.override,
         rivers: cur.rivers,
+        lakes: cur.lakes,
         bridges: cur.bridges,
         easterEggs: cur.easterEggs,
         proceduralSeed: cur.proceduralSeed,
@@ -683,9 +932,32 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props: cur.props,
         override: cur.override,
         rivers,
+        lakes: cur.lakes,
         bridges,
         easterEggs: cur.easterEggs,
         proceduralSeed: cur.proceduralSeed,
+        // Carried through: omitting it read as "the erase mask shrank to
+        // empty" in the level adapter, which restored every bulldozed
+        // procedural item on the next river edit.
+        erasedProcedural: cur.erasedProcedural,
+      });
+    };
+
+    // Replace just the lakes array, keeping everything else unchanged.
+    // Lakes take no part in bridge resolution — bridges are a path×river
+    // affordance, and a path crossing a lake is an authoring mistake the
+    // author fixes by moving one of the two.
+    const commitLakes = (lakes: AuthoredLake[]): void => {
+      const cur = adapter.getCurrent();
+      commit({
+        props: cur.props,
+        override: cur.override,
+        rivers: cur.rivers,
+        lakes,
+        bridges: cur.bridges,
+        easterEggs: cur.easterEggs,
+        proceduralSeed: cur.proceduralSeed,
+        erasedProcedural: cur.erasedProcedural,
       });
     };
 
@@ -696,6 +968,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         props: cur.props,
         override: cur.override,
         rivers: cur.rivers,
+        lakes: cur.lakes,
         bridges: cur.bridges,
         easterEggs,
         proceduralSeed: cur.proceduralSeed,
@@ -770,6 +1043,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           brush: { ...s.brush, active: false, eraser: false },
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, active: false, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             active: false,
@@ -795,6 +1069,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           moving: false,
           brush: { ...s.brush, active: false, eraser: false },
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, active: false, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             active: false,
@@ -1185,6 +1460,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           props: cur.props,
           override: on,
           rivers: cur.rivers,
+          lakes: cur.lakes,
           bridges: cur.bridges,
           easterEggs: cur.easterEggs,
           proceduralSeed: cur.proceduralSeed,
@@ -1207,6 +1483,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           props: [],
           override: true,
           rivers: [],
+          lakes: [],
           bridges: [],
           easterEggs: [],
           proceduralSeed: cur.proceduralSeed,
@@ -1219,6 +1496,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           version: s.version + 1,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, active: false, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             active: false,
@@ -1242,6 +1520,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             props: [],
             override: cur.override,
             rivers: [],
+            lakes: [],
             bridges: [],
             easterEggs: [],
             proceduralSeed: cur.proceduralSeed,
@@ -1255,6 +1534,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           version: s.version + 1,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             placingDefId: null,
@@ -1276,6 +1556,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             props: cur.props,
             override: true,
             rivers: cur.rivers,
+            lakes: cur.lakes,
             bridges: cur.bridges,
             easterEggs: cur.easterEggs,
             proceduralSeed: cur.proceduralSeed,
@@ -1311,6 +1592,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           props: cur.props,
           override: false,
           rivers: cur.rivers,
+          lakes: cur.lakes,
           bridges: cur.bridges,
           easterEggs: cur.easterEggs,
           proceduralSeed: Date.now(),
@@ -1342,6 +1624,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           moving: false,
           // Arming a brush disarms the river + egg tools — they share the click plane.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, active: false, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             active: false,
@@ -1372,6 +1655,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           moving: false,
           // Eraser shares the click plane with placement/river/egg/scatter brush.
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, active: false, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             active: false,
@@ -1702,6 +1986,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           moving: false,
           brush: { ...s.brush, active: false, eraser: false },
           riverTool: { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, active: false, selectedLakeId: null },
           easterEggTool: {
             ...s.easterEggTool,
             active: false,
@@ -1826,6 +2111,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           // a river-tool toggle is a hard re-arm boundary in practice).
           marqueeTool: on ? DEFAULT_MARQUEE_TOOL : s.marqueeTool,
           placingStampId: on ? null : s.placingStampId,
+          lakeTool: on ? { ...s.lakeTool, active: false, selectedLakeId: null } : s.lakeTool,
         }));
       },
 
@@ -1841,6 +2127,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           riverTool: on
             ? { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null }
             : s.riverTool,
+          lakeTool: on ? { ...s.lakeTool, active: false, selectedLakeId: null } : s.lakeTool,
           easterEggTool: on
             ? {
                 ...s.easterEggTool,
@@ -1914,13 +2201,15 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // First click of a new river: seed two coincident-ish points so the
         // Catmull-Rom curve has enough samples to render immediately. The
         // second click (addRiverPoint) replaces the placeholder offset.
-        // Always snap the start to the nearest map edge — rivers as a
-        // policy enter the playfield from off-screen, never start
-        // mid-map. When the adapter doesn't know its bounds (world-map
-        // editor today), keep the click position verbatim.
+        // A river has to come from somewhere — the start anchors either to
+        // a lake the click landed in/near (a stream leaving a lake) or, by
+        // default, to the nearest map edge, so it never begins in the middle
+        // of nowhere. When the adapter doesn't know its bounds (world-map
+        // editor today) and no lake captures the click, keep it verbatim.
         const id = nanoid(8);
+        const cur = adapter.getCurrent();
         const bounds = adapter.getMapBounds?.() ?? null;
-        const start = bounds ? projectToEdge({ x, y }, bounds) : { x, y };
+        const start = anchorRiverEnd({ x, y }, cur.lakes, bounds);
         const seed: River = {
           id,
           points: [start, { x: start.x + 0.01, y: start.y + 0.01 }],
@@ -1928,10 +2217,9 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           material: get().riverTool.material,
         };
         snapshotAndPush();
-        const cur = adapter.getCurrent();
         commitRivers([...cur.rivers, seed]);
         set((s) => ({
-          riverTool: { ...s.riverTool, editingRiverId: id, selectedRiverId: id },
+          riverTool: { ...s.riverTool, editingRiverId: id, selectedRiverId: id, warning: null },
         }));
       },
 
@@ -1941,29 +2229,32 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // No history push during a stroke — beginRiver pushed the creation
         // entry. Without this gate each map click would pollute undo.
         const cur = adapter.getCurrent();
+        const river = cur.rivers.find((r) => r.id === editingId);
+        if (!river) return;
+        const isSeed = isPlaceholderRiver(river.points);
+        // Self-intersection guard. Against the placeholder seed there's no
+        // real geometry yet, so nothing can cross. Otherwise the candidate
+        // segment is tested against every earlier segment; a crossing is
+        // refused outright (the click does nothing) with a panel warning,
+        // because a ribbon extruded over a crossing polyline renders as
+        // overlapping banks and doubled foam.
+        if (!isSeed && wouldSelfIntersect(river.points, { x, y })) {
+          set((st) => ({ riverTool: { ...st.riverTool, warning: SELF_INTERSECT_MSG } }));
+          return;
+        }
         const next = cur.rivers.map((r) => {
           if (r.id !== editingId) return r;
           // Replace the placeholder seed point on the second click; append after.
-          if (
-            r.points.length === 2 &&
-            r.points[1].x === r.points[0].x + 0.01 &&
-            r.points[1].y === r.points[0].y + 0.01
-          ) {
-            return { ...r, points: [r.points[0], { x, y }] };
-          }
+          if (isSeed) return { ...r, points: [r.points[0], { x, y }] };
           return { ...r, points: [...r.points, { x, y } as RiverPoint] };
         });
         commitRivers(next);
+        set((st) => ({ riverTool: { ...st.riverTool, warning: null } }));
       },
 
       finishRiver: () => {
         const editingId = get().riverTool.editingRiverId;
         if (editingId === null) return;
-        const bounds = adapter.getMapBounds?.() ?? null;
-        if (!bounds) {
-          set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
-          return;
-        }
         const cur = adapter.getCurrent();
         const river = cur.rivers.find((r) => r.id === editingId);
         if (!river) {
@@ -1973,14 +2264,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // Single-click finish: only the placeholder seed exists. Drop the
         // river entirely rather than persisting an unrenderable stub.
         const pts = river.points;
-        const isPlaceholder =
-          pts.length === 2 && pts[1].x === pts[0].x + 0.01 && pts[1].y === pts[0].y + 0.01;
-        if (isPlaceholder) {
+        if (isPlaceholderRiver(pts)) {
           commitRivers(cur.rivers.filter((r) => r.id !== editingId));
           set((s) => ({
             riverTool: {
               ...s.riverTool,
               editingRiverId: null,
+              warning: null,
               selectedRiverId:
                 s.riverTool.selectedRiverId === editingId ? null : s.riverTool.selectedRiverId,
             },
@@ -1989,34 +2279,64 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         }
         const lastIdx = pts.length - 1;
         const last = pts[lastIdx];
-        const prev = lastIdx >= 1 ? pts[lastIdx - 1] : null;
-        const distAbs = Math.abs(distToNearestEdge(last, bounds));
+        // A river that ends inside (or at the shore of) a lake is finished —
+        // the lake is where it goes. Pull the tail just inside the rim so the
+        // ribbon end is covered by the lake mesh instead of stopping at it.
+        const mouth = findLakeMouth(cur.lakes, last.x, last.y);
+        const bounds = adapter.getMapBounds?.() ?? null;
         let nextPts: RiverPoint[];
-        if (distAbs <= RIVER_EDGE_SNAP_THRESHOLD || !prev) {
-          // Tail already sits near an edge (or there's no direction to
-          // extrapolate from): replace the last point in place.
-          const snapped = projectToEdge(last, bounds);
-          nextPts = pts.map((p, i) => (i === lastIdx ? snapped : p));
+        if (mouth) {
+          const snapped = snapIntoLake(mouth, last);
+          nextPts = replaceLast(pts, snapped);
+        } else if (!bounds) {
+          // World-map editor: no bounds to anchor against, leave as drawn.
+          nextPts = pts;
         } else {
-          // Extend the last stroke direction out to the nearest wall so the
-          // river continues off-map along the tangent the user was drawing,
-          // instead of jogging perpendicular to it.
-          const edgePt = extendToEdge(prev, last, bounds);
-          if (edgePt) {
-            nextPts = [...pts, edgePt];
+          const prev = lastIdx >= 1 ? pts[lastIdx - 1] : null;
+          const distAbs = Math.abs(distToNearestEdge(last, bounds));
+          if (distAbs <= RIVER_EDGE_SNAP_THRESHOLD || !prev) {
+            // Tail already sits near an edge (or there's no direction to
+            // extrapolate from): replace the last point in place.
+            nextPts = replaceLast(pts, projectToEdge(last, bounds));
           } else {
-            const snapped = projectToEdge(last, bounds);
-            nextPts = pts.map((p, i) => (i === lastIdx ? snapped : p));
+            // Extend the last stroke direction out to the nearest wall so the
+            // river continues off-map along the tangent the user was drawing,
+            // instead of jogging perpendicular to it. If that extension would
+            // cross the river's own body, fall back to the perpendicular
+            // projection, and if that crosses too, leave the tail where the
+            // author put it rather than committing a crossing.
+            const edgePt = extendToEdge(prev, last, bounds);
+            const perpPt = projectToEdge(last, bounds);
+            if (edgePt && !wouldSelfIntersect(pts, edgePt)) {
+              nextPts = [...pts, edgePt];
+            } else if (!wouldSelfIntersect(pts.slice(0, -1), perpPt)) {
+              nextPts = replaceLast(pts, perpPt);
+            } else {
+              nextPts = pts;
+            }
           }
         }
+        const crossed = nextPts === pts && !mouth && bounds !== null;
         commitRivers(cur.rivers.map((r) => (r.id === editingId ? { ...r, points: nextPts } : r)));
-        set((s) => ({ riverTool: { ...s.riverTool, editingRiverId: null } }));
+        set((s) => ({
+          riverTool: {
+            ...s.riverTool,
+            editingRiverId: null,
+            warning: crossed
+              ? "River left un-anchored — extending it to the map edge would cross the river itself."
+              : null,
+          },
+        }));
       },
 
       selectRiver: (id) => {
         set((s) => ({
-          riverTool: { ...s.riverTool, selectedRiverId: id, editingRiverId: null },
+          riverTool: { ...s.riverTool, selectedRiverId: id, editingRiverId: null, warning: null },
         }));
+      },
+
+      clearRiverWarning: () => {
+        set((s) => ({ riverTool: { ...s.riverTool, warning: null } }));
       },
 
       dragRiverPointStart: () => {
@@ -2029,18 +2349,29 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // Pure mutation — history was captured at drag start.
         const cur = adapter.getCurrent();
         const bounds = adapter.getMapBounds?.() ?? null;
-        const next = cur.rivers.map((r) => {
-          if (r.id !== riverId) return r;
-          if (index < 0 || index >= r.points.length) return r;
-          const last = r.points.length - 1;
-          // Endpoint drags re-snap to the edge so a river always enters
-          // and exits the map at the perimeter, matching the policy in
-          // beginRiver/finishRiver. Interior point drags are free-form.
-          const nextPoint =
-            bounds && (index === 0 || index === last) ? projectToEdge({ x, y }, bounds) : { x, y };
-          return { ...r, points: r.points.map((p, i) => (i === index ? nextPoint : p)) };
-        });
-        commitRivers(next);
+        const target = cur.rivers.find((r) => r.id === riverId);
+        if (!target) return;
+        if (index < 0 || index >= target.points.length) return;
+        const lastIdx = target.points.length - 1;
+        // Endpoint drags re-anchor to a lake mouth or the map edge so a
+        // river always enters and exits at a real feature, matching the
+        // policy in beginRiver/finishRiver. Interior points are free-form.
+        const nextPoint =
+          index === 0 || index === lastIdx ? anchorRiverEnd({ x, y }, cur.lakes, bounds) : { x, y };
+        const nextPoints = target.points.map((p, i) => (i === index ? nextPoint : p));
+        // Refuse the frame that would cross the river over itself. The drag
+        // stays live — the point simply stops following the cursor until the
+        // author steers it back out of the crossing.
+        if (isSelfIntersecting(nextPoints)) {
+          if (get().riverTool.warning !== DRAG_INTERSECT_MSG) {
+            set((st) => ({ riverTool: { ...st.riverTool, warning: DRAG_INTERSECT_MSG } }));
+          }
+          return;
+        }
+        commitRivers(cur.rivers.map((r) => (r.id === riverId ? { ...r, points: nextPoints } : r)));
+        if (get().riverTool.warning !== null) {
+          set((st) => ({ riverTool: { ...st.riverTool, warning: null } }));
+        }
       },
 
       dragRiverPointEnd: () => {
@@ -2054,11 +2385,17 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         // A river needs ≥2 points to render — refuse the delete instead of
         // silently destroying the river.
         if (river.points.length <= 2) return;
+        // Dropping a point re-joins its neighbours, which can pull the new
+        // segment across another part of the river. Refuse that too.
+        const nextPoints = river.points.filter((_, i) => i !== index);
+        if (isSelfIntersecting(nextPoints)) {
+          set((st) => ({ riverTool: { ...st.riverTool, warning: DELETE_INTERSECT_MSG } }));
+          return;
+        }
         snapshotAndPush();
-        const next = cur.rivers.map((r) =>
-          r.id === riverId ? { ...r, points: r.points.filter((_, i) => i !== index) } : r,
-        );
+        const next = cur.rivers.map((r) => (r.id === riverId ? { ...r, points: nextPoints } : r));
         commitRivers(next);
+        set((st) => ({ riverTool: { ...st.riverTool, warning: null } }));
       },
 
       deleteRiver: (id) => {
@@ -2103,6 +2440,144 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         set((s) => ({ riverTool: { ...s.riverTool, material } }));
       },
 
+      lakeTool: DEFAULT_LAKE_TOOL,
+
+      setLakeToolActive: (on) => {
+        if (on) adapter.onActivate?.();
+        set((s) => ({
+          // Mutually exclusive with every other click-plane tool.
+          placingUrl: null,
+          ...clearSelectionFields(),
+          moving: false,
+          brush: { ...s.brush, active: false, eraser: false },
+          riverTool: on
+            ? { ...s.riverTool, active: false, editingRiverId: null, selectedRiverId: null }
+            : s.riverTool,
+          easterEggTool: on
+            ? {
+                ...s.easterEggTool,
+                active: false,
+                placingDefId: null,
+                selectedId: null,
+                settingDirection: false,
+              }
+            : s.easterEggTool,
+          marqueeTool: on ? DEFAULT_MARQUEE_TOOL : s.marqueeTool,
+          placingStampId: on ? null : s.placingStampId,
+          lakeTool: {
+            ...s.lakeTool,
+            active: on,
+            // Preserve the selection across a re-toggle, same as the river tool.
+            selectedLakeId: on ? s.lakeTool.selectedLakeId : null,
+          },
+        }));
+      },
+
+      placeLakeAt: (x, y) => {
+        const tool = get().lakeTool;
+        const id = nanoid(8);
+        const lake: AuthoredLake = {
+          id,
+          pos: { x, y },
+          rx: clampLakeRadius(tool.rx),
+          ry: clampLakeRadius(tool.ry),
+          rot: tool.rot,
+          material: tool.material,
+        };
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitLakes([...cur.lakes, lake]);
+        set((s) => ({ lakeTool: { ...s.lakeTool, selectedLakeId: id } }));
+      },
+
+      selectLake: (id) => {
+        set((s) => {
+          if (id === null) return { lakeTool: { ...s.lakeTool, selectedLakeId: null } };
+          // Adopt the picked lake's dimensions as the tool defaults so the
+          // sliders show what's selected (and the next lake matches it).
+          const lake = adapter.getCurrent().lakes.find((l) => l.id === id);
+          return {
+            lakeTool: {
+              ...s.lakeTool,
+              selectedLakeId: id,
+              rx: lake?.rx ?? s.lakeTool.rx,
+              ry: lake?.ry ?? s.lakeTool.ry,
+              rot: lake?.rot ?? s.lakeTool.rot,
+              material: lake?.material ?? s.lakeTool.material,
+            },
+          };
+        });
+      },
+
+      dragLakeStart: () => {
+        // One undo entry per drag — snapshot here, then mutate freely via
+        // dragLake until dragLakeEnd.
+        snapshotAndPush();
+      },
+
+      dragLake: (id, x, y) => {
+        // Pure mutation — history was captured at drag start.
+        const cur = adapter.getCurrent();
+        commitLakes(cur.lakes.map((l) => (l.id === id ? { ...l, pos: { x, y } } : l)));
+      },
+
+      dragLakeEnd: () => {
+        // No-op for now; the undo entry was opened at drag start.
+      },
+
+      setLakeSize: ({ rx, ry }) => {
+        const tool = get().lakeTool;
+        const nextRx = clampLakeRadius(rx ?? tool.rx);
+        const nextRy = clampLakeRadius(ry ?? tool.ry);
+        const targetId = tool.selectedLakeId;
+        if (targetId === null) {
+          set((s) => ({ lakeTool: { ...s.lakeTool, rx: nextRx, ry: nextRy } }));
+          return;
+        }
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitLakes(
+          cur.lakes.map((l) => (l.id === targetId ? { ...l, rx: nextRx, ry: nextRy } : l)),
+        );
+        set((s) => ({ lakeTool: { ...s.lakeTool, rx: nextRx, ry: nextRy } }));
+      },
+
+      setLakeRotation: (rot) => {
+        const targetId = get().lakeTool.selectedLakeId;
+        if (targetId === null) {
+          set((s) => ({ lakeTool: { ...s.lakeTool, rot } }));
+          return;
+        }
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitLakes(cur.lakes.map((l) => (l.id === targetId ? { ...l, rot } : l)));
+        set((s) => ({ lakeTool: { ...s.lakeTool, rot } }));
+      },
+
+      setLakeMaterial: (material) => {
+        const targetId = get().lakeTool.selectedLakeId;
+        if (targetId === null) {
+          set((s) => ({ lakeTool: { ...s.lakeTool, material } }));
+          return;
+        }
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitLakes(cur.lakes.map((l) => (l.id === targetId ? { ...l, material } : l)));
+        set((s) => ({ lakeTool: { ...s.lakeTool, material } }));
+      },
+
+      deleteLake: (id) => {
+        snapshotAndPush();
+        const cur = adapter.getCurrent();
+        commitLakes(cur.lakes.filter((l) => l.id !== id));
+        set((s) => ({
+          lakeTool: {
+            ...s.lakeTool,
+            selectedLakeId: s.lakeTool.selectedLakeId === id ? null : s.lakeTool.selectedLakeId,
+          },
+        }));
+      },
+
       easterEggTool: DEFAULT_EASTER_EGG_TOOL,
 
       setEasterEggToolActive: (on) => {
@@ -2130,6 +2605,11 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             active: on ? false : s.riverTool.active,
             editingRiverId: on ? null : s.riverTool.editingRiverId,
             selectedRiverId: on ? null : s.riverTool.selectedRiverId,
+          },
+          lakeTool: {
+            ...s.lakeTool,
+            active: on ? false : s.lakeTool.active,
+            selectedLakeId: on ? null : s.lakeTool.selectedLakeId,
           },
           marqueeTool: on ? DEFAULT_MARQUEE_TOOL : s.marqueeTool,
           placingStampId: on ? null : s.placingStampId,
@@ -2233,6 +2713,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           moving: false,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, selectedLakeId: null },
           marqueeTool: { ...s.marqueeTool, rect: null, anchor: null },
         }));
         adapter.saveHistory?.(result.next);
@@ -2248,6 +2729,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           moving: false,
           ...STROKE_CLEAR,
           riverTool: { ...s.riverTool, editingRiverId: null, selectedRiverId: null },
+          lakeTool: { ...s.lakeTool, selectedLakeId: null },
           marqueeTool: { ...s.marqueeTool, rect: null, anchor: null },
         }));
         adapter.saveHistory?.(result.next);

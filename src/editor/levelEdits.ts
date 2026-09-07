@@ -1,4 +1,4 @@
-import type { AutoBridge, PlacedEasterEgg, PlacedProp, River } from "../sim/types";
+import type { AuthoredLake, AutoBridge, PlacedEasterEgg, PlacedProp, River } from "../sim/types";
 
 // Persistence for the dev-only level editor (src/editor). Hand-placed props
 // and the per-level "override procedural" flag are stored in localStorage,
@@ -21,6 +21,9 @@ export type LevelEdit = {
   // blobs without this field load with rivers defaulting to []. The
   // schema version stays at 1 because the addition is purely additive.
   rivers?: River[];
+  // Hand-painted lakes from the lake tool. Additive over v:1 — older blobs
+  // without this field load with lakes defaulting to [].
+  lakes?: AuthoredLake[];
   // Editor-managed bridges resolved per commit from rivers × paths.
   // Additive over v:1 — older blobs without this field load with
   // bridges defaulting to [] and re-resolve on the next editor commit

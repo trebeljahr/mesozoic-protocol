@@ -1,7 +1,7 @@
 import { PAN_LIMIT_X, PAN_LIMIT_Z } from "../render/worldMapBounds";
-import type { AutoBridge, PlacedProp, River } from "../sim/types";
+import type { AuthoredLake, AutoBridge, PlacedProp, River } from "../sim/types";
 import { distSq } from "../sim/vec2";
-import { createEditorStore, type EditorStore, isOnRiver, propRadius } from "./editorCore";
+import { createEditorStore, type EditorStore, isOnLake, isOnRiver, propRadius } from "./editorCore";
 import { loadWorldMapHistory, saveWorldMapHistory } from "./historyPersist";
 import { loadWorldMapEdit, saveWorldMapEdit } from "./worldMapEdits";
 
@@ -29,6 +29,8 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
   let props: PlacedProp[] = seed?.props ?? [];
   // Additive field — older v:1 blobs without rivers load with [].
   let rivers: River[] = seed?.rivers ?? [];
+  // Additive field — older v:1 blobs without lakes load with [].
+  let lakes: AuthoredLake[] = seed?.lakes ?? [];
   // Additive field — older v:1 blobs without bridges load with [].
   let bridges: AutoBridge[] = seed?.bridges ?? [];
   let override: boolean = seed?.override ?? false;
@@ -37,13 +39,14 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
     // the editor source feeds an empty array. The shared store still walks
     // through the `easterEggs` field on every snapshot/commit, but it never
     // grows.
-    getCurrent: () => ({ props, override, rivers, bridges, easterEggs: [] }),
+    getCurrent: () => ({ props, override, rivers, lakes, bridges, easterEggs: [] }),
     commit: (next) => {
       props = next.props;
       rivers = next.rivers;
+      lakes = next.lakes;
       bridges = next.bridges;
       override = next.override;
-      saveWorldMapEdit({ v: 1, override, props, rivers, bridges });
+      saveWorldMapEdit({ v: 1, override, props, rivers, lakes, bridges });
     },
     // History persists alongside props/rivers so reloads keep the undo/redo
     // stacks. World-map history is a single global blob (no level scope).
@@ -57,6 +60,7 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
       if (Math.abs(x) > PAN_LIMIT_X - WORLDMAP_BOUNDS_INSET) return false;
       if (Math.abs(y) > PAN_LIMIT_Z - WORLDMAP_BOUNDS_INSET) return false;
       if (isOnRiver(rivers, x, y, candidateRadius)) return false;
+      if (isOnLake(lakes, x, y, candidateRadius)) return false;
       const pos = { x, y };
       // Normalise the ignore arg so the prop-loop just calls .has(). Single-
       // string callers and Set callers (future group/stamp validation paths)
@@ -91,6 +95,7 @@ export const useWorldMapEditor: EditorStore = /* @__PURE__ */ createEditorStore(
           override,
           props,
           rivers,
+          lakes,
           bridges,
         },
         null,

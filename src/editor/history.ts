@@ -1,4 +1,4 @@
-import type { AutoBridge, PlacedEasterEgg, PlacedProp, River } from "../sim/types";
+import type { AuthoredLake, AutoBridge, PlacedEasterEgg, PlacedProp, River } from "../sim/types";
 
 // Undo/redo helpers for the dev-only editors. Pure helpers, no globals.
 // A snapshot captures the pre-mutation state; each mutating action pushes
@@ -13,6 +13,9 @@ export type Snapshot = {
   props: PlacedProp[];
   override: boolean;
   rivers: River[];
+  // Hand-painted lakes from the lake tool. Captured so undo/redo restores
+  // the water bodies alongside the rivers that feed them.
+  lakes: AuthoredLake[];
   // Editor-managed bridges resolved from rivers × paths at commit time.
   // Captured here so undo/redo restores the same bridge ids the user saw.
   bridges: AutoBridge[];

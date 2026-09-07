@@ -305,6 +305,26 @@ export type River = {
   color?: string;
 };
 
+// Hand-painted lake from the dev-only lake tool. A rotated ellipse on the
+// XZ ground plane — same shape the procedural flow generator uses for its
+// biome lakes (see `Lake` in src/flowGeometry.ts), so the renderer can feed
+// both through the same disc mesh + water shader. Persisted alongside
+// rivers in the per-level (or world-map) edit blob. Visual-only today, but
+// it blocks editor prop placement the same way a river ribbon does.
+export type AuthoredLake = {
+  id: string;
+  pos: Vec2;
+  // Half-axes before rotation. Both ≥ MIN_LAKE_RADIUS (editorCore).
+  rx: number;
+  ry: number;
+  // Rotation of the ellipse's local x-axis, radians, sim-space.
+  rot: number;
+  // Render material chosen in the editor. Missing legacy values default
+  // to water at load/render time. Shares RiverMaterial so a lava river
+  // can pool into a lava lake.
+  material?: RiverMaterial;
+};
+
 // Editor-managed bridge over a path×river crossing. Resolved once per
 // editor commit (see `resolveBridges` in src/editor/bridgeResolver.ts)
 // and persisted alongside the river polylines so bridges get stable ids,
@@ -885,6 +905,9 @@ export type World = {
   // persisted alongside the river polylines. Empty in production unless
   // the saved blob ships bridges. See src/editor/bridgeResolver.ts.
   autoBridges: AutoBridge[];
+  // Hand-painted lakes from the dev-only lake tool. Persisted in the same
+  // blob as rivers. Empty in production unless the saved blob ships lakes.
+  lakes: AuthoredLake[];
   projectiles: Projectile[];
   beams: Beam[];
   explosions: Explosion[];

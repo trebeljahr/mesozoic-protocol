@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { type Bridge, computeBridges, type FlowPalette } from "../flowGeometry";
 import { PATH_WIDTH } from "../level";
-import type { River, RiverMaterial, Vec2 } from "../sim/types";
+import type { AuthoredLake, River, RiverMaterial, Vec2 } from "../sim/types";
 import { makeWaterMaterial } from "./waterShader";
 
 // Universal renderer for hand-painted rivers. Reads from a `rivers` prop
@@ -161,28 +161,46 @@ const RiverMesh = ({ river, material }: { river: River; material: THREE.ShaderMa
 // gameplay frame-rate.
 const useRiverMaterials = (
   rivers: River[],
+  lakes: AuthoredLake[],
   bridges: Bridge[],
-): Map<RiverMaterial, THREE.ShaderMaterial> => {
+): {
+  ribbon: Map<RiverMaterial, THREE.ShaderMaterial>;
+  pool: Map<RiverMaterial, THREE.ShaderMaterial>;
+} => {
   // Only build materials for the river materials actually present in the
   // scene. Editor sessions often only use water; building lava+toxic up
-  // front would waste a shader compile each.
-  const kinds = useMemo(() => {
+  // front would waste a shader compile each. Ribbons and pools need separate
+  // materials because the shader keys its flow direction and foam band off
+  // uIsJoint — a lake has no downstream, so it ripples radially instead.
+  const ribbonKinds = useMemo(() => {
     const set = new Set<RiverMaterial>();
     for (const r of rivers) set.add(r.material ?? "water");
     return Array.from(set);
   }, [rivers]);
+  const poolKinds = useMemo(() => {
+    const set = new Set<RiverMaterial>();
+    for (const l of lakes) set.add(l.material ?? "water");
+    return Array.from(set);
+  }, [lakes]);
 
   const mats = useMemo(() => {
-    const m = new Map<RiverMaterial, THREE.ShaderMaterial>();
-    for (const k of kinds) {
-      m.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: false, bridges }));
+    const ribbon = new Map<RiverMaterial, THREE.ShaderMaterial>();
+    for (const k of ribbonKinds) {
+      ribbon.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: false, bridges }));
     }
-    return m;
-  }, [kinds, bridges]);
+    const pool = new Map<RiverMaterial, THREE.ShaderMaterial>();
+    for (const k of poolKinds) {
+      pool.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: true, bridges }));
+    }
+    return { ribbon, pool };
+  }, [ribbonKinds, poolKinds, bridges]);
 
   useEffect(
     () => () => {
-      mats.forEach((mat) => {
+      mats.ribbon.forEach((mat) => {
+        mat.dispose();
+      });
+      mats.pool.forEach((mat) => {
         mat.dispose();
       });
     },
@@ -191,13 +209,34 @@ const useRiverMaterials = (
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    mats.forEach((mat) => {
+    mats.ribbon.forEach((mat) => {
+      mat.uniforms.uTime.value = t;
+    });
+    mats.pool.forEach((mat) => {
       mat.uniforms.uTime.value = t;
     });
   });
 
   return mats;
 };
+
+// Authored lake — a rotated ellipse disc under the shared water shader's
+// "joint" variant (radial ripple + rim foam, no downstream flow). Lifted a
+// hair below the river ribbons so a river feeding a lake draws on top of the
+// pool rather than z-fighting with it.
+const LAKE_Y_OFFSET = Y_OFFSET - 0.005;
+
+const LakeMesh = ({ lake, material }: { lake: AuthoredLake; material: THREE.ShaderMaterial }) => (
+  <mesh
+    position={[lake.pos.x, LAKE_Y_OFFSET, -lake.pos.y]}
+    rotation={[-Math.PI / 2, 0, lake.rot]}
+    scale={[lake.rx, lake.ry, 1]}
+    material={material}
+    renderOrder={0}
+  >
+    <circleGeometry args={[1, 40]} />
+  </mesh>
+);
 
 // Prod-safe — rivers are world data, not editor surface. The renderer ships
 // in both per-level and world-map scenes. Tree-shaking is driven by whether
@@ -213,10 +252,15 @@ const useRiverMaterials = (
 // commit writes the persisted version.
 export const Rivers = ({
   rivers,
+  lakes = [],
   paths = [],
   autoBridges = [],
 }: {
   rivers: River[];
+  // Authored lakes render alongside the ribbons — same palette, same shader,
+  // one closed pool per entry. Optional so callers that predate the lake
+  // tool keep compiling.
+  lakes?: AuthoredLake[];
   paths?: Vec2[][];
   autoBridges?: { length: number };
 }) => {
@@ -226,8 +270,8 @@ export const Rivers = ({
     [showFallback, paths, rivers],
   );
   const bridges = fallbackBridges;
-  const materials = useRiverMaterials(rivers, bridges);
-  if (rivers.length === 0) return null;
+  const materials = useRiverMaterials(rivers, lakes, bridges);
+  if (rivers.length === 0 && lakes.length === 0) return null;
   const bridgeWidth = PATH_WIDTH + 0.4;
   // Index every river by id so the fallback bridge palette can pick the
   // matching deck colour instead of hard-coding the water palette. Two
@@ -260,8 +304,13 @@ export const Rivers = ({
   };
   return (
     <group>
+      {lakes.map((l) => {
+        const mat = materials.pool.get(l.material ?? "water");
+        if (!mat) return null;
+        return <LakeMesh key={l.id} lake={l} material={mat} />;
+      })}
       {rivers.map((r) => {
-        const mat = materials.get(r.material ?? "water");
+        const mat = materials.ribbon.get(r.material ?? "water");
         if (!mat) return null;
         return <RiverMesh key={r.id} river={r} material={mat} />;
       })}

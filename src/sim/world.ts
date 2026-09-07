@@ -44,6 +44,7 @@ import {
 } from "./robotSkills";
 import { ROBOT_SPECS } from "./robotVariants";
 import type {
+  AuthoredLake,
   AutoBridge,
   Beam,
   BeamPoint,
@@ -777,6 +778,7 @@ export const createWorld = (
   // clear/reload can suppress or reseed all derived set-dressing.
   let editorProps: PlacedProp[] = [];
   let editorRivers: River[] = [];
+  let editorLakes: AuthoredLake[] = [];
   let editorBridges: AutoBridge[] = [];
   let editorAuthoredEggs: PlacedEasterEgg[] = [];
   let overrideActive = false;
@@ -792,6 +794,10 @@ export const createWorld = (
         editorRivers = (Array.isArray(edit.rivers) ? edit.rivers : []).map((river: River) => ({
           ...river,
           material: river.material ?? "water",
+        }));
+        editorLakes = (Array.isArray(edit.lakes) ? edit.lakes : []).map((lake: AuthoredLake) => ({
+          ...lake,
+          material: lake.material ?? "water",
         }));
         editorBridges = Array.isArray(edit.bridges) ? (edit.bridges as AutoBridge[]) : [];
         editorAuthoredEggs = Array.isArray(edit.easterEggs)
@@ -809,6 +815,7 @@ export const createWorld = (
     } catch {
       editorProps = [];
       editorRivers = [];
+      editorLakes = [];
       editorBridges = [];
       editorAuthoredEggs = [];
       overrideActive = false;
@@ -1015,6 +1022,7 @@ export const createWorld = (
     proceduralSeed,
     erasedProcedural,
     rivers: editorRivers,
+    lakes: editorLakes,
     autoBridges: editorBridges,
     projectiles: [],
     beams: [],
