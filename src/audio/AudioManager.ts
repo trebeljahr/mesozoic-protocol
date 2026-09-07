@@ -453,14 +453,16 @@ export class AudioManager {
     osc.stop(now + duration);
   }
 
-  // Sci-fi laser zap for the HQ base gun. A fast downward pitch sweep
-  // (the classic "pew") on a dual-oscillator core plus a short noise
-  // spark, so the last-ditch defence reads as an energy weapon firing
-  // rather than the projectile-impact thud it used to borrow. Synthesised
-  // (like playSplat) so multi-path levels can fire several beams a second
-  // without loop seams or shipping a sample.
+  // Heavy plasma discharge for the HQ base gun. The base is the thing the
+  // player is defending, so its shot has to read as the biggest gun on the
+  // field, not a pocket blaster: a sub thump for chest weight, a detuned
+  // saw core for body, a square edge + noise spark for the sci-fi bite, and
+  // a bandpass-swept noise tail so the discharge sounds like it happened in
+  // a big metal emplacement instead of a vacuum. Synthesised (like
+  // playSplat) so multi-path levels can fire several beams a second without
+  // loop seams or shipping a sample.
   private lastLaserAt = 0;
-  private activeLasers = new Set<AudioScheduledSourceNode>();
+  private activeLaserShots = 0;
   playLaser(volumeScale = 0.45) {
     const towersGain = this.busGains.towers;
     if (!this.ctx || !towersGain || this.muted) return;
@@ -468,20 +470,26 @@ export class AudioManager {
     const now = ctx.currentTime;
     const wallNow = performance.now();
     if (wallNow - this.lastLaserAt < 45) return;
-    if (this.activeLasers.size >= 8) return;
+    // Cap concurrent *shots* (not nodes) — each shot is a fixed 7-voice
+    // stack, so counting shots keeps polyphony stable if the layer count
+    // changes again.
+    if (this.activeLaserShots >= 5) return;
     this.lastLaserAt = wallNow;
+    this.activeLaserShots += 1;
 
-    const dur = 0.16;
+    const dur = 0.26;
+    const tailDur = 0.42;
     const peak = Math.min(0.6, volumeScale);
     // Per-shot pitch jitter so a steady-firing HQ doesn't read as one
     // looping sample.
     const j = 0.96 + Math.random() * 0.08;
 
-    // Master envelope: fast attack, exponential decay — the discharge
-    // tailing off.
+    // Core envelope: fast attack, exponential decay — the discharge
+    // tailing off. Trimmed against the old single-layer peak so the added
+    // sub/tail layers add weight rather than raw level.
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(peak, now + 0.004);
+    env.gain.linearRampToValueAtTime(peak * 0.8, now + 0.004);
     env.gain.exponentialRampToValueAtTime(0.001, now + dur);
 
     // Lowpass sweeps down with the pitch so the bright top doesn't sound
@@ -489,18 +497,28 @@ export class AudioManager {
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
     lp.frequency.setValueAtTime(5200, now);
-    lp.frequency.exponentialRampToValueAtTime(1400, now + dur);
+    lp.frequency.exponentialRampToValueAtTime(1200, now + dur);
     lp.Q.value = 1;
     lp.connect(env).connect(towersGain);
 
-    // Core sweep — saw drops fast from bright to low for the "pew".
+    // Core sweep — saw drops fast from bright to low for the "pew". Pitched
+    // a third lower than a hand-weapon zap so the HQ reads as the heavier
+    // gun, with a slightly detuned twin underneath for thickness.
     const o1 = ctx.createOscillator();
     o1.type = "sawtooth";
-    o1.frequency.setValueAtTime(1500 * j, now);
-    o1.frequency.exponentialRampToValueAtTime(300 * j, now + dur * 0.85);
+    o1.frequency.setValueAtTime(1100 * j, now);
+    o1.frequency.exponentialRampToValueAtTime(210 * j, now + dur * 0.85);
     const o1g = ctx.createGain();
-    o1g.gain.value = 0.5;
+    o1g.gain.value = 0.34;
     o1.connect(o1g).connect(lp);
+
+    const o1b = ctx.createOscillator();
+    o1b.type = "sawtooth";
+    o1b.frequency.setValueAtTime(1100 * j * 0.994, now);
+    o1b.frequency.exponentialRampToValueAtTime(210 * j * 0.994, now + dur * 0.85);
+    const o1bg = ctx.createGain();
+    o1bg.gain.value = 0.2;
+    o1b.connect(o1bg).connect(lp);
 
     // Detuned square higher up adds the electric edge.
     const o2 = ctx.createOscillator();
@@ -508,27 +526,74 @@ export class AudioManager {
     o2.frequency.setValueAtTime(2300 * j, now);
     o2.frequency.exponentialRampToValueAtTime(460 * j, now + dur * 0.85);
     const o2g = ctx.createGain();
-    o2g.gain.value = 0.18;
+    o2g.gain.value = 0.12;
     o2.connect(o2g).connect(lp);
 
-    // Spark transient — brief noise burst gives the discharge its bite.
-    const sparkDur = 0.012;
-    const noise = this.makeNoise(ctx, sparkDur);
-    const ng = ctx.createGain();
-    ng.gain.setValueAtTime(peak * 0.5, now);
-    ng.gain.exponentialRampToValueAtTime(0.001, now + sparkDur);
-    noise.connect(ng).connect(towersGain);
+    // Sub-octave triangle under the core — fills the low-mids the saw
+    // leaves empty, which is most of what made the old shot sound thin.
+    const o3 = ctx.createOscillator();
+    o3.type = "triangle";
+    o3.frequency.setValueAtTime(550 * j, now);
+    o3.frequency.exponentialRampToValueAtTime(105 * j, now + dur * 0.85);
+    const o3g = ctx.createGain();
+    o3g.gain.value = 0.16;
+    o3.connect(o3g).connect(lp);
 
-    for (const osc of [o1, o2]) {
-      this.activeLasers.add(osc);
-      osc.onended = () => this.activeLasers.delete(osc);
+    // Sub thump — fast pitch drop into the 60-70Hz region on its own
+    // envelope. This is the "weight": it lands with the shot instead of
+    // ringing under it, so rapid fire stays readable.
+    const thumpDur = 0.2;
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(200 * j, now);
+    sub.frequency.exponentialRampToValueAtTime(62 * j, now + 0.12);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0, now);
+    subGain.gain.linearRampToValueAtTime(peak * 0.45, now + 0.006);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + thumpDur);
+    sub.connect(subGain).connect(towersGain);
+
+    // Spark transient — brief highpassed noise burst gives the discharge
+    // its crack without muddying the sub.
+    const sparkDur = 0.016;
+    const spark = this.makeNoise(ctx, sparkDur);
+    const sparkHp = ctx.createBiquadFilter();
+    sparkHp.type = "highpass";
+    sparkHp.frequency.value = 1200;
+    const sparkGain = ctx.createGain();
+    sparkGain.gain.setValueAtTime(peak * 0.45, now);
+    sparkGain.gain.exponentialRampToValueAtTime(0.001, now + sparkDur);
+    spark.connect(sparkHp).connect(sparkGain).connect(towersGain);
+
+    // Discharge tail — resonant noise sweeping down long after the core has
+    // gone, so the shot decays into the emplacement instead of stopping
+    // dead. Low level: it's size, not loudness.
+    const tail = this.makeNoise(ctx, tailDur);
+    const tailBp = ctx.createBiquadFilter();
+    tailBp.type = "bandpass";
+    tailBp.Q.value = 3;
+    tailBp.frequency.setValueAtTime(1800, now);
+    tailBp.frequency.exponentialRampToValueAtTime(400, now + tailDur);
+    const tailGain = ctx.createGain();
+    tailGain.gain.setValueAtTime(0, now);
+    tailGain.gain.linearRampToValueAtTime(peak * 0.14, now + 0.02);
+    tailGain.gain.exponentialRampToValueAtTime(0.001, now + tailDur);
+    tail.connect(tailBp).connect(tailGain).connect(towersGain);
+
+    for (const osc of [o1, o1b, o2, o3]) {
       osc.start(now);
       osc.stop(now + dur + 0.02);
     }
-    this.activeLasers.add(noise);
-    noise.onended = () => this.activeLasers.delete(noise);
-    noise.start(now);
-    noise.stop(now + sparkDur);
+    sub.start(now);
+    sub.stop(now + thumpDur + 0.02);
+    spark.start(now);
+    spark.stop(now + sparkDur);
+    tail.start(now);
+    tail.stop(now + tailDur);
+    // Tail outlives every other voice, so it owns the shot's slot release.
+    tail.onended = () => {
+      this.activeLaserShots = Math.max(0, this.activeLaserShots - 1);
+    };
   }
 
   // Footfall for heavy units. Synthesised (like playSplat) so the sim can
