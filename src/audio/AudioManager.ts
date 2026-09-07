@@ -663,6 +663,82 @@ export class AudioManager {
     this.trackStep(thud, now, now + 0.12);
   }
 
+  // Move-order acknowledgement for the robot. Synthesised like the footsteps
+  // so it shares the mech's voice: a rising two-step comms blip over a short
+  // servo whir, reading as "order received" rather than a generic UI click.
+  // Only fired for accepted orders — rejections keep ui("error").
+  private lastRobotOrderAt = 0;
+  private activeRobotOrder = new Set<AudioScheduledSourceNode>();
+  playRobotOrder(volumeScale = 0.5) {
+    const uiGain = this.busGains.ui;
+    if (!this.ctx || !uiGain || this.muted) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const wallNow = performance.now();
+    // Rapid re-orders (dragging the destination around) shouldn't stack.
+    if (wallNow - this.lastRobotOrderAt < 70) return;
+    if (this.activeRobotOrder.size >= 8) return;
+    this.lastRobotOrderAt = wallNow;
+
+    const peak = Math.min(0.5, volumeScale);
+    const track = (node: AudioScheduledSourceNode, start: number, stop: number) => {
+      this.activeRobotOrder.add(node);
+      node.onended = () => this.activeRobotOrder.delete(node);
+      node.start(start);
+      node.stop(stop);
+    };
+
+    // Two ascending square blips — the affirmative. Second one lands a
+    // fifth up so the pair reads as confirmation, not an alarm.
+    const blipDur = 0.055;
+    for (const [i, freq] of [660, 990].entries()) {
+      const at = now + i * 0.065;
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, at);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(peak * 0.22, at + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.001, at + blipDur);
+      // Soften the square's top harmonics so it sits under the blip's body
+      // instead of piercing on repeat orders.
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 3200;
+      osc.connect(lp).connect(g).connect(uiGain);
+      track(osc, at, at + blipDur + 0.01);
+    }
+
+    // Servo whir sweeping up — the legs taking the order.
+    const servoDur = 0.14;
+    const servo = ctx.createOscillator();
+    servo.type = "sawtooth";
+    servo.frequency.setValueAtTime(180, now);
+    servo.frequency.exponentialRampToValueAtTime(420, now + servoDur);
+    const servoLp = ctx.createBiquadFilter();
+    servoLp.type = "lowpass";
+    servoLp.frequency.value = 1100;
+    const servoGain = ctx.createGain();
+    servoGain.gain.setValueAtTime(0, now);
+    servoGain.gain.linearRampToValueAtTime(peak * 0.1, now + 0.01);
+    servoGain.gain.exponentialRampToValueAtTime(0.001, now + servoDur);
+    servo.connect(servoLp).connect(servoGain).connect(uiGain);
+    track(servo, now, now + servoDur + 0.01);
+
+    // Relay tick — tiny band-passed noise click for the mechanical bite.
+    const tickDur = 0.02;
+    const noise = this.makeNoise(ctx, tickDur);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 2400;
+    bp.Q.value = 4;
+    const tickGain = ctx.createGain();
+    tickGain.gain.setValueAtTime(peak * 0.16, now);
+    tickGain.gain.exponentialRampToValueAtTime(0.001, now + tickDur);
+    noise.connect(bp).connect(tickGain).connect(uiGain);
+    track(noise, now, now + tickDur);
+  }
+
   ui(kind: "click" | "tab" | "open" | "close" | "error" | "select") {
     const map: Record<typeof kind, [string, number, number, number]> = {
       click: ["ui-click", 0.4, 30, 0.4],

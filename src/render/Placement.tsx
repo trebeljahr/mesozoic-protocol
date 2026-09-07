@@ -396,7 +396,9 @@ export const Placement = () => {
     // selected on empty ground — click the robot again to deselect.
     if (state.world.robot.selected && state.selectedKind === null) {
       if (!state.towerAtPos(pos) && !state.hqAtPos(pos)) {
-        if (!state.orderRobotMove(pos)) {
+        if (state.orderRobotMove(pos)) {
+          audio.playRobotOrder();
+        } else {
           // Tap landed well outside the playfield. On touch there's no
           // right-click/Esc to back out of robot command mode, so a tap off
           // the field means "I'm done driving the robot" — deselect it.
@@ -440,7 +442,9 @@ export const Placement = () => {
     }
     if (!state.world.robot.selected) return;
     const pos = eventPoint(e);
-    if (!state.orderRobotMove(pos)) {
+    if (state.orderRobotMove(pos)) {
+      audio.playRobotOrder();
+    } else {
       audio.ui("error");
       flashInvalidMove(pos);
     }
