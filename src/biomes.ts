@@ -1055,6 +1055,36 @@ export const classifyPropUrl = (url: string): PropRole => {
   return "cosmetic";
 };
 
+// Fraction of a prop's half-extent that actually meets the floor. A tree is
+// mostly crown — its trunk touches the ground over a tiny disc — while a
+// house or boulder sits on roughly its whole silhouette. Used by the editor
+// so "placing a model clears what's underneath it" means the ground contact
+// patch, not the canopy and not the (much wider) selection circle.
+export const GROUND_FOOTPRINT_RATIO_BY_ROLE: Record<PropRole, number> = {
+  building: 0.8,
+  tree: 0.18,
+  bush: 0.45,
+  rock: 0.75,
+  grass: 0.5,
+  cosmetic: 0.5,
+};
+
+// Ground-contact half-radius of a prop in world units: the silhouette
+// half-extent scaled down to whatever part of it rests on the floor.
+export const propGroundRadius = (url: string, scale: number): number => {
+  const role = classifyPropUrl(url);
+  return TARGET_SIZE_BY_ROLE[role] * scale * 0.5 * GROUND_FOOTPRINT_RATIO_BY_ROLE[role];
+};
+
+// Roles small and flat enough to be bulldozed implicitly when another prop
+// lands on top of them: ground foliage and low set-dressing. Anything with
+// real presence — buildings, trees, rocks, bushes — survives and has to be
+// deleted deliberately, otherwise placing one tree eats its neighbours.
+const CLEARED_ON_PLACE_ROLES: ReadonlySet<PropRole> = new Set<PropRole>(["grass", "cosmetic"]);
+
+export const isClearedOnPlace = (url: string): boolean =>
+  CLEARED_ON_PLACE_ROLES.has(classifyPropUrl(url));
+
 export const ALL_BIOME_URLS = [
   ...Object.values(BIOME_LAYERS).flatMap((ls) => ls.flatMap((l) => l.urls)),
   ...Object.values(BIOME_TREE_URLS).flat(),

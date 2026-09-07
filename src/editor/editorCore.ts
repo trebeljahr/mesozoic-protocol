@@ -1,6 +1,11 @@
 import { nanoid } from "nanoid";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
-import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
+import {
+  classifyPropUrl,
+  isClearedOnPlace,
+  propGroundRadius,
+  TARGET_SIZE_BY_ROLE,
+} from "../biomes";
 import type {
   AutoBridge,
   PlacedEasterEgg,
@@ -805,18 +810,27 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const url = get().placingUrl;
         if (!url) return;
         const radius = propRadius(url, 1);
+        // Only the ground-contact disc bulldozes anything. For a tree that's
+        // the trunk, not the crown and not the selection circle.
+        const groundR = propGroundRadius(url, 1);
         const cur = adapter.getCurrent();
-        // Overlapping authored props get overwritten so a click never silently
-        // fails just because another prop sits underneath. Hard blockers
-        // (paths/rivers/towers/trees/rocks/outposts/bounds) still refuse —
-        // we hand the gate the overlap set so it tests as if those props were
-        // already gone.
         const overlap = new Set<string>();
+        const cleared = new Set<string>();
         for (const p of cur.props) {
-          const r = propRadius(p.url, p.scale) + radius;
           const dx = p.pos.x - x;
           const dy = p.pos.y - y;
-          if (dx * dx + dy * dy < r * r) overlap.add(p.id);
+          const d2 = dx * dx + dy * dy;
+          // Silhouettes are allowed to intersect — dense forests need
+          // overlapping canopies — so any prop the new one touches goes into
+          // the gate's ignore set, otherwise the click would silently fail.
+          const r = propRadius(p.url, p.scale) + radius;
+          if (d2 < r * r) overlap.add(p.id);
+          // ...but only small foliage / ground dressing standing on the new
+          // prop's footprint is actually removed. Trees, rocks, bushes and
+          // buildings survive and stay the author's to delete explicitly.
+          if (!isClearedOnPlace(p.url)) continue;
+          const cr = propGroundRadius(p.url, p.scale) + groundR;
+          if (d2 < cr * cr) cleared.add(p.id);
         }
         if (
           adapter.canPlaceAt &&
@@ -833,17 +847,12 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           blocks: defaultBlocks(url),
         };
         snapshotAndPush();
-        // Procedural decor (trees/rocks/outposts) the new prop's footprint
-        // covers gets bulldozed too — same overwrite logic as for hand-placed
-        // props above, but routed through the erased-procedural mask.
-        const procOverlap = collectOverlappingProcedural(
-          x,
-          y,
-          radius,
-          new Set(cur.erasedProcedural ?? []),
-        );
-        const kept = overlap.size > 0 ? cur.props.filter((p) => !overlap.has(p.id)) : cur.props;
-        commitPropsAndErasedProcedural([...kept, prop], procOverlap);
+        // Procedural decor exposed to the editor is trees / rocks / outposts —
+        // all "real" objects, so placement no longer erases any of it. The
+        // procedural ground carpet (grass, mushrooms, flowers) is culled at
+        // render time in Ground.tsx against the same ground footprint.
+        const kept = cleared.size > 0 ? cur.props.filter((p) => !cleared.has(p.id)) : cur.props;
+        commitProps([...kept, prop]);
         // Auto-select the freshly placed prop. Mirror the single id into both
         // the authoritative Set and the derived single-id field so legacy
         // subscribers and bulk-op readers see the same selection.
@@ -932,16 +941,9 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const ignore: ReadonlySet<string> = new Set([id]);
         if (adapter.canPlaceAt && !adapter.canPlaceAt(x, y, radius, ignore)) return;
         snapshotAndPush();
-        const overlap = collectOverlappingProcedural(
-          x,
-          y,
-          radius,
-          new Set(cur.erasedProcedural ?? []),
-        );
-        commitPropsAndErasedProcedural(
-          cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)),
-          overlap,
-        );
+        // Dragging a prop around must not bulldoze procedural trees / rocks /
+        // outposts it passes over — same rule as placeAt.
+        commitProps(cur.props.map((p) => (p.id === id ? { ...p, pos: { x, y } } : p)));
         set({ moving: false });
       },
 

@@ -2,7 +2,13 @@ import { useGLTF } from "@react-three/drei";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { ALL_BIOME_URLS, BIOME_LAYERS, BIOME_STYLE, type BiomeLayer } from "../biomes";
+import {
+  ALL_BIOME_URLS,
+  BIOME_LAYERS,
+  BIOME_STYLE,
+  type BiomeLayer,
+  propGroundRadius,
+} from "../biomes";
 import {
   buildFlowFeatures,
   type FlowFeatures,
@@ -289,6 +295,11 @@ export const Ground = () => {
   // place/sell — that's the trigger; the array is read via getState.
   const towerVersion = useGame((s) => s.ui.towerVersion);
   const towers = useGame.getState().world.towers;
+  // Hand-placed editor props cull the ground carpet under their footprint the
+  // same way towers do. treeVersion is the static-geometry invalidation key
+  // the editor bumps on every commit.
+  const propVersion = useGame((s) => s.ui.treeVersion);
+  const props = useGame((s) => s.world.props);
   const style = BIOME_STYLE[biome];
   const specs = useMemo(() => BIOME_LAYERS[biome].filter((s) => !s.blocks), [biome]);
 
@@ -313,13 +324,21 @@ export const Ground = () => {
     }));
   }, [paths, specs, biome, levelId, proceduralSeed, overrideActive, trees, rocks]);
 
-  // Cull any decor instance the player has built a tower on top of, so the
-  // tower base sits on clean ground instead of poking through a mushroom
-  // or grass tuft. Done at render-time so placement stays deterministic.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: towerVersion is the intended invalidation key
+  // Cull any decor instance the player has built a tower on top of, or that
+  // an authored prop stands on, so the base sits on clean ground instead of
+  // poking through a mushroom or grass tuft. Props use their ground-contact
+  // radius, not their silhouette — a tree only clears grass around its trunk,
+  // the canopy keeps whatever grows in its shade. Done at render-time so
+  // placement stays deterministic.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: towerVersion/propVersion are the intended invalidation keys
   const culledLayers = useMemo(() => {
-    if (towers.length === 0) return layers;
+    if (towers.length === 0 && props.length === 0) return layers;
     const towerR = TOWER_CLEAR_RADIUS;
+    const propDiscs = props.map((p) => ({
+      x: p.pos.x,
+      y: p.pos.y,
+      r: propGroundRadius(p.url, p.scale),
+    }));
     return layers.map(({ spec, buckets }) => ({
       spec,
       buckets: buckets.map(({ id, placements }) => ({
@@ -331,11 +350,17 @@ export const Ground = () => {
             const lim = towerR + p.r;
             if (dx * dx + dy * dy < lim * lim) return false;
           }
+          for (const d of propDiscs) {
+            const dx = d.x - p.x;
+            const dy = d.y - p.y;
+            const lim = d.r + p.r;
+            if (dx * dx + dy * dy < lim * lim) return false;
+          }
           return true;
         }),
       })),
     }));
-  }, [layers, towers, towerVersion]);
+  }, [layers, towers, towerVersion, props, propVersion]);
 
   return (
     <group>
