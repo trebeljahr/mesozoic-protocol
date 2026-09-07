@@ -15,6 +15,8 @@ import {
   isOnFlowSurface,
 } from "../flowGeometry";
 import { HQ_PAD_BLOCKER_RADIUS, MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "../level";
+import { type LandscapeField, passesDensityCut, variantForStand } from "../sim/landscape";
+import { levelLandscape } from "../sim/levelLandscape";
 import { poissonDiskSample } from "../sim/poisson";
 import { mulberry32 } from "../sim/random";
 import type { Vec2 } from "../sim/types";
@@ -101,6 +103,7 @@ const buildInstances = (
   levelId: number,
   blockers: { pos: Vec2; radius: number }[],
   flow: FlowFeatures | null,
+  field: LandscapeField,
 ): Instance[] => {
   const urls = BIOME_COSMETICS[biome];
   if (urls.length === 0) return [];
@@ -135,6 +138,11 @@ const buildInstances = (
       const minDist = b.radius + 0.75;
       if (dx * dx + dy * dy < minDist * minDist) return false;
     }
+    // Landmark cosmetics want the clearings between the stands — a barrel
+    // or a skull half-swallowed by a thicket reads as debris the generator
+    // dropped, not as something someone left there. The floor is high so
+    // all COUNT_PER_LEVEL still place on a densely wooded map.
+    if (!passesDensityCut(field, field.density("open", x, y), x, y, 0.5)) return false;
     return true;
   };
 
@@ -150,13 +158,14 @@ const buildInstances = (
     initialPoints: sampleStratifiedFeatures(levelId * 6271 + 13, bounds, COUNT_PER_LEVEL),
   });
 
-  // Uniform random URL per instance — with the even spread there are no
-  // discrete groves left to bias toward a single species.
+  // Model choice leans on the stand field so two cosmetics that happen to
+  // land in the same clearing tend to match — a pair of barrels reads as a
+  // dump site, one barrel next to one skull reads as noise.
   const detailRng = mulberry32(levelId * 3119 + 29);
   const out: Instance[] = [];
   for (const p of points) {
     out.push({
-      url: urls[Math.floor(detailRng() * urls.length)],
+      url: urls[variantForStand(field, p.x, p.y, urls.length, detailRng(), 0.3)],
       pos: { x: p.x, y: p.y },
       scale: 0.7 + ((detailRng() + detailRng()) / 2) * 0.7,
       rotY: detailRng() * Math.PI * 2,
@@ -486,8 +495,9 @@ export const BiomeCosmetics = () => {
     const proceduralKey = levelId + proceduralSeed;
     const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, proceduralKey, biome) : null;
     const story = buildStoryDetails(biome, paths, proceduralKey, blockers, flow);
+    const field = levelLandscape(proceduralKey, biome, flow);
     const instances = [
-      ...buildInstances(biome, paths, proceduralKey, blockers, flow),
+      ...buildInstances(biome, paths, proceduralKey, blockers, flow, field),
       ...story.instances,
     ];
     const byUrl = new Map<string, Instance[]>();

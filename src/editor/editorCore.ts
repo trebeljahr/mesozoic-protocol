@@ -407,7 +407,7 @@ export type EditorAdapter = {
   clear?: () => void;
   clearManual?: () => void;
   clearProcedural?: () => void;
-  reloadProcedural?: () => void;
+  reloadProcedural?: (seed?: number) => void;
   canPlaceAt?: (
     x: number,
     y: number,
@@ -706,7 +706,7 @@ export type EditorStoreApi = {
   clear: () => void;
   clearManual: () => void;
   clearProcedural: () => void;
-  reloadProcedural: () => void;
+  reloadProcedural: (seed?: number) => void;
   setBrushPreset: (id: string | null) => void;
   setBrushEraser: (on: boolean) => void;
   setBrushParams: (p: {
@@ -1573,10 +1573,13 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         }));
       },
 
-      reloadProcedural: () => {
+      // `seed` lets the editor re-run generation on a chosen seed instead of
+      // a random one — the same seed always reproduces the same landscape,
+      // so a layout you liked can be written back into the level data.
+      reloadProcedural: (seed) => {
         snapshotAndPush();
         if (adapter.reloadProcedural) {
-          adapter.reloadProcedural();
+          adapter.reloadProcedural(seed);
           set((s) => ({
             ...clearSelectionFields(),
             moving: false,
@@ -1595,7 +1598,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
           lakes: cur.lakes,
           bridges: cur.bridges,
           easterEggs: cur.easterEggs,
-          proceduralSeed: Date.now(),
+          proceduralSeed: seed ?? Date.now(),
           erasedProcedural: [],
         });
       },

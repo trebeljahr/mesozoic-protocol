@@ -43,11 +43,35 @@ export const LevelEditorPanel = () => {
     },
   ];
 
+  // Generation is deterministic in the procedural seed, so a landscape you
+  // like can be pinned by writing its seed number back into the level data.
+  // Re-rolling until it looks right and then reading the seed off this
+  // prompt is the intended authoring loop.
+  const onSetSeed = () => {
+    const current = useGame.getState().world.proceduralSeed;
+    const answer = window.prompt(
+      `Procedural seed for L${levelId} — same seed regenerates the same landscape.`,
+      String(current),
+    );
+    if (answer === null) return;
+    const parsed = Number(answer.trim());
+    if (!Number.isFinite(parsed)) {
+      window.alert(`"${answer}" is not a number.`);
+      return;
+    }
+    useEditor.getState().reloadProcedural(Math.floor(parsed));
+  };
+
   const clearButtons: FooterButton[] = [
     {
       label: "Re-roll procedural",
       title: `Pick a new procedural seed and regenerate procedural set-dressing on L${levelId} (hand-placed props preserved). Undoable.`,
       onClick: () => useEditor.getState().reloadProcedural(),
+    },
+    {
+      label: "Set seed…",
+      title: `Regenerate L${levelId}'s procedural landscape from a specific seed (reproducible). Undoable.`,
+      onClick: onSetSeed,
     },
     {
       label: "Clear procedural",

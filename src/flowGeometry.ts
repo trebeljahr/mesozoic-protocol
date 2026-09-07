@@ -921,3 +921,52 @@ export const isOnFlowSurface = (
   }
   return false;
 };
+
+// Shoreline wetness in [0, 1] for the landscape fields: 1 at the water's
+// edge, fading to 0 `SHORE_FALLOFF` world units inland. Vegetation masks
+// take the max of this and their own moisture noise, so groves bank up
+// along a river the way they do in a real valley instead of ignoring it.
+const SHORE_FALLOFF = 5.5;
+export const buildWetnessProbe = (
+  features: FlowFeatures | null,
+): ((x: number, y: number) => number) => {
+  if (!features || (features.rivers.length === 0 && features.lakes.length === 0)) return () => 0;
+  // Flatten rivers to segments once; the probe is called per grid cell.
+  const segs: Array<{ ax: number; ay: number; bx: number; by: number; half: number }> = [];
+  for (const r of features.rivers) {
+    for (let i = 0; i < r.points.length - 1; i++) {
+      segs.push({
+        ax: r.points[i].x,
+        ay: r.points[i].y,
+        bx: r.points[i + 1].x,
+        by: r.points[i + 1].y,
+        half: r.width / 2,
+      });
+    }
+  }
+  const lakes = features.lakes.map((l) => ({ ...l }));
+  return (x, y) => {
+    let best = 0;
+    for (const s of segs) {
+      const d = Math.sqrt(distPointToSegSq(x, y, s.ax, s.ay, s.bx, s.by)) - s.half;
+      const w = 1 - Math.max(0, d) / SHORE_FALLOFF;
+      if (w > best) best = w;
+      if (best >= 1) return 1;
+    }
+    for (const l of lakes) {
+      const dx = x - l.x;
+      const dy = y - l.y;
+      const c = Math.cos(-l.rot);
+      const s = Math.sin(-l.rot);
+      const lx = (dx * c - dy * s) / Math.max(0.001, l.rx);
+      const ly = (dx * s + dy * c) / Math.max(0.001, l.ry);
+      // Normalized ellipse distance → world-ish distance via the mean radius.
+      const meanR = (l.rx + l.ry) / 2;
+      const d = (Math.sqrt(lx * lx + ly * ly) - 1) * meanR;
+      const w = 1 - Math.max(0, d) / SHORE_FALLOFF;
+      if (w > best) best = w;
+      if (best >= 1) return 1;
+    }
+    return best > 1 ? 1 : best;
+  };
+};

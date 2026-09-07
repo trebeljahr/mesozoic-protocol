@@ -32,6 +32,16 @@ import {
   outpostScaleBand,
 } from "../render/outpostKit";
 import { availableDamageTypes, ensureImmunityCoverage } from "./immunityCoverage";
+import {
+  clamp01,
+  type LandscapeField,
+  landscapeMaskForUrls,
+  passesDensityCut,
+  scaleTFromDensity,
+  spacingForDensity,
+  variantForStand,
+} from "./landscape";
+import { levelLandscape } from "./levelLandscape";
 import { prependLeadInToBounds, samplePath, smoothPath } from "./path";
 import { poissonDiskSample } from "./poisson";
 import { mulberry32 } from "./random";
@@ -239,6 +249,7 @@ const buildTrees = (
   flow: FlowFeatures | null,
   biome: Biome,
   outposts: Outpost[],
+  field: LandscapeField,
 ): { trees: Tree[]; nextId: number } => {
   const biomeScale = BIOME_TREE_SCALE_MUL[biome] ?? 1;
   const treeRange = BIOME_TREE_SCALE_RANGE[biome];
@@ -255,10 +266,19 @@ const buildTrees = (
   // packs tight inside groves (TREE_MIN_SPACING), loose between them
   // (TREE_MAX_SPACING) — natural-looking woodland rather than even mat.
   const worley = createWorleyField(seed, bounds, TREE_GROVE_COUNT, TREE_GROVE_RADIUS);
-  const radiusAt = (x: number, y: number): number => {
-    const d = worley.density(x, y);
-    return TREE_MIN_SPACING + (1 - d) * (TREE_MAX_SPACING - TREE_MIN_SPACING);
+  // Grove centres alone give round blobs in arbitrary places. Multiplying
+  // them into the landscape's fertility (moist, flat, off-ridge ground,
+  // banked up along any river) makes the woodland follow terrain: it
+  // spills along a valley, thins on the dry rise, and stops at the scree.
+  const densityAt = (x: number, y: number): number => {
+    const grove = worley.density(x, y);
+    const fert = field.density("canopy", x, y);
+    // Keep a floor under the grove term so a fertile hollow with no grove
+    // centre still grows the odd tree instead of being a hard cut-out.
+    return clamp01(fert * (0.35 + 0.65 * grove));
   };
+  const radiusAt = (x: number, y: number): number =>
+    spacingForDensity(densityAt(x, y), TREE_MIN_SPACING, TREE_MAX_SPACING);
 
   // Pre-compute HQ blocker centres so trees never spawn inside (or just
   // outside) the home-base fence — HQBase.tsx renders its own authored
@@ -268,6 +288,10 @@ const buildTrees = (
 
   const isValid = (x: number, y: number): boolean => {
     if (isOnFlowSurface(flow, x, y, TREE_FOOTPRINT)) return false;
+    // Real clearings: without a cut, Bridson eventually backfills the
+    // meadows once the fertile ground is full and the woodland reads as
+    // even scatter again.
+    if (!passesDensityCut(field, densityAt(x, y), x, y, 0.08)) return false;
     for (const path of paths) {
       for (let i = 0; i < path.length - 1; i++) {
         if (distPointToSegSq(x, y, path[i].x, path[i].y, path[i + 1].x, path[i + 1].y) < pathR2) {
@@ -307,14 +331,21 @@ const buildTrees = (
   const trees: Tree[] = [];
   let nextId = firstId;
   for (const p of points) {
+    // Triangular distribution (avg of two uniforms) biases toward mid-size,
+    // so saplings and elders are uncommon but visible; the landscape term
+    // then puts the elders in the heart of a stand and the saplings on its
+    // fringe rather than shuffling sizes at random. Biomes with a tight
+    // BIOME_TREE_SCALE_RANGE (alien) collapse this to a uniform big size.
+    const jitter = (rng() + rng()) / 2;
+    const t = scaleTFromDensity(densityAt(p.x, p.y), jitter, 0.45);
     trees.push({
       id: nextId++,
       pos: { x: p.x, y: p.y },
-      variant: Math.floor(rng() * TREE_VARIANTS),
-      // Triangular distribution (avg of two uniforms) biases toward mid-size,
-      // so saplings and elders are uncommon but visible. Biomes with a tight
-      // BIOME_TREE_SCALE_RANGE (alien) collapse this to a uniform big size.
-      scale: (treeMinScale + ((rng() + rng()) / 2) * (treeMaxScale - treeMinScale)) * biomeScale,
+      // Species follows the stand field so a grove is mostly one kind of
+      // tree with a few strays — random per-tree variants are the loudest
+      // "this was generated" signal on a wooded map.
+      variant: variantForStand(field, p.x, p.y, TREE_VARIANTS, rng()),
+      scale: (treeMinScale + t * (treeMaxScale - treeMinScale)) * biomeScale,
       rot: rng() * Math.PI * 2,
     });
   }
@@ -334,6 +365,7 @@ const buildRocks = (
   flow: FlowFeatures | null,
   levelId: number,
   outposts: Outpost[],
+  field: LandscapeField,
 ): { rocks: Rock[]; nextId: number } => {
   const rocks: Rock[] = [];
   const halfW = MAP_WIDTH / 2 + 11;
@@ -363,10 +395,16 @@ const buildRocks = (
     const treeSpacingSq = treeSpacing * treeSpacing;
     const rMin = Math.max(ROCK_MIN_SPACING, 2 * baseFootprint * avgScale + 0.4);
     const rMax = rMin * ROCK_MAX_SPACING_MUL;
-    const radiusAt = (x: number, y: number): number => {
-      const d = worley.density(x, y);
-      return rMin + (1 - d) * (rMax - rMin);
-    };
+    // Same idea as the groves: the Worley pile centres say "a cluster
+    // belongs somewhere around here", the landscape mask says which ground
+    // can hold it — steep, dry, high, and away from the fertile hollows the
+    // trees took. Debris/bone/crystal layers classify onto the rock mask
+    // too; anything plant-shaped in a blocking layer follows vegetation.
+    const mask = landscapeMaskForUrls(spec.urls);
+    const densityAt = (x: number, y: number): number =>
+      clamp01(field.density(mask, x, y) * (0.35 + 0.65 * worley.density(x, y)));
+    const radiusAt = (x: number, y: number): number =>
+      spacingForDensity(densityAt(x, y), rMin, rMax);
 
     const pathR2 = spec.clearance * spec.clearance;
     // Snapshot rocks from earlier layers so this layer's Poisson treats
@@ -381,6 +419,7 @@ const buildRocks = (
 
     const isValid = (x: number, y: number): boolean => {
       if (isOnFlowSurface(flow, x, y, flowFootprint)) return false;
+      if (!passesDensityCut(field, densityAt(x, y), x, y, 0.1)) return false;
       for (const path of paths) {
         for (let i = 0; i < path.length - 1; i++) {
           if (distPointToSegSq(x, y, path[i].x, path[i].y, path[i + 1].x, path[i + 1].y) < pathR2) {
@@ -429,9 +468,10 @@ const buildRocks = (
 
     const detailRng = mulberry32(seedBase * 53 + 91);
     for (const p of points) {
-      const variant = Math.floor(detailRng() * spec.urls.length);
-      const scale =
-        spec.minScale + ((detailRng() + detailRng()) / 2) * (spec.maxScale - spec.minScale);
+      const variant = variantForStand(field, p.x, p.y, spec.urls.length, detailRng());
+      const jitter = (detailRng() + detailRng()) / 2;
+      const t = scaleTFromDensity(densityAt(p.x, p.y), jitter, 0.45);
+      const scale = spec.minScale + t * (spec.maxScale - spec.minScale);
       const rot = detailRng() * Math.PI * 2;
       rocks.push({
         id: nextId++,
@@ -845,13 +885,26 @@ export const createWorld = (
     ? { outposts: [], nextId: 1 }
     : buildOutposts(paths, biome, proceduralKey, flow, 1);
   const outposts = filterErased(rawOutposts);
+  // Elevation/moisture/slope fields for this seed. Trees, rocks and (in
+  // Ground.tsx) every decor layer sample the same instance, so the whole
+  // level's scatter agrees on where the woodland, the scree and the
+  // clearings are.
+  const landscape = levelLandscape(proceduralKey, biome, flow);
   const { trees: rawTrees, nextId: afterTrees } = overrideActive
     ? { trees: [], nextId: afterOutposts }
-    : buildTrees(paths, proceduralKey * 7919 + 101, afterOutposts, flow, biome, outposts);
+    : buildTrees(
+        paths,
+        proceduralKey * 7919 + 101,
+        afterOutposts,
+        flow,
+        biome,
+        outposts,
+        landscape,
+      );
   const trees = filterErased(rawTrees);
   const { rocks: rawRocks, nextId: afterRocks } = overrideActive
     ? { rocks: [], nextId: afterTrees }
-    : buildRocks(biome, paths, trees, afterTrees, flow, proceduralKey, outposts);
+    : buildRocks(biome, paths, trees, afterTrees, flow, proceduralKey, outposts, landscape);
   const rocks = filterErased(rawRocks);
   // Author-placed eggs short-circuit the random per-level pick. Static eggs
   // (no motion def) seed `easterEggs` directly at their authored pos/rotY;

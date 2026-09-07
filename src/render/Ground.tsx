@@ -16,6 +16,15 @@ import {
   isOnFlowSurface,
 } from "../flowGeometry";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
+import {
+  type LandscapeField,
+  landscapeMaskForUrls,
+  passesDensityCut,
+  scaleTFromDensity,
+  spacingForDensity,
+  variantForStand,
+} from "../sim/landscape";
+import { levelLandscape } from "../sim/levelLandscape";
 import { evenSpreadSpacing, poissonDiskSample } from "../sim/poisson";
 import { mulberry32 } from "../sim/random";
 import type { Rock, Tree, Vec2 } from "../sim/types";
@@ -63,11 +72,20 @@ const PROP_SPACING_SLACK = 0.35;
 // still keep meshes from physically overlapping.
 const GROUND_COVER_CROSS_SLACK = 0.05;
 
-// Build placements for one non-blocking layer using uniform Poisson disk
-// sampling. Non-removable decor spreads evenly across the playable rect
-// (no Worley clustering) so the map reads as "alive and full" without
-// type-segregated clumps or bare patches. External constraints (paths,
-// flow, blockers, earlier decor) plug into `isValid`.
+// How far the Poisson radius may open up in the sparsest ground, relative
+// to the layer's even-spread spacing. 2.4 is enough for a clearing to read
+// as a clearing without leaving the map looking half-empty.
+const SPARSE_SPACING_MUL = 2.4;
+// Ground-cover carpets keep a much tighter range — they should thin, not
+// disappear, or the map stops reading as "alive and full".
+const GROUND_COVER_SPARSE_MUL = 1.5;
+
+// Build placements for one non-blocking layer with landscape-driven Poisson
+// disk sampling. Spacing, the accept/reject cut, model choice and scale all
+// read the shared per-level landscape field, so undergrowth follows the same
+// fertile hollows and dry ridges the trees and rocks do instead of speckling
+// the rect uniformly. External constraints (paths, flow, blockers, earlier
+// decor) plug into `isValid`.
 const buildLayer = (
   paths: Vec2[][],
   spec: BiomeLayer,
@@ -76,6 +94,7 @@ const buildLayer = (
   flow: FlowFeatures | null,
   levelId: number,
   layerIndex: number,
+  field: LandscapeField,
 ): Placement[][] => {
   const buckets: Placement[][] = spec.urls.map(() => []);
   const footprint = layerFootprint(spec);
@@ -91,13 +110,26 @@ const buildLayer = (
   // for a count well below the rect's capacity it leaves the radius far
   // under the count-implied spacing, so Bridson clumps points near the seed
   // frontiers and stops at maxCount with bare gaps between (the patchy look).
-  // Floor at the even-spread spacing so the same count covers the whole
-  // field uniformly. Constant radius across the map yields a uniform scatter.
+  // The even-spread spacing is the reference the landscape modulation
+  // brackets: tighter in the stands, looser in the clearings, so the layer
+  // still lands near its authored count overall.
   const avgScale = (spec.minScale + spec.maxScale) / 2;
   const collisionRMin = 2 * footprint * avgScale + PROP_SPACING_SLACK;
   const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
-  const rMin = Math.max(collisionRMin, evenSpreadSpacing(area, spec.count));
-  const radiusAt = (): number => rMin;
+  const even = evenSpreadSpacing(area, spec.count);
+  // Pack tighter than even spread inside a stand and open out well past it
+  // in the clearings; the two bracket `even` so the layer still lands near
+  // its authored count.
+  const dense = Math.max(collisionRMin, even * 0.7);
+  const sparseMul = isGroundCover ? GROUND_COVER_SPARSE_MUL : SPARSE_SPACING_MUL;
+  const sparse = Math.max(dense, even * sparseMul);
+  const mask = landscapeMaskForUrls(spec.urls, isGroundCover);
+  const densityAt = (x: number, y: number): number => field.density(mask, x, y);
+  const radiusAt = (x: number, y: number): number =>
+    spacingForDensity(densityAt(x, y), dense, sparse);
+  // Ground cover keeps a high floor so clearings stay grassy; sparser
+  // layers get a real cut so their clearings are actually clear.
+  const cutFloor = isGroundCover ? 0.45 : 0.12;
 
   // Conservative footprints for external checks — use max scale so a
   // max-scale instance at the candidate position couldn't graze any
@@ -107,6 +139,7 @@ const buildLayer = (
 
   const isValid = (x: number, y: number): boolean => {
     if (nearAnyPath(paths, x, y, spec.clearance)) return false;
+    if (!passesDensityCut(field, densityAt(x, y), x, y, cutFloor)) return false;
     if (isOnFlowSurface(flow, x, y, flowFootprint)) return false;
     for (const b of blockers) {
       const dx = b.x - x;
@@ -151,8 +184,13 @@ const buildLayer = (
 
   const detailRng = mulberry32(seedBase * 53 + 91);
   for (const p of points) {
-    const variant = Math.floor(detailRng() * spec.urls.length);
-    const scale = spec.minScale + detailRng() * (spec.maxScale - spec.minScale);
+    // Model choice follows a slow stand field rather than a per-prop coin
+    // flip, so a thicket is mostly one species with the odd stray — the
+    // single biggest tell that a scatter was generated is neighbouring
+    // props cycling through every variant at random.
+    const variant = variantForStand(field, p.x, p.y, spec.urls.length, detailRng());
+    const scaleT = scaleTFromDensity(densityAt(p.x, p.y), detailRng());
+    const scale = spec.minScale + scaleT * (spec.maxScale - spec.minScale);
     const r = footprint * scale;
     const placement: Placement = { x: p.x, y: p.y, scale, rot: detailRng() * Math.PI * 2, r };
     buckets[variant].push(placement);
@@ -313,9 +351,12 @@ export const Ground = () => {
     const decor: DecorEntry[] = [];
     const proceduralKey = levelId + proceduralSeed;
     const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, proceduralKey, biome) : null;
+    // Same field the sim used for trees/rocks — decor has to agree with the
+    // terrain those were placed on, not invent its own.
+    const field = levelLandscape(proceduralKey, biome, flow);
     return specs.map((spec, layerIndex) => ({
       spec,
-      buckets: buildLayer(paths, spec, decor, blockers, flow, proceduralKey, layerIndex).map(
+      buckets: buildLayer(paths, spec, decor, blockers, flow, proceduralKey, layerIndex, field).map(
         (placements) => ({
           id: nanoid(),
           placements,

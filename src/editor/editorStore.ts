@@ -209,10 +209,13 @@ export const useEditor: EditorStore = /* @__PURE__ */ createEditorStore(() => ({
     saveCurrentLevelEdit();
     reloadLevel();
   },
-  reloadProcedural: () => {
+  reloadProcedural: (seed?: number) => {
     const w = useGame.getState().world;
     w.overrideActive = false;
-    w.proceduralSeed = Math.floor(Math.random() * 1_000_000_000);
+    w.proceduralSeed =
+      typeof seed === "number" && Number.isFinite(seed)
+        ? Math.floor(seed)
+        : Math.floor(Math.random() * 1_000_000_000);
     // New seed means new positions — existing mask keys can't match
     // anything in the regenerated set, so drop them so the mask doesn't
     // accidentally suppress fresh items on a future seed-flip.
