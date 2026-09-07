@@ -96,6 +96,11 @@ export type BiomePainted = {
   dustColor: string;
   // 0..1 scalar on the haze pool. 0 hides the layer entirely (no fog of
   // particulates in clear biomes); 1 fills the budget for that quality tier.
+  // Keep this LOW. The haze is scene geometry drifting 0.1–2.3 units above
+  // the whole map, so every mote is a mark competing with the path, the
+  // build slots, the towers and the enemies — and selective bloom makes the
+  // bright-tinted biomes' motes the loudest thing on screen. Anything past
+  // ~0.4 stops reading as atmosphere and starts reading as confetti.
   dustDensity: number;
   // Multiplier on the selective-bloom intensity. Volcanic / alien biomes
   // bias up so emissive surfaces (magma rivers, crystal veins) blow brighter
@@ -111,7 +116,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
     shadowTint: [0.82, 0.92, 1.0],
     highlightTint: [1.04, 0.98, 0.88],
     dustColor: "#cae7b5",
-    dustDensity: 0.35,
+    dustDensity: 0.22,
     bloomBias: 0.85,
     godRaysColor: "#ffe2a8",
   },
@@ -119,7 +124,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
     shadowTint: [0.92, 0.86, 0.78],
     highlightTint: [1.08, 0.98, 0.82],
     dustColor: "#e8c890",
-    dustDensity: 0.5,
+    dustDensity: 0.3,
     bloomBias: 0.9,
     godRaysColor: "#ffd87a",
   },
@@ -127,7 +132,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
     shadowTint: [0.78, 0.9, 1.04],
     highlightTint: [1.0, 1.0, 1.06],
     dustColor: "#dceaff",
-    dustDensity: 0.4,
+    dustDensity: 0.25,
     bloomBias: 0.8,
     godRaysColor: "#cfe6ff",
   },
@@ -135,7 +140,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
     shadowTint: [0.88, 0.82, 0.8],
     highlightTint: [1.12, 0.96, 0.78],
     dustColor: "#caa078",
-    dustDensity: 0.55,
+    dustDensity: 0.32,
     bloomBias: 1.0,
     godRaysColor: "#ffb070",
   },
@@ -143,7 +148,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
     shadowTint: [0.7, 0.55, 0.55],
     highlightTint: [1.2, 0.85, 0.6],
     dustColor: "#ff8a32",
-    dustDensity: 0.95,
+    dustDensity: 0.35,
     bloomBias: 1.35,
     godRaysColor: "#ff9050",
   },
@@ -151,7 +156,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
     shadowTint: [0.78, 0.78, 1.0],
     highlightTint: [1.02, 0.95, 1.1],
     dustColor: "#7effe0",
-    dustDensity: 0.7,
+    dustDensity: 0.3,
     bloomBias: 1.2,
     godRaysColor: "#9fffe2",
   },
@@ -247,6 +252,15 @@ type BiomeLayerSpec = BiomeLayer[];
 
 const makeBiomeLayers = (spec: BiomeLayerSpec): BiomeLayer[] => spec;
 
+// Path clearance for decorative ground cover (grass, pebbles, shards,
+// tufts). Was PATH_WIDTH/2 + 0.2..0.3, which let the sprinkle run right up
+// to the road edge — the lane the player actually reads (path silhouette,
+// enemies walking it, the first ring of tower slots at ~2.6 from centre)
+// was the busiest part of the frame. Pushing decor out to 2.5 from the
+// centreline gives the road a clean halo, so path + towers + enemies own
+// the eye and scenery stays background texture.
+const GROUND_COVER_CLEARANCE = PATH_WIDTH / 2 + 1.1;
+
 const FOREST_LAYERS: BiomeLayerSpec = [
   {
     seed: 1337,
@@ -254,12 +268,13 @@ const FOREST_LAYERS: BiomeLayerSpec = [
     // Ground-cover mode — Ground.tsx tiles the map with many small Worley
     // features and a tight rMin/rMax ratio so grass reads as a near-
     // uniform sprinkle across the whole field, only thinning around path
-    // clearance + blockers. Higher count keeps the carpet feeling dense
-    // even on busy maps where rocks/bushes carve big holes out of it.
-    count: 220,
-    clearance: PATH_WIDTH / 2 + 0.3,
-    minScale: 0.55,
-    maxScale: 1.0,
+    // clearance + blockers. Count is deliberately below "carpet" density:
+    // the field should read as textured ground the eye skims over, not as
+    // a mass of individual marks competing with towers and enemies.
+    count: 130,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.5,
+    maxScale: 0.9,
     castShadow: false,
     footprint: 0.26,
     groundCover: true,
@@ -297,8 +312,8 @@ const FOREST_LAYERS: BiomeLayerSpec = [
     seed: 6464,
     // Mushroom.glb authored 0.78 max-dim; 0.65–1.25 → ~0.5–1.0 world units.
     urls: ["/models/landmarks/forest/Mushroom.glb"],
-    count: 22,
-    clearance: PATH_WIDTH / 2 + 0.5,
+    count: 12,
+    clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.55,
     maxScale: 1.1,
     castShadow: true,
@@ -313,8 +328,8 @@ const FOREST_LAYERS: BiomeLayerSpec = [
     // it spreads evenly across the forest floor instead of clumping into
     // three pockets.
     urls: ["/models/landmarks/forest/BushFlowers.glb"],
-    count: 28,
-    clearance: PATH_WIDTH / 2 + 0.3,
+    count: 16,
+    clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.18,
     maxScale: 0.32,
     castShadow: false,
@@ -387,10 +402,11 @@ const DESERT_LAYERS: BiomeLayerSpec = [
   },
   DEAD_TREE_LAYER("/models/landmarks/desert/DeadTree.glb", 3, 5151, 0.135, 0.225),
   {
-    // Loose pebbles — tiny gritty stones carpeting the sand so the dunes
-    // read as littered with debris instead of empty. Authored small so
-    // they sit under foot like real desert pavement, and dense enough to
-    // cover the whole field. Non-blocking; tower placement auto-culls.
+    // Loose pebbles — tiny gritty stones dusting the sand so the dunes
+    // read as weathered instead of empty. Authored small so they sit
+    // under foot like real desert pavement, and sparse enough that the
+    // path and tower slots stay the loudest things on screen.
+    // Non-blocking; tower placement auto-culls.
     // Replaces the previous dwarf-scrub layer (small desert bushes) —
     // those bush meshes read as tiny cacti and were too small to be
     // clearable, so they got mistaken for stuck obstacles.
@@ -400,10 +416,10 @@ const DESERT_LAYERS: BiomeLayerSpec = [
       "/models/biomes/desert/Rock2.glb",
       "/models/biomes/desert/Rock3.glb",
     ],
-    count: 260,
-    clearance: PATH_WIDTH / 2 + 0.2,
+    count: 140,
+    clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.08,
-    maxScale: 0.16,
+    maxScale: 0.15,
     castShadow: false,
     footprint: 0.12,
     groundCover: true,
@@ -478,8 +494,11 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // Surface rocks — the full snow rock set scattered as non-interactive
     // ground stones (smaller than the clearable blocker boulders, larger than
     // the ice-shard pebbles below). The 7 variants span 0.7–1.25 authored
-    // units, so normalizeTo pins them to a consistent ~0.7-unit stone before
-    // the band adds spread.
+    // units, so normalizeTo pins them to a consistent stone size before the
+    // band adds spread. Kept sparse and clearly under blocker size: at the
+    // old count/scale these read as removable boulders the player couldn't
+    // click, and three grey rock layers on grey ground turned the
+    // snowfield into visual static.
     seed: 4848,
     urls: [
       "/models/biomes/snow/RockSnow1.glb",
@@ -490,11 +509,11 @@ const SNOW_LAYERS: BiomeLayerSpec = [
       "/models/biomes/snow/RockSnow6.glb",
       "/models/biomes/snow/RockSnow7.glb",
     ],
-    count: 34,
-    clearance: PATH_WIDTH / 2 + 0.4,
-    normalizeTo: 0.7,
-    minScale: 0.6,
-    maxScale: 1.05,
+    count: 14,
+    clearance: PATH_WIDTH / 2 + 1.2,
+    normalizeTo: 0.6,
+    minScale: 0.55,
+    maxScale: 0.9,
     castShadow: true,
     footprint: 0.4,
   },
@@ -505,8 +524,8 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // consistent ~0.5-unit shard instead of the raw-scale 0.3–0.65 spread.
     seed: 7878,
     urls: ["/models/biomes/alien/Crystal_Small_1.glb", "/models/biomes/alien/Crystal_Small_2.glb"],
-    count: 6,
-    clearance: PATH_WIDTH / 2 + 0.3,
+    count: 4,
+    clearance: PATH_WIDTH / 2 + 1.1,
     normalizeTo: 0.5,
     minScale: 0.7,
     maxScale: 1.1,
@@ -519,10 +538,10 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // ground-cover.
     seed: 3131,
     urls: ["/models/biomes/snow/Bush1.glb", "/models/biomes/snow/Bush2.glb"],
-    count: 120,
-    clearance: PATH_WIDTH / 2 + 0.25,
+    count: 55,
+    clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.18,
-    maxScale: 0.3,
+    maxScale: 0.28,
     castShadow: false,
     footprint: 0.22,
     groundCover: true,
@@ -533,10 +552,10 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // material reads as a family; size differential keeps the role clear.
     seed: 5959,
     urls: ["/models/biomes/snow/Rock1.glb"],
-    count: 90,
-    clearance: PATH_WIDTH / 2 + 0.25,
-    minScale: 0.15,
-    maxScale: 0.26,
+    count: 30,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.13,
+    maxScale: 0.22,
     castShadow: false,
     footprint: 0.18,
     groundCover: true,
@@ -547,10 +566,10 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // soft sprinkle of the forest floor, tinted for the climate.
     seed: 1717,
     urls: ["/models/nature/Grass1.glb", "/models/nature/Grass2.glb", "/models/nature/Grass3.glb"],
-    count: 130,
-    clearance: PATH_WIDTH / 2 + 0.3,
-    minScale: 0.55,
-    maxScale: 1.0,
+    count: 70,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.5,
+    maxScale: 0.9,
     castShadow: false,
     footprint: 0.26,
     groundCover: true,
@@ -611,10 +630,10 @@ const WASTELAND_LAYERS: BiomeLayerSpec = [
       "/models/biomes/wasteland/Rock4.glb",
       "/models/biomes/wasteland/Rock5.glb",
     ],
-    count: 150,
-    clearance: PATH_WIDTH / 2 + 0.25,
-    minScale: 0.14,
-    maxScale: 0.26,
+    count: 80,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.13,
+    maxScale: 0.23,
     castShadow: false,
     footprint: 0.18,
     groundCover: true,
@@ -624,10 +643,10 @@ const WASTELAND_LAYERS: BiomeLayerSpec = [
     // the muted silhouette reads correctly in wasteland's brown ground.
     seed: 5959,
     urls: ["/models/biomes/desert/Bush1.glb", "/models/biomes/desert/Bush2.glb"],
-    count: 90,
-    clearance: PATH_WIDTH / 2 + 0.25,
+    count: 45,
+    clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.15,
-    maxScale: 0.26,
+    maxScale: 0.24,
     castShadow: false,
     footprint: 0.18,
     groundCover: true,
@@ -679,7 +698,8 @@ const LAVA_LAYERS: BiomeLayerSpec = [
   {
     // Ember chunks — wasteland Rocks at miniature scale read as cooled
     // basalt shards scattered across the scorched basin. Non-blocking so
-    // they sprinkle around lava rivers without gating build slots.
+    // they sprinkle around lava rivers without gating build slots. Sparse:
+    // on the near-black basin every chunk is a high-contrast mark.
     seed: 3131,
     urls: [
       "/models/biomes/wasteland/Rock1.glb",
@@ -688,10 +708,10 @@ const LAVA_LAYERS: BiomeLayerSpec = [
       "/models/biomes/wasteland/Rock4.glb",
       "/models/biomes/wasteland/Rock5.glb",
     ],
-    count: 140,
-    clearance: PATH_WIDTH / 2 + 0.25,
-    minScale: 0.13,
-    maxScale: 0.24,
+    count: 70,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.12,
+    maxScale: 0.2,
     castShadow: false,
     footprint: 0.18,
     groundCover: true,
@@ -699,14 +719,16 @@ const LAVA_LAYERS: BiomeLayerSpec = [
   {
     // Crystal shards — the same small alien-pack crystals used in the
     // alien biome's ground cover; here they read as cooled glass slivers
-    // ejected from the lava flows. Tiny, non-blocking, sparser than the
-    // rubble layer.
+    // ejected from the lava flows. Tiny, non-blocking, and much sparser
+    // than the rubble layer: saturated blue is the loudest hue in a biome
+    // built from browns and ember orange, so at any real density it reads
+    // as scattered pickups rather than ground texture.
     seed: 5959,
     urls: ["/models/biomes/alien/Crystal_Small_1.glb", "/models/biomes/alien/Crystal_Small_2.glb"],
-    count: 60,
-    clearance: PATH_WIDTH / 2 + 0.25,
-    minScale: 0.05,
-    maxScale: 0.09,
+    count: 18,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.04,
+    maxScale: 0.07,
     castShadow: false,
     footprint: 0.22,
     groundCover: true,
@@ -803,13 +825,16 @@ const ALIEN_LAYERS: BiomeLayerSpec = [
     // Crystal dust — small alien-pack shards at miniature scale dotted
     // across the violet plains as luminous grit. Non-blocking; the same
     // mesh family as the chunky blocker crystals so the material reads
-    // consistently while size differential separates the role.
+    // consistently while size differential separates the role. Kept very
+    // sparse — cyan on violet is this biome's highest-contrast pairing,
+    // so a dense sprinkle buries the path and the build slots under
+    // glowing speckle.
     seed: 3131,
     urls: ["/models/biomes/alien/Crystal_Small_1.glb", "/models/biomes/alien/Crystal_Small_2.glb"],
-    count: 130,
-    clearance: PATH_WIDTH / 2 + 0.25,
-    minScale: 0.04,
-    maxScale: 0.08,
+    count: 40,
+    clearance: GROUND_COVER_CLEARANCE,
+    minScale: 0.035,
+    maxScale: 0.065,
     castShadow: false,
     footprint: 0.2,
     groundCover: true,
@@ -825,10 +850,10 @@ const ALIEN_LAYERS: BiomeLayerSpec = [
       "/models/biomes/alien/Plant_2.gltf",
       "/models/biomes/alien/Plant_3.gltf",
     ],
-    count: 100,
-    clearance: PATH_WIDTH / 2 + 0.25,
+    count: 50,
+    clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.08,
-    maxScale: 0.16,
+    maxScale: 0.15,
     castShadow: false,
     footprint: 0.2,
     groundCover: true,

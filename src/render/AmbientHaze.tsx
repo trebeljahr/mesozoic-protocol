@@ -46,7 +46,7 @@ const spawn = (p: Particle) => {
   p.drift = (Math.random() * 2 - 1) * HAZE_DRIFT;
   p.maxLife = HAZE_LIFE * (0.7 + Math.random() * 0.6);
   p.life = Math.random() * p.maxLife;
-  p.size = 0.18 + Math.random() * 0.22;
+  p.size = 0.15 + Math.random() * 0.17;
 };
 
 export const AmbientHaze = () => {
@@ -157,7 +157,11 @@ export const AmbientHaze = () => {
         ref={matRef}
         map={tex}
         transparent
-        opacity={0.55}
+        // Additive + toneMapped:false means this reads at close to full
+        // brightness against any ground colour, so a mote is effectively an
+        // opaque mark, not a wash. Kept low so the layer settles behind the
+        // gameplay silhouettes (path, slots, towers, enemies) it drifts over.
+        opacity={0.32}
         depthWrite={false}
         toneMapped={false}
         side={THREE.DoubleSide}
