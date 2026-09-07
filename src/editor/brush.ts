@@ -148,21 +148,22 @@ export const resolveBrushUrls = (preset: BrushPreset, customUrls: string[] | nul
   return customUrls.filter((u) => allowed.has(u));
 };
 
-// Emit up to `density * 16` raw candidate points uniform-in-disc (sqrt for
-// radial distribution). Pure geometry — no collision gating; the caller
-// (paintAt) is responsible for radius-aware rejection against paths,
-// rivers, existing props, and same-stroke siblings using the full role /
-// scale knowledge of each candidate, and for stopping once `density`
-// candidates have been accepted. Budget is `density * 16` (up from the old
-// `density * 8` reject-sampling limit) since real collisions in dense
-// forests / near paths reduce the acceptance rate sharply — without the
-// extra attempts the brush feels weak when scattering through obstacles.
+// Emit raw candidate points uniform-in-disc (sqrt for radial
+// distribution). Pure geometry — no collision gating; the caller (paintAt)
+// is responsible for radius-aware rejection against paths, rivers, existing
+// props, and same-stroke siblings using the full role / scale knowledge of
+// each candidate, and for stopping once the pass budget is spent. Callers
+// pass an explicit `attempts` budget because the useful number of tries is
+// driven by how crowded the patch already is, not by how many instances the
+// pass wants to add — a nearly-full patch needs many probes to land two more
+// trees. Defaults to `density * 16` for callers that don't care.
 export const samplePoints = (
   center: { x: number; y: number },
   radius: number,
   density: number,
+  attempts?: number,
 ): { x: number; y: number }[] => {
-  const budget = Math.max(1, Math.floor(density * 16));
+  const budget = Math.max(1, Math.floor(attempts ?? density * 16));
   const out: { x: number; y: number }[] = new Array(budget);
   for (let i = 0; i < budget; i++) {
     const t = Math.random() * Math.PI * 2;
@@ -170,6 +171,52 @@ export const samplePoints = (
     out[i] = { x: center.x + Math.cos(t) * r, y: center.y + Math.sin(t) * r };
   }
   return out;
+};
+
+// --- Accumulating density model -------------------------------------------
+//
+// A brush pass adds at most `density` instances, so painting the same spot
+// repeatedly builds the patch up gradually instead of slamming it to its
+// final state on the first tick. The ceiling that stops it growing forever
+// is expressed as a COVERAGE fraction rather than an instance count: the
+// summed footprint area of everything already inside the brush disc must
+// stay under `fillPercent` of the disc's area. Coverage adapts across
+// rosters for free — five trees fill a radius-4 disc about as much as fifty
+// grass tufts do — where a flat "max N props" cap would be far too dense for
+// trees and far too sparse for grass.
+//
+// Hexagonal circle packing tops out near 91% coverage, so fills above that
+// are simply unreachable and the collision test becomes the binding limit.
+
+// Footprint area of one instance with effective (collision) radius `r`.
+export const footprintArea = (r: number): number => Math.PI * r * r;
+
+// Total footprint area a patch of `radius` may hold at `fillPercent`.
+export const patchAreaBudget = (radius: number, fillPercent: number): number => {
+  const fill = Math.max(0, Math.min(100, fillPercent)) / 100;
+  return Math.PI * radius * radius * fill;
+};
+
+// Order a patch's instances for thinning: nearest-to-centre first, with a
+// random jitter so repeated thinning passes carve out of the middle rather
+// than deterministically peeling the same ring every tick.
+export const pickThinTargets = <T>(
+  items: T[],
+  posOf: (t: T) => { x: number; y: number },
+  center: { x: number; y: number },
+  radius: number,
+  count: number,
+): T[] => {
+  if (count <= 0) return [];
+  const norm = Math.max(radius, 1e-6);
+  const scored = items.map((it) => {
+    const p = posOf(it);
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    return { it, score: Math.sqrt(dx * dx + dy * dy) / norm + Math.random() * 0.6 };
+  });
+  scored.sort((a, b) => a.score - b.score);
+  return scored.slice(0, count).map((e) => e.it);
 };
 
 // Weighted random url choice over an explicit url list. Uniform when

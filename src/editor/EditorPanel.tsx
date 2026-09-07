@@ -1147,16 +1147,37 @@ const BrushSection = ({
           {!eraserOn && (
             <>
               <div style={sliderRow}>
-                <span style={{ color: "#8b93a3" }}>Density</span>
+                <span style={{ color: "#8b93a3" }} title="Instances added per brush tick">
+                  Per pass
+                </span>
                 <input
                   type="range"
                   min={1}
-                  max={30}
+                  max={12}
                   step={1}
                   value={brush.density}
                   onChange={(e) => setBrushParams({ density: Number(e.target.value) })}
+                  title="How many instances one paint tick adds (also the thinning rate)"
                 />
                 <span>{brush.density}</span>
+              </div>
+              <div style={sliderRow}>
+                <span
+                  style={{ color: "#8b93a3" }}
+                  title="Ceiling on accumulated density — % of the brush disc covered by props"
+                >
+                  Max fill
+                </span>
+                <input
+                  type="range"
+                  min={5}
+                  max={95}
+                  step={5}
+                  value={brush.maxFill}
+                  onChange={(e) => setBrushParams({ maxFill: Number(e.target.value) })}
+                  title="Paint over a spot repeatedly to build up to this coverage, then it stops"
+                />
+                <span>{brush.maxFill}%</span>
               </div>
               <div style={sliderRow}>
                 <span style={{ color: "#8b93a3" }}>Spacing</span>
@@ -1169,6 +1190,10 @@ const BrushSection = ({
                   onChange={(e) => setBrushParams({ minSpacing: Number(e.target.value) })}
                 />
                 <span>{brush.minSpacing.toFixed(1)}</span>
+              </div>
+              <div style={{ color: "#6f7787", fontSize: 10, lineHeight: 1.4 }}>
+                Keep painting the same spot to build density up to Max fill. Hold{" "}
+                <b style={{ color: "#8b93a3" }}>Alt</b> while dragging to thin it back out.
               </div>
               {activePreset && (
                 <BrushVariants

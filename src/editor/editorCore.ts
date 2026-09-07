@@ -12,7 +12,16 @@ import type {
 } from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
 import { resolveBridges } from "./bridgeResolver";
-import { getBrushPreset, pickFromUrls, randRange, resolveBrushUrls, samplePoints } from "./brush";
+import {
+  footprintArea,
+  getBrushPreset,
+  patchAreaBudget,
+  pickFromUrls,
+  pickThinTargets,
+  randRange,
+  resolveBrushUrls,
+  samplePoints,
+} from "./brush";
 import {
   canRedo as canRedoH,
   canUndo as canUndoH,
@@ -257,7 +266,16 @@ export type BrushState = {
   // and the same stroke-anchor gating as the scatter brush.
   eraser: boolean;
   radius: number;
+  // Instances added by ONE paintAt tick. Deliberately small: painting is
+  // meant to accumulate, so a stroke that lingers over a patch keeps
+  // thickening it tick by tick instead of reaching its final look on the
+  // first one. Doubles as the per-tick removal count when thinning.
   density: number;
+  // Accumulation ceiling, as a percentage of the brush disc covered by
+  // prop footprints. See the coverage model in brush.ts — a coverage cap
+  // (rather than a flat instance count) means one slider reads the same
+  // whether the roster is trees or grass tufts.
+  maxFill: number;
   minSpacing: number;
   // Url filter: null = use every url in the active preset; an array =
   // restrict the brush to this subset. Reset to null whenever the preset
@@ -298,7 +316,8 @@ const DEFAULT_BRUSH: BrushState = {
   presetId: null,
   eraser: false,
   radius: 4,
-  density: 8,
+  density: 2,
+  maxFill: 55,
   minSpacing: 1.0,
   customUrls: null,
 };
@@ -460,11 +479,20 @@ export type EditorStoreApi = {
   reloadProcedural: () => void;
   setBrushPreset: (id: string | null) => void;
   setBrushEraser: (on: boolean) => void;
-  setBrushParams: (p: { radius?: number; density?: number; minSpacing?: number }) => void;
+  setBrushParams: (p: {
+    radius?: number;
+    density?: number;
+    maxFill?: number;
+    minSpacing?: number;
+  }) => void;
   toggleBrushUrl: (url: string) => void;
   resetBrushUrls: () => void;
   beginStroke: () => void;
-  paintAt: (x: number, y: number) => void;
+  // `opts.thin` (Alt held on the map) runs the inverse of a scatter pass:
+  // it removes a few of the active preset's instances from under the
+  // cursor instead of adding, so an over-painted patch can be walked back
+  // without switching to the all-or-nothing eraser.
+  paintAt: (x: number, y: number, opts?: { thin?: boolean }) => void;
   endStroke: () => void;
   // Stamps. saveSelectionAsStamp captures the current selection into a new
   // stamp in the global library (localStorage key mz:stamplib:v1). Children
@@ -1360,6 +1388,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             ...s.brush,
             radius: p.radius ?? s.brush.radius,
             density: p.density ?? s.brush.density,
+            maxFill: p.maxFill ?? s.brush.maxFill,
             minSpacing: p.minSpacing ?? s.brush.minSpacing,
           },
         })),
@@ -1392,7 +1421,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         set({ strokeAnchor: snapshot(), strokeOpen: true, strokePushed: false });
       },
 
-      paintAt: (x, y) => {
+      paintAt: (x, y, opts) => {
         const s = get();
         if (!s.brush.active) return;
 
@@ -1455,32 +1484,93 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
         const urls = resolveBrushUrls(preset, s.brush.customUrls);
         if (urls.length === 0) return;
         const cur = adapter.getCurrent();
+        const radSq = s.brush.radius * s.brush.radius;
+        const spacingFloor = Math.max(0, s.brush.minSpacing);
+        // Effective footprint radius — the same value the collision test
+        // uses, so the coverage budget below agrees with what can actually
+        // fit. Spacing acts as a floor for tiny props (grass), which is
+        // exactly how it reads in the collision loop.
+        const effRadius = (url: string, scale: number): number =>
+          Math.max(propRadius(url, scale), spacingFloor);
+
+        // Thinning pass (Alt): the inverse of scattering. Removes up to
+        // `density` instances per tick, restricted to urls the active
+        // preset can paint so alt-dragging over a forest never eats a
+        // hand-placed building standing in it. Procedural decor is left
+        // alone — un-erasing it isn't a thing; that's the eraser's job.
+        if (opts?.thin) {
+          const roster = new Set(urls);
+          const inPatch = cur.props.filter((p) => {
+            if (!roster.has(p.url)) return false;
+            const dx = p.pos.x - x;
+            const dy = p.pos.y - y;
+            return dx * dx + dy * dy <= radSq;
+          });
+          if (inPatch.length === 0) return;
+          const doomed = pickThinTargets(
+            inPatch,
+            (p) => p.pos,
+            { x, y },
+            s.brush.radius,
+            s.brush.density,
+          );
+          if (doomed.length === 0) return;
+          const drop = new Set(doomed.map((p) => p.id));
+          openStrokeEntry();
+          const next = cur.props.filter((p) => !drop.has(p.id));
+          commitPropsAndErasedProcedural(next, []);
+          if (s.selectedId !== null && drop.has(s.selectedId)) {
+            const remaining = new Set<string>();
+            for (const id of s.selectedIds) {
+              if (!drop.has(id)) remaining.add(id);
+            }
+            set({ selectedIds: remaining, selectedId: firstOf(remaining) });
+          }
+          return;
+        }
+
         // Radius-tagged existing props so the per-candidate collision test
         // can compare sums-of-radii against actual rendered silhouettes (a
         // bare-point list would let small candidates clip into big trees).
+        // `minSpacing` folds in as a floor on top of role radii so the
+        // slider still means "extra breathing room" for tiny props.
         const existing: { x: number; y: number; r: number }[] = cur.props.map((p) => ({
           x: p.pos.x,
           y: p.pos.y,
-          r: propRadius(p.url, p.scale),
+          r: effRadius(p.url, p.scale),
         }));
-        const candidates = samplePoints({ x, y }, s.brush.radius, s.brush.density);
+        // Coverage already inside the disc. Each pass tops this up by at
+        // most `density` instances and stops at the fill ceiling, so
+        // repeated passes over one spot thicken the patch smoothly and then
+        // level off instead of growing without bound.
+        const areaBudget = patchAreaBudget(s.brush.radius, s.brush.maxFill);
+        let areaUsed = 0;
+        for (const e of existing) {
+          const dx = e.x - x;
+          const dy = e.y - y;
+          if (dx * dx + dy * dy <= radSq) areaUsed += footprintArea(e.r);
+        }
+        if (areaUsed >= areaBudget) return;
+        const targetCount = s.brush.density;
+        // Probe budget scales with the disc, not with the per-pass count:
+        // adding two more trees to a nearly-full patch needs far more tries
+        // than adding the first two to an empty one, and a low per-pass
+        // count must not starve the sampler.
+        const attempts = Math.max(48, Math.ceil(targetCount * 16));
+        const candidates = samplePoints({ x, y }, s.brush.radius, targetCount, attempts);
         if (candidates.length === 0) return;
         // Same-stroke siblings — accepted candidates from earlier in THIS
         // paintAt call. Keeps intra-stroke spawns from overlapping each
         // other in dense bursts.
         const accepted: { x: number; y: number; r: number; url: string; scale: number }[] = [];
-        // `minSpacing` is now an extra floor on top of role-radius gaps so
-        // the slider semantics still make sense — boosts the effective
-        // candidate radius when the author wants extra breathing room.
-        const spacingFloor = Math.max(0, s.brush.minSpacing);
-        const targetCount = s.brush.density;
         const erasedSoFar = new Set(cur.erasedProcedural ?? []);
         const newErased: string[] = [];
         for (const pt of candidates) {
           if (accepted.length >= targetCount) break;
+          if (areaUsed >= areaBudget) break;
           const url = pickFromUrls(urls);
           const scale = randRange(preset.scaleJitter[0], preset.scaleJitter[1]);
-          const r = Math.max(propRadius(url, scale), spacingFloor);
+          const r = effRadius(url, scale);
           let collides = false;
           for (const e of existing) {
             const sum = r + e.r;
@@ -1512,6 +1602,7 @@ export const createEditorStore = (makeAdapter: () => EditorAdapter): EditorStore
             newErased.push(key);
           }
           accepted.push({ x: pt.x, y: pt.y, r, url, scale });
+          areaUsed += footprintArea(r);
         }
         if (accepted.length === 0) return;
         openStrokeEntry();

@@ -33,6 +33,10 @@ const selectRadius = (url: string, scale: number): number =>
 
 const PAINT_INTERVAL_MS = 80;
 
+// Cursor-ring colours: blue while scattering, orange while Alt-thinning.
+const PAINT_RING_COLOR = 0x6aa9ff;
+const THIN_RING_COLOR = 0xff8a5c;
+
 // Cast a ray through the supplied client-space pointer against an unbounded
 // math plane and return the world-space XZ hit. Used while painting so a
 // brush drag past the bounded mesh edge still hits ground — and so we
@@ -253,6 +257,13 @@ const EditorGroundPlane = ({
   // Last marquee move time, for throttling updateMarquee calls in pointermove.
   const lastMarqueeRef = useRef(0);
   const lastPaintRef = useRef(0);
+  // Whether the in-flight stroke is a thinning (Alt) stroke. Latched at
+  // pointerdown so the mode can't flip mid-drag.
+  const thinStrokeRef = useRef(false);
+  // Live Alt state, used only to preview the thinning mode on the cursor
+  // ring before the stroke starts.
+  const altHeldRef = useRef(false);
+  const ringMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const capturePointerIdRef = useRef<number | null>(null);
   // Unbounded math plane (y=0) for paint raycasting. Lets the brush keep
@@ -297,6 +308,28 @@ const EditorGroundPlane = ({
     window.addEventListener("pointerup", onUp);
     return () => window.removeEventListener("pointerup", onUp);
   }, [brushMode, store]);
+
+  // Track Alt purely for the cursor-ring tint (orange = this stroke will
+  // thin the patch out rather than add to it). Window-level and ref-based
+  // so holding a modifier never triggers a React re-render mid-stroke.
+  useEffect(() => {
+    if (!brushMode) return;
+    const sync = (e: KeyboardEvent) => {
+      altHeldRef.current = e.altKey;
+    };
+    const clear = () => {
+      altHeldRef.current = false;
+    };
+    window.addEventListener("keydown", sync);
+    window.addEventListener("keyup", sync);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", sync);
+      window.removeEventListener("keyup", sync);
+      window.removeEventListener("blur", clear);
+      altHeldRef.current = false;
+    };
+  }, [brushMode]);
 
   // Marquee-specific pointerup safety net. Mirrors the brush version above:
   // if the pointer is released off-canvas or over UI we still want endMarquee
@@ -365,6 +398,14 @@ const EditorGroundPlane = ({
     const p = hits[0].point;
     ring.position.set(p.x, 0.11, p.z);
     ring.visible = true;
+    const mat = ringMatRef.current;
+    if (mat) {
+      const thinning =
+        !store.getState().brush.eraser &&
+        (isDownRef.current ? thinStrokeRef.current : altHeldRef.current);
+      const want = thinning ? THIN_RING_COLOR : PAINT_RING_COLOR;
+      if (mat.color.getHex() !== want) mat.color.setHex(want);
+    }
   });
 
   // Cursor tracking for the river-tool overlay. forceUpdate fires whenever
@@ -472,7 +513,11 @@ const EditorGroundPlane = ({
     if (!brushMode) return;
     const ed = store.getState();
     ed.beginStroke();
-    ed.paintAt(e.point.x, -e.point.z);
+    // Alt = thin the patch instead of adding to it. Latched for the whole
+    // stroke from the pointerdown modifier so releasing Alt mid-drag can't
+    // flip a thinning drag into a scattering one halfway through.
+    thinStrokeRef.current = e.nativeEvent.altKey;
+    ed.paintAt(e.point.x, -e.point.z, { thin: thinStrokeRef.current });
     isDownRef.current = true;
     lastPaintRef.current = performance.now();
     lastPaintHitRef.current = { x: e.point.x, z: e.point.z };
@@ -547,7 +592,7 @@ const EditorGroundPlane = ({
         const useHit = hit ?? lastPaintHitRef.current;
         if (useHit) {
           lastPaintHitRef.current = useHit;
-          store.getState().paintAt(useHit.x, -useHit.z);
+          store.getState().paintAt(useHit.x, -useHit.z, { thin: thinStrokeRef.current });
         }
       }
       return;
@@ -624,6 +669,7 @@ const EditorGroundPlane = ({
         raycast={noRaycast}
       >
         <meshBasicMaterial
+          ref={ringMatRef}
           color="#6aa9ff"
           transparent
           opacity={0.85}
