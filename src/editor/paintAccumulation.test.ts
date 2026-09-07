@@ -13,6 +13,7 @@ const emptySource = (): EditorSource => ({
   props: [],
   override: true,
   rivers: [],
+  lakes: [],
   bridges: [],
   easterEggs: [],
   erasedProcedural: [],
