@@ -42,6 +42,20 @@ export type AtlasTint = {
 
 export type TintEntry = MaterialTint | AtlasTint;
 
+export type TowerFinish = { metalness: number; roughness: number };
+
+// The stock turret GLBs all ship metalness 0.4 / roughness 0.27 — a
+// half-metal, near-mirror response. Under the scene's HDRI environment
+// plus the 3-light rig that lays a white specular sheen across the whole
+// silhouette: metalness eats 40% of the diffuse albedo and hands it back
+// as an environment-coloured reflection, so every tint reads a tier or
+// two paler than authored and the upgrade colours wash out toward white.
+// Towers listed here get a matte, near-dielectric finish instead, so the
+// tint colour is what the player actually sees.
+export const TOWER_FINISH: Partial<Record<TowerKind, TowerFinish>> = {
+  pulse: { metalness: 0.05, roughness: 0.68 },
+};
+
 const tier = (upgrades: TowerUpgrades) => ({
   a: Math.min(3, Math.max(0, upgrades.a | 0)),
   b: Math.min(3, Math.max(0, upgrades.b | 0)),
@@ -59,40 +73,51 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
       //   x=12 #DC7700 secondary body (lighter orange)
       //   x=16 #3B3B3B darkest gray (barrel core)
       //
-      // Path A (Damage) drifts the orange body swatches toward a steel
-      // royal-blue: more damage reads as a heavier, "armoured" body.
+      // Path A (Damage) drives the body from its stock orange to a
+      // saturated royal blue: more damage reads as a heavier, "armoured"
+      // body. The route matters as much as the endpoints — a straight
+      // orange→blue interpolation passes through neutral grey, which is
+      // exactly where the mid tiers used to land (a muddy tan at T1, a
+      // washed periwinkle at T2). Instead each tier is picked at full
+      // chroma and the hue jumps around the warm side of the wheel
+      // (orange → vermillion → indigo → royal blue), so no tier is ever
+      // the desaturated one.
       // Path B (Fire Rate) darkens the gray swatches toward near-black,
       // so heavy fire-rate investment reads as a charred, well-used
       // barrel — independent from the body colour.
       const bodyOrange: [number, number, number] = [
-        [0.804, 0.38, 0.0],
-        [0.55, 0.34, 0.18],
-        [0.3, 0.3, 0.46],
-        [0.15, 0.31, 0.62],
+        [0.85, 0.33, 0.0],
+        [0.76, 0.11, 0.02],
+        [0.26, 0.09, 0.66],
+        [0.06, 0.3, 0.92],
       ][a] as [number, number, number];
       const bodyAccent: [number, number, number] = [
-        [0.863, 0.467, 0.0],
-        [0.6, 0.43, 0.28],
-        [0.34, 0.4, 0.6],
-        [0.2, 0.4, 0.78],
+        [0.95, 0.46, 0.0],
+        [0.9, 0.22, 0.03],
+        [0.42, 0.18, 0.86],
+        [0.14, 0.47, 1.0],
       ][a] as [number, number, number];
+      // Greys sit against a now-matte finish, so they no longer get the
+      // specular lift that used to fake contrast — the stock values read
+      // as near-white plastic. Pulled down and biased cool (steel, not
+      // putty) so the body colour stays the loudest thing on the model.
       const grayMid: [number, number, number] = [
-        [0.451, 0.451, 0.451],
-        [0.32, 0.32, 0.32],
-        [0.2, 0.2, 0.2],
-        [0.09, 0.09, 0.09],
+        [0.3, 0.315, 0.35],
+        [0.21, 0.22, 0.25],
+        [0.13, 0.14, 0.17],
+        [0.06, 0.065, 0.08],
       ][b] as [number, number, number];
       const grayDark: [number, number, number] = [
-        [0.282, 0.282, 0.282],
-        [0.2, 0.2, 0.2],
-        [0.12, 0.12, 0.12],
-        [0.055, 0.055, 0.055],
+        [0.175, 0.185, 0.21],
+        [0.125, 0.13, 0.15],
+        [0.075, 0.08, 0.095],
+        [0.035, 0.038, 0.048],
       ][b] as [number, number, number];
       const graySoot: [number, number, number] = [
-        [0.231, 0.231, 0.231],
-        [0.16, 0.16, 0.16],
-        [0.09, 0.09, 0.09],
-        [0.035, 0.035, 0.035],
+        [0.135, 0.142, 0.163],
+        [0.095, 0.1, 0.118],
+        [0.055, 0.058, 0.07],
+        [0.022, 0.024, 0.03],
       ][b] as [number, number, number];
       return [
         {

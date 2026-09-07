@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
-import { type AtlasSwatch, computeTowerTints, tierKey } from "./towerTints";
+import { type AtlasSwatch, computeTowerTints, TOWER_FINISH, tierKey } from "./towerTints";
 
 type SolidAtlasState = {
   materialsBySwatch: Map<number, THREE.MeshStandardMaterial>;
@@ -18,6 +18,19 @@ const clearEmissive = (mat: THREE.MeshStandardMaterial) => {
   if (!mat.emissive) return;
   mat.emissive.setRGB(0, 0, 0);
   mat.emissiveIntensity = 0;
+};
+
+// Override the GLB's authored PBR response for kinds that ship a finish
+// in TOWER_FINISH. Runs on the per-instance material clones (and is
+// therefore inherited by the solid-atlas clones made from them), so the
+// shared cached GLTF materials — and every other consumer of the same
+// model, e.g. the compendium diorama — are left alone.
+const applyFinish = (mat: THREE.MeshStandardMaterial, kind: TowerKind) => {
+  const finish = TOWER_FINISH[kind];
+  if (!finish) return;
+  mat.metalness = finish.metalness;
+  mat.roughness = finish.roughness;
+  mat.needsUpdate = true;
 };
 
 const swatchXForVertex = (uv: THREE.BufferAttribute, vertexIndex: number): number => {
@@ -258,6 +271,7 @@ export const ModelTowerMesh = ({
           for (const mm of mats) {
             if (!mm) continue;
             clearEmissive(mm as THREE.MeshStandardMaterial);
+            applyFinish(mm as THREE.MeshStandardMaterial, kind);
           }
         });
         parent.add(item);

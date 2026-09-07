@@ -1,4 +1,5 @@
 import { useGLTF } from "@react-three/drei";
+import { TOWER_FINISH } from "../render/towerTints";
 import type { TowerKind } from "../sim/types";
 import { Diorama, StaticModel } from "./Diorama";
 
@@ -28,7 +29,12 @@ export const TowerDiorama = ({ kind, size = 360 }: { kind: TowerKind; size?: num
   const span = cfg.targetSize + 0.4;
   return (
     <Diorama span={span} size={size}>
-      <StaticModel url={cfg.url} targetSize={cfg.targetSize} rotY={cfg.rotY} />
+      <StaticModel
+        url={cfg.url}
+        targetSize={cfg.targetSize}
+        rotY={cfg.rotY}
+        finish={TOWER_FINISH[kind]}
+      />
     </Diorama>
   );
 };

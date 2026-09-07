@@ -52,11 +52,17 @@ export const StaticModel = ({
   targetSize,
   rotY = 0,
   position = [0, 0, 0],
+  finish,
 }: {
   url: string;
   targetSize: number;
   rotY?: number;
   position?: [number, number, number];
+  // Optional PBR override (see TOWER_FINISH in render/towerTints). Supplied
+  // so a subject whose in-game materials are re-finished doesn't read
+  // glossier in the compendium than it does on the board. Materials are
+  // cloned first — the GLTF cache hands every consumer the same references.
+  finish?: { metalness: number; roughness: number };
 }) => {
   const gltf = useGLTF(url);
   const obj = useMemo(() => {
@@ -73,9 +79,20 @@ export const StaticModel = ({
       if (!m.isMesh) return;
       m.castShadow = true;
       m.receiveShadow = true;
+      if (!finish) return;
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      m.material = mats.map((raw) => {
+        const mat = (raw as THREE.MeshStandardMaterial).clone();
+        mat.metalness = finish.metalness;
+        mat.roughness = finish.roughness;
+        mat.needsUpdate = true;
+        return mat;
+      });
+      if (!Array.isArray(m.material)) return;
+      if (m.material.length === 1) m.material = m.material[0];
     });
     return cloned;
-  }, [gltf.scene, targetSize]);
+  }, [gltf.scene, targetSize, finish]);
   return (
     <group position={position} rotation={[0, rotY, 0]}>
       <primitive object={obj} />
