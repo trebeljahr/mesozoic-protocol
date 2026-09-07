@@ -5,13 +5,17 @@ import type { Bridge, FlowPalette } from "../flowGeometry";
 import type { Vec2 } from "../sim/types";
 import { makeWaterMaterial } from "./waterShader";
 
-// Forest biome's per-level flow renderer. Builds miter-jointed ribbon
-// geometry along each river polyline and reuses the shared waterShader for
-// the fluid surface so editor preview (Rivers.tsx) and gameplay share one
-// look. Palette is passed in so a future biome could swap colours without
-// touching the shader source.
+// Per-level flow renderer for every biome that has flow features. Builds
+// miter-jointed ribbon geometry along each river polyline and disc geometry
+// for each lake, both fed to the shared waterShader.
+//
+// This used to be forest-only (`ForestWaterGroup`); lava and alien rendered
+// their rivers as a chain of independent planes plus circle joints on a plain
+// meshStandardMaterial, which showed every segment seam as a straight edge
+// and every lake as a flat disc. They now share this path — the palette is
+// what differs between biomes, not the geometry or the surface treatment.
 
-export const ForestWaterGroup = ({
+export const FlowWaterGroup = ({
   palette,
   rivers,
   lakes,
@@ -30,6 +34,17 @@ export const ForestWaterGroup = ({
     [palette, bridges],
   );
 
+  // One disc shared by every lake — scaled per instance. Built here rather
+  // than via <circleGeometry> so it can carry the `aFlow` attribute the
+  // shader reads; lakes have no flow direction, so it is all zeros and the
+  // shader falls back to its drift mode.
+  const lakeGeo = useMemo(() => {
+    const geo = new THREE.CircleGeometry(1, 28);
+    const count = geo.getAttribute("position").count;
+    geo.setAttribute("aFlow", new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+    return geo;
+  }, []);
+
   useEffect(
     () => () => {
       segMat.dispose();
@@ -37,6 +52,8 @@ export const ForestWaterGroup = ({
     },
     [segMat, jointMat],
   );
+
+  useEffect(() => () => lakeGeo.dispose(), [lakeGeo]);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -55,10 +72,9 @@ export const ForestWaterGroup = ({
           position={[l.x, 0.014, -l.y]}
           rotation={[-Math.PI / 2, 0, l.rot]}
           scale={[l.rx, l.ry, 1]}
+          geometry={lakeGeo}
           material={jointMat}
-        >
-          <circleGeometry args={[1, 28]} />
-        </mesh>
+        />
       ))}
     </group>
   );
@@ -82,6 +98,7 @@ const RiverSegments = ({
     const n = points.length;
     const positions: number[] = [];
     const uvs: number[] = [];
+    const flows: number[] = [];
     const indices: number[] = [];
     const halfW = width / 2;
     let cum = 0;
@@ -94,6 +111,16 @@ const RiverSegments = ({
       let nx: number;
       let ny: number;
       let scale = 1;
+
+      // Downstream tangent at this vertex, sim-space. Fed to the shader as
+      // `aFlow` (converted to render space, where sim +y is render -z) so
+      // ripples advect along the channel instead of along a UV axis whose
+      // scale differs between geometry builders.
+      const prevP = points[Math.max(0, i - 1)];
+      const nextP = points[Math.min(n - 1, i + 1)];
+      const tx = nextP.x - prevP.x;
+      const ty = nextP.y - prevP.y;
+      const tl = Math.hypot(tx, ty) || 1;
 
       if (i === 0) {
         const b = points[1];
@@ -154,6 +181,8 @@ const RiverSegments = ({
       positions.push(p.x - ox, 0.012, -(p.y - oy));
       uvs.push(cum, 0);
       uvs.push(cum, 1);
+      flows.push(tx / tl, -ty / tl);
+      flows.push(tx / tl, -ty / tl);
 
       if (i > 0) {
         // Winding chosen so the mesh's normal is +Y (camera looks straight down,
@@ -167,6 +196,7 @@ const RiverSegments = ({
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setAttribute("aFlow", new THREE.Float32BufferAttribute(flows, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
     return geo;

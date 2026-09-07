@@ -13,7 +13,7 @@ import { makeWaterMaterial } from "./waterShader";
 // extruded along a Catmull-Rom curve through its control points.
 //
 // Material is the shared shader from waterShader.ts — same fresnel + ripple
-// + foam + bridge-wake treatment used by ForestWater for per-level forest
+// + foam + bridge-wake treatment used by FlowWater for per-level biome
 // rivers — palette-themed per RiverMaterial (water/lava/toxic). The editor
 // preview now matches the gameplay look instead of falling back to a flat
 // meshStandardMaterial.
@@ -57,10 +57,12 @@ const MATERIALS: Record<RiverMaterial, FlowPalette> = {
 // (left and right of the centerline at ±width/2). Caller disposes when
 // inputs change. Returns null if the river has fewer than two points.
 //
-// UV convention matches the shared water shader: U = along-length flow
-// coordinate (used for downstream-drift sampling), V = cross-ribbon (0 on
-// the left bank, 1 on the right). The river shader keys foam intensity on
-// abs(V - 0.5), so a swapped convention pushes foam down the centerline.
+// UV convention matches the shared water shader: V = cross-ribbon (0 on the
+// left bank, 1 on the right); the shader keys depth/foam on abs(V - 0.5), so
+// a swapped convention pushes foam down the centerline. The shader takes its
+// downstream direction from the `aFlow` attribute (world-space curve tangent)
+// rather than from U, so ripple scale is identical here and in FlowWater's
+// ribbon builder even though the two disagree on what U measures.
 const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
   const pts = river.points;
   if (pts.length < 2) return null;
@@ -79,6 +81,7 @@ const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
   const half = Math.max(0.05, river.width * 0.5);
   const positions = new Float32Array((sampleCount + 1) * 2 * 3);
   const uvs = new Float32Array((sampleCount + 1) * 2 * 2);
+  const flows = new Float32Array((sampleCount + 1) * 2 * 2);
 
   const up = new THREE.Vector3(0, 1, 0);
   // Tangent reused across samples to avoid allocations in the hot loop.
@@ -103,12 +106,16 @@ const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
     positions[base + 4] = Y_OFFSET;
     positions[base + 5] = rz;
     // U = along-length flow coord, V = cross-ribbon (0 left → 1 right).
-    // Matches ForestWater / waterShader expectations.
     const uBase = i * 4;
     uvs[uBase + 0] = t;
     uvs[uBase + 1] = 0;
     uvs[uBase + 2] = t;
     uvs[uBase + 3] = 1;
+    // Downstream direction on the ground plane, shared by both bank vertices.
+    flows[uBase + 0] = tangent.x;
+    flows[uBase + 1] = tangent.z;
+    flows[uBase + 2] = tangent.x;
+    flows[uBase + 3] = tangent.z;
   }
 
   // Two triangles per segment between samples i and i+1.
@@ -130,6 +137,7 @@ const buildRiverGeometry = (river: River): THREE.BufferGeometry | null => {
   const geom = new THREE.BufferGeometry();
   geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geom.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geom.setAttribute("aFlow", new THREE.BufferAttribute(flows, 2));
   geom.setIndex(new THREE.BufferAttribute(indices, 1));
   geom.computeVertexNormals();
   return geom;

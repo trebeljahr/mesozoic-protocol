@@ -1,16 +1,20 @@
 import { nanoid } from "nanoid";
 import { useMemo } from "react";
-import type { FlowPalette } from "../flowGeometry";
 import { getFlowConfig } from "../flowGeometry";
 import { PATH_WIDTH } from "../level";
-import type { Vec2 } from "../sim/types";
 import { useGame } from "../store";
-import { ForestWaterGroup } from "./ForestWater";
+import { FlowWaterGroup } from "./FlowWater";
 
 // Renders the per-biome flow geometry built by `buildFlowFeatures` —
 // rivers, lakes/puddles, and bridges over path crossings. Palette comes
 // from `getFlowConfig(biome).palette` so each biome (lava/forest/alien)
 // styles the same shapes differently.
+//
+// Every biome goes through <FlowWaterGroup/>. Lava and alien used to take a
+// separate path that laid rivers out as a chain of independent planes on a
+// meshStandardMaterial — flat colour, visible seam at every segment join, and
+// lakes as hard-edged discs. The palette is the only thing that should differ
+// between biomes here.
 export const FlowFeatures = () => {
   const biome = useGame((s) => s.world.biome);
   const features = useGame((s) => s.world.flowFeatures);
@@ -31,42 +35,14 @@ export const FlowFeatures = () => {
   const { palette } = decorated;
   const bridgeWidth = PATH_WIDTH + 0.4;
 
-  const isForest = biome === "forest";
-
   return (
     <group>
-      {isForest ? (
-        <ForestWaterGroup
-          palette={palette}
-          rivers={decorated.rivers}
-          lakes={decorated.lakes}
-          bridges={decorated.bridges}
-        />
-      ) : (
-        <>
-          {decorated.rivers.map((river) => (
-            <RiverMesh key={river.id} points={river.points} width={river.width} palette={palette} />
-          ))}
-          {decorated.lakes.map((l) => (
-            <mesh
-              key={l.id}
-              position={[l.x, 0.014, -l.y]}
-              rotation={[-Math.PI / 2, 0, l.rot]}
-              scale={[l.rx, l.ry, 1]}
-              receiveShadow
-            >
-              <circleGeometry args={[1, 28]} />
-              <meshStandardMaterial
-                color={palette.fluidColor}
-                emissive={palette.fluidEmissive}
-                emissiveIntensity={palette.fluidEmissiveIntensity}
-                roughness={0.85}
-                toneMapped={false}
-              />
-            </mesh>
-          ))}
-        </>
-      )}
+      <FlowWaterGroup
+        palette={palette}
+        rivers={decorated.rivers}
+        lakes={decorated.lakes}
+        bridges={decorated.bridges}
+      />
       {decorated.bridges.map((b) =>
         b.kind === "plaza" ? (
           <group key={b.id} position={[b.pos.x, 0.06, -b.pos.y]}>
@@ -96,69 +72,6 @@ export const FlowFeatures = () => {
           </group>
         ),
       )}
-    </group>
-  );
-};
-
-const RiverMesh = ({
-  points,
-  width,
-  palette,
-}: {
-  points: Vec2[];
-  width: number;
-  palette: FlowPalette;
-}) => {
-  const segs = useMemo(() => {
-    const out: { id: string; pos: [number, number, number]; rotY: number; length: number }[] = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const a = points[i];
-      const b = points[i + 1];
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const length = Math.hypot(dx, dy);
-      out.push({
-        id: nanoid(),
-        pos: [(a.x + b.x) / 2, 0.012, -(a.y + b.y) / 2],
-        rotY: Math.atan2(-dy, dx),
-        length,
-      });
-    }
-    return out;
-  }, [points]);
-
-  const joints = useMemo(
-    () =>
-      points.map((p) => ({ id: nanoid(), pos: [p.x, 0.013, -p.y] as [number, number, number] })),
-    [points],
-  );
-
-  return (
-    <group>
-      {segs.map((s) => (
-        <mesh key={s.id} position={s.pos} rotation={[-Math.PI / 2, 0, -s.rotY]} receiveShadow>
-          <planeGeometry args={[s.length, width]} />
-          <meshStandardMaterial
-            color={palette.fluidColor}
-            emissive={palette.fluidEmissive}
-            emissiveIntensity={palette.fluidEmissiveIntensity}
-            roughness={0.85}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
-      {joints.map((j) => (
-        <mesh key={j.id} position={j.pos} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <circleGeometry args={[width / 2, 16]} />
-          <meshStandardMaterial
-            color={palette.fluidColor}
-            emissive={palette.fluidEmissive}
-            emissiveIntensity={palette.fluidEmissiveIntensity}
-            roughness={0.85}
-            toneMapped={false}
-          />
-        </mesh>
-      ))}
     </group>
   );
 };
