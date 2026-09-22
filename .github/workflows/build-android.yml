@@ -15,7 +15,7 @@
 #                -keyalg RSA -keysize 2048 -validity 10000
 #      → base64-encode and paste as ANDROID_KEYSTORE_BASE64.
 #   2. Play Console → create app, set up internal testing track, link package
-#      name `com.mesozoicprotocol.app`.
+#      name `com.ricoslabs.mesozoicprotocol`.
 #   3. Play Console → Setup → API access → link a Google Cloud project →
 #      create a service account → grant "Release manager" → download JSON.
 #      Paste the JSON contents into PLAY_SERVICE_ACCOUNT_JSON.
@@ -187,7 +187,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1.1.3
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.mesozoicprotocol.app
+          packageName: com.ricoslabs.mesozoicprotocol
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           track: ${{ github.event.inputs.track || 'internal' }}
           status: completed

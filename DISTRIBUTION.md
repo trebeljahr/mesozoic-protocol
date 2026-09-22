@@ -335,14 +335,16 @@ Common subcommands:
 
 ### iOS distribution — App Store Connect via CI
 
-Bundle ID is `com.mesozoicprotocol.app` (matches the Tauri identifier — keep them in sync).
+Bundle ID is `com.ricoslabs.mesozoicprotocol` (matches the Tauri identifier and the Android `applicationId` — keep them in sync).
+
+It was `com.mesozoicprotocol.app` until 2026-09-22, when it moved before anything had shipped, so there is no compatibility shim anywhere. The new id is registered under the Ricos Labs LLC Apple team (`4BHY8H2J25`) and is the Google Play package name (Play app id `4972014174140347180`); the App Store Connect record already points at it. Registered is final: an App ID, an App Store Connect record and a Play package name cannot be renamed, so the id is now a contract — the Xcode project, `capacitor.config.ts`, `android/app/build.gradle`, the `MainActivity` package, `strings.xml`, the Tauri identifier, the export-options template and both store workflows all state it.
 
 Automated in [.github/workflows/build-ios.yml](.github/workflows/build-ios.yml). Flow: build web bundle → `npx cap sync ios` → import distribution cert into a temp keychain → install provisioning profile → render `ExportOptions.plist` from [scripts/ios-ExportOptions.plist.template](scripts/ios-ExportOptions.plist.template) → `xcodebuild archive` → `xcodebuild -exportArchive` → upload .ipa to TestFlight via the App Store Connect API.
 
 **One-time Apple setup:**
 
 1. **Apple Developer Portal → Certificates** → create `Apple Distribution` certificate, download, import to Keychain, then export as `.p12` with a password (right-click the cert in Keychain Access → Export).
-2. **Identifiers** → register `com.mesozoicprotocol.app` (Capabilities: Push if needed; default otherwise).
+2. **Identifiers** → register `com.ricoslabs.mesozoicprotocol` (Capabilities: Push if needed; default otherwise).
 3. **Profiles** → create an `App Store` distribution profile bound to that ID + the distribution cert. Note the profile's `Name` field — must match `APPLE_PROVISIONING_PROFILE_NAME` exactly.
 4. **App Store Connect → Users and Access → Keys** → generate API key, role `App Manager`. Download the `AuthKey_<ID>.p8` (one-time only). Note Key ID + Issuer ID.
 5. **App Store Connect → My Apps** → create the app record (SKU, primary language, bundle ID) so TestFlight has a target.
@@ -375,7 +377,7 @@ Automated in [.github/workflows/build-android.yml](.github/workflows/build-andro
    ```bash
    base64 -i mesozoic-protocol.keystore | pbcopy   # → ANDROID_KEYSTORE_BASE64
    ```
-3. **Play Console** → create app, link package `com.mesozoicprotocol.app`, configure the internal testing track.
+3. **Play Console** → create app, link package `com.ricoslabs.mesozoicprotocol`, configure the internal testing track.
 4. **Play Console → Setup → API access** → link a Google Cloud project → create a service account → grant it `Release manager` (or narrower: `Release apps to testing tracks`). Download the service account JSON.
 5. **First release must be uploaded manually through the Play Console UI** so Google can validate the app and distribution terms can be accepted. Subsequent versions can flow through this workflow.
 

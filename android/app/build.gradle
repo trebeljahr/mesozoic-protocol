@@ -8,10 +8,10 @@ if (hasReleaseKeystore) {
 }
 
 android {
-    namespace = "com.mesozoicprotocol.app"
+    namespace = "com.ricoslabs.mesozoicprotocol"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.mesozoicprotocol.app"
+        applicationId "com.ricoslabs.mesozoicprotocol"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1") as Integer

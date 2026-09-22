@@ -1,4 +1,4 @@
-package com.mesozoicprotocol.app;
+package com.ricoslabs.mesozoicprotocol;
 
 import com.getcapacitor.BridgeActivity;
 
