@@ -93,7 +93,8 @@
     "outpost": "Außenposten {{id}}",
     "startingGold": "Startgold",
     "locked": "Gesperrt",
-    "deploy": "Einsatz"
+    "deploy": "Einsatz",
+    "endlessSteamNote": "In der Steam-Version verfügbar"
   },
   "compendium": {
     "title": "Kompendium",

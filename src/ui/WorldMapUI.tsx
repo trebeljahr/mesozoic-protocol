@@ -17,6 +17,7 @@ import {
 } from "../progress";
 import { spentMetaStars } from "../sim/metaSkills";
 import { useGame } from "../store";
+import { isTauriShell } from "../updater";
 import { DebugProgressSettings } from "./DebugProgressSettings";
 import { DifficultyButton } from "./DifficultyButton";
 import { EndlessUnlockedModal } from "./EndlessUnlockedModal";
@@ -76,10 +77,16 @@ export const WorldMapUI = () => {
   const showModesUnlocked =
     !progress.seenModesUnlockExplainer && hasUnlockedChallengeModes(progress);
   const endlessUnlocked = hasUnlockedEndless(progress);
+  // Endless is a paid extra: it only ships in the desktop/Steam shell (Tauri).
+  // The web build keeps the save data intact but hides every entry point and
+  // shows a teaser instead. `isTauriShell()` is the same probe the updater
+  // uses, and is true for both plain-desktop and Steam builds.
+  const desktopShell = isTauriShell();
   // One-shot Endless reveal after the final outpost falls. Held back while
-  // the modes explainer is still pending so two dialogs never stack.
+  // the modes explainer is still pending so two dialogs never stack, and
+  // suppressed entirely on non-desktop builds where Endless is unavailable.
   const showEndlessUnlocked =
-    !progress.seenEndlessUnlockExplainer && endlessUnlocked && !showModesUnlocked;
+    desktopShell && !progress.seenEndlessUnlockExplainer && endlessUnlocked && !showModesUnlocked;
   const navRepeatRef = useRef<{ direction: -1 | 1 | 0; nextAt: number }>({
     direction: 0,
     nextAt: 0,
@@ -177,20 +184,38 @@ export const WorldMapUI = () => {
       </div>
 
       <div className="world-map-rd absolute bottom-6 right-6 pointer-events-none flex flex-col items-end gap-2">
-        {endlessUnlocked && (
-          <button
-            type="button"
-            className="world-map-utility-btn bg-surface-1 border border-blue/50 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
-            onClick={() => setEndlessPickerOpen(true)}
-            aria-label="Open endless mode"
-            title="Endless — survive infinite escalating waves"
-          >
-            <span className="text-base leading-none font-bold text-cyan shrink-0" aria-hidden>
-              ∞
-            </span>
-            <span className="text-sm font-bold tracking-wide uppercase">Endless</span>
-          </button>
-        )}
+        {endlessUnlocked &&
+          (desktopShell ? (
+            <button
+              type="button"
+              className="world-map-utility-btn bg-surface-1 border border-blue/50 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
+              onClick={() => setEndlessPickerOpen(true)}
+              aria-label="Open endless mode"
+              title="Endless — survive infinite escalating waves"
+            >
+              <span className="text-base leading-none font-bold text-cyan shrink-0" aria-hidden>
+                ∞
+              </span>
+              <span className="text-sm font-bold tracking-wide uppercase">Endless</span>
+            </button>
+          ) : (
+            // Web build: Endless is a Steam-version extra. Non-interactive
+            // teaser in place of the button — no dead onClick, nothing blocks.
+            <div
+              className="world-map-utility-btn bg-surface-1 border border-border/60 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-default select-none opacity-80"
+              title={t("worldMap.endlessSteamNote")}
+            >
+              <span className="text-base leading-none font-bold text-cyan/50 shrink-0" aria-hidden>
+                ∞
+              </span>
+              <span className="text-sm font-bold tracking-wide uppercase text-fg-muted">
+                Endless
+              </span>
+              <span className="text-[11px] font-medium normal-case text-fg-faint">
+                {t("worldMap.endlessSteamNote")}
+              </span>
+            </div>
+          ))}
         <button
           type="button"
           className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"

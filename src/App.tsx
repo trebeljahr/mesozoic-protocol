@@ -36,6 +36,7 @@ import { useInputModeSignal } from "./ui/useInputMode";
 import { useLevelLoadProgress } from "./ui/useLevelLoadProgress";
 import { useIsMobile } from "./ui/useMediaQuery";
 import { WorldMapUI } from "./ui/WorldMapUI";
+import { isTauriShell } from "./updater";
 
 const worldSceneKeys = new WeakMap<object, number>();
 let nextWorldSceneKey = 1;
@@ -351,7 +352,7 @@ export const App = () => {
           <ModePicker />
         </Suspense>
       )}
-      {endlessPickerOpen && (
+      {endlessPickerOpen && isTauriShell() && (
         <Suspense fallback={null}>
           <EndlessPicker />
         </Suspense>

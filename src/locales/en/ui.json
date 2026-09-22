@@ -93,7 +93,8 @@
     "outpost": "Outpost {{id}}",
     "startingGold": "Starting gold",
     "locked": "Locked",
-    "deploy": "Deploy"
+    "deploy": "Deploy",
+    "endlessSteamNote": "Available in the Steam version"
   },
   "compendium": {
     "title": "Compendium",
