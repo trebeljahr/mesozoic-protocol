@@ -7,9 +7,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Host split: the apex domain is the marketing site (landing, press,
 // privacy), the game lives on the play subdomain. The sitemap is served
 // from the same dist on every host, but robots.txt points crawlers at
-// the apex copy. The legacy host (protocol.trebeljahr.com) still serves
-// the game and is intentionally absent here — its pages canonicalize to
-// the URLs below.
+// the apex copy. The retired host (protocol.trebeljahr.com) 301-redirects
+// to the play subdomain, so it is intentionally absent here.
 const seo = {
   siteUrl: "https://mesozoicprotocol.com",
   gameUrl: "https://play.mesozoicprotocol.com",
@@ -36,7 +35,8 @@ const joinUrl = (base, urlPath) => {
   return `${cleanBase}${cleanPath}`;
 };
 
-const urlEntry = (base) => (route) => `  <url>
+const urlEntry = (base) => (route) =>
+  `  <url>
     <loc>${escapeXml(joinUrl(base, route.path))}</loc>
     <lastmod>${seo.lastmod}</lastmod>
     <changefreq>${route.changefreq}</changefreq>

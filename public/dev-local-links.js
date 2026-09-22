@@ -18,10 +18,7 @@
 
   for (const a of document.querySelectorAll('a[href^="https://"]')) {
     const url = new URL(a.href);
-    if (
-      url.hostname === "play.mesozoicprotocol.com" ||
-      url.hostname === "protocol.trebeljahr.com"
-    ) {
+    if (url.hostname === "play.mesozoicprotocol.com") {
       a.href = "/";
     } else if (url.hostname === "mesozoicprotocol.com") {
       const path = url.pathname.replace(/\/$/, "");

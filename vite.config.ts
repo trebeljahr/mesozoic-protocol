@@ -192,13 +192,10 @@ const tailnetPortBanner = (port: number): PluginOption => ({
 export default defineConfig(async ({ command, mode }) => {
   const env = loadEnv(mode, ".", "");
   const plausibleDomain = env.VITE_PLAUSIBLE_DOMAIN ?? "play.mesozoicprotocol.com";
-  // Hosts where the loader attaches. Events from every allowed host
-  // report under the single canonical data-domain above, so the legacy
-  // host and the play subdomain share one Plausible site. Keep in sync
-  // with src/analytics.ts.
-  const plausibleHosts = (
-    env.VITE_PLAUSIBLE_HOSTS ?? "play.mesozoicprotocol.com,protocol.trebeljahr.com"
-  ).split(",");
+  // Hosts where the loader attaches. Only the play subdomain runs the
+  // game, so it is the sole analytics host; events report under the
+  // canonical data-domain above. Keep in sync with src/analytics.ts.
+  const plausibleHosts = (env.VITE_PLAUSIBLE_HOSTS ?? "play.mesozoicprotocol.com").split(",");
   const plausibleScriptUrl =
     env.VITE_PLAUSIBLE_SCRIPT_URL ??
     "https://plausible.trebeljahr.com/js/script.file-downloads.hash.outbound-links.pageview-props.revenue.tagged-events.js";

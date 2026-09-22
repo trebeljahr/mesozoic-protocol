@@ -92,7 +92,7 @@ jobs:
       # verify URL isn't configured, so existing repos don't break.
       - name: Verify deploy
         env:
-          VERIFY_URL: ${{ vars.DEPLOY_VERIFY_URL || 'https://protocol.trebeljahr.com/' }}
+          VERIFY_URL: ${{ vars.DEPLOY_VERIFY_URL || 'https://play.mesozoicprotocol.com/' }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           if [ -z "$VERIFY_URL" ]; then

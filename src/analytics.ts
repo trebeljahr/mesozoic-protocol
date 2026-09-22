@@ -5,9 +5,9 @@
 // host. track() mirrors that host check so local previews and native
 // shells stay silent.
 //
-// Events from every allowed host report under the single canonical
-// data-domain (VITE_PLAUSIBLE_DOMAIN), so the legacy host and the play
-// subdomain share one Plausible site.
+// The play subdomain is the only host that runs the game, so it is the
+// only host that emits events; they report under the single canonical
+// data-domain (VITE_PLAUSIBLE_DOMAIN).
 
 type PlausibleProps = Record<string, string | number | boolean>;
 
@@ -17,9 +17,9 @@ declare global {
   }
 }
 
-const allowedHosts = (
-  import.meta.env.VITE_PLAUSIBLE_HOSTS ?? "play.mesozoicprotocol.com,protocol.trebeljahr.com"
-).split(",");
+const allowedHosts = (import.meta.env.VITE_PLAUSIBLE_HOSTS ?? "play.mesozoicprotocol.com").split(
+  ",",
+);
 
 export const track = (event: string, props?: PlausibleProps): void => {
   if (typeof window === "undefined") return;
