@@ -166,6 +166,39 @@
   footer .links { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
   footer a { color: var(--cyan-soft); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
+
+  /* Store buttons + "Where to get it" grid */
+  .btn-steam {
+    border: 1px solid rgba(90, 214, 255, 0.42);
+    color: var(--cyan-soft);
+    background: rgba(90, 214, 255, 0.1);
+  }
+  .btn.is-soon { opacity: 0.6; cursor: not-allowed; }
+  .soon-tag {
+    display: inline-block;
+    margin-left: 0.55rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 0.14rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(255, 214, 106, 0.16);
+    color: var(--amber);
+    vertical-align: middle;
+  }
+  .store-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .store-card {
+    background: var(--bg-raise);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.4rem 1.4rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .store-card .store-name { font-size: 1.05rem; color: var(--amber); letter-spacing: 0.05em; font-weight: 600; }
+  .store-card .store-plat { margin: 0.25rem 0 1rem; font-size: 0.82rem; color: #8295a8; letter-spacing: 0.04em; }
+  .store-card .btn { margin-top: auto; text-align: center; }
 </style>
 </head>
 <body>
@@ -177,9 +210,11 @@
     <p class="tagline">A single-player roguelite tower defense where you pilot a hero mech alongside your turrets and hold thirty outposts against waves of dinosaurs and matriarch queens.</p>
     <div class="cta-row">
       <a class="btn btn-primary" href="https://play.mesozoicprotocol.com/">Play free in your browser</a>
+      <!-- STEAM_URL placeholder: https://store.steampowered.com/app/<APP_ID>/Mesozoic_Protocol/ — App ID not yet assigned. Swap this <span> for an <a href> and drop is-soon/soon-tag/aria-disabled once the Steam page is public. -->
+      <span class="btn btn-steam is-soon" role="link" aria-disabled="true" title="Steam page coming soon">Wishlist on Steam<span class="soon-tag">Coming soon</span></span>
       <a class="btn btn-secondary" href="https://mesozoicprotocol.com/press">Press kit</a>
     </div>
-    <p class="sub-cta">No download, no account, no ads, no microtransactions. Desktop and mobile builds are in preparation.</p>
+    <p class="sub-cta">The browser version is free — no account, no ads, no microtransactions. Paid Steam, iOS, and Android builds are in preparation.</p>
     <figure class="hero-shot">
       <img src="/screenshots/mesozoic-protocol-screenshot-01-forest-defense.jpg" alt="Top-down view of the Jungle Outpost: a raptor pack advancing along the dirt path toward turrets guarding the base" width="1920" height="1080" fetchpriority="high" />
       <figcaption>Jungle Outpost, wave one — a raptor pack tests the perimeter.</figcaption>
@@ -318,6 +353,37 @@
       <li>Available in English, German, Brazilian Portuguese, and Simplified Chinese.</li>
       <li>Desktop builds for Windows, macOS, and Linux, plus iOS and Android versions, are in preparation.</li>
     </ul>
+  </div>
+</section>
+
+<section id="get-it">
+  <div class="wrap">
+    <h2>Where to Get It</h2>
+    <p class="lede">Play the full campaign free in your browser today. Paid native builds are on the way — each store button goes live the moment its page opens.</p>
+    <!--
+      STORE LINKS — PLACEHOLDERS, not live as of 2026-09-23. When a store page goes public,
+      replace that store's <span> with <a href="…">, then drop the is-soon class, the .soon-tag span, and aria-disabled.
+        STEAM_URL       = https://store.steampowered.com/app/<APP_ID>/Mesozoic_Protocol/                (App ID unset — Steamworks / CI var STEAM_APP_ID)
+        APP_STORE_URL   = https://apps.apple.com/app/id<APPLE_APP_ID>                                    (no listing yet — App Store Connect)
+        GOOGLE_PLAY_URL = https://play.google.com/store/apps/details?id=com.ricoslabs.mesozoicprotocol   (app is a draft, not yet public)
+    -->
+    <div class="store-grid">
+      <div class="store-card">
+        <div class="store-name">Steam</div>
+        <p class="store-plat">Windows · macOS · Linux</p>
+        <span class="btn btn-steam is-soon" role="link" aria-disabled="true" title="Steam page coming soon">Wishlist on Steam<span class="soon-tag">Coming soon</span></span>
+      </div>
+      <div class="store-card">
+        <div class="store-name">App Store</div>
+        <p class="store-plat">iPhone · iPad</p>
+        <span class="btn btn-secondary is-soon" role="link" aria-disabled="true" title="App Store listing coming soon">Download on the App Store<span class="soon-tag">Coming soon</span></span>
+      </div>
+      <div class="store-card">
+        <div class="store-name">Google Play</div>
+        <p class="store-plat">Android</p>
+        <span class="btn btn-secondary is-soon" role="link" aria-disabled="true" title="Google Play listing coming soon">Get it on Google Play<span class="soon-tag">Coming soon</span></span>
+      </div>
+    </div>
   </div>
 </section>
 
