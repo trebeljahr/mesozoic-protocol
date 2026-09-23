@@ -210,6 +210,13 @@ export default defineConfig(async ({ command, mode }) => {
   // the Dockerfile. Falls back to "dev" for local builds.
   const buildSha = env.VITE_BUILD_SHA ?? "dev";
   const buildSourcemap = getBuildSourcemap(env.BUILD_SOURCEMAP ?? env.VITE_BUILD_SOURCEMAP);
+  // Compile-time DEMO build target (see src/demo.ts). loadEnv above already
+  // pulls VITE_DEMO from a shell `VITE_DEMO=1 pnpm build` (and .env files), so
+  // define pins it as a literal in client code even though Vite's own VITE_
+  // exposure would also inline it — being explicit keeps the flag's wiring in
+  // one obvious place and guarantees dead-code elimination in the default
+  // build (undefined → "" → the IS_DEMO branch folds away).
+  const demoFlag = env.VITE_DEMO ?? "";
   const buildShaTag = `<meta name="build-sha" content="${buildSha}" />`;
   const plausibleTag = plausibleDomain
     ? `<script>
@@ -268,6 +275,9 @@ export default defineConfig(async ({ command, mode }) => {
     ] as PluginOption[],
     clearScreen: false,
     customLogger: command === "serve" ? quietLogger : undefined,
+    define: {
+      "import.meta.env.VITE_DEMO": JSON.stringify(demoFlag),
+    },
     server: {
       port: DEV_PORT,
       strictPort: true,

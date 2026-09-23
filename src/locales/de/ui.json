@@ -228,6 +228,13 @@
       "libraries": "Drittanbieter-Bibliotheken"
     }
   },
+  "demo": {
+    "wishlist": "Auf die Wunschliste",
+    "resultsTitle": "Das war die Demo",
+    "resultsBody": "Du hast die fünf Waldaußenposten gehalten. Das volle Spiel bringt 25 weitere in fünf Biomen, vier Piloten und einen Endlosmodus.",
+    "teaserTag": "Vollversion",
+    "teaserBody": "{{name}} kommt in der Vollversion zum Einsatz."
+  },
   "endlessPicker": {
     "title": "Endlos",
     "subtitle": "Wähle eine Arena · {{difficulty}} · überlebe ewig",

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { OrthographicCamera as OrthographicCameraImpl } from "three";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
+import { DEMO_MAX_LEVEL, IS_DEMO } from "../demo";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { LEVELS } from "../levels";
 import { getStars, isLevelUnlocked, type ProgressData } from "../progress";
@@ -83,7 +84,9 @@ const findCurrentLevelIndex = (progress: ProgressData): number => {
     const l = LEVELS[i];
     if (isLevelUnlocked(l.id, progress) && getStars(progress, l.id) === 0) return i;
   }
-  return LEVELS.length - 1;
+  // Once every level is cleared, re-center on the last real node. In the demo
+  // that's the last playable outpost (L5), not the locked L30 far up the map.
+  return IS_DEMO ? DEMO_MAX_LEVEL - 1 : LEVELS.length - 1;
 };
 
 type CameraFocus = { zoom: number; targetX: number; targetZ: number };

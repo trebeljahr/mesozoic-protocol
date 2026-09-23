@@ -5,6 +5,7 @@ import { track } from "./analytics";
 import { BIOME_LAYERS, BIOME_TREE_URLS, classifyPropUrl, TARGET_SIZE_BY_ROLE } from "./biomes";
 import { isDebug } from "./debug";
 import { deriveSuggestedDebugLoadout, type PlannerTrace } from "./debugPlannerTrace";
+import { IS_DEMO } from "./demo";
 import { EASTER_EGG_BY_ID, EASTER_EGG_DEFS } from "./easterEggs";
 import { isOnFlowSurface } from "./flowGeometry";
 import { MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "./level";
@@ -1719,6 +1720,10 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   unlockRobot: (variant) => {
+    // Demo build: pilots past George are locked full-game teasers, never
+    // purchasable. The shop UI hides the buy button, but reject here too so no
+    // path can spend the demo player's bolts on locked content.
+    if (IS_DEMO) return;
     const s = get();
     if (s.progress.robotUnlocks[variant]) return;
     const cost = ROBOT_SPECS[variant].unlockBolts;

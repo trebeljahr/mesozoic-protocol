@@ -2,6 +2,7 @@ import type React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
+import { DEMO_MAX_LEVEL, IS_DEMO, STEAM_STORE_URL } from "../demo";
 import { LEVELS } from "../levels";
 import { isLevelUnlocked } from "../progress";
 import { useGame } from "../store";
@@ -56,6 +57,11 @@ export const ResultsScreen = () => {
 
   const stars = result?.stars ?? 0;
   const won = result?.won ?? false;
+  // Demo build: clearing the final playable outpost (L5) is the end of the
+  // slice — swap the missing "next level" path for a Steam wishlist CTA.
+  // Folds away in the full build (IS_DEMO === false).
+  const showDemoCta =
+    IS_DEMO && !!result && !result.endless && result.won && result.levelId === DEMO_MAX_LEVEL;
   useEffect(() => {
     if (!result) return;
     if (cuedResult === result) return;
@@ -167,6 +173,21 @@ export const ResultsScreen = () => {
             </div>
           )}
         </div>
+
+        {showDemoCta && (
+          <div className="bg-[rgba(10,40,60,0.55)] border border-blue/50 rounded-lg px-4 py-3.5 mb-5 text-center">
+            <div className="text-sm font-bold text-cyan mb-1">{t("demo.resultsTitle")}</div>
+            <p className="text-[12px] leading-snug text-fg-muted mb-3">{t("demo.resultsBody")}</p>
+            <a
+              href={STEAM_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-blue text-sm py-2 px-4 no-underline inline-flex"
+            >
+              {t("demo.wishlist")}
+            </a>
+          </div>
+        )}
 
         <div className="flex gap-2.5 justify-center">
           {showNext && (

@@ -228,6 +228,13 @@
       "libraries": "Third-party libraries"
     }
   },
+  "demo": {
+    "wishlist": "加入 Steam 愿望单",
+    "resultsTitle": "试玩到此结束",
+    "resultsBody": "你守住了五个森林前哨。完整版还有 25 个前哨，横跨五种生态、四名机师，以及无尽模式。",
+    "teaserTag": "完整版",
+    "teaserBody": "{{name}} 将在完整版中登场。"
+  },
   "endlessPicker": {
     "title": "Endless",
     "subtitle": "Pick an arena · {{difficulty}} · survive forever",

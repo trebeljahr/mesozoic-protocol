@@ -1,3 +1,4 @@
+import { isLevelBeyondDemo } from "./demo";
 import enModes from "./locales/en/modes.json";
 import { type AllMetaSkills, migrateLegacyMetaSkills } from "./sim/metaSkills";
 import type { AllRobotSkills } from "./sim/robotSkills";
@@ -597,6 +598,11 @@ export const recordEndlessResult = (
 };
 
 export const isLevelUnlocked = (levelId: number, p: ProgressData): boolean => {
+  // Demo build: the campaign stops at the five forest outposts. This single
+  // chokepoint makes levels 6+ unreachable everywhere — world map nodes,
+  // gamepad nav, startLevel, the results "next level" button, the mode picker.
+  // Folds to a no-op in the default build (IS_DEMO === false).
+  if (isLevelBeyondDemo(levelId)) return false;
   if (levelId <= 1) return true;
   return getStars(p, levelId - 1) >= 1;
 };

@@ -228,6 +228,13 @@
       "libraries": "Third-party libraries"
     }
   },
+  "demo": {
+    "wishlist": "Wishlist on Steam",
+    "resultsTitle": "That's the demo",
+    "resultsBody": "You held the five forest outposts. The full game adds 25 more across five biomes, four pilots, and an endless mode.",
+    "teaserTag": "Full game",
+    "teaserBody": "{{name}} deploys in the full game."
+  },
   "endlessPicker": {
     "title": "Endless",
     "subtitle": "Pick an arena · {{difficulty}} · survive forever",

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
 import { isDebug } from "../debug";
+import { DEMO_MAX_LEVEL, IS_DEMO } from "../demo";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { type GamepadInputFrame, snapGamepadDirection, useGamepadInput } from "../input/gamepad";
 import { useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
@@ -105,11 +106,15 @@ export const WorldMapUI = () => {
   const hoveredStars = hovered ? getStars(progress, hovered.id) : 0;
 
   const total = totalStars(progress);
+  // Demo build counts only the five forest outposts so the "OUTPOSTS" and
+  // "TOTAL STARS" chips read against the playable slice, not the full 30-level
+  // campaign. Folds to LEVELS.length in the full build (IS_DEMO === false).
+  const outpostCount = IS_DEMO ? DEMO_MAX_LEVEL : LEVELS.length;
   // Each level caps at 5 stars: 3 normal + 1 breach + 1 containment. The
   // mode-totals are gated behind clearing normal first, so this max is
   // the theoretical ceiling once every level has been three-starred
   // and both challenge modes completed.
-  const maxTotal = LEVELS.length * 5;
+  const maxTotal = outpostCount * 5;
   const completed = LEVELS.filter((l) => getStars(progress, l.id) > 0).length;
   const availableStars = Math.max(0, total - spentMetaStars(progress.metaSkills));
   const bolts = progress.bolts;
@@ -160,7 +165,7 @@ export const WorldMapUI = () => {
     <div className="hud">
       <div className="world-map-stats absolute top-6 left-6 flex flex-col gap-2 pointer-events-none">
         <MetaChip label={t("worldMap.totalStars")} value={total} max={maxTotal} />
-        <MetaChip label={t("worldMap.outposts")} value={completed} max={LEVELS.length} />
+        <MetaChip label={t("worldMap.outposts")} value={completed} max={outpostCount} />
       </div>
 
       <div className="world-map-actions absolute top-6 right-6 pointer-events-none flex items-center gap-1.5">

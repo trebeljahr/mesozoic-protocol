@@ -1,6 +1,7 @@
 import { type FC, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isDebug } from "../debug";
+import { DEMO_TEASER_ROBOT, DEMO_TEASER_ROBOT_BOLTS, IS_DEMO, STEAM_STORE_URL } from "../demo";
 import { robotSkillBoltDelta } from "../sim/robotBolts";
 import {
   levelForXp,
@@ -33,6 +34,12 @@ import { RobotPreview } from "./RobotPreview";
 import { type AbilitySlot, formatAbilityStats } from "./robotAbilityStats";
 
 const ROSTER: RobotVariant[] = ["george", "leela", "mike", "stan"];
+
+// Demo roster: George is playable; Leela shows up as a locked full-game
+// teaser once the player has banked enough bolts to have bought her. Mike and
+// Stan stay out of the demo entirely. Full build always shows the whole ROSTER.
+const demoRoster = (bolts: number): RobotVariant[] =>
+  bolts >= DEMO_TEASER_ROBOT_BOLTS ? ["george", DEMO_TEASER_ROBOT] : ["george"];
 
 const SKILL_ICONS: Record<RobotSkillId, FC<MenuIconProps>> = {
   vitality: IconShield,
@@ -185,12 +192,17 @@ const RosterCard = ({
       <div className="robot-roster-portrait">
         <RobotPreview variant={variant} />
         {active && <span className="robot-roster-active-tag">{t("robotShop.active")}</span>}
-        {!unlocked && (
-          <span className="robot-roster-lock">
-            <BoltPrice amount={spec.unlockBolts} className="robot-roster-lock-cost" />
-            <span className="robot-roster-lock-label">{t("robotShop.locked")}</span>
-          </span>
-        )}
+        {!unlocked &&
+          (IS_DEMO ? (
+            <span className="robot-roster-lock">
+              <span className="robot-roster-lock-label">{t("demo.teaserTag")}</span>
+            </span>
+          ) : (
+            <span className="robot-roster-lock">
+              <BoltPrice amount={spec.unlockBolts} className="robot-roster-lock-cost" />
+              <span className="robot-roster-lock-label">{t("robotShop.locked")}</span>
+            </span>
+          ))}
       </div>
       <div className="robot-roster-meta">
         <div className="robot-roster-name">{spec.label}</div>
@@ -528,6 +540,20 @@ const RobotDetail = ({
                 </button>
               )}
             </>
+          ) : IS_DEMO ? (
+            <div className="border-t border-border-faint pt-3 flex flex-col items-start gap-2">
+              <span className="text-[12px] text-fg-muted">
+                {t("demo.teaserBody", { name: spec.label })}
+              </span>
+              <a
+                href={STEAM_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-blue text-sm py-2 px-4 no-underline"
+              >
+                {t("demo.wishlist")}
+              </a>
+            </div>
           ) : (
             <div className="border-t border-border-faint pt-3 flex items-center gap-3">
               <span className="text-[12px] text-fg-muted">{t("robotShop.unlockCost")}</span>
@@ -602,7 +628,7 @@ export const RobotShop = () => {
           />
         ) : (
           <div className="robot-roster-grid">
-            {ROSTER.map((variant) => (
+            {(IS_DEMO ? demoRoster(availableBolts) : ROSTER).map((variant) => (
               <RosterCard
                 key={variant}
                 variant={variant}

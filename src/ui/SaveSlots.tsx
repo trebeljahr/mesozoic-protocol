@@ -1,6 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { DEMO_MAX_LEVEL, IS_DEMO } from "../demo";
 import { LEVELS } from "../levels";
 import { DIFFICULTY_ACCENT, listSlots, type SlotId, type SlotInfo } from "../progress";
 import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
@@ -33,7 +34,9 @@ export const SaveSlots = () => {
   void revision;
   const slots = listSlots();
 
-  const totalLevels = LEVELS.length;
+  // Demo build counts the playable slice (five forest outposts) so the slot
+  // card's "cleared" tally matches the world map. Full build shows all 30.
+  const totalLevels = IS_DEMO ? DEMO_MAX_LEVEL : LEVELS.length;
 
   const beginDelete = (id: SlotId) => setConfirmDeleteId(id);
 

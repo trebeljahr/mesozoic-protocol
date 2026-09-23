@@ -228,6 +228,13 @@
       "libraries": "Third-party libraries"
     }
   },
+  "demo": {
+    "wishlist": "Adicionar à lista de desejos",
+    "resultsTitle": "Essa é a demo",
+    "resultsBody": "Você defendeu os cinco postos da floresta. O jogo completo traz mais 25 em cinco biomas, quatro pilotos e um modo infinito.",
+    "teaserTag": "Jogo completo",
+    "teaserBody": "{{name}} entra em ação no jogo completo."
+  },
   "endlessPicker": {
     "title": "Endless",
     "subtitle": "Pick an arena · {{difficulty}} · survive forever",
