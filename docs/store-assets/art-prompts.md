@@ -14,11 +14,11 @@ App-icon emblem for the game 'Mesozoic Protocol'. Semi-realistic stylized painte
 ```
 Export: **App Store** 1024×1024 PNG no alpha, flat (no rounded corners), sRGB · **Play** 512×512 PNG with alpha · **Steam** 32×32 + 184×184 PNG.
 
-## 2. LOGOTYPE / WORDMARK → Steam Library Logo (transparent)
+## 2. LOGOTYPE / WORDMARK → Steam Library Logo (chroma-key to transparent)
 ```
-Game logo on a fully transparent background for 'Mesozoic Protocol'. The wordmark 'MESOZOIC PROTOCOL' in bold uppercase, wide letter-spacing, a rugged military/tech stencil typeface, cyan-white lettering with a subtle amber edge glow, and a small scaffolding-bone-and-circuit motif fused into the letterforms. No scene, no background box, transparent alpha, subject centered with even padding. Palette: electric cyan (#5ad6ff) and amber (#ffd66a) on transparent.
+Game logo on a solid, flat, pure magenta background (#FF00FF) for the game 'Mesozoic Protocol'. The wordmark 'MESOZOIC PROTOCOL' in bold uppercase, wide letter-spacing, a rugged military/tech stencil typeface, cyan-white lettering with a subtle amber edge glow, and a small scaffolding-bone-and-circuit motif fused into the letterforms. No scene, no other background elements, the flat magenta filling the entire frame evenly, subject centered with generous even padding. Palette: electric cyan (#5ad6ff) and amber (#ffd66a) lettering on flat magenta (#FF00FF).
 ```
-Export: transparent **PNG** up to **1280×720**.
+Export: generate on flat magenta, then remove the background (sprite-tools or any keyer) → transparent **PNG** up to **1280×720**. Magenta is chosen because it appears nowhere in the cyan/amber logo, so it keys out cleanly.
 
 ## 3. LANDSCAPE HERO → Steam Header 920×430, Main 1232×706, Play Feature 1024×500
 ```
@@ -68,8 +68,8 @@ Export: **3840×1240** (no alpha; leave logo space).
 ## Tips (for "out of the box")
 - Attach the existing key art as a **reference image** every time — keeps mech, dinos, palette on-model.
 - Generate at 2–4× the target and downscale; export the **exact** pixels above (stores reject wrong sizes).
-- **Flatten alpha** for every asset marked "no". Keep alpha only for the Play/Steam icons and the Steam library logo.
-- App Store icon: **no rounded corners, no transparency** — Apple masks it.
+- **Transparency:** generators like Flow can't output alpha. The only asset that truly needs it is the library logo (§2) — render it on flat magenta (#FF00FF) and key it out with sprite-tools. Icons are full-bleed squares, so generate them opaque; the store masks the corners.
+- App Store icon: **no rounded corners, no transparency** — Apple masks it. Play/Steam icons can also be opaque full-bleed.
 - Steam capsules must show the game name and must not bake in review scores, awards, discounts, or "coming soon" text.
 - Screenshots are real gameplay captures (from play.mesozoicprotocol.com); an optional branded frame can reuse the palette + title font.
 
