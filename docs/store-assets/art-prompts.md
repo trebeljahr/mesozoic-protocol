@@ -38,11 +38,12 @@ Compact wide store thumbnail for the game 'Mesozoic Protocol'. Semi-realistic st
 ```
 Export: **462×174**.
 
-## 6. LIBRARY HERO → Steam 3840×1240 (NO title — logo overlays separately)
+## 6. LIBRARY HERO → Steam 3840×1240 (NO title — Steam overlays the logo bottom-left)
+Steam only lets the logo anchor to 4 spots: **left bottom corner · centered top · centered middle · centered bottom**. This prompt reserves the **lower-left** for it.
 ```
-Wide environmental banner key art for the game 'Mesozoic Protocol', with NO title or logo text (a separate logo layer is overlaid later). Ultra-widescreen cinematic composition, semi-realistic stylized painterly style with atmospheric haze and glow. A breached revival-biotech dinosaur facility: a boxy piloted battle mech (olive-green and tan armor, glowing cyan camera-eye, dual cyan arm-cannon beams) and flanking sci-fi gatling turrets offset to one side, a jagged breach in a cracked concrete containment wall, tall glowing toxic-green specimen tanks, a pack of reanimated raptors with glowing eyes and a colossal apatosaur silhouette, an erupting volcano against a smoky red-orange sky, cyan lightning arcing across, orange embers falling. Leave a clean, uncluttered area with negative space where a logo will sit. Palette: deep teal-black (#0b1016), toxic green, electric cyan (#5ad6ff), amber-orange (#ffd66a).
+Wide environmental banner key art for the game 'Mesozoic Protocol', with NO title or logo text (Steam overlays a separate logo layer). Ultra-widescreen cinematic composition, semi-realistic stylized painterly style with atmospheric haze and glow. A breached revival-biotech dinosaur facility: a boxy piloted battle mech (olive-green and tan armor, glowing cyan camera-eye, dual cyan arm-cannon beams) with flanking sci-fi gatling turrets as the focal point in the center-to-right, a jagged breach in a cracked concrete containment wall, tall glowing toxic-green specimen tanks, a pack of reanimated raptors with glowing eyes and a colossal apatosaur silhouette, an erupting volcano against a smoky red-orange sky, cyan lightning arcing across, orange embers falling. Keep the lower-left quarter a calm, darker, uncluttered area (ground shadow, smoke, haze) reserved for the game logo. Keep the main action within the central horizontal band. Palette: deep teal-black (#0b1016), toxic green, electric cyan (#5ad6ff), amber-orange (#ffd66a).
 ```
-Export: **3840×1240** (no alpha; leave logo space).
+Export: generate **16:9** in Flow → crop to **3840×1240** (content stays in the central band). Keep focal art inside the central **860×380** safe zone; logo will sit **bottom-left**.
 
 ---
 
@@ -64,6 +65,22 @@ Export: **3840×1240** (no alpha; leave logo space).
 | App Store | App icon | 1024×1024 | PNG | **no** | §1 (flat, no rounded corners) |
 | App Store | iPhone 6.9″ shots | 1290×2796 | PNG/JPG | no | game capture |
 | App Store | iPad 13″ shots | 2064×2752 | PNG/JPG | no | game capture |
+
+## Google Flow — which ratio to generate (Flow only offers 16:9, 4:3, 1:1, 3:4, 9:16)
+Generate the closest ratio, then crop to the exact px above. For anything wider than 16:9
+(small capsule, library hero), keep all key content + the logo zone in the **central horizontal band** — the top/bottom get cropped away.
+
+| Prompt | Asset | Target px | Generate in Flow | After |
+|---|---|---|---|---|
+| §1 | Icons (App Store / Play / Steam) | 1024² · 512² · 184² · 32² | **1:1** | downscale to each; Apple flat/opaque |
+| §2 | Library logo | ≤1280×720 | **16:9** | on magenta → key out → crop tight |
+| §3 | Steam header | 920×430 | **16:9** | crop sides (2.14:1) |
+| §3 | Steam main | 1232×706 | **16:9** | near-exact, minor crop |
+| §3 | Play feature | 1024×500 | **16:9** | crop top/bottom (2.05:1) |
+| §4 | Steam vertical | 748×896 | **3:4** | slight crop |
+| §4 | Library capsule | 600×900 | **3:4** | crop to 2:3 (narrower) |
+| §5 | Small capsule | 462×174 | **16:9** | crop to wide strip; content in central band |
+| §6 | Library hero | 3840×1240 | **16:9** | crop to wide strip; content + bottom-left logo zone in central band |
 
 ## Tips (for "out of the box")
 - Attach the existing key art as a **reference image** every time — keeps mech, dinos, palette on-model.
