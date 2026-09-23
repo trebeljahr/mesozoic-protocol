@@ -42,7 +42,7 @@ No ads. No microtransactions. Single-player. The full campaign is also free in a
 |---|---|
 | App category | Games → Strategy |
 | Email | press@mesozoicprotocol.com |
-| Privacy Policy | https://mesozoicprotocol.com/privacy *(Play Console still holds the old protocol.trebeljahr.com/privacy — update it)* |
+| Privacy Policy | https://mesozoicprotocol.com/privacy *(confirmed live in Play Console 2026-09-23)* |
 | Website | https://mesozoicprotocol.com |
 | Languages | English, German, Portuguese (Brazil), Simplified Chinese |
 
@@ -50,6 +50,8 @@ No ads. No microtransactions. Single-player. The full campaign is also free in a
 icon-512.png · feature-graphic.jpg (1024×500) · screenshot-1..6.png. Play needs 2+ phone
 screenshots — the six are there.
 
-## Remaining blockers (from listing.md) — YOU
-Signed AAB upload + Play App Signing, Advertising ID declaration, Data safety, content-rating
-certificate, set price ($3.99), fix privacy URL, promote draft → Production.
+## Remaining blockers (verified 2026-09-23) — YOU
+Done: privacy URL (apex), Advertising ID, Data safety, content-rating (IARC), price + merchant account.
+Left: upload store graphics (icon / feature graphic / screenshots — the assets are in this folder), upload
+the first signed AAB (this generates the Play App Signing key) via the UI + accept the 3 acknowledgments,
+then promote the draft → Production and select countries/regions.
