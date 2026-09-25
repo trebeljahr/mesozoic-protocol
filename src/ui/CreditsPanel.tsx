@@ -548,6 +548,16 @@ export const CreditsPanel = () => {
               </ul>
             </section>
           ))}
+          <section className="credits-section credits-legal">
+            <a
+              className="credits-url"
+              href="https://mesozoicprotocol.com/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t("credits.privacy")}
+            </a>
+          </section>
         </div>
       </div>
     </div>

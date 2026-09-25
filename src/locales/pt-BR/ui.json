@@ -216,9 +216,10 @@
     "subtitle": "Assets, libraries, and tools",
     "close": "Close credits",
     "studioName": "Ricos Labs",
-    "aboutBody": "Independent studio building browser games, real-time apps, and the developer tools that hold them up. Extinction Protocol is built by Rico Trebeljahr. See",
+    "aboutBody": "Independent studio building browser games, real-time apps, and the developer tools that hold them up. Mesozoic Protocol is built by Rico Trebeljahr. See",
     "aboutCatalogue": "for the rest of the catalogue.",
     "source": "Source ↗",
+    "privacy": "Privacy Policy ↗",
     "section": {
       "models3d": "3D Models",
       "sprites2d": "2D Sprites",
