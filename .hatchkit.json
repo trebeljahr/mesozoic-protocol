@@ -22,5 +22,9 @@
     "mailingList": "none"
   },
   "publicService": "client",
-  "topology": "single-origin"
+  "topology": "single-origin",
+  "coolifyRuntime": "image",
+  "containerPorts": {
+    "app": 80
+  }
 }
