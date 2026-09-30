@@ -158,6 +158,9 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          # Public certificate metadata identifies which portal certificate
+          # the distribution profile must include; no private key is exported.
+          openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -passin env:CERT_PASSWORD | openssl x509 -noout -enddate -fingerprint -sha256
           keychains=()
           while IFS= read -r path; do
             keychains+=("$path")
@@ -173,6 +176,17 @@ jobs:
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
           echo -n "$PROFILE_B64" | base64 --decode > "$PROFILE_DIR/dist.mobileprovision"
+          security cms -D -i "$PROFILE_DIR/dist.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          python3 <<'PY'
+          import os, plistlib
+          from pathlib import Path
+          profile = plistlib.loads((Path(os.environ['RUNNER_TEMP']) / 'profile.plist').read_bytes())
+          expected = os.environ['APPLE_TEAM_ID'] + '.com.ricoslabs.mesozoicprotocol'
+          if profile['Entitlements'].get('application-identifier') != expected:
+              raise SystemExit('::error::Provisioning profile does not match the Mesozoic Protocol bundle ID and team.')
+          if profile['Name'] != os.environ['APPLE_PROVISIONING_PROFILE_NAME']:
+              raise SystemExit('::error::Provisioning profile name does not match the configured name.')
+          PY
 
       - name: Render ExportOptions.plist
         run: |
