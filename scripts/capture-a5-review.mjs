@@ -176,7 +176,7 @@ try {
     await page.getByRole("button", { name: /build/i }).tap();
     log.mobileButtons = await page.getByRole("button").allTextContents();
     await page.screenshot({ path: out + "-build.png" });
-    await page.getByRole("button", { name: /50gPulse Rifle/ }).tap();
+    await page.getByRole("button", { name: /Pulse Rifle/ }).tap();
     log.mobileSelectedKind = await page.evaluate(() => window.__game.getState().selectedKind);
     await page.screenshot({ path: out + "-placement.png" });
   }
