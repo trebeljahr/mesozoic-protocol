@@ -36,6 +36,25 @@ describe("biome carcasses", () => {
     map.dispose();
   });
 
+  it("mixes stable ash-covered and charred lava bodies without dusting other biomes", () => {
+    const source = new THREE.MeshStandardMaterial();
+    const ashAmount = (biome: keyof typeof CARCASS_PALETTES, seed: number) => {
+      const material = carcassMaterial(source, biome, seed);
+      const shader = { uniforms: {}, vertexShader: "", fragmentShader: "" } as THREE.WebGLProgramParametersWithUniforms;
+      material.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+      material.dispose();
+      return shader.uniforms.remainsAsh.value as number;
+    };
+    const amounts = Array.from({ length: 100 }, (_, seed) => ashAmount("lava", seed));
+    expect(amounts.filter(amount => amount > 0).length).toBeGreaterThan(20);
+    expect(amounts.filter(amount => amount === 0).length).toBeGreaterThan(40);
+    amounts.forEach((amount, seed) => expect(ashAmount("lava", seed)).toBe(amount));
+    for (const biome of ["forest", "snow", "desert", "wasteland", "alien"] as const) {
+      amounts.forEach((_, seed) => expect(ashAmount(biome, seed)).toBe(0));
+    }
+    source.dispose();
+  });
+
   it("anchors growth to the current posed surface and follows its transform", () => {
     const geometry = new THREE.BoxGeometry(2, 1, 1, 4, 1, 3);
     const material = new THREE.MeshStandardMaterial();
@@ -69,7 +88,7 @@ describe("biome carcasses", () => {
     material.dispose();
   });
 
-  it("gives every environment a distinct palette, reserving pale remains for snow", () => {
+  it("gives every environment a distinct palette, reserving pale base colors for snow", () => {
     const snow = new THREE.Color(CARCASS_PALETTES.snow.skin);
     for (const [biome, palette] of Object.entries(CARCASS_PALETTES)) {
       if (biome === "snow") continue;

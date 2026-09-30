@@ -17,7 +17,7 @@ export const CARCASS_PALETTES: Record<
 
 // Clone only the material. Textures and skinned geometry remain loader-owned;
 // no biome treatment can bleed back into living enemies or another carcass.
-export function carcassMaterial(source: THREE.Material, biome: Biome): THREE.Material {
+export function carcassMaterial(source: THREE.Material, biome: Biome, seed = 0): THREE.Material {
   const material = source.clone() as THREE.MeshStandardMaterial;
   const palette = CARCASS_PALETTES[biome];
   if (material.color) material.color.multiply(new THREE.Color(palette.skin));
@@ -30,6 +30,9 @@ export function carcassMaterial(source: THREE.Material, biome: Biome): THREE.Mat
     shader.uniforms.remainsStain = { value: new THREE.Color(palette.stain) };
     shader.uniforms.remainsFrost = { value: biome === "snow" ? 0.55 : 0 };
     shader.uniforms.remainsStrength = { value: palette.strength };
+    // One stable choice for every material on a body; most remain dark and charred.
+    const random = mulberry32(seed);
+    shader.uniforms.remainsAsh = { value: biome === "lava" && random() < 0.4 ? 0.65 + random() * 0.25 : 0 };
     shader.vertexShader = `varying vec3 vRemainsPosition;\n${shader.vertexShader}`.replace(
       "#include <project_vertex>",
       "vRemainsPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;\n#include <project_vertex>",
@@ -37,7 +40,7 @@ export function carcassMaterial(source: THREE.Material, biome: Biome): THREE.Mat
     shader.fragmentShader = `
       varying vec3 vRemainsPosition;
       uniform vec3 remainsStain;
-      uniform float remainsStrength, remainsFrost;
+      uniform float remainsStrength, remainsFrost, remainsAsh;
       float remainsHash(vec3 p) { return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453); }
       float remainsNoise(vec3 p) {
         vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
@@ -53,6 +56,8 @@ export function carcassMaterial(source: THREE.Material, biome: Biome): THREE.Mat
         float patina=remainsNoise(vRemainsPosition*3.2)*0.75+remainsNoise(vRemainsPosition*11.0)*0.25;
         diffuseColor.rgb *= mix(vec3(1.0),remainsStain,smoothstep(0.25,0.7,patina)*remainsStrength);
         diffuseColor.rgb = mix(diffuseColor.rgb,vec3(0.6,0.69,0.72),remainsFrost*smoothstep(0.2,0.65,patina));
+        float ash=remainsNoise(vRemainsPosition*1.8+vec3(17.0))*0.7+patina*0.3;
+        diffuseColor.rgb = mix(diffuseColor.rgb,vec3(0.57,0.54,0.49),remainsAsh*smoothstep(0.28,0.65,ash));
       `,
     );
   };

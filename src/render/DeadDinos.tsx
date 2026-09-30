@@ -168,8 +168,8 @@ export const DeadDinoInstancer = ({
         m.receiveShadow = true;
         m.raycast = noRaycast;
         if (Array.isArray(m.material))
-          m.material = m.material.map((mat) => carcassMaterial(mat, habitat));
-        else m.material = carcassMaterial(m.material, habitat);
+          m.material = m.material.map((mat) => carcassMaterial(mat, habitat, hashString(it.id)));
+        else m.material = carcassMaterial(m.material, habitat, hashString(it.id));
       });
 
       // Blood / goo splats — small dark ground decals around the corpse.
