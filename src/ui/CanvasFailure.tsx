@@ -1,9 +1,9 @@
+import { isModuleLoadFailure } from "./moduleLoadFailure";
+
 type Props = { error: Error; reset: () => void };
 
-// Fallback shown when the 3D canvas fails to mount — usually a transient
-// asset-load (HDR / glTF) failure on first frame. The user gets a hard
-// reload (cleanest path to re-fetch everything) plus a retry that just
-// re-mounts the subtree, in case the failure was a one-off.
+// A subtree retry cannot clear rejected module loaders. Offer a fresh page
+// for import failures, and keep the lighter retry for other render errors.
 export const CanvasFailure = ({ error, reset }: Props) => (
   <div className="overlay" style={{ zIndex: 50 }}>
     <div className="overlay-card">
@@ -16,16 +16,19 @@ export const CanvasFailure = ({ error, reset }: Props) => (
           maxWidth: 360,
         }}
       >
-        The scene didn&rsquo;t mount. This is usually a transient asset-load failure — a fresh load
-        almost always recovers.
+        {isModuleLoadFailure(error)
+          ? "A game module could not load. Reload to request the current files from the server."
+          : "The scene could not start. Try again, or reload if the problem continues."}
       </p>
       <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
         <button type="button" className="btn" onClick={() => window.location.reload()}>
           Reload
         </button>
-        <button type="button" className="btn-ghost btn--sm" onClick={reset}>
-          Try again
-        </button>
+        {!isModuleLoadFailure(error) && (
+          <button type="button" className="btn-ghost btn--sm" onClick={reset}>
+            Try again
+          </button>
+        )}
       </div>
       {import.meta.env.DEV && (
         <pre

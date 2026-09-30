@@ -249,6 +249,9 @@ export default defineConfig(async ({ command, mode }) => {
   };
 
   return {
+    // Worktrees may symlink node_modules to the primary checkout. Keep the
+    // optimizer cache here so another checkout cannot replace live chunks.
+    cacheDir: ".vite",
     plugins: [
       react(),
       tailwindcss(),
