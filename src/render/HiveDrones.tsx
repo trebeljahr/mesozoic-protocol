@@ -21,6 +21,8 @@ const TARGET_SIZE = 0.23;
 const BOB_AMP = 0.08;
 const BOB_SPEED = 2.2;
 const MAX_DRONES = 256;
+const ARC_SEGMENTS = 5;
+const UP = new THREE.Vector3(0, 1, 0);
 
 type Part = { id: string; geom: THREE.BufferGeometry; material: THREE.Material };
 type Source = { parts: Part[]; minY: number; baseScale: number };
@@ -64,6 +66,14 @@ export const HiveDrones = () => {
   );
   const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const arcs = useRef<THREE.InstancedMesh>(null);
+  const sparks = useRef<THREE.InstancedMesh>(null);
+  const arcDummy = useMemo(() => new THREE.Object3D(), []);
+  const points = useMemo(
+    () => Array.from({ length: ARC_SEGMENTS + 1 }, () => new THREE.Vector3()),
+    [],
+  );
+  const direction = useMemo(() => new THREE.Vector3(), []);
 
   useFrame(() => {
     if (!source) return;
@@ -71,6 +81,8 @@ export const HiveDrones = () => {
     const { time } = world;
 
     let count = 0;
+    let arcCount = 0;
+    let sparkCount = 0;
     for (const t of world.towers) {
       if (t.kind !== "hive") continue;
       if (count + t.droneCount > MAX_DRONES) break;
@@ -92,7 +104,57 @@ export const HiveDrones = () => {
           im.setMatrixAt(count, dummy.matrix);
         }
         count++;
+
+        const targetId = t.droneAssignments[d];
+        const target = targetId == null ? undefined : world.towerById.get(targetId);
+        if (!target || target.kind === "hive" || !arcs.current || !sparks.current) continue;
+
+        // Stagger short power pulses; sim time keeps them still when paused.
+        const phase = time * 1.25 + t.id * 0.37 + d * 0.41;
+        const pulse = phase - Math.floor(phase);
+        if (pulse > 0.48) continue;
+        const strength = Math.sin((pulse / 0.48) * Math.PI);
+        const flicker = Math.floor(time * 18);
+        for (let p = 0; p <= ARC_SEGMENTS; p++) {
+          const along = p / ARC_SEGMENTS;
+          const jitter = Math.sin(along * Math.PI) * 0.12;
+          points[p].set(
+            THREE.MathUtils.lerp(pos.x, target.pos.x, along) +
+              Math.sin(flicker * 2.3 + p * 7.1 + d + t.id) * jitter,
+            THREE.MathUtils.lerp(HIVE_ORBIT_HEIGHT + bob, 0.65, along) +
+              Math.cos(flicker * 1.7 + p * 5.3 + d) * jitter,
+            THREE.MathUtils.lerp(-pos.y, -target.pos.y, along) +
+              Math.sin(flicker * 3.1 + p * 4.7 + t.id) * jitter,
+          );
+        }
+        for (let p = 0; p < ARC_SEGMENTS; p++) {
+          direction.subVectors(points[p + 1], points[p]);
+          const length = direction.length();
+          arcDummy.position
+            .copy(points[p])
+            .add(points[p + 1])
+            .multiplyScalar(0.5);
+          arcDummy.quaternion.setFromUnitVectors(UP, direction.normalize());
+          arcDummy.scale.set(0.009 * strength, length, 0.009 * strength);
+          arcDummy.updateMatrix();
+          arcs.current.setMatrixAt(arcCount++, arcDummy.matrix);
+        }
+        // A bright bead travels inward along the bolt, showing energy direction.
+        const travel = (pulse / 0.48) * ARC_SEGMENTS;
+        const segment = Math.min(ARC_SEGMENTS - 1, Math.floor(travel));
+        arcDummy.position.lerpVectors(points[segment], points[segment + 1], travel - segment);
+        arcDummy.scale.setScalar(0.035 * strength);
+        arcDummy.updateMatrix();
+        sparks.current.setMatrixAt(sparkCount++, arcDummy.matrix);
       }
+    }
+    if (arcs.current) {
+      arcs.current.count = arcCount;
+      arcs.current.instanceMatrix.needsUpdate = true;
+    }
+    if (sparks.current) {
+      sparks.current.count = sparkCount;
+      sparks.current.instanceMatrix.needsUpdate = true;
     }
 
     for (const im of partRefs.current) {
@@ -106,6 +168,25 @@ export const HiveDrones = () => {
 
   return (
     <group>
+      <instancedMesh
+        ref={arcs}
+        args={[undefined, undefined, MAX_DRONES * ARC_SEGMENTS]}
+        frustumCulled={false}
+      >
+        <cylinderGeometry args={[1, 1, 1, 4]} />
+        <meshBasicMaterial
+          color="#67e8f9"
+          toneMapped={false}
+          transparent
+          opacity={0.75}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </instancedMesh>
+      <instancedMesh ref={sparks} args={[undefined, undefined, MAX_DRONES]} frustumCulled={false}>
+        <sphereGeometry args={[1, 6, 4]} />
+        <meshBasicMaterial color="#dcffff" toneMapped={false} />
+      </instancedMesh>
       {source.parts.map((part, pi) => (
         <instancedMesh
           key={part.id}
