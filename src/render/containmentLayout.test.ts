@@ -46,10 +46,10 @@ describe("Marsh containment architecture", () => {
     };
     expect(wallClearsRoutes(closedGate, world.paths)).toBe(false);
     expect(
-      wallClearsRoutes(MARSH_WALLS[2], [
+      wallClearsRoutes(MARSH_WALLS[1], [
         [
-          { x: -10, y: 10 },
-          { x: -10, y: 20 },
+          { x: -25, y: 9 },
+          { x: -18, y: 9 },
         ],
       ]),
     ).toBe(false);

@@ -1,0 +1,29 @@
+{
+  "asset": "Brown Mud 03",
+  "provider": "Poly Haven",
+  "page": "https://polyhaven.com/a/brown_mud_03",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "retrieved": "2026-09-30",
+  "resolution": 1024,
+  "files": [
+    {
+      "file": "albedo.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_03/brown_mud_03_diff_1k.jpg",
+      "sha256": "6da4fbd6fc5d21044dcbdbd96e098fb464ed544b42c982e72ce8ccd1d53686c5",
+      "bytes": 526262
+    },
+    {
+      "file": "normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_03/brown_mud_03_nor_gl_1k.jpg",
+      "sha256": "b53758dbc93f1ab3ad2884ca07a217dd90450e6a70d055f34573573668812a2a",
+      "bytes": 1229474
+    },
+    {
+      "file": "roughness.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_03/brown_mud_03_rough_1k.jpg",
+      "sha256": "e1eff4cb387ab1211b473df6c1e3e280e4d18defdcc8b68ca0791bcd9f3c22da",
+      "bytes": 287221
+    }
+  ]
+}

@@ -47,3 +47,8 @@ other biomes implicitly. Validate the complete silhouette against pilot bounds,
 smoothed routes, flow surfaces and HQ clearance. Add route/override checks, then
 inspect fixed-camera gameplay and low quality rendering. Build success alone
 does not establish visual acceptance against the A5 reference.
+
+The level-4 north edge stays open: the long north wall, its detached remnant
+and rubble, and the eastern exterior annex are omitted. The west breach and
+central research tanks remain. This changes scenery only, not simulation
+reservations or saved layouts.

@@ -254,8 +254,6 @@ const BreachDebris = () => (
       [-23.4, -12.1, 1.2, -0.3],
       [-21.7, 12.6, 0.9, 0.4],
       [-22.9, 13.1, 1.3, -0.2],
-      [7.5, 14.4, 1.0, 0.4],
-      [8.8, 15.1, 0.65, -0.6],
     ].map(([x, y, scale, yaw]) => (
       <group key={`${x}:${y}`} position={[x, 0, -y]} rotation={[0, yaw, 0]}>
         <mesh
@@ -313,7 +311,7 @@ export const ContainmentCompound = ({
       ))}
       {walls.length > 0 && <BreachDebris />}
       {outposts
-        .filter((o) => !o.interior)
+        .filter((o) => !o.interior && o.pos.x < 0)
         .map((o) => (
           <ServiceAnnex key={o.id} outpost={o} />
         ))}

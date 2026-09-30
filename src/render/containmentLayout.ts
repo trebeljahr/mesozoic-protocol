@@ -23,14 +23,6 @@ export const MARSH_WALLS: ContainmentWall[] = [
     brokenStart: true,
   },
   { id: "research-west", from: { x: -21.1, y: 4.8 }, to: { x: -21.1, y: 14.4 }, height: 4.2 },
-  { id: "research-north", from: { x: -21.1, y: 14.4 }, to: { x: -7, y: 14.4 }, height: 4.2 },
-  {
-    id: "north-remnant",
-    from: { x: -7, y: 14.4 },
-    to: { x: 6.5, y: 14.4 },
-    height: 3.5,
-    brokenEnd: true,
-  },
   {
     id: "entry-south",
     from: { x: -21.1, y: -15 },

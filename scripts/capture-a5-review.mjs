@@ -32,6 +32,9 @@ try {
     isMobile: mode === "mobile",
   });
   page.on("pageerror", (e) => log.errors.push(e.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") log.errors.push(message.text());
+  });
   await page.addInitScript(
     ({ low }) => {
       localStorage.setItem("mesozoic-protocol:audio:v2", JSON.stringify({ muted: true }));

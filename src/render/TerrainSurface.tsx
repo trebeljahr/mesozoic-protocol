@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { BIOME_STYLE } from "../biomes";
 import { useGame } from "../store";
+import { TerrainSoilMaterial } from "./TerrainSoilMaterial";
 import { buildTerrainSurface } from "./terrainSurfaceGeometry";
 
 export const TerrainSurface = () => {
@@ -30,7 +31,13 @@ export const TerrainSurface = () => {
   if (!geometry) return null;
   return (
     <mesh geometry={geometry} receiveShadow raycast={() => {}}>
-      <meshStandardMaterial vertexColors roughness={0.98} />
+      {level === 4 ? (
+        <Suspense fallback={<meshStandardMaterial color="#625d4e" roughness={0.98} />}>
+          <TerrainSoilMaterial groundColor={BIOME_STYLE[biome].groundColor} />
+        </Suspense>
+      ) : (
+        <meshStandardMaterial vertexColors roughness={0.98} />
+      )}
     </mesh>
   );
 };

@@ -1,0 +1,23 @@
+{
+  "asset": "Dirt",
+  "provider": "Poly Haven",
+  "page": "https://polyhaven.com/a/dirt",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "retrieved": "2026-09-30",
+  "resolution": 1024,
+  "files": [
+    {
+      "file": "albedo.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt/dirt_diff_1k.jpg",
+      "sha256": "6ce6ca7e28ed046f7f93fa60dcb29f8cf42cd5a539adc5676675acccfa34efd3",
+      "bytes": 730425
+    },
+    {
+      "file": "normal.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dirt/dirt_nor_gl_1k.jpg",
+      "sha256": "5a5f97d920fdcdf352b350b95558bf48bb306be1fe61a47418aadc60b7deb0ce",
+      "bytes": 1202783
+    }
+  ]
+}

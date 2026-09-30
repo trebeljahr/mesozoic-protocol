@@ -47,9 +47,8 @@ export function pathDistance(x: number, y: number, paths: Vec2[][]) {
   return Math.sqrt(d);
 }
 
-// A single static draw: flat actor/build surfaces, faceted mineral colour,
-// and a low wet shelf confined to the already unbuildable fluid footprint.
-// No texture download, screen-space pass, animated CPU work or sim edits.
+// Flat actor/build surfaces with continuous material weights. Texture detail
+// supplies small-scale relief without changing navigation or placement height.
 export function buildTerrainSurface(
   paths: Vec2[][],
   rivers: FluidRibbon[],
@@ -59,11 +58,13 @@ export function buildTerrainSurface(
   bankPalette = { wet: "#354a49", gravel: "#696959" },
 ) {
   const positions: number[] = [],
-    colors: number[] = [];
+    colors: number[] = [],
+    uvs: number[] = [],
+    surface: number[] = [];
   const ground = new THREE.Color(groundColor);
-  const rock = new THREE.Color("#48524a"),
-    soil = new THREE.Color("#706b5a");
-  const road = new THREE.Color("#998668"),
+  const rock = new THREE.Color("#b4b9b4"),
+    soil = new THREE.Color("#c8c2b2");
+  const road = new THREE.Color("#d5c8ae"),
     wet = new THREE.Color(bankPalette.wet);
   const gravel = new THREE.Color(bankPalette.gravel);
   const step = showcase ? 0.55 : 0.4;
@@ -98,27 +99,29 @@ export function buildTerrainSurface(
       triangle(mids, detail + 1);
       return;
     }
-    const patch = Math.sin(cx * 0.42 + Math.sin(cy * 0.51) * 1.7) * Math.cos(cy * 0.29 - cx * 0.18);
-    const grain = hash(cx, cy);
     for (const id of ids) {
       const [x, y] = vertices[id];
+      // Shared vertices must have the same colour across every triangle.
+      const patch = Math.sin(x * 0.22 + Math.sin(y * 0.19) * 1.7) * Math.cos(y * 0.21 - x * 0.12);
+      let lane = 0;
       const pd = pathDistance(x, y, paths);
       const fd = fluidDistance(x, y, rivers, lakes);
       const edge = Math.min(halfX - Math.abs(x), halfY - Math.abs(y));
       color.copy(ground);
       if (showcase) {
-        color.copy(rock).lerp(soil, smooth(-0.6, 0.65, patch));
+        color.copy(rock).lerp(soil, 0.4 + patch * 0.18);
         // Full legal lane stays readable; broad, irregular shoulders break
         // the visual road border without narrowing its gameplay footprint.
         const shoulder = 0.8 + 0.4 * Math.sin(x * 1.8 + y * 1.1) + 0.3 * patch;
-        const lane = 1 - smooth(PATH_WIDTH * 0.38, PATH_WIDTH * 0.5 + shoulder, pd);
-        color.lerp(road, lane * (0.88 + grain * 0.12));
+        lane = 1 - smooth(PATH_WIDTH * 0.38, PATH_WIDTH * 0.5 + shoulder, pd);
+        color.lerp(road, lane * 0.8);
       }
       const bankBand = 1 - smooth(0.15, 1.1 + patch * 0.3, fd);
       if (pd > PATH_WIDTH * 0.5 + 0.1) color.lerp(gravel, bankBand * 0.65);
       if (fd < 0.32 && pd > PATH_WIDTH * 0.5) color.lerp(wet, 1 - smooth(-0.1, 0.32, fd));
-      color.multiplyScalar(0.96 + grain * 0.08);
-      if (showcase) color.lerp(ground, 1 - smooth(0, 7, edge));
+
+      // Fade the textured surface into the surrounding untextured ground.
+      const edgeBlend = showcase ? smooth(0, 7, edge) : 0;
       // Shelf only intrudes into water by centimetres. All dry land remains
       // at y=.003, so towers and props cannot float on decorative elevation.
       const shelfWidth = 0.17 + 0.11 * (0.5 + 0.5 * Math.sin(x * 4.2 + Math.sin(y * 3.1)));
@@ -128,6 +131,8 @@ export function buildTerrainSurface(
           : 0;
       positions.push(x, 0.003 + shelf, -y);
       colors.push(color.r, color.g, color.b);
+      uvs.push(x / 3, y / 3);
+      surface.push(lane, (1 - smooth(-0.1, 1.0, fd)) * (1 - lane), edgeBlend);
     }
   };
   for (let j = 0; j < ny; j++)
@@ -142,6 +147,8 @@ export function buildTerrainSurface(
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("terrainSurface", new THREE.Float32BufferAttribute(surface, 3));
   geometry.computeVertexNormals();
   return geometry;
 }
