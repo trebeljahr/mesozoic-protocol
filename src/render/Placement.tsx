@@ -328,6 +328,10 @@ export const Placement = () => {
       return;
     }
 
+    // Entity taps are handled by their click handler. Do not run a ground
+    // action on touch-up first (which can clear selection or issue a move).
+    if (e.intersections[0]?.object !== e.object) return;
+
     const pos = eventPoint(e);
     suppressClickUntilRef.current = Date.now() + TOUCH_CLICK_SUPPRESS_MS;
 
@@ -488,6 +492,7 @@ export const Placement = () => {
           three.js exposes click/hover on 3D geometry. */}
       <mesh
         geometry={geom}
+        userData={{ placementPlane: true }}
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.001, 0]}
         onPointerDown={onPointerDown}

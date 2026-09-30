@@ -1,9 +1,11 @@
 import { useGLTF } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useEditor } from "../editor/editorStore";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
+import { towerHitId } from "./interactionPriority";
 import { findPulseMuzzle, pulseMuzzles } from "./pulseMuzzles";
 import { type AtlasSwatch, computeTowerTints, TOWER_FINISH, tierKey } from "./towerTints";
 
@@ -259,6 +261,7 @@ export const ModelTowerMesh = ({
       let item = itemsRef.current.get(t.id);
       if (!item) {
         item = scene.clone(true);
+        item.userData.towerId = t.id;
         item.scale.setScalar(normalizedScale);
         // Per-instance material clones — the GLTF cache hands every
         // tower the same material reference by default, so tinting one
@@ -328,7 +331,18 @@ export const ModelTowerMesh = ({
     }
   });
 
-  return <group ref={groupRef} />;
+  const onClick = (event: ThreeEvent<MouseEvent>) => {
+    if (useEditor.getState().active) return;
+    const state = useGame.getState();
+    const id = towerHitId(event.object);
+    const tower = id === undefined ? undefined : state.world.towerById.get(id);
+    if (!tower) return;
+    event.stopPropagation();
+    state.tryPlaceOrSelect(tower.pos);
+  };
+
+  // biome-ignore lint/a11y/noStaticElementInteractions: r3f model selection
+  return <group ref={groupRef} onClick={onClick} />;
 };
 
 useGLTF.preload("/models/tower_pulse.glb");

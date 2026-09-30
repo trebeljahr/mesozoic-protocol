@@ -16,6 +16,7 @@ import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
 import { ComposerBufferCleanup } from "./render/ComposerBufferCleanup";
 import { ExpectedCanvasTeardown } from "./render/ExpectedCanvasTeardown";
 import { PaintedPostFx } from "./render/PaintedPostFx";
+import { playEvents } from "./render/playEvents";
 import { PlayScene } from "./render/Scene";
 import { useGame } from "./store";
 import { AchievementToast } from "./ui/AchievementToast";
@@ -267,6 +268,7 @@ export const App = () => {
               toDataURL for press screenshots; costs a buffer copy per frame,
               so keep it out of normal play. Dead-codes out of prod builds. */}
           <Canvas
+            events={playEvents}
             shadows
             dpr={dprCap}
             gl={{
