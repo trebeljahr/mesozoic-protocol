@@ -57,12 +57,12 @@ export const TerrainSoilMaterial = ({
       roughness: 1,
     });
     const palette = TERRAIN_PALETTE[biome];
+    const forest = biome === "forest";
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uMineralTint = { value: new THREE.Color(palette.mineral) };
       shader.uniforms.uRoadTint = { value: new THREE.Color(palette.road) };
       shader.uniforms.uCoverTint = { value: new THREE.Color(palette.cover) };
       shader.uniforms.uCoverAmount = { value: palette.coverAmount };
-      shader.uniforms.uForest = { value: biome === "forest" ? 1 : 0 };
       shader.uniforms.uRoadMap = { value: textures[2] };
       shader.uniforms.uRoadNormal = { value: textures[6] ?? null };
       shader.uniforms.uLeafMap = { value: textures[3] };
@@ -83,7 +83,7 @@ export const TerrainSoilMaterial = ({
           varying vec3 vTerrainSurface;
           uniform vec3 uTerrainEdgeColor;
           uniform vec3 uMineralTint, uRoadTint, uCoverTint;
-          uniform float uCoverAmount, uForest;
+          uniform float uCoverAmount;
           uniform sampler2D uRoadMap, uRoadNormal, uLeafMap, uGrassMap, uLeafNormal, uGrassNormal;
           vec2 surfaceHash(vec2 p) {
             return fract(sin(vec2(dot(p, vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)))) * 43758.5453);
@@ -137,26 +137,27 @@ export const TerrainSoilMaterial = ({
           `
           vec2 world = vMapUv * 3.0;
           float habitat = habitatNoise(world*0.085) * 0.72 + habitatNoise(world*0.23+17.0)*0.28;
+          #ifdef TERRAIN_FOREST
           float grassWeight = smoothstep(0.12,0.88,habitat) * (1.0-vTerrainSurface.y) * 0.65;
           float leafWeight = (1.0-grassWeight) * (1.0-vTerrainSurface.y) * 0.58;
+          #endif
           vec3 soil = untiled(map,vMapUv).rgb * 1.7;
+          vec3 roadTex = untiled(uRoadMap,vMapUv*1.2).rgb;
+          #ifdef TERRAIN_FOREST
           vec3 leaves = untiled(uLeafMap,vMapUv*1.3).rgb * 1.2;
           // Suppress broad sandy stripes in each rotated patch before blending.
           vec3 grass = stochastic(uGrassMap,vMapUv*1.55,false,true).rgb;
-          vec3 roadTex = untiled(uRoadMap,vMapUv*1.2).rgb;
           vec3 road = mix(roadTex*3.4,vec3(0.38,0.285,0.17),0.38);
           vec3 surface = mix(soil,leaves,leafWeight);
           surface = mix(surface,grass,grassWeight);
-          if (uForest < 0.5) {
+          #else
             float grain = dot(soil,vec3(0.2126,0.7152,0.0722));
             float fineGrain = dot(roadTex,vec3(0.2126,0.7152,0.0722));
-            surface = uMineralTint * (0.72 + grain*0.85);
+            vec3 surface = uMineralTint * (0.72 + grain*0.85);
             surface = mix(surface,uCoverTint*(0.82+fineGrain*1.1),
               smoothstep(0.22,0.78,habitat)*uCoverAmount*(1.0-vTerrainSurface.y));
-            road = uRoadTint * (0.5 + fineGrain*5.0);
-            leafWeight = 0.0;
-            grassWeight = 0.0;
-          }
+            vec3 road = uRoadTint * (0.5 + fineGrain*5.0);
+          #endif
           surface = mix(surface,road,vTerrainSurface.x);
           diffuseColor *= vec4(surface,1.0);
         `,
@@ -188,16 +189,22 @@ export const TerrainSoilMaterial = ({
             .replace(
               "mapN.xy *= normalScale;",
               `vec3 roadNormal = untiledNormal(uRoadNormal, vNormalMapUv*1.2).xyz * 2.0 - 1.0;
+             #ifdef TERRAIN_FOREST
              vec3 leafNormal = untiledNormal(uLeafNormal, vNormalMapUv*1.3).xyz*2.0-1.0;
              vec3 grassNormal = untiledNormal(uGrassNormal, vNormalMapUv*1.55).xyz*2.0-1.0;
              mapN = mix(mapN,leafNormal,leafWeight);
              mapN = mix(mapN,grassNormal,grassWeight);
+             #endif
              mapN = normalize(mix(mapN, roadNormal, vTerrainSurface.x));
              mapN.xy *= normalScale * mix(1.0, 0.65, vTerrainSurface.x) * vTerrainSurface.z;`,
             ),
         );
     };
-    mat.customProgramCacheKey = () => "terrain-stochastic-biomes-v2";
+    // Specialize before compilation: nonforest surfaces never use leaf/grass
+    // samples. Keep derivative-bearing samples outside runtime branches.
+    if (forest) mat.defines = { TERRAIN_FOREST: 1 };
+    mat.customProgramCacheKey = () =>
+      `terrain-stochastic-biomes-v3-${forest ? "forest" : "mineral"}`;
     return { mat, textures };
   }, [sources, gl, groundColor, biome]);
   useEffect(
