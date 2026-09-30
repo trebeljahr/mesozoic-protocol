@@ -674,6 +674,7 @@ export type Beam = {
 };
 
 export type Explosion = {
+  damageType?: DamageType;
   id: EntityId;
   pos: Vec2;
   radius: number;

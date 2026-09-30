@@ -2538,8 +2538,10 @@ export const createExplosion = (
   pos: Vec2,
   radius: number,
   lifeSec = 0.35,
+  damageType: DamageType = "explosive",
 ): Explosion => {
   const e: Explosion = {
+    damageType,
     id: world.nextEntityId++,
     pos: { x: pos.x, y: pos.y },
     radius,
@@ -2551,7 +2553,9 @@ export const createExplosion = (
   // ~3 wisps while a mortar gets a fat plume. Capped to keep the puff
   // pool from blowing out on overlapping splashes.
   const puffCount = Math.min(10, Math.max(3, Math.round(radius * 2.2)));
-  spawnExplosionSmoke(world, pos, radius, puffCount);
+  if (damageType === "flame" || damageType === "explosive") {
+    spawnExplosionSmoke(world, pos, radius, puffCount);
+  }
   return e;
 };
 

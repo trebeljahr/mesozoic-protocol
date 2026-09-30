@@ -130,6 +130,27 @@ export const CombatBillows = ({ kind }: { kind: "blast" | "vapor" }) => {
       return item;
     };
     if (kind === "blast") {
+      // Draw the actual gameplay front, with bounded atlas lobes instead of
+      // another full-radius explosion each time Mike emits a ring.
+      const payload = world.robot.payload;
+      if (payload?.kind === "flameRings") {
+        const segments = low ? 12 : 20;
+        for (const ring of payload.rings) {
+          const age = ring.radius / payload.maxRadius;
+          for (let j = 0; j < segments && sorted.length < capacity / 2; j++) {
+            const b = take();
+            const angle = (j / segments) * Math.PI * 2;
+            b.x = world.robot.pos.x + Math.cos(angle) * ring.radius;
+            b.z = -world.robot.pos.y + Math.sin(angle) * ring.radius;
+            b.y = 0.45;
+            b.size = 0.45 + ring.radius * 0.12;
+            b.angle = Math.sin(j * 2.4) * 0.25;
+            b.frame = (world.time * 18 + j * 3.7) % 16;
+            b.alpha = Math.min(1, age * 12) * (1 - THREE.MathUtils.smoothstep(age, 0.65, 1)) * 0.8;
+            b.tint.setRGB(1.2, 0.9, 0.65);
+          }
+        }
+      }
       const lobes = low ? 2 : 3;
       // Prefer recent explosions under overload; there is no persistent
       // per-explosion renderer state to leak when a level resets.
@@ -139,9 +160,10 @@ export const CombatBillows = ({ kind }: { kind: "blast" | "vapor" }) => {
         i++
       ) {
         const e = world.explosions[i];
+        if (e.damageType && e.damageType !== "flame" && e.damageType !== "explosive") continue;
         const age = THREE.MathUtils.clamp(1 - (e.expiresAt - world.time) / e.maxLife, 0, 1);
         if (age >= 1) continue;
-        for (let j = 0; j < lobes; j++) {
+        for (let j = 0; j < lobes && sorted.length < capacity; j++) {
           const b = take();
           const s = seed(e.id + j * 31);
           const angle = s * Math.PI * 2;
@@ -162,7 +184,7 @@ export const CombatBillows = ({ kind }: { kind: "blast" | "vapor" }) => {
       // Reserve space for cold mist so explosions cannot erase the freeze cue.
       const smokeBudget = Math.min(
         world.puffs.length,
-        world.cryoWaves.length ? Math.floor(capacity * 0.6) : capacity,
+        world.cryoWaves.length || world.explosions.length ? Math.floor(capacity * 0.6) : capacity,
       );
       const step = world.puffs.length / Math.max(1, smokeBudget);
       for (let i = 0; i < smokeBudget; i++) {
@@ -179,6 +201,26 @@ export const CombatBillows = ({ kind }: { kind: "blast" | "vapor" }) => {
         b.alpha =
           p.alpha0 * Math.min(1, age / 0.16) * (1 - THREE.MathUtils.smoothstep(age, 0.35, 1));
         b.tint.set(p.tint);
+      }
+      // Nonthermal robot pulses use cool vapor / impact dust, without soot
+      // or orange emission. Same shared depth fade and existing draw call.
+      for (const e of world.explosions) {
+        if (!e.damageType || e.damageType === "flame" || e.damageType === "explosive") continue;
+        const age = THREE.MathUtils.clamp(1 - (e.expiresAt - world.time) / e.maxLife, 0, 1);
+        if (age >= 1) continue;
+        const wisps = low ? 8 : 12;
+        for (let j = 0; j < wisps && sorted.length < capacity; j++) {
+          const b = take();
+          const angle = (j / wisps) * Math.PI * 2;
+          b.x = e.pos.x + Math.cos(angle) * e.radius * age;
+          b.z = -e.pos.y + Math.sin(angle) * e.radius * age;
+          b.y = 0.25 + age * 0.3;
+          b.size = 0.3 + e.radius * 0.16;
+          b.angle = angle;
+          b.frame = (j * 3.7 + age * 12) % 16;
+          b.alpha = Math.sin(age * Math.PI) * 0.4;
+          b.tint.set(e.damageType === "kinetic" ? "#b9aa91" : "#9beaff");
+        }
       }
       const wisps = low ? 5 : 9;
       for (const w of world.cryoWaves) {

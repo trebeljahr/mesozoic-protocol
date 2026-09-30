@@ -587,8 +587,8 @@ const tickPayload = (
       p.rings.push({ radius: 0, hitIds: new Set<EntityId>() });
       p.ringsRemaining -= 1;
       p.nextRingAt = p.ringsRemaining > 0 ? world.time + p.ringInterval : Number.POSITIVE_INFINITY;
-      createExplosion(world, robot.pos, p.maxRadius, 0.55);
-      spawnParticles(world, robot.pos, 18, "#ff8a3a", [3, 7], 0.4);
+      createExplosion(world, robot.pos, Math.min(1.8, p.maxRadius), 0.55, "flame");
+      spawnParticles(world, robot.pos, 12, "#ff8a3a", [2, 4], 0.55, undefined, undefined, "flame");
       addShake(world, 0.25, 3);
     }
     // Advance each active ring outward and damage any enemy newly
@@ -607,7 +607,7 @@ const tickPayload = (
           fromRobot: true,
         });
         e.flashUntil = world.time + 0.12;
-        spawnParticles(world, e.pos, 8, "#ff8a3a", [3, 7], 0.35);
+        spawnParticles(world, e.pos, 5, "#ff8a3a", [1, 3], 0.55, undefined, undefined, "flame");
         if (p.burn) {
           applyRobotBurn(world, e, p.burn.duration, p.burn.totalDamage);
         }
@@ -1101,10 +1101,20 @@ export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boole
       }
       if (points.length > 1) createBeam(world, points, "#7ee0ff", 0.18);
     }
-    createExplosion(world, robot.pos, spec.radius, 0.45);
+    createExplosion(world, robot.pos, spec.radius, 0.45, spec.damageType);
     // Burst particles now key off variant tint instead of a hard-coded
     // orange — an electric burst no longer reads as flame.
-    spawnParticles(world, robot.pos, 24, variant.tint, [3, 7], 0.5);
+    spawnParticles(
+      world,
+      robot.pos,
+      24,
+      variant.tint,
+      [3, 7],
+      0.5,
+      undefined,
+      undefined,
+      spec.damageType === "flame" ? "flame" : undefined,
+    );
     spawnParticles(world, robot.pos, 14, variant.tint, [4, 9], 0.4);
     addShake(world, 0.4, 5);
     emit(world, { type: "impact", pos: robot.pos });
@@ -1157,7 +1167,7 @@ export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boole
       burn: spec.burn,
       rings: [],
     };
-    spawnParticles(world, robot.pos, 22, "#ff8a3a", [3, 7], 0.45);
+    spawnParticles(world, robot.pos, 14, "#ff8a3a", [2, 4], 0.55, undefined, undefined, "flame");
     addShake(world, 0.35, 4);
     emit(world, { type: "robot-ability", kind: "flameRings", pos: robot.pos });
     return true;
