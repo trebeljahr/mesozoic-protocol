@@ -100,15 +100,15 @@ void main() {
     (vec2(vWorldPos.x, -vWorldPos.z) - uFieldBounds.xy) / uFieldBounds.zw).rgb;
   vec2 current = mix(vFlow, field.gb * 2.0 - 1.0, uHasField);
   float bankDistance = mix(shapeDistance, field.r * 1.2, uHasField);
-  // Quiet pools wash back and forth perpendicular to their actual bank.
+  // Quiet pools carry wave crests perpendicular to their actual bank.
+  // Keep the water coverage and depth fixed while these surface details move.
   // Fade this motion out where a river brings a directional current.
   float pool = uIsJoint * (1.0 - smoothstep(0.03, 0.25, length(current)))
     * (1.0 - uMolten);
   float lapPhase = uTime * 1.65 + noised(vWorldPos.xz * 0.32).x * 2.0;
   float retreat = pool * (0.5 + 0.5 * sin(lapPhase)) * 0.13;
-  float washDistance = bankDistance - retreat;
-  float depth = smoothstep(0.02, 0.52, washDistance);
-  float shore = 1.0 - smoothstep(0.02, 0.30, washDistance);
+  float depth = smoothstep(0.02, 0.52, bankDistance);
+  float shore = 1.0 - smoothstep(0.02, 0.30, bankDistance);
 
   // Two overlapping, bounded advection phases prevent stretching at bends
   // after long play sessions. Never rotate the absolute world coordinates
@@ -173,8 +173,8 @@ void main() {
     foamPatch = noised(vWorldPos.xz*1.7-uTime*velocity*0.18).x;
   }
   float foamWidth = 0.12 + foamNoise*0.32 + foamSway;
-  float foamBand = (1.0-smoothstep(0.03,foamWidth,washDistance));
-  // A narrow crest advances toward the bank, then draws back with the wash.
+  float foamBand = (1.0-smoothstep(0.03,foamWidth,bankDistance));
+  // A narrow crest moves over the surface without pulling back the shoreline.
   float swash = pool * (1.0 - smoothstep(0.025, 0.075,
     abs(bankDistance - retreat - 0.055)));
   float shoreRipple = pool * (1.0 - smoothstep(0.15, 0.65, bankDistance))
@@ -214,7 +214,7 @@ void main() {
   // Keep the mesh silhouette at miter corners, where the sampled capsule
   // field is conservative. The union distance fills interior join edges.
   float silhouette = mix(max(bankDistance, shapeDistance), bankDistance, pool * uHasField);
-  float alpha = smoothstep(0.0, max(0.07, aa), silhouette - retreat);
+  float alpha = smoothstep(0.0, max(0.07, aa), silhouette);
 
   gl_FragColor = vec4(col, alpha);
   #include <fog_fragment>
