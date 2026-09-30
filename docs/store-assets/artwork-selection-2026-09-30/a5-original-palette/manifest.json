@@ -1,0 +1,87 @@
+{
+  "date": "2026-09-30",
+  "status": "A5_original_A_palette_review_ready",
+  "supersedes": "../a4-steam/manifest.json",
+  "feedback": "User rejected A4 palette and explicitly requested colors closer to version A.",
+  "colorReference": "../originals/a-containment-breach.jpg",
+  "layoutReferences": [
+    "../a4-steam/landscape-master.png",
+    "../a4-steam/portrait-master.png",
+    "../a4-steam/hero-master.png"
+  ],
+  "generationTool": "ChatGPT built-in image_gen",
+  "generationRequests": 3,
+  "prompts": "prompts.json",
+  "files": [
+    {
+      "file": "landscape-master.png",
+      "dimensions": "1678x937",
+      "sha256": "304a1a2ce4cb5be9965ea68856d4447bcf94ae08bcd1082ccc194dcefefc808b"
+    },
+    {
+      "file": "portrait-master.png",
+      "dimensions": "1024x1536",
+      "sha256": "7d51b63835a0f1db650ed8675aa06c25af14b2389b4dab7a64a63cffd40fd5f2"
+    },
+    {
+      "file": "hero-master.png",
+      "dimensions": "2170x725",
+      "sha256": "3ba1f98269ffaf38bf93e30271f2a2e1210401fcd42296545d8228e6ec2ddcda"
+    },
+    {
+      "file": "exports/header-capsule.png",
+      "dimensions": "920x430",
+      "sha256": "cd92e70fb96581b7189148cd3af5f6c4516e817912338134611f2c45cc46f680"
+    },
+    {
+      "file": "exports/library-capsule.png",
+      "dimensions": "600x900",
+      "sha256": "c332a54e3cdb9ed470aba01bcb8db33f37c339cf952843ad10e950c2f4bd3b84"
+    },
+    {
+      "file": "exports/library-header.png",
+      "dimensions": "920x430",
+      "sha256": "cd92e70fb96581b7189148cd3af5f6c4516e817912338134611f2c45cc46f680"
+    },
+    {
+      "file": "exports/library-hero.png",
+      "dimensions": "3840x1240",
+      "sha256": "2280ceb696308cd9b0d794dc3729e1e3e620f7b0683310f6a3f14ed32611b7cf"
+    },
+    {
+      "file": "exports/library-logo.png",
+      "dimensions": "1280x441",
+      "sha256": "4545670c93508ab881eb1084e279c3ce81e237afe6a3669582f1f35c8a00901b"
+    },
+    {
+      "file": "exports/main-capsule.png",
+      "dimensions": "1232x706",
+      "sha256": "2c7dc159b88b64f7443c4473642e45e50d5cdcf0eb4096b7bc6eae5b77889fa4"
+    },
+    {
+      "file": "exports/small-capsule.png",
+      "dimensions": "462x174",
+      "sha256": "9075a1aad54a8cac2b4ae167b0a7e62024959af34a2f902ee3d9511a9313ad7e"
+    },
+    {
+      "file": "exports/vertical-capsule.png",
+      "dimensions": "748x896",
+      "sha256": "e20b47cc70acf33a597daa72ae7caf3d47b6b5298eb03c5f346a50ae4bf09f0d"
+    }
+  ],
+  "logo": {
+    "font": "Rajdhani Bold",
+    "colors": ["#e7e1cf", "#bfe4df"],
+    "outline": "#0d1f20",
+    "background": "transparent"
+  },
+  "hero": {
+    "recommendedLogoPosition": "left bottom corner",
+    "alternate": "centered top",
+    "avoid": ["centered middle", "centered bottom"],
+    "exportUpscaled": true,
+    "verification": "Official Valve template overlay and local narrow-window/position proofs; live Steam preview not performed"
+  },
+  "handoff": "/Users/rico/projects/ai-work-notes/projects/mesozoic-protocol/mesozoic-protocol-a5-steam-artwork-handoff.md",
+  "scope": "Marketing artwork only; game code, storefronts and disclosures unchanged"
+}
