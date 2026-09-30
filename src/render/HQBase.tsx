@@ -6,25 +6,17 @@ import type { Vec2 } from "../sim/types";
 import { distToSegmentSq } from "../sim/vec2";
 import { TOWER_FOOTPRINT } from "../sim/world";
 import { useGame } from "../store";
+import { CommandBase } from "./CommandBase";
 import {
   DEAD_DINO_SPECS,
   DeadDinoInstancer,
   type DeadDinoItem,
   deadDinoCollisionRadius,
 } from "./DeadDinos";
-import { OutpostClusters } from "./OutpostClusters";
-import { HQ_COMMAND_TEMPLATE, KIT_SCALE, type PlacedOutpost } from "./outpostKit";
 
-// The player's HQ reads as a small modular colony: a KayKit command base
-// (HQ_COMMAND_TEMPLATE) sits behind the turret on each HQ pad, ringed by a
-// procedural perimeter fence + corner lights, with the occasional dead-dino
-// carcass strewn outside the fence. Render-only — none of it blocks tower
-// placement.
-
-// Cluster scale so the command base fits the 6.7×5.0 pad. Its clearance
-// radius gates dead-dino carcasses so they never overlap the buildings.
-const HQ_CLUSTER_SCALE = 0.9;
-const HQ_CLUSTER_RADIUS = HQ_COMMAND_TEMPLATE.footprint * KIT_SCALE * HQ_CLUSTER_SCALE;
+// The command building sits behind the functional defence turret. Perimeter
+// fixtures and corpse rejection retain the existing HQ reservation.
+const HQ_CLUSTER_RADIUS = 3.6;
 
 type PrimitiveDef = {
   kind: "fence" | "light";
@@ -322,8 +314,7 @@ export const HQBase = () => {
   const towerVersion = useGame((s) => s.ui.towerVersion);
   const towers = useGame.getState().world.towers;
 
-  const { clusters, primitives } = useMemo(() => {
-    const clusterList: PlacedOutpost[] = [];
+  const { primitives } = useMemo(() => {
     const primitiveList: PrimitiveInstance[] = [];
 
     for (const path of paths) {
@@ -339,16 +330,6 @@ export const HQBase = () => {
       const rightY = -faceX;
       const yaw = Math.atan2(dx, -dy);
 
-      // Command base on the pad. The cluster yaw maps the template's local
-      // +dz axis onto the approach direction (faceVec) and +dx onto the
-      // right vector, so all structures sit behind/around the turret.
-      clusterList.push({
-        template: HQ_COMMAND_TEMPLATE,
-        pos: { x: last.x, y: last.y },
-        yaw: Math.atan2(-faceX, faceY),
-        scale: HQ_CLUSTER_SCALE,
-      });
-
       for (const def of BASE_PRIMITIVES) {
         const wx = last.x + def.right * rightX + def.fwd * faceX;
         const wy = last.y + def.right * rightY + def.fwd * faceY;
@@ -361,7 +342,7 @@ export const HQBase = () => {
         });
       }
     }
-    return { clusters: clusterList, primitives: primitiveList };
+    return { primitives: primitiveList };
   }, [paths]);
 
   // Only the perimeter fence/lights cull around towers + the path; the
@@ -543,7 +524,7 @@ export const HQBase = () => {
   return (
     <>
       <BasePrimitives items={visiblePrimitives} />
-      <OutpostClusters clusters={clusters} />
+      <CommandBase paths={paths} />
       {corpseGroups.map(([url, items]) => (
         <DeadDinoInstancer key={url} url={url} items={items} />
       ))}

@@ -281,7 +281,7 @@ const FOREST_LAYERS: BiomeLayerSpec = [
   },
   {
     seed: 9001,
-    urls: ["/models/nature/Bush1.glb", "/models/nature/Bush2.glb", "/models/nature/Bush3.glb"],
+    urls: ["/models/natural/Bush1.glb", "/models/natural/Bush2.glb", "/models/natural/Bush3.glb"],
     // These read as build-slot blockers from above, so route them through
     // the clear/remove flow instead of leaving them as untouchable decor.
     // Bushes are a *blocking obstacle* in every biome that has them (forest,
@@ -300,7 +300,9 @@ const FOREST_LAYERS: BiomeLayerSpec = [
   {
     seed: 4242,
     urls: ["/models/nature/Rock1.glb", "/models/nature/Rock2.glb", "/models/nature/Rock3.glb"],
-    count: 16,
+    // Retain the layer slot for authored references; natural forest rock clusters
+    // are removed from generation and therefore leave no invisible blockers.
+    count: 0,
     clearance: PATH_WIDTH / 2 + 0.9,
     minScale: 0.55,
     maxScale: 1.2,
@@ -875,12 +877,10 @@ export const BIOME_LAYERS: Record<Biome, BiomeLayer[]> = {
 // Clearable trees per biome (exactly 4 variants for compatibility with Tree.variant 0..3).
 export const BIOME_TREE_URLS: Record<Biome, string[]> = {
   forest: [
-    "/models/nature/Tree1.glb",
-    "/models/nature/Tree2.glb",
-    // Tree3 was the 'shiny cluster of polyhedra' variant that reads as
-    // broken — swapped for another Tree1 so the slot still has 4 entries.
-    "/models/nature/Tree1.glb",
-    "/models/nature/Tree2.glb",
+    "/models/natural/Tree1.glb",
+    "/models/natural/Tree2.glb",
+    "/models/natural/Tree3.glb",
+    "/models/natural/Tree4.glb",
   ],
   desert: [
     "/models/biomes/desert/Tree1.glb",

@@ -346,7 +346,7 @@ const buildRocks = (
   const masses = composeEnvironment(paths, biome, field);
   for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
     const spec = layers[layerIndex];
-    if (!spec.blocks) continue;
+    if (!spec.blocks || spec.count <= 0) continue;
     const seedBase = spec.seed + levelId * 1013 + layerIndex * 97;
 
     const baseFootprint = blockingFootprint(spec);

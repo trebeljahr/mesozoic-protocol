@@ -251,6 +251,8 @@ const VariantGroup = ({ bucket, source }: { bucket: Tree[]; source: VariantSourc
       }
       im.count = bucket.length;
       im.instanceMatrix.needsUpdate = true;
+      // Instance bounds must follow the populated matrices for raycasting.
+      im.computeBoundingSphere();
     }
   }, [bucket, source]);
 
@@ -320,6 +322,8 @@ const TreeHitTargets = ({
     }
     im.count = trees.length;
     im.instanceMatrix.needsUpdate = true;
+    // Instance bounds must follow the populated matrices for raycasting.
+    im.computeBoundingSphere();
   }, [trees, sources]);
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {

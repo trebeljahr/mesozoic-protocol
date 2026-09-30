@@ -11,6 +11,14 @@ import { createWorld, TREE_CLEARANCE_MARGIN, TREE_FOOTPRINT, TREE_MIN_SPACING } 
 const levels = [1, 4, 5, 8, 10, 11, 13, 15, 18, 20, 23, 25, 28, 30];
 
 describe("composed playable scenery", () => {
+  it("does not leave an obstacle from a disabled forest stone layer", () => {
+    const w = createWorld(getLevel(4));
+    expect(w.rocks.length).toBeGreaterThan(0); // Clearable shrubs remain.
+    expect(w.rocks.every((r) => BIOME_LAYERS[w.biome][r.layerIndex].count > 0)).toBe(true);
+    expect(
+      w.rocks.some((r) => BIOME_LAYERS[w.biome][r.layerIndex].urls.some((url) => /Rock/.test(url))),
+    ).toBe(false);
+  });
   it.each(levels)("preserves lane, water, HQ and compound clearances in level %i", (id) => {
     const w = createWorld(getLevel(id));
     const flow = hasFlowFeatures(w.biome) ? buildFlowFeatures(w.paths, id, w.biome) : null;

@@ -61,6 +61,8 @@ const RockGroup = ({
       }
       im.count = rocks.length;
       im.instanceMatrix.needsUpdate = true;
+      // Instance bounds must follow the populated matrices for raycasting.
+      im.computeBoundingSphere();
     }
   }, [rocks, source, baseScale]);
 
@@ -276,6 +278,8 @@ const RockHitTargets = ({
     }
     im.count = rocks.length;
     im.instanceMatrix.needsUpdate = true;
+    // Instance bounds must follow the populated matrices for raycasting.
+    im.computeBoundingSphere();
   }, [rocks, biome]);
 
   const onClick = (e: ThreeEvent<MouseEvent>) => {

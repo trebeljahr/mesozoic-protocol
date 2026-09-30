@@ -52,3 +52,17 @@ The level-4 north edge stays open: the long north wall, its detached remnant
 and rubble, and the eastern exterior annex are omitted. The west breach and
 central research tanks remain. This changes scenery only, not simulation
 reservations or saved layouts.
+
+## Command base
+
+`CommandBase` replaces the assorted HQ kit cluster with one command block,
+recessed doorway, shaded observation windows, roof ventilation, solar array and
+communications mast. Local +Z faces the route endpoint. The 5.8×4.6 apron stays
+inside the 4.5-unit HQ reservation. The defence turret, aiming, loss animation
+and base upgrades remain driven by `HQTurret`; the command building is scenery.
+
+Natural forest trees and shrubs use the generated meshes documented in
+`public/models/natural/README.md`. The instanced renderers refresh bounding
+spheres after matrix changes, including invisible hit discs, so selection tracks
+loaded and removed props. Forest stone generation is disabled, with no hidden
+obstacle left by the sampling fallback. Other biomes retain their prop sets.

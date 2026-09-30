@@ -127,7 +127,7 @@ export function buildTerrainSurface(
       const shelfWidth = 0.17 + 0.11 * (0.5 + 0.5 * Math.sin(x * 4.2 + Math.sin(y * 3.1)));
       const shelf =
         fd < 0 && fd > -shelfWidth && pd > PATH_WIDTH * 0.5 + 0.35
-          ? Math.sin((-fd / shelfWidth) * Math.PI) * 0.026
+          ? Math.sin((-fd / shelfWidth) * Math.PI) * 0.006
           : 0;
       positions.push(x, 0.003 + shelf, -y);
       colors.push(color.r, color.g, color.b);

@@ -142,8 +142,14 @@ void main() {
   float ripple = smoothstep(0.35, 0.9, detail.z) * smoothstep(0.45, 0.70, detail.x);
   wet = mix(wet, uColorFoam, (ripple * 0.04 + crest * (0.018 + wake * 0.045)) * depth * (1.0 - toxic * 0.65));
   wet += uEmissiveTint * toxic * smoothstep(0.52, 0.76, height) * 0.16 * depth;
-  // Contact is a dark wet shelf, never a permanent white outline.
-  wet *= 1.0 - shore * 0.12;
+  // Broken, advecting foam gathers at the union shoreline, not ribbon joins.
+  float foamNoise = noised(vWorldPos.xz*5.2 - velocity*uTime*0.6).x;
+  float foamFine = noised(vWorldPos.xz*18.0 + velocity*uTime*0.3).x;
+  float foamWidth = 0.12 + foamNoise*0.32;
+  float foamBand = (1.0-smoothstep(0.03,foamWidth,bankDistance));
+  float bubbles = smoothstep(0.32,0.66,foamNoise*0.65+foamFine*0.35);
+  float foam = foamBand*(0.08+bubbles*0.92) * smoothstep(0.24,0.52,noised(vWorldPos.xz*1.7-uTime*velocity*0.18).x);
+  wet = mix(wet,uColorFoam,foam*0.88*(1.0-uMolten)*(1.0-toxic*0.6));
   edge = 1.0 - depth;
 
   // -------- molten treatment (lava) --------

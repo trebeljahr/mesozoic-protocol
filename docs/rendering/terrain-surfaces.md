@@ -11,16 +11,18 @@ only shoreline strips. `BiomeGround` is the separate world-map renderer.
   Never add interior rings where those shapes overlap.
 - Keep dry terrain at y=0.003. Shelf relief is confined inside existing fluid
   bounds and excluded from the lane plus bridge-approach margin. It peaks below
-  0.03. Do not add actor-height changes without updating the simulation.
+  0.01, below the water/foam surface. Do not add actor-height changes without updating the simulation.
 - Use a coarse jittered triangle lattice, refining only shore triangles twice.
   Colour, UVs, blend weights and height depend only on position, keeping shared
   vertices continuous.
   Palette comes from the biome for banks. The full A5 soil treatment is currently
   level-4-only and is not an all-biome art-direction switch.
 - The mesh is non-interactive, receives shadows, uses no post-processing passes, and disposes on
-  replacement/unmount. Level 4 blends locally bundled photographic mud and
-  compacted dirt with world-scaled UVs, wet-bank roughness and tangent normals.
-  Low quality retains colour/roughness but skips both normal maps. Source images
+  replacement/unmount. Level 4 blends locally bundled photographic mud, compacted dirt, grass and leaf litter with world-scaled UVs, wet-bank roughness and tangent normals.
+  World cells blend independent texture offsets with explicit UV gradients to avoid
+  mip seams. Broad habitat noise separates grassy areas from leaf-covered soil;
+  lane and union-shore weights preserve tracks and wet banks.
+  Low quality retains colour/roughness but skips all four terrain normal maps. Source images
   are CC0 from Poly Haven; per-asset `source.json` files under
   `public/textures/terrain/` record URLs and SHA-256 hashes.
 - Editor overrides skip this layer because authored rivers use spline sampling;
@@ -38,3 +40,7 @@ BASE_URL=http://127.0.0.1:PORT node scripts/capture-terrain-review.mjs /tmp/lava
 The script uses a fresh browser context, default camera, campaign seed 0,
 1440×1000 viewport, and no combat. It closes its browser even on failure.
 These captures are development evidence, not approved store media.
+
+Water foam uses the union shore distance and two animated noise scales. Broken
+patches gather near banks; lake/river joins have no interior foam outlines. Lava
+retains its crust treatment.
