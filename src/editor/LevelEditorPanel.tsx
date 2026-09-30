@@ -1,7 +1,7 @@
 import { useGame } from "../store";
 import { downloadJson } from "./download";
 import { EditorPanel, type FooterButton } from "./EditorPanel";
-import { clearAllLevels, exportAllLevelsJson, useEditor } from "./editorStore";
+import { clearAllLevels, exportAllLevelsJson, resetCurrentLevel, useEditor } from "./editorStore";
 
 // Dev-only level-editor side panel. Thin wrapper over the shared EditorPanel —
 // supplies the level-editor store, per-level title, and the level-editor's
@@ -63,6 +63,19 @@ export const LevelEditorPanel = () => {
   };
 
   const clearButtons: FooterButton[] = [
+    {
+      label: "Reset level",
+      title: `Discard all editor changes on L${levelId} and restore its original generated layout.`,
+      onClick: () => {
+        if (
+          window.confirm(
+            `Reset L${levelId} to its original generated layout? This discards this level's saved edits and undo history and restarts the level. Other levels are unchanged.`,
+          )
+        ) {
+          resetCurrentLevel();
+        }
+      },
+    },
     {
       label: "Re-roll procedural",
       title: `Pick a new procedural seed and regenerate procedural set-dressing on L${levelId} (hand-placed props preserved). Undoable.`,

@@ -11,8 +11,13 @@ import {
   type ProceduralItem,
   propRadius,
 } from "./editorCore";
-import { clearAllLevelHistories, loadLevelHistory, saveLevelHistory } from "./historyPersist";
-import { clearAllLevelEdits, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
+import {
+  clearAllLevelHistories,
+  clearLevelHistory,
+  loadLevelHistory,
+  saveLevelHistory,
+} from "./historyPersist";
+import { clearAllLevelEdits, clearLevelEdit, readAllLevelEdits, saveLevelEdit } from "./levelEdits";
 
 // Half-extents of the level's editable area — fed to the editor's river
 // tool so endpoints snap to the perimeter the player actually plays on.
@@ -303,6 +308,37 @@ if (import.meta.env.DEV) {
     useEditor.setState({ history: loadLevelHistory(id) });
   });
 }
+
+// Restore the generated baseline, including its original seed and erased scenery.
+// Drop history and pending tools so stale edits cannot be reapplied after reset.
+export const resetCurrentLevel = (): void => {
+  const levelId = useGame.getState().world.levelId;
+  clearLevelEdit(levelId);
+  clearLevelHistory(levelId);
+  const initial = useEditor.getInitialState();
+  useEditor.setState((s) => ({
+    history: { past: [], future: [] },
+    selectedIds: new Set<string>(),
+    selectedId: null,
+    moving: false,
+    placingUrl: null,
+    placingStampId: null,
+    brush: { ...s.brush, active: false, eraser: false },
+    riverTool: { ...initial.riverTool },
+    lakeTool: { ...initial.lakeTool },
+    easterEggTool: { ...initial.easterEggTool },
+    marqueeTool: { ...initial.marqueeTool },
+    strokeAnchor: null,
+    strokeOpen: false,
+    strokePushed: false,
+    rotateStrokeOpen: false,
+    rotateStrokePushed: false,
+    version: s.version + 1,
+  }));
+  reloadLevel();
+  const g = useGame.getState();
+  if (useEditor.getState().active && g.world.status === "running") g.togglePause();
+};
 
 // Wipe every authored level layout in one shot. Bypasses the per-level
 // history (the undo stack only spans one level's edits anyway) and rebuilds
