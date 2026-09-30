@@ -133,6 +133,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build ${{ steps.updater.outputs.args }}
 
+      # Tauri restores the unsigned Cargo executable after packaging installers.
+      # Sign the final standalone artifact used by the portable/Steam upload.
+      - name: Sign final portable executable
+        shell: pwsh
+        run: ./scripts/ci/sign-windows.ps1 -Path src-tauri/target/release/mesozoic-protocol.exe
+
       - name: Verify app and installer signatures and publisher
         shell: pwsh
         run: ./scripts/ci/verify-windows-signatures.ps1

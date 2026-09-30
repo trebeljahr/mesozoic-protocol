@@ -9,7 +9,7 @@ $nsis = @(Get-ChildItem "$release/bundle/nsis/*-setup.exe")
 if ($msi.Count -eq 0 -or $nsis.Count -eq 0) { throw 'Both MSI and NSIS installers are required' }
 $files = @((Get-Item -LiteralPath $app)) + $msi + $nsis
 $evidence = foreach ($file in $files) {
-    & $signtool verify /pa /all /v /tw $file.FullName
+    & $signtool verify /pa /all /v /tw $file.FullName | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "Signature verification failed: $file" }
     $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
     if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode status: $file" }
