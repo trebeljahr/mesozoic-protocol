@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { BIOME_STYLE, type Biome, biomeForPos } from "../biomes";
+import { type Biome, biomeForPos } from "../biomes";
 import { LEVELS } from "../levels";
+import { TERRAIN_PALETTE } from "./terrainPalette";
+import { WorldMapSoilMaterial } from "./WorldMapSoilMaterial";
 
 // Soft falloff width in world units — how quickly one level node's biome
 // bleeds into neighbors. Larger = more blended; smaller = sharper biome patches.
-const FALLOFF = 9;
+const FALLOFF = 5;
 
 // Half-width of the edge fade — points within this distance of the plane
 // boundary smoothly blend toward the fallback sky color so the rectangular
@@ -29,7 +31,7 @@ const BAND_BOUNDARIES: { upper: number; biome: Biome }[] = [
 // fallback color blends between adjacent biomes instead of stepping —
 // otherwise the discrete biomeForPos thresholds show as horizontal stripes
 // in the empty (no-level) corners of the map.
-const BAND_BLEND = 6;
+const BAND_BLEND = 2.5;
 
 // Constant baseline weight added to the IDW totals so even a vertex with
 // effectively-zero level contributions still blends smoothly toward the
@@ -53,10 +55,8 @@ const hash01 = (x: number, y: number) => {
 
 // The world map is WORLD_W x WORLD_H centred at (0,0) in xy sim coords.
 // Render plane lies on the xz plane (y-up), so sim.y maps to world -z.
-// Default segments bumped from 160 → 280 so each band-blend zone covers
-// several vertices instead of ~1 — the eye reads the underlying mesh
-// triangulation as visible banding when there's only one sample per
-// transition zone.
+// Vertices are concentrated around the playable area; the distant skirt
+// keeps the existing edge fade without consuming the central detail budget.
 export const BiomeGround = ({
   width,
   height,
@@ -73,13 +73,29 @@ export const BiomeGround = ({
     geom.rotateX(-Math.PI / 2);
 
     const pos = geom.attributes.position;
+    const uv = geom.attributes.uv;
+    // Spend the mesh budget on the playable atlas, not its distant edge fade.
+    const atlasAxis = (value: number, extent: number) => {
+      const t = Math.abs(value) / (extent / 2);
+      const core = Math.min(58, extent * 0.4);
+      return (
+        Math.sign(value) *
+        (t < 0.85 ? (t / 0.85) * core : core + ((t - 0.85) / 0.15) ** 2 * (extent / 2 - core))
+      );
+    };
+    for (let i = 0; i < pos.count; i++) {
+      const x = atlasAxis(pos.getX(i), width);
+      const z = atlasAxis(pos.getZ(i), height);
+      pos.setXYZ(i, x, 0, z);
+      uv.setXY(i, x / 4, z / 4);
+    }
     const colors = new Float32Array(pos.count * 3);
     const acc = new THREE.Color();
 
     const nodes = LEVELS.map((l) => ({
       x: l.nodePos.x,
       y: l.nodePos.y,
-      color: new THREE.Color(BIOME_STYLE[biomeForPos(l.nodePos)].groundColor),
+      color: new THREE.Color(TERRAIN_PALETTE[biomeForPos(l.nodePos)].cover),
     }));
 
     const halfW = width / 2;
@@ -91,9 +107,7 @@ export const BiomeGround = ({
 
     // Pre-resolve each band's ground color once — referenced inside the
     // hot per-vertex loop below.
-    const bandColors = BAND_BOUNDARIES.map(
-      (b) => new THREE.Color(BIOME_STYLE[b.biome].groundColor),
-    );
+    const bandColors = BAND_BOUNDARIES.map((b) => new THREE.Color(TERRAIN_PALETTE[b.biome].cover));
     const fallback = new THREE.Color();
     const fallbackNext = new THREE.Color();
 
@@ -140,7 +154,11 @@ export const BiomeGround = ({
       // contribution to the IDW. Eliminates the hard discontinuity at the
       // edge of every level node's gaussian (where the previous code
       // snapped from "single-level IDW result" to "band fallback").
-      computeSmoothBand(sy, fallback);
+      const habitatY =
+        sy +
+        Math.sin(wx * 0.19 + Math.sin(sy * 0.3)) * 1.7 +
+        Math.sin(wx * 0.43 - sy * 0.21) * 0.65;
+      computeSmoothBand(habitatY, fallback);
 
       let totalW = BASE_FALLBACK_WEIGHT;
       acc.setRGB(
@@ -198,7 +216,7 @@ export const BiomeGround = ({
 
   return (
     <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial vertexColors roughness={0.95} metalness={0} />
+      <WorldMapSoilMaterial />
     </mesh>
   );
 };

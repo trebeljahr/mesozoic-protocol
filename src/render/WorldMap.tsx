@@ -251,14 +251,14 @@ export const WorldMapScene = () => {
       <Environment
         files="/hdri/rooitou_park_1k.hdr"
         background={false}
-        environmentIntensity={0.6}
+        environmentIntensity={0.25}
       />
 
-      <ambientLight intensity={0.55} color="#eaf2ff" />
+      <ambientLight intensity={0.2} color="#eaf2ff" />
       <directionalLight
         position={[14, 26, 10]}
-        intensity={2.2}
-        color="#fff4dc"
+        intensity={2.8}
+        color="#ffe8cf"
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
@@ -268,7 +268,7 @@ export const WorldMapScene = () => {
         shadow-camera-bottom={-CONTENT_H}
         shadow-bias={-0.0005}
       />
-      <hemisphereLight args={[HEMI_TOP, HEMI_BOTTOM, 0.85]} />
+      <hemisphereLight args={[HEMI_TOP, HEMI_BOTTOM, 0.5]} />
 
       <BiomeGround width={GROUND_W} height={GROUND_H} />
       <BiomeProps />

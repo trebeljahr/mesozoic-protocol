@@ -115,16 +115,16 @@ export const LevelNode = ({ level }: Props) => {
   // Hover bumps the dome. Locked levels still get a smaller bump so the
   // user gets feedback that the cursor is on the node (cursor also flips
   // to not-allowed). Unplayed levels still pulse underneath the bump.
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const g = groupRef.current;
     if (!g) return;
     const hoverBoost = hovered ? (unlocked ? 1.18 : 1.08) : 1.0;
     if (unplayed) {
       const t = state.clock.elapsedTime;
       const pulse = 1 + Math.sin(t * 3.2) * 0.08;
-      g.scale.setScalar(pulse * hoverBoost);
+      g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, pulse * hoverBoost, 12, delta));
     } else {
-      g.scale.setScalar(hoverBoost);
+      g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, hoverBoost, 12, delta));
     }
   });
 
@@ -184,11 +184,9 @@ export const LevelNode = ({ level }: Props) => {
         <mesh position={[0, 0.5, 0]} castShadow>
           <cylinderGeometry args={[0.9, 1.1, 0.6, 24]} />
           <meshStandardMaterial
-            color={baseColor}
-            emissive={emissive}
-            emissiveIntensity={emissiveIntensity + (hovered && unlocked ? 0.5 : 0)}
-            roughness={0.45}
-            metalness={0.25}
+            color={unlocked ? "#596165" : "#42494b"}
+            roughness={0.72}
+            metalness={0.35}
           />
         </mesh>
         <mesh position={[0, 0.85, 0]} castShadow>
