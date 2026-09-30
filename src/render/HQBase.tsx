@@ -562,7 +562,7 @@ export const HQBase = () => {
       <BasePrimitives items={visiblePrimitives} />
       <CommandBase paths={paths} biome={biome} seed={levelId} />
       {corpseGroups.map(([url, items]) => (
-        <DeadDinoInstancer key={url} url={url} items={items} />
+        <DeadDinoInstancer key={url} url={url} items={items} biome={biome} />
       ))}
     </>
   );

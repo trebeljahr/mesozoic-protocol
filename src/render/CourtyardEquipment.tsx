@@ -131,6 +131,7 @@ export function CourtyardEquipment({ biome, seed }: { biome: Biome; seed: number
           <DeadDinoInstancer
             url={layout === "recovery" ? "/models/Parasaurolophus.glb" : "/models/Velociraptor.glb"}
             items={corpses}
+            biome={biome}
             decorative
           />
         </group>

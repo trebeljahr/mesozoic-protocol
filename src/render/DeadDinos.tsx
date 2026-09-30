@@ -3,8 +3,10 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { Fragment, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import type { Biome } from "../biomes";
 import { mulberry32 } from "../sim/random";
 import { findClip } from "./animUtils";
+import { CARCASS_PALETTES, carcassMaterial, createCarcassCrystals } from "./carcassAppearance";
 import { disposeModelInstance } from "./disposeModelInstance";
 import { measureVisibleBox } from "./measureModel";
 
@@ -54,32 +56,6 @@ const stopCorpseSelection = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
   if ("preventDefault" in e.nativeEvent) e.nativeEvent.preventDefault();
 };
 
-// Pale-grey corpse multiplier. GLB materials usually have white base color
-// modulating a texture; copying this color into the cloned material drains
-// the texture toward a desaturated undertone — the visual cue for "dead
-// and drained" instead of "alive". Emissives are wiped so glowing skin
-// patches (alien dino variants) go dark on death.
-const DEATH_TINT = new THREE.Color(0.56, 0.53, 0.5);
-
-const tintCorpseMaterial = (mat: THREE.Material): THREE.Material => {
-  const cloned = mat.clone();
-  const corpse = cloned as THREE.MeshStandardMaterial;
-  if (corpse.color) corpse.color.copy(DEATH_TINT);
-  if (corpse.emissive) {
-    corpse.emissive.setRGB(0, 0, 0);
-    corpse.emissiveIntensity = 0;
-  }
-  if ("metalness" in corpse) corpse.metalness = 0;
-  if ("roughness" in corpse) corpse.roughness = 1;
-  if ("toneMapped" in corpse) corpse.toneMapped = true;
-  return cloned;
-};
-
-// Splat color palette: muted blood reds plus a couple of biome goo greens.
-// Kept dark and low-saturation so a splat reads as "stain on ground"
-// instead of "bright sticker".
-const SPLAT_COLORS = ["#3a0808", "#4a0c0c", "#2b0606", "#1d3a18", "#23381a"];
-
 type Splat = {
   x: number;
   z: number;
@@ -92,6 +68,7 @@ type Corpse = {
   id: string;
   obj: THREE.Object3D;
   splats: Splat[];
+  crystals: THREE.Mesh | null;
   blockerPos: THREE.Vector3;
   blockerRadius: number;
 };
@@ -109,10 +86,12 @@ export const DeadDinoInstancer = ({
   url,
   items,
   decorative = false,
+  biome,
 }: {
   url: string;
   items: DeadDinoItem[];
   decorative?: boolean;
+  biome: Biome | ((item: DeadDinoItem) => Biome);
 }) => {
   const gltf = useGLTF(url);
   const footprint = DEAD_DINO_FOOTPRINT[url] ?? 2.0;
@@ -142,6 +121,7 @@ export const DeadDinoInstancer = ({
   // render.
   const clones = useMemo<Corpse[]>(() => {
     return items.map((it) => {
+      const habitat = typeof biome === "function" ? biome(it) : biome;
       const obj = cloneSkinned(gltf.scene);
       // Bake the Death-clip end pose. All shipped dino GLBs include
       // a "Death" clip; fall back to substrings (`Die`, `Dead`) for
@@ -187,8 +167,9 @@ export const DeadDinoInstancer = ({
         m.castShadow = true;
         m.receiveShadow = true;
         m.raycast = noRaycast;
-        if (Array.isArray(m.material)) m.material = m.material.map(tintCorpseMaterial);
-        else m.material = tintCorpseMaterial(m.material);
+        if (Array.isArray(m.material))
+          m.material = m.material.map((mat) => carcassMaterial(mat, habitat));
+        else m.material = carcassMaterial(m.material, habitat);
       });
 
       // Blood / goo splats — small dark ground decals around the corpse.
@@ -196,6 +177,7 @@ export const DeadDinoInstancer = ({
       // doesn't read as a wall of red. Deterministic per corpse id so the
       // splats survive HMR and React re-renders.
       const rng = mulberry32(hashString(it.id));
+      const splatColors = CARCASS_PALETTES[habitat].splats;
       const splats: Splat[] = [];
       if (rng() < 0.65) {
         const count = 1 + Math.floor(rng() * 3);
@@ -204,12 +186,12 @@ export const DeadDinoInstancer = ({
           const angle = rng() * Math.PI * 2;
           const off = corpseHalf * (0.2 + rng() * 0.55);
           const radius = corpseHalf * (0.22 + rng() * 0.28);
-          const colorIdx = Math.floor(rng() * SPLAT_COLORS.length);
+          const colorIdx = Math.floor(rng() * splatColors.length);
           splats.push({
             x: it.pos.x + Math.cos(angle) * off,
             z: it.pos.z + Math.sin(angle) * off,
             radius,
-            color: SPLAT_COLORS[colorIdx],
+            color: splatColors[colorIdx],
             opacity: 0.5 + rng() * 0.25,
           });
         }
@@ -218,15 +200,25 @@ export const DeadDinoInstancer = ({
         id: it.id,
         obj,
         splats,
+        crystals:
+          habitat === "alien"
+            ? createCarcassCrystals(obj, footprint * it.scale, hashString(it.id))
+            : null,
         blockerPos: it.pos,
         blockerRadius: deadDinoCollisionRadius(url, it.scale),
       };
     });
-  }, [gltf.scene, gltf.animations, items, footprint, url]);
+  }, [gltf.scene, gltf.animations, items, footprint, url, biome]);
 
   useEffect(
     () => () => {
-      for (const corpse of clones) disposeModelInstance(corpse.obj, gltf.scene);
+      for (const corpse of clones) {
+        disposeModelInstance(corpse.obj, gltf.scene);
+        if (corpse.crystals) {
+          corpse.crystals.geometry.dispose();
+          for (const material of [corpse.crystals.material].flat()) material.dispose();
+        }
+      }
     },
     [clones, gltf.scene],
   );
@@ -236,6 +228,7 @@ export const DeadDinoInstancer = ({
       {clones.map((c) => (
         <Fragment key={c.id}>
           <primitive object={c.obj} />
+          {c.crystals && <primitive object={c.crystals} />}
           {!decorative && (
             // biome-ignore lint/a11y/noStaticElementInteractions: invisible r3f hit shield blocks corpse click-through
             <mesh

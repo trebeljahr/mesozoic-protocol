@@ -3,14 +3,17 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { useGame } from "../store";
-import { DeadDinoInstancer, isDeadDinoUrl } from "./DeadDinos";
+import { DeadDinoInstancer, type DeadDinoItem, isDeadDinoUrl } from "./DeadDinos";
 import { collectMeshSource } from "./meshSource";
 import { SceneryBatches } from "./SceneryBatches";
+import { mapBiome } from "./worldMapLandscape";
 import { mapPropTargetSize, type PropInstance, propPlan } from "./worldMapPropPlan";
 
 // Renders the world map's generated set-dressing. The layout itself lives
 // in worldMapPropPlan.ts; this module instances it, and in DEV applies the
 // world-map editor's suppress / erase mask on top.
+
+const corpseBiome = (item: DeadDinoItem) => mapBiome(item.pos.x, -item.pos.z);
 
 const noRaycast: THREE.Mesh["raycast"] = () => {};
 
@@ -109,7 +112,7 @@ const BiomePropsView = ({
     <>
       {entries.map(([url, items]) =>
         isDeadDinoUrl(url) ? (
-          <DeadDinoInstancer key={url} url={url} items={items} />
+          <DeadDinoInstancer key={url} url={url} items={items} biome={corpseBiome} decorative />
         ) : (
           <PropInstancer key={url} url={url} items={items} />
         ),
