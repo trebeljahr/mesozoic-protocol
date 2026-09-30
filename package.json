@@ -68,20 +68,29 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "playwright": "^1.60.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.2.4",
     "three-stdlib": "^2.36.1",
     "tsx": "^4.22.3",
     "typescript": "^5.6.2",
-    "vite": "^5.4.8",
-    "vitest": "^3.2.7"
+    "vite": "^6.4.3",
+    "vitest": "^4.1.11"
   },
   "pnpm": {
     "overrides": {
       "postprocessing": "~6.37.8",
       "fflate@0.8": "0.8.3",
       "fflate@0.6": "0.6.11",
-      "xcode>uuid": "11.1.1"
+      "xcode>uuid": "11.1.1",
+      "@babel/core@7": "7.29.6",
+      "brace-expansion@5": "5.0.12",
+      "tar@7": "7.5.21",
+      "postcss@8": "8.5.28",
+      "browserslist@4": "4.28.7",
+      "baseline-browser-mapping@2": "2.11.0",
+      "@xmldom/xmldom": "0.9.12",
+      "esbuild@0.27": "0.28.1",
+      "esbuild@0.28": "0.28.1"
     }
   },
   "lint-staged": {
