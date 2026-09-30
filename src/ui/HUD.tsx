@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditor } from "../editor/editorStore";
 import { getLevelOrdinal } from "../levels";
@@ -28,14 +28,6 @@ const KINDS: TowerKind[] = ["pulse", "chain", "flame", "hive", "mortar", "cryo"]
 // "1" is reserved for robot select — towers shift up by one so the row
 // reads "1 = robot, 2..7 = towers" left-to-right.
 const ROBOT_HOTKEY = "1";
-const HOTKEYS: Record<TowerKind, string> = {
-  pulse: "2",
-  chain: "3",
-  flame: "4",
-  hive: "5",
-  mortar: "6",
-  cryo: "7",
-};
 
 export const HUD = () => {
   const { t } = useTranslation();
@@ -68,6 +60,14 @@ export const HUD = () => {
   const runMode = useGame((s) => s.world.mode);
   const forbidden = useGame((s) => s.world.forbiddenTowers);
   const lockedLoadout = useGame((s) => s.world.lockedLoadout);
+  // Number only visible towers, keeping labels and keyboard selection in sync.
+  const buildOptions = useMemo(
+    () =>
+      KINDS.filter(
+        (kind) => !forbidden.has(kind) && (lockedLoadout === null || lockedLoadout.includes(kind)),
+      ).map((kind, index) => ({ kind, hotkey: String(index + 2) })),
+    [forbidden, lockedLoadout],
+  );
 
   // Endless drives the name off the snapshot (selectedLevelId is null on
   // endless runs so getLevel is never called with an arena id). Campaign
@@ -238,12 +238,12 @@ export const HUD = () => {
         s.selectRobotUnit(!s.world.robot.selected);
         return;
       }
-      const kind = (Object.keys(HOTKEYS) as TowerKind[]).find((k) => HOTKEYS[k] === digit);
+      const kind = buildOptions.find((option) => option.hotkey === digit)?.kind;
       if (kind) setSelectedKind(selectedKind === kind ? null : kind);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePause, setSelectedKind, selectedKind, callWaveEarly]);
+  }, [togglePause, setSelectedKind, selectedKind, callWaveEarly, buildOptions]);
 
   return (
     <div className="hud">
@@ -420,10 +420,7 @@ export const HUD = () => {
               ×
             </button>
           )}
-          {KINDS.filter(
-            (kind) =>
-              !forbidden.has(kind) && (lockedLoadout === null || lockedLoadout.includes(kind)),
-          ).map((kind) => {
+          {buildOptions.map(({ kind, hotkey }) => {
             const existingSameKind = towers.filter((t) => t.kind === kind).length;
             const atLimit = existingSameKind >= TOWER_BUILD_LIMIT;
             const cost = effectiveTowerCost(kind, progress.metaSkills);
@@ -440,7 +437,7 @@ export const HUD = () => {
                   setSelectedKind(selectedKind === kind ? null : kind);
                   e.currentTarget.blur();
                 }}
-                title={`${TOWER_LABEL[kind]} · ${t(`damageTypes.${pill.type}`)} · ${atLimit ? `MAX (${TOWER_BUILD_LIMIT})` : `${cost}g`}${showKeyboardHints ? ` [${HOTKEYS[kind]}]` : ""}`}
+                title={`${TOWER_LABEL[kind]} · ${t(`damageTypes.${pill.type}`)} · ${atLimit ? `MAX (${TOWER_BUILD_LIMIT})` : `${cost}g`}${showKeyboardHints ? ` [${hotkey}]` : ""}`}
               >
                 {active && (
                   <span className="card-cancel" aria-hidden>
@@ -449,7 +446,7 @@ export const HUD = () => {
                 )}
                 <div className="tower-preview-wrap">
                   <TowerPreview kind={kind} />
-                  <span className="tower-hot kbd-only">{HOTKEYS[kind]}</span>
+                  <span className="tower-hot kbd-only">{hotkey}</span>
                 </div>
                 <div className="flex items-center justify-between gap-1 mt-1">
                   <span
