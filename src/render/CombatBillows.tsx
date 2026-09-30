@@ -39,9 +39,14 @@ void main() {
   float margin = min(min(vUv.x, vUv.y), min(1.0-vUv.x, 1.0-vUv.y));
   fade *= smoothstep(0.015, 0.10, margin);
   vec3 rgb = puff.rgb / max(puff.a, 0.001) * vTint;
+  // Negative flash marks cold mist: lift the soot-colored atlas into pale
+  // blue-white vapor while retaining its texture and soft alpha edges.
+  float cold = max(0.0, -vState.z);
+  rgb = mix(rgb, vTint * (0.78 + 0.22 * dot(puff.rgb / max(puff.a, 0.001),
+    vec3(0.2126, 0.7152, 0.0722))), cold);
   // A hot initial flash gives way to textured orange lobes, never a solid
   // glowing sphere. Vapor stays alpha-blended rather than emitting light.
-  rgb = mix(rgb, vec3(2.3, 1.8, 1.0), vState.z * emissive);
+  rgb = mix(rgb, vec3(2.3, 1.8, 1.0), max(0.0, vState.z) * emissive);
   gl_FragColor = vec4(rgb, puff.a * fade * mix(1.0, 0.85, emissive));
   #include <colorspace_fragment>
   gl_FragColor.rgb *= puff.a * fade;
@@ -234,12 +239,13 @@ export const CombatBillows = ({ kind }: { kind: "blast" | "vapor" }) => {
           b.x = w.pos.x + Math.cos(angle) * radius;
           b.z = -w.pos.y + Math.sin(angle) * radius;
           b.y = 0.18 + Math.sin(age * Math.PI) * 0.23;
-          b.size = (0.24 + w.maxRadius * 0.1) * (0.65 + age * 0.55);
-          b.stretch = 1.45;
-          b.angle = s * Math.PI;
+          b.size = (0.24 + w.maxRadius * 0.1) * (0.65 + age * 0.55) * (0.75 + s * 0.5);
+          b.stretch = 1.3 + s * 0.5;
+          b.angle = (s - 0.5) * 0.45;
           b.frame = (s * 16 + age * 9) % 16;
           b.alpha = Math.sin(age * Math.PI) * 0.22;
-          b.tint.setRGB(0.6, 0.82, 0.95);
+          b.flash = -1;
+          b.tint.setRGB(0.8, 0.91, 1.0);
         }
       }
     }

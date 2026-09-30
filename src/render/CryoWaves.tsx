@@ -8,16 +8,19 @@ const vertexShader = /* glsl */ `
   attribute vec3 waveState;
   varying vec2 ground;
   varying vec3 wave;
+  varying vec2 crystalOrigin;
   void main() {
     // Explicit data stays valid even before the first wave is emitted.
     wave = waveState;
     ground = position.xy * wave.y;
+    crystalOrigin = instanceMatrix[3].xz;
     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
   }
 `;
 const fragmentShader = /* glsl */ `
   varying vec2 ground;
   varying vec3 wave;
+  varying vec2 crystalOrigin;
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float segment(vec2 p, vec2 a, vec2 b) {
     vec2 v = b - a;
@@ -32,25 +35,35 @@ const fragmentShader = /* glsl */ `
     if (band <= 0.001 || radius > wave.y) discard;
     vec2 cell = floor(ground / 0.58);
     vec2 p = fract(ground / 0.58) - 0.5;
-    float seed = hash(cell);
-    p -= vec2(seed - 0.5, hash(cell + 7.0) - 0.5) * 0.16;
+    vec2 key = cell + crystalOrigin * 3.17;
+    float seed = hash(key);
+    p -= vec2(hash(key + 3.0) - 0.5, hash(key + 7.0) - 0.5) * 0.30;
     float angle = atan(p.y, p.x) + seed * 6.283185;
     // Fold six arms into one dendrite, with paired fern-like side branches.
     float sector = mod(angle + 0.523599, 1.047198) - 0.523599;
+    float armIndex = floor(mod(angle + 0.523599, 6.283185) / 1.047198);
+    float armSeed = hash(key + armIndex * 13.7);
     vec2 q = length(p) * vec2(cos(sector), sin(sector));
-    float growth = smoothstep(0.0, 0.32, behind);
-    float arm = (0.28 + seed * 0.13) * growth;
+    float growth = smoothstep(0.0, 0.20 + seed * 0.22, behind);
+    // Keep each jittered footprint inside its cell, with small shards among
+    // larger dendrites. Stable hashes avoid flickering as the wave advances.
+    float arm = mix(0.10, 0.34, pow(hash(key + 19.0), 0.7))
+      * mix(0.68, 1.0, armSeed) * growth;
     float d = segment(q, vec2(0.0), vec2(max(arm, 0.001), 0.0));
     for (int j = 1; j <= 3; j++) {
-      float t = float(j) * 0.22;
+      if (float(j) > 1.0 + floor(hash(key + 29.0) * 3.0)) continue;
+      float twigSeed = hash(key + float(j) * 23.0 + armIndex * 7.0);
+      float t = float(j) * 0.21 + (twigSeed - 0.5) * 0.10;
       vec2 root = vec2(arm * t, 0.0);
-      float twig = arm * (0.30 - t * 0.20);
+      float twig = arm * (0.22 + twigSeed * 0.20 - t * 0.20);
       d = min(d, segment(vec2(q.x, abs(q.y)), root, root + vec2(twig * 0.65, twig)));
     }
     float aa = max(fwidth(d), 0.002);
-    float crystal = 1.0 - smoothstep(0.004, 0.004 + aa, d);
+    float thickness = mix(0.0025, 0.006, hash(key + 41.0));
+    float crystal = 1.0 - smoothstep(thickness, thickness + aa, d);
     float frost = (1.0 - smoothstep(0.01, 0.065, d)) * 0.10;
-    float alpha = (crystal * 0.42 + frost) * band * wave.z;
+    float alpha = (crystal * 0.42 + frost) * band * wave.z
+      * mix(0.55, 1.0, hash(key + 53.0));
     // Sparse specular catches travel through the growing branches, leaving
     // the quiet ground-frost footprint intact rather than a glowing ring.
     float glint = pow(max(0.0, sin(behind * 9.0 + seed * 31.0)), 18.0)
