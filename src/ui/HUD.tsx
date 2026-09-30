@@ -21,6 +21,7 @@ import { RobotSelectionPanel } from "./RobotSelectionPanel";
 import { TowerPanel } from "./TowerPanel";
 import { prewarmTowerIcons, TowerPreview } from "./TowerPreview";
 import { TreePanel } from "./TreePanel";
+import { exitFullscreen, isFullscreen } from "./useFullscreen";
 import { useKeyboardHintsVisible } from "./useInputMode";
 import { useIsMobile } from "./useMediaQuery";
 
@@ -178,7 +179,13 @@ export const HUD = () => {
       // abilities, pause toggle and tower-kind digits are all gameplay
       // actions that have no meaning while the run is on hold. Esc still
       // routes through the editor's own listener (it owns close).
-      if (useEditor.getState().active) return;
+      if (useEditor.getState().active || e.defaultPrevented) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")
+      )
+        return;
       if (e.code === "Space") {
         e.preventDefault();
         callWaveEarly();
@@ -188,8 +195,10 @@ export const HUD = () => {
         togglePause();
         return;
       }
-      if (e.code === "Escape") {
+      if (e.code === "Escape" || e.code === "KeyX") {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
         e.preventDefault();
+        if (e.repeat) return;
         const s = useGame.getState();
         if (s.world.robot.dashAim) {
           s.cancelRobotDashAim();
@@ -198,6 +207,8 @@ export const HUD = () => {
         if (
           s.selectedKind !== null ||
           s.world.selectedTowerId !== null ||
+          s.world.selectedBase ||
+          s.spotSelecting ||
           s.inspectedEnemy.kind !== null ||
           s.selectedTreeId !== null ||
           s.selectedRockId !== null ||
@@ -208,7 +219,10 @@ export const HUD = () => {
           (document.activeElement as HTMLElement | null)?.blur();
           return;
         }
-        if (s.world.status === "running" || s.world.status === "paused") togglePause();
+        if (e.code === "KeyX") return;
+        if (s.world.status === "paused") togglePause();
+        else if (isFullscreen()) void exitFullscreen();
+        else if (s.world.status === "running") togglePause();
         (document.activeElement as HTMLElement | null)?.blur();
         return;
       }
@@ -342,11 +356,11 @@ export const HUD = () => {
           className="hud-menu-btn"
           onClick={togglePause}
           aria-label={t("common.openMenu")}
-          title={showKeyboardHints ? `${t("common.menu")} (Esc)` : t("common.menu")}
+          title={showKeyboardHints ? `${t("common.menu")} (P)` : t("common.menu")}
         >
           <IconCog size={18} />
           <span className="kbd-only text-[10px] font-bold tracking-wide px-1.5 py-0.5 border border-[rgba(159,216,255,0.35)] rounded-sm text-blue bg-tint-blue-soft uppercase">
-            Esc
+            P
           </span>
         </button>
       </div>
@@ -380,7 +394,9 @@ export const HUD = () => {
           className="tower-picker-handle tower-picker-handle-cancel"
           onClick={() => useGame.getState().clearSelection()}
           aria-label={t("hud.cancelPlacingAria", { tower: TOWER_LABEL[selectedKind] })}
-          title={t("hud.cancelPlacement")}
+          title={
+            showKeyboardHints ? `${t("hud.cancelPlacement")} (Esc / X)` : t("hud.cancelPlacement")
+          }
           data-ui-sound="close"
         >
           <span className="tower-picker-handle-cancel-icon" aria-hidden>

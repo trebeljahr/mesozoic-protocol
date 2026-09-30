@@ -293,7 +293,7 @@
     "idle": "Untätig",
     "cancel": "Abbrechen",
     "cancelPickHint": "Auswahl abbrechen",
-    "cancelPickHintKeyboard": "Auswahl abbrechen - Karte klicken oder Esc drücken",
+    "cancelPickHintKeyboard": "Auswahl abbrechen - Karte klicken oder Esc / X drücken",
     "pick": "Wählen",
     "pickHint": "Klicke einen Turm auf der Karte zum Zuweisen",
     "clearHint": "Diese Drohne nach Hause schicken",

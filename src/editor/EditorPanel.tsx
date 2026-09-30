@@ -401,6 +401,7 @@ export const EditorPanel = ({
         return;
       }
       if (e.key === "Escape") {
+        e.preventDefault();
         // Step back through armed tools first, then selection, then close.
         // Stamp paste sits ahead of placingUrl because both are "armed click
         // tools" but the stamp arm is the more recently introduced surface

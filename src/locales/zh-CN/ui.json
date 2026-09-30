@@ -293,7 +293,7 @@
     "idle": "Idle",
     "cancel": "Cancel",
     "cancelPickHint": "Cancel pick",
-    "cancelPickHintKeyboard": "Cancel pick - click the map or press Esc",
+    "cancelPickHintKeyboard": "Cancel pick - click the map or press Esc / X",
     "pick": "Pick",
     "pickHint": "Click a tower on the map to assign",
     "clearHint": "Send this drone home",

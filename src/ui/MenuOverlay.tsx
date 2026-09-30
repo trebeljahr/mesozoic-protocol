@@ -32,6 +32,7 @@ export const MenuOverlay = ({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      e.preventDefault();
       // Capture-phase + stopImmediatePropagation: the HUD also listens on
       // window for Escape→togglePause, which would fight this handler and
       // re-pause the game on the same key event. Eat the event here so

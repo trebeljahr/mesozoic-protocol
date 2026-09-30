@@ -142,7 +142,7 @@ export const TreePanel = () => {
         </button>
         <button type="button" className="btn btn-secondary" onClick={selection.clear}>
           {t("common.cancel")}
-          <span className="kbd-only"> (Esc)</span>
+          <span className="kbd-only"> (Esc / X)</span>
         </button>
       </div>
     </RightOverlay>
