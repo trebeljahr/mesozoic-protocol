@@ -11,17 +11,36 @@ The selected artwork is **A5 / original A palette**, approved on 30 September 20
 | Store / purpose | Location | State as of 30 September 2026 |
 | --- | --- | --- |
 | Steam capsules, hero, transparent logo | [current/steam](current/steam/) | Eight approved exports. User completed uploads; Steam's store and library checklists pass. |
-| Steam Linux client icon bundle | [current/steam/client](current/steam/client/) | Original upload ZIP recovered from temporary storage. |
-| Desktop gameplay screenshots | [current/shared/gameplay-desktop](current/shared/gameplay-desktop/) | Eight existing captures for Steam/itch. Review freshness and select the shots to upload. |
-| Google Play icon and feature graphic | [current/google-play](current/google-play/) | Existing assets; draft uploads recorded in rollout audit. These predate A5 and retain the earlier icon branding. |
+| Steam client icons | [current/steam/client](current/steam/client/) | New 512px transparent shortcut PNG and 184px app JPG; native Mac ICNS and original Linux ZIP. New exports have not been uploaded. |
+| Desktop gameplay screenshots | [current/shared/gameplay-desktop](current/shared/gameplay-desktop/) | Eight historical captures. User deferred fresh screenshots until the game visual pass is ready. |
+| Google Play icon and feature graphic | [current/google-play](current/google-play/) | Existing icon and earlier uploaded JPG retained. Use new `feature-graphic-a5.png` for the A5 replacement; not yet uploaded. |
 | App Store icon | [current/app-store](current/app-store/) | Opaque 1024×1024 icon from the native asset catalog. Normally delivered in the app build. |
 | Shared icon master / desktop icons | [current/shared](current/shared/) | Existing master, ICO and ICNS. Changes to these copies do not update the native projects. |
 | Apple / Play mobile screenshots | Not yet approved | Capture tooling exists. Legacy [Play screenshots](google-play/) are reference only, not a validated phone/tablet set. |
-| itch.io cover | Exact upload source not recovered | Draft cover and five screenshots were uploaded in the earlier rollout. Do not substitute a random capsule and call it the uploaded cover. |
-| Microsoft Store | Not yet assembled | Product listing is not created. Select requirements for its actual product type before exporting. |
-| Gameplay trailer | Missing | Generated key art is not a gameplay trailer or screenshot. |
+| itch.io cover | [current/itch-io](current/itch-io/) | New A5 630×500 cover ready locally; does not claim to match the old upload. |
+| Microsoft Store | [current/microsoft-store](current/microsoft-store/) | Square box art, portrait poster and text-free hero prepared. Confirm actual product slots and overlay previews when its listing exists. |
+| Gameplay trailer | Capture deferred pending visual pass | No new footage or thumbnail created. Existing shot plan is in the project notes vault. |
 
 `current/` is a committed upload snapshot, assembled by **copying** catalogued source files. It contains no generated replacement art. The manifest records dimensions, source paths, SHA-256 hashes, status and known gaps. A populated folder does not mean the store is published.
+
+## New static pack
+
+![A5 adaptations and client icons](static-pack-2026-09-30/review-sheet.jpg)
+
+The preview reads left-to-right, top-to-bottom: itch cover, Microsoft box, Microsoft poster, Microsoft text-free hero, Play banner, Steam shortcut PNG, Steam app JPG. [Source exports and provenance](static-pack-2026-09-30/) · [Layout recipe](recipes/other-stores-layout.json).
+
+| Upload file under `current/` | Slot | Pixels |
+| --- | --- | --- |
+| `itch-io/cover-630x500.png` | itch project cover | 630×500 |
+| `microsoft-store/box-art-1080.png` | 1:1 box art | 1080×1080 |
+| `microsoft-store/poster-art-720x1080.png` | 2:3 poster art | 720×1080 |
+| `microsoft-store/super-hero-1920x1080.png` | Super hero art, no title | 1920×1080 |
+| `google-play/feature-graphic-a5.png` | Play feature graphic | 1024×500 |
+| `steam/client/shortcut-icon-512.png` | Steam shortcut icon | 512×512, transparent |
+| `steam/client/app-icon-184.jpg` | Steam app icon | 184×184, opaque |
+| `steam/client/mac-icon.icns` | Mac shortcut icon | Native ICNS bundle |
+
+These are local exports, not store uploads or approved listing previews. Microsoft dimensions follow published MSIX guidance; MSI/EXE guidance specifies matching ratios. Microsoft may overlay the bottom third: the title and dinosaurs stay higher, but foreground mech/turret details can be obscured. Confirm the final console preview before using these candidates. The Microsoft hero is modestly upscaled from the 1678×937 landscape master. Steam client icons retain the native turret design; A5 artwork adapts the marketing scenes only.
 
 ## Steam drag-and-drop map
 

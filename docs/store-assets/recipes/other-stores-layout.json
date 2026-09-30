@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "checkedOn": "2026-09-30",
+  "masterDirectory": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette",
+  "logo": "exports/library-logo.png",
+  "icon": "src-tauri/icons/source.png",
+  "exports": [
+    {
+      "output": "itch-io/cover-630x500.png",
+      "source": "landscape-master.png",
+      "size": [630, 500],
+      "position": "centre",
+      "logo": { "width": 390, "left": 25, "top": 25 }
+    },
+    {
+      "output": "microsoft-store/box-art-1080.png",
+      "source": "landscape-master.png",
+      "size": [1080, 1080],
+      "position": "centre",
+      "logo": { "width": 860, "left": 110, "top": 55 }
+    },
+    {
+      "output": "microsoft-store/poster-art-720x1080.png",
+      "source": "portrait-master.png",
+      "size": [720, 1080],
+      "position": "centre",
+      "logo": { "width": 590, "left": 65, "top": 55 }
+    },
+    {
+      "output": "microsoft-store/super-hero-1920x1080.png",
+      "source": "landscape-master.png",
+      "size": [1920, 1080],
+      "position": "centre",
+      "upscaled": true
+    },
+    {
+      "output": "google-play/feature-graphic-a5.png",
+      "source": "landscape-master.png",
+      "size": [1024, 500],
+      "position": "south",
+      "logo": { "width": 380, "left": 48, "top": 30 }
+    },
+    {
+      "output": "steam/client/shortcut-icon-512.png",
+      "source": "icon",
+      "size": [512, 512],
+      "alpha": "transparent"
+    },
+    {
+      "output": "steam/client/app-icon-184.jpg",
+      "source": "icon",
+      "size": [184, 184],
+      "background": "#29364d"
+    }
+  ],
+  "references": [
+    "https://itch.io/docs/creators/getting-started",
+    "https://partner.steamgames.com/doc/store/assets/community",
+    "https://support.google.com/googleplay/android-developer/answer/9866151",
+    "https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/screenshots-and-images",
+    "https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images"
+  ],
+  "notes": [
+    "Deterministic format adaptations of approved A5 layers, not new generated scenes or game screenshots.",
+    "Microsoft sizes follow published MSIX artwork guidance; MSI/EXE guidance confirms the same ratios. Confirm the actual product's slots before upload.",
+    "Microsoft overlays may obscure the bottom third. Review placement proofs in the actual console; no Xbox availability is implied.",
+    "Steam PNG shortcut is accepted and converted by Steam; app icon is a separately flattened JPG to avoid automatic black transparency fill."
+  ]
+}

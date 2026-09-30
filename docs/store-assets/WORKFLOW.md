@@ -29,7 +29,17 @@ This recreates the deterministic layout from the committed masters and font. Ima
 
 Inspect the small capsule at 120, 184 and 231 pixels wide; both portrait crops; the hero's safe area; and the transparent logo over the hero. Keep text off the hero master. Preserve proofs, but label simulated layouts as simulations. A5's official-template overlay is retained as a proof; rebuilding it requires downloading the current Valve template separately.
 
+The other-store format recipe uses the already approved scene and logo layers; it does not regenerate artwork:
+
+```sh
+node scripts/assemble-other-store-artwork.mjs --out=/tmp/meso-other-store-candidates
+```
+
+[other-stores-layout.json](recipes/other-stores-layout.json) records crop anchors, title placement, dimensions and official references checked on 30 September 2026. The script uses the existing `sharp` dependency, one worker and a bounded cache. It writes seven exports, a contact sheet and source hashes. Review the sheet in recipe order before copying outputs into a dated source folder and adding them to the catalog. Opaque formats have their alpha channel removed after compositing. Shortcut PNG retains real transparency; Steam app JPG flattens against the native icon background.
+
 ## 4. Capture actual gameplay separately
+
+**Current decision, 30 September 2026:** fresh screenshots wait until game visuals improve. Trailer capture is also deferred pending that pass; the existing trailer-and-asset-plan in the project notes vault contains reference shot lists. Recheck those older feature claims against the game before recording.
 
 Desktop sources are in `public/screenshots/`; the curated package copies them into `current/shared/gameplay-desktop/`. Use full-size images, not `-thumb` files. Never place concept art in gameplay screenshot slots.
 
@@ -50,9 +60,9 @@ The existing six Play PNGs are historical references with inconsistent crops/dim
 
 `src-tauri/icons/source.png` is the native icon source. `pnpm sync:native-assets` derives the iOS icon, Android launchers and splash assets; see [DISTRIBUTION.md](../../DISTRIBUTION.md). The App Store icon is carried by the build, so uploading a file to a folder does not update an existing build.
 
-Play's retained feature graphic is 1024×500, opaque; its icon is 512×512. These are the existing earlier-branding exports, not newly approved A5 adaptations. Keep them until a replacement is selected.
+Play's retained JPG is the earlier uploaded feature graphic. The new opaque 1024×500 `feature-graphic-a5.png` is the local replacement. Keep the historical JPG as an upload reference. The 512×512 icon remains the existing native branding.
 
-For itch.io, retain the actual chosen cover and screenshot selection once recovered. For Microsoft Store, first choose the product/package type and inspect its listing slots. Do not treat the Windows executable icon as a complete store asset package. Trailers are a separate workflow and must represent actual gameplay.
+The new itch cover is 630×500 (315:250 ratio). Its old uploaded cover was not recovered; do not claim byte identity. Microsoft box/poster/hero files are candidates using published dimensions. Choose the product/package type and inspect live slots and bottom-third overlays before upload. Never use these scene exports as gameplay screenshots. The Microsoft hero is text-free and is not a trailer thumbnail; derive that thumbnail from eventual footage.
 
 ## 6. Verify and upload
 
@@ -76,5 +86,7 @@ Steam's legacy drop zone did not expose a usable file chooser in our browser aut
 | Apple screenshots | https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications |
 | Apple icon | https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon |
 | itch.io project setup | https://itch.io/docs/creators/getting-started |
+| Microsoft MSI/EXE images | https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msi/screenshots-and-images |
+| Microsoft MSIX dimensions and placement | https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images |
 
 Keep credentials, signing material, personal records and account-console screenshots out of the artwork package. Track remaining release operations in the project notes vault. The reusable technical memory is this file, the catalog, source manifests, recipes and scripts.

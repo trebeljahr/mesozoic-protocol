@@ -64,49 +64,49 @@
       "source": "public/screenshots/mesozoic-protocol-screenshot-01-forest-defense.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-01-forest-defense.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-02-world-map.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-02-world-map.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-03-lava-firefight.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-03-lava-firefight.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-04-alien-biome.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-04-alien-biome.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-05-desert-crossing.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-05-desert-crossing.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-06-snow-outpost.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-06-snow-outpost.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-07-wasteland-serpentine.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-07-wasteland-serpentine.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "public/screenshots/mesozoic-protocol-screenshot-08-compendium.jpg",
       "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-08-compendium.jpg",
       "slot": "Desktop gameplay screenshot",
-      "status": "existing capture; selection and freshness review required"
+      "status": "historical capture; fresh screenshots deferred by user until game visual improvements"
     },
     {
       "source": "docs/store-assets/google-play/icon-512.png",
@@ -155,38 +155,85 @@
       "output": "steam/client/linux-icons.zip",
       "slot": "Linux client icons",
       "status": "retained upload bundle from 2026-09-30"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/itch-io/cover-630x500.png",
+      "output": "itch-io/cover-630x500.png",
+      "slot": "Project cover",
+      "size": [630, 500],
+      "alpha": "none",
+      "status": "ready-local; new export, not uploaded"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/microsoft-store/box-art-1080.png",
+      "output": "microsoft-store/box-art-1080.png",
+      "slot": "1:1 box art",
+      "size": [1080, 1080],
+      "alpha": "none",
+      "status": "local candidate; confirm actual product slots and overlay preview before upload"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/microsoft-store/poster-art-720x1080.png",
+      "output": "microsoft-store/poster-art-720x1080.png",
+      "slot": "2:3 poster art",
+      "size": [720, 1080],
+      "alpha": "none",
+      "status": "local candidate; confirm actual product slots and overlay preview before upload"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/microsoft-store/super-hero-1920x1080.png",
+      "output": "microsoft-store/super-hero-1920x1080.png",
+      "slot": "16:9 Super hero art (no title)",
+      "size": [1920, 1080],
+      "alpha": "none",
+      "status": "local candidate; confirm actual product slots and overlay preview before upload"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/google-play/feature-graphic-a5.png",
+      "output": "google-play/feature-graphic-a5.png",
+      "slot": "Play feature graphic, A5 replacement",
+      "size": [1024, 500],
+      "alpha": "none",
+      "status": "ready-local; new export, not uploaded"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/steam/client/shortcut-icon-512.png",
+      "output": "steam/client/shortcut-icon-512.png",
+      "slot": "Shortcut icon (Steam converts PNG to ICO)",
+      "size": [512, 512],
+      "alpha": "transparent",
+      "status": "ready-local; new export, not uploaded"
+    },
+    {
+      "source": "docs/store-assets/static-pack-2026-09-30/steam/client/app-icon-184.jpg",
+      "output": "steam/client/app-icon-184.jpg",
+      "slot": "App icon",
+      "size": [184, 184],
+      "alpha": "none",
+      "status": "ready-local; new export, not uploaded"
+    },
+    {
+      "source": "src-tauri/icons/icon.icns",
+      "output": "steam/client/mac-icon.icns",
+      "slot": "Mac shortcut icon",
+      "status": "ready-local; existing native export, upload identity unverified"
     }
   ],
   "missing": [
     {
-      "store": "Steam",
-      "asset": "Gameplay trailer",
-      "status": "not created"
+      "store": "All stores",
+      "asset": "Fresh gameplay screenshots (desktop, phone and tablet)",
+      "status": "deferred by user 2026-09-30 until game visuals improve; historical captures retained"
     },
     {
-      "store": "Steam",
-      "asset": "Exact uploaded Windows shortcut and app-icon files",
-      "status": "not recovered; native ICO preserved as reference, do not claim exact upload identity"
-    },
-    {
-      "store": "App Store",
-      "asset": "iPhone and iPad screenshots",
-      "status": "capture script exists; no device-validated approved set archived"
-    },
-    {
-      "store": "Google Play",
-      "asset": "Phone and tablet screenshots",
-      "status": "legacy screenshot-1..6.png retained outside current; not approved mobile captures"
-    },
-    {
-      "store": "itch.io",
-      "asset": "Exact uploaded cover and screenshot selection",
-      "status": "draft upload reported in rollout audit; exact uploaded cover source not identified, shared desktop screenshots available"
+      "store": "Steam / other stores",
+      "asset": "Gameplay trailer and its actual-footage thumbnail",
+      "status": "capture deferred pending visual pass; existing trailer-and-asset-plan in project notes vault remains reference, no video created"
     },
     {
       "store": "Microsoft Store",
-      "asset": "Listing artwork and screenshot package",
-      "status": "product not yet created; requirements and assets must be selected for actual product type"
+      "asset": "Product-specific artwork preview validation",
+      "status": "box/poster/hero candidates created; confirm package type and live slot requirements when product exists"
     }
   ]
 }
