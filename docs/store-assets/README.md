@@ -6,7 +6,7 @@ The selected artwork is **A5 / original A palette**, approved on 30 September 20
 
 **Current in-game art direction:** the user clarified that the uploaded **A5 Steam capsules and library hero** are the primary target for the game itself. Earlier preference for exploration B is historical and superseded for implementation. Match A5's breached research compounds, substantial structures, grouped rocks/vegetation, charcoal/petrol shadows, tan/rust surfaces, warm light and focused cyan energy. Establish one integrated playable showcase before propagating the treatment. A palette-only or scatter-density pass does not satisfy this direction.
 
-![Approved A5 artwork and layout proofs](artwork-selection-2026-09-30/a5-original-palette/review-sheet.jpg)
+![Approved A5 main capsule](current/steam/main-capsule.png)
 
 ## Files to use
 
@@ -65,11 +65,8 @@ Steam app ID: `4798230`; store editor record: `1202837`. [Store editor](https://
 
 ## Exploration and decisions
 
-- [A / B / C contact sheet](artwork-selection-2026-09-30/selection-sheet.jpg), [original images](artwork-selection-2026-09-30/originals/) and [exact Flow prompts](artwork-selection-2026-09-30/flow-prompts.json).
-- **A:** strongest palette and drama, initially too busy. **B:** initially preferred for in-game visual work; superseded by the explicit A5 direction above. **C:** least preferred.
-- **A2:** cleaner landscape, too calm. **A3:** restored breach action.
-- [A4](artwork-selection-2026-09-30/a4-steam/): established portrait/hero layouts, but its cobalt/yellow palette was rejected. Do not upload these exports.
-- [A5](artwork-selection-2026-09-30/a5-original-palette/): approved layouts with A's charcoal/petrol teal, tan/rust, cyan-white weapon light and localized green tank glow. [Prompts](artwork-selection-2026-09-30/a5-original-palette/prompts.json), [masters](artwork-selection-2026-09-30/a5-original-palette/), [crop/alignment proofs](artwork-selection-2026-09-30/a5-original-palette/proofs/).
+Historical A/B/C, A2/A3, rejected A4 exports, and A5 crop/alignment proofs now live in the local Obsidian [design archive](DESIGN-HISTORY.md). The game repository retains the approved [A5 masters and prompts](artwork-selection-2026-09-30/a5-original-palette/) and current upload sources. A4's cobalt/yellow palette was rejected; the earlier B preference for gameplay was superseded by A5.
+
 - [Production recipe](recipes/a5-layout.json), [portable export script](../../scripts/assemble-steam-artwork.mjs), [Rajdhani Bold and license](sources/fonts/).
 
 The A5 hero was upscaled from 2170×725 to the required 3840×1240. The title is **typeset Rajdhani Bold**, not generated lettering. The scenes are AI-generated marketing art, not evidence of game graphics. AI use in Steam marketing was disclosed in the content survey on 30 September 2026.

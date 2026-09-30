@@ -4,7 +4,7 @@ This is the technical procedure for assembling this repository's store files. Co
 
 ## 1. Inventory before creating
 
-Collect existing game screenshots, model reference sheets, icons, fonts and earlier art. Keep source material in a dated exploration folder. Save the prompt, tool/model where known, references, native size and approval state with each result. Export originals from the generation service immediately; browser history and temporary files are not an archive.
+Collect existing game screenshots, model reference sheets, icons, fonts and earlier art. Keep exploratory source material in the project vault under `assets/design-history/<date>/<topic>/`; promote selected production masters into this repository. Save the prompt, tool/model where known, references, native size and approval state with each result. Export originals from the generation service immediately; browser history and temporary files are not an archive.
 
 We used the existing Google Flow project and its game model ingredients for A/B/C, A2 and A3. Later edits used built-in ChatGPT image generation. The original A generation model is unknown. Flow displayed zero-credit requests during this session; that is historical information, not a guarantee for another account or date.
 
@@ -27,7 +27,7 @@ node scripts/assemble-steam-artwork.mjs --out=/tmp/meso-artwork-rebuild
 
 This recreates the deterministic layout from the committed masters and font. ImageMagick/font-renderer versions can change PNG bytes or text rasterization; visually compare before replacing approved exports. AI generation itself is not byte-reproducible. Preserve the approved master images rather than relying on prompts alone.
 
-Inspect the small capsule at 120, 184 and 231 pixels wide; both portrait crops; the hero's safe area; and the transparent logo over the hero. Keep text off the hero master. Preserve proofs, but label simulated layouts as simulations. A5's official-template overlay is retained as a proof; rebuilding it requires downloading the current Valve template separately.
+Inspect the small capsule at 120, 184 and 231 pixels wide; both portrait crops; the hero's safe area; and the transparent logo over the hero. Keep text off the hero master. Preserve proofs, but label simulated layouts as simulations. A5's official-template overlay is retained in the vault design archive; rebuilding it requires downloading the current Valve template separately.
 
 The other-store format recipe uses the already approved scene and logo layers; it does not regenerate artwork:
 
@@ -90,3 +90,7 @@ Steam's legacy drop zone did not expose a usable file chooser in our browser aut
 | Microsoft MSIX dimensions and placement | https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/screenshots-and-images |
 
 Keep credentials, signing material, personal records and account-console screenshots out of the artwork package. Track remaining release operations in the project notes vault. The reusable technical memory is this file, the catalog, source manifests, recipes and scripts.
+
+## Design history location
+
+See [the archive guide](DESIGN-HISTORY.md). Store rejected concepts, crop studies, render comparisons, and historical QA media in the project vault, with captions and provenance. Ignore binary design-history media in vault Git; track the lightweight index and metadata. Verify copies and repair links before removing originals. Approved masters, selected exports, fonts/licenses, recipes, and technical rendering contracts stay here so a clean checkout remains usable.

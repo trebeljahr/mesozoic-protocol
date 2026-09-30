@@ -1,13 +1,13 @@
 {
   "date": "2026-09-30",
   "status": "approved_visual_direction_local_exports_ready",
-  "supersedes": "../a4-steam/manifest.json",
+  "supersedes": "vault:projects/mesozoic-protocol/assets/design-history/2026-09-30/store-artwork/a4-steam/manifest.json",
   "feedback": "User rejected A4 palette and explicitly requested colors closer to version A.",
-  "colorReference": "../originals/a-containment-breach.jpg",
+  "colorReference": "vault:projects/mesozoic-protocol/assets/design-history/2026-09-30/store-artwork/originals/a-containment-breach.jpg",
   "layoutReferences": [
-    "../a4-steam/landscape-master.png",
-    "../a4-steam/portrait-master.png",
-    "../a4-steam/hero-master.png"
+    "vault:projects/mesozoic-protocol/assets/design-history/2026-09-30/store-artwork/a4-steam/landscape-master.png",
+    "vault:projects/mesozoic-protocol/assets/design-history/2026-09-30/store-artwork/a4-steam/portrait-master.png",
+    "vault:projects/mesozoic-protocol/assets/design-history/2026-09-30/store-artwork/a4-steam/hero-master.png"
   ],
   "generationTool": "ChatGPT built-in image_gen",
   "generationRequests": 3,
@@ -71,14 +71,20 @@
   ],
   "logo": {
     "font": "Rajdhani Bold",
-    "colors": ["#e7e1cf", "#bfe4df"],
+    "colors": [
+      "#e7e1cf",
+      "#bfe4df"
+    ],
     "outline": "#0d1f20",
     "background": "transparent"
   },
   "hero": {
     "recommendedLogoPosition": "left bottom corner",
     "alternate": "centered top",
-    "avoid": ["centered middle", "centered bottom"],
+    "avoid": [
+      "centered middle",
+      "centered bottom"
+    ],
     "exportUpscaled": true,
     "verification": "Official Valve template overlay and local narrow-window/position proofs; live Steam preview not performed"
   },
@@ -95,5 +101,6 @@
     "identityCaveat": "Steam UI reports logo 1280x720; archived local export is 1280x441. Uploaded bytes were not retrieved or hash-compared.",
     "disclosure": "Steam content survey now includes AI-generated marketing art; published survey verified complete.",
     "history": "Earlier status/validation fields describe the original local assembly checkpoint."
-  }
+  },
+  "historicalReferenceLocation": "vault: references are archival provenance, not assembly dependencies; see ../../DESIGN-HISTORY.md"
 }
