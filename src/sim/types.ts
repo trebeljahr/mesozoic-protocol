@@ -383,17 +383,29 @@ export type RobotPendingShot = {
 };
 
 // Ongoing slot-3 effect that ticks per frame.
-// - storm (Leela): self-AoE lightning storm; zaps the N nearest enemies
-//   in radius every tickInterval until endAt.
+// - storm (Leela): cryo pulses damage, slow, and briefly freeze enemies in radius.
+// - barrage (Stan): repeated kinetic fans along a locked firing direction.
 // - flameRings (Mike): spawns N expanding rings sequentially; each ring
 //   walks outward at expandSpeed, damaging enemies as it passes them.
 // - frenzy (George): time-windowed damage + fire-rate multipliers
 //   stacked on top of the slot-2 self-buff.
-// - killshot (Stan): charges then drops a single high-damage projectile
+// - killshot: charges then drops a single high-damage projectile
 //   with splash at the locked target.
 export type RobotPayloadState =
   | {
+      kind: "barrage";
+      endAt: number;
+      nextTickAt: number;
+      tickInterval: number;
+      range: number;
+      halfAngle: number;
+      facing: number;
+      damage: number;
+      damageType: DamageType;
+    }
+  | {
       kind: "storm";
+      frost?: { factor: number; duration: number; freezeDuration: number };
       endAt: number;
       nextTickAt: number;
       tickInterval: number;
@@ -855,7 +867,16 @@ export type GameEvent =
   | { type: "footstep"; source: "dino" | "robot"; pos: Vec2; weight: number }
   | {
       type: "robot-ability";
-      kind: "dash-aim" | "dash" | "burst" | "buff" | "storm" | "flameRings" | "frenzy" | "killshot";
+      kind:
+        | "dash-aim"
+        | "dash"
+        | "burst"
+        | "buff"
+        | "barrage"
+        | "storm"
+        | "flameRings"
+        | "frenzy"
+        | "killshot";
       pos: Vec2;
     };
 

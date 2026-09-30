@@ -24,9 +24,8 @@ export { CHAIN_BEAM_COLOR } from "./lightningGeometry";
 const MAX_PARTICLES = 1024;
 const MAX_BEAMS = 64;
 const MAX_BEAM_POINTS = 16;
-const BEAM_SUBDIVISIONS = 6; // interior noise points per source segment
+const BEAM_SUBDIVISIONS = 6; // interpolation points per source segment
 const MAX_BEAM_VERTS = (MAX_BEAM_POINTS - 1) * BEAM_SUBDIVISIONS + 1;
-const BEAM_NOISE = 0.28;
 
 type BeamPass = { line: THREE.Line; mat: THREE.LineBasicMaterial };
 
@@ -156,7 +155,7 @@ export const Effects = () => {
       if (pMesh.instanceColor) pMesh.instanceColor.needsUpdate = true;
     }
 
-    // --- Beams: jagged lightning, core + halo ---
+    // --- Straight tracers, core + halo (lightning has its own renderer) ---
     for (let k = 0; k < beamPairs.length; k++) {
       beamPairs[k].core.line.visible = false;
       beamPairs[k].halo.line.visible = false;
@@ -188,13 +187,6 @@ export const Effects = () => {
         arr[vi * 3 + 2] = z;
       };
 
-      // Seed for deterministic per-beam jitter (keeps arc shape stable within its 0.1s life).
-      let seedA = (b.id * 9301 + 49297) >>> 0;
-      const rng = () => {
-        seedA = (seedA * 1664525 + 1013904223) >>> 0;
-        return (seedA / 0xffffffff) * 2 - 1;
-      };
-
       const firstP = b.points[0];
       const firstH = firstP.h ?? 0.85;
       writePoint(coreArr, coreVi++, firstP.x, firstH, -firstP.y);
@@ -207,33 +199,14 @@ export const Effects = () => {
         const dy = bpt.y - a.y;
         const ah = a.h ?? 0.85;
         const bh = bpt.h ?? 0.85;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        // perpendicular in XZ plane (world coords: x, -y)
-        const perpX = -dy / len;
-        const perpZ = -dx / len;
         for (let sub = 1; sub <= BEAM_SUBDIVISIONS; sub++) {
           const t = sub / BEAM_SUBDIVISIONS;
           const baseX = a.x + dx * t;
           const baseY = a.y + dy * t;
           const baseH = ah + (bh - ah) * t;
-          // taper noise near the endpoints
-          const taper = Math.sin(t * Math.PI);
-          const nCore = rng() * BEAM_NOISE * taper;
-          const nHalo = rng() * BEAM_NOISE * 1.9 * taper;
-          writePoint(
-            coreArr,
-            coreVi++,
-            baseX + perpX * nCore,
-            baseH + rng() * 0.05 * taper,
-            -baseY + perpZ * nCore,
-          );
-          writePoint(
-            haloArr,
-            haloVi++,
-            baseX + perpX * nHalo,
-            baseH + 0.08 + rng() * 0.12 * taper,
-            -baseY + perpZ * nHalo,
-          );
+
+          writePoint(coreArr, coreVi++, baseX, baseH, -baseY);
+          writePoint(haloArr, haloVi++, baseX, baseH + 0.08, -baseY);
         }
       }
 

@@ -21,6 +21,7 @@ import {
   applyDamage,
   applyPathKnockback,
   applyRobotBurn,
+  applySlow,
   createBeam,
   createCoalEmber,
   createExplosion,
@@ -252,6 +253,71 @@ const applyRobotLightningDamage = (
   enemy.flashUntil = world.time + 0.1;
 };
 
+const applyFrost = (
+  world: World,
+  enemy: Enemy,
+  frost: { factor: number; duration: number; freezeDuration: number },
+) => {
+  if (!enemy.alive) return;
+  applySlow(enemy, world, frost.factor, frost.duration);
+  enemy.freezeUntil = Math.max(enemy.freezeUntil, world.time + frost.freezeDuration);
+};
+
+export const insideRobotCone = (
+  origin: Vec2,
+  pos: Vec2,
+  facing: number,
+  range: number,
+  halfAngle: number,
+): boolean => {
+  const dx = pos.x - origin.x,
+    dy = pos.y - origin.y;
+  const distance = Math.hypot(dx, dy);
+  return (
+    distance <= range &&
+    (distance < 1e-6 ||
+      (dx * Math.sin(facing) - dy * Math.cos(facing)) / distance >= Math.cos(halfAngle))
+  );
+};
+
+const fireBulletFan = (
+  world: World,
+  robot: Robot,
+  facing: number,
+  range: number,
+  halfAngle: number,
+  damage: number,
+  rays = 7,
+) => {
+  for (const enemy of world.enemies) {
+    if (
+      !isEnemyTargetable(enemy) ||
+      !insideRobotCone(robot.pos, enemy.pos, facing, range, halfAngle)
+    )
+      continue;
+    applyDamage(world, enemy, damage, "kinetic", "#ffd24a", 2, false, { fromRobot: true });
+  }
+  const source = robotMuzzlePoint(robot);
+  for (let i = 0; i < rays; i++) {
+    const angle = facing - halfAngle + (2 * halfAngle * i) / (rays - 1);
+    createBeam(
+      world,
+      [
+        source,
+        {
+          x: robot.pos.x + Math.sin(angle) * range,
+          y: robot.pos.y - Math.cos(angle) * range,
+          h: source.h,
+        },
+      ],
+      "#ffd24a",
+      0.09,
+    );
+  }
+  robot.shootFlashUntil = world.time + 0.14;
+  emit(world, { type: "shoot", towerId: robot.id, towerKind: "pulse", pos: robot.pos });
+};
+
 const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
   const variant = ROBOT_SPECS[robot.variant];
   // George Sidestep flags the next shot as a piercing crit (×mul, no
@@ -266,7 +332,17 @@ const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
   // Leela auto-attack — hitscan lightning that visibly bounces from
   // enemy to enemy. Damage lands in chain order so kill/XP attribution
   // stays robot-owned for every hop.
-  if (variant.attackChain) {
+  if (variant.attackConeAngle) {
+    fireBulletFan(
+      world,
+      robot,
+      Math.atan2(target.pos.x - robot.pos.x, -(target.pos.y - robot.pos.y)),
+      robot.range,
+      variant.attackConeAngle,
+      dmg,
+      3,
+    );
+  } else if (variant.attackChain) {
     const { hops, damagePerHop, radius } = variant.attackChain;
     const seen = new Set<EntityId>([target.id]);
     const points: BeamPoint[] = [source, enemyLightningPoint(target)];
@@ -291,7 +367,12 @@ const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
     applyDamage(world, target, dmg, robot.damageType, "#fff4d6", crit ? 12 : 5, false, {
       fromRobot: true,
     });
-    createBeam(world, [source, enemyLightningPoint(target)], crit ? "#ffe9a0" : "#cfe8ff", 0.12);
+    createBeam(
+      world,
+      [source, enemyLightningPoint(target)],
+      crit ? "#ffe9a0" : variant.attackFrost ? "#b8fff4" : "#fff4d6",
+      0.12,
+    );
     spawnParticles(world, source, 4, "#cfe8ff", [2, 5], 0.18);
     spawnParticles(world, target.pos, crit ? 14 : 6, crit ? "#ffe9a0" : "#cfe8ff", [3, 7], 0.3);
   } else if (robot.attackSplashRadius > 0) {
@@ -322,6 +403,8 @@ const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
     );
   }
 
+  if (variant.attackFrost) applyFrost(world, target, variant.attackFrost);
+
   // Mike Ignition (slot 2 buff) tags every shot with a short burn DoT.
   const buffSpec = variant.abilities[2];
   if (
@@ -334,7 +417,13 @@ const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
   }
 
   robot.shootFlashUntil = world.time + 0.18;
-  emit(world, { type: "shoot", towerId: robot.id, towerKind: "pulse", pos: robot.pos });
+  if (!variant.attackConeAngle)
+    emit(world, {
+      type: "shoot",
+      towerId: robot.id,
+      towerKind: variant.attackFrost ? "cryo" : "pulse",
+      pos: robot.pos,
+    });
 };
 
 const firePendingShot = (
@@ -489,13 +578,13 @@ const dashDir = (robot: Robot): Vec2 => {
 };
 
 // Mid-tick payload servicing for slot 3 ongoing effects (ultimate).
-// - storm (Leela): every tickInterval, lash the N nearest enemies in
-//   radius with chain beams.
+// - storm (Leela): pulse cryo damage and freeze across enemies in radius.
+// - barrage (Stan): sustained kinetic area fire along a fixed cone.
 // - flameRings (Mike): spawn rings on cadence, advance each ring's
 //   radius and damage any enemy newly inside the circle.
 // - frenzy (George): pure stat multipliers, no per-tick effect of its
 //   own — auto-attacks naturally pump through the buffed cadence.
-// - killshot (Stan): charge timer, then delete the locked target with
+// - killshot: charge timer, then delete the locked target with
 //   splash at impact.
 // The slot-2 self-buff is its own tick pass (tickBuff) — they stack.
 const tickPayload = (
@@ -506,6 +595,18 @@ const tickPayload = (
   const p = robot.payload;
   const idle = { dmgMul: 1, rateMul: 1 };
   if (!p) return idle;
+  if (p.kind === "barrage") {
+    if (world.time >= p.endAt) {
+      robot.payload = null;
+      return idle;
+    }
+    robot.facing = p.facing;
+    if (world.time >= p.nextTickAt) {
+      fireBulletFan(world, robot, p.facing, p.range, p.halfAngle, p.damage, 11);
+      p.nextTickAt += p.tickInterval;
+    }
+    return idle;
+  }
   if (p.kind === "killshot") {
     const target = world.enemyById.get(p.targetId);
     const lockedTarget = target && isEnemyTargetable(target) ? target : null;
@@ -554,6 +655,19 @@ const tickPayload = (
   if (p.kind === "storm") {
     if (world.time >= p.endAt) {
       robot.payload = null;
+      return idle;
+    }
+    if (world.time >= p.nextTickAt && p.frost) {
+      for (const enemy of world.enemies) {
+        if (!isEnemyTargetable(enemy) || distSq(enemy.pos, robot.pos) > p.radius * p.radius)
+          continue;
+        applyDamage(world, enemy, p.damagePerArc, p.damageType, "#b8fff4", 2, false, {
+          fromRobot: true,
+        });
+        applyFrost(world, enemy, p.frost);
+        spawnParticles(world, enemy.pos, 3, "#b8fff4", [1, 3], 0.3);
+      }
+      p.nextTickAt = world.time + p.tickInterval;
       return idle;
     }
     if (world.time >= p.nextTickAt) {
@@ -672,7 +786,7 @@ export const updateRobot = (world: World, dt: number) => {
   robot.attackCooldown = Math.max(0, robot.attackCooldown - dt);
   // Ultimate (slot 3) and self-buff (slot 2) refresh the robot's per-tick
   // multipliers. Damage and fire rate stack multiplicatively across the
-  // payload + buff (George's Bullet Storm + Spotter Drone is the
+  // payload + buff (George's Deadeye + Spotter Drone is the
   // intended combo). damageResist clamped <1 inside damageRobot.
   const payloadMul = tickPayload(world, robot, dt);
   const buff = tickBuff(world, robot);
@@ -700,7 +814,26 @@ export const updateRobot = (world: World, dt: number) => {
   // (shouldn't happen — robotDefaults builds it).
   const variant = ROBOT_SPECS[robot.variant];
   const dashSpec = variant.abilities[0];
-  const baseSpeed = robot.speed * robot.speedMul;
+  const channeling = robot.payload?.kind === "barrage";
+  // Resolve the frost dash at the actual landing point, including obstacles.
+  if (
+    dashSpec.frost &&
+    dashSpec.landingBlast &&
+    robot.abilityActiveUntil[0] > 0 &&
+    world.time >= robot.abilityActiveUntil[0] &&
+    world.time - dt < robot.abilityActiveUntil[0]
+  ) {
+    const blast = dashSpec.landingBlast;
+    for (const enemy of world.enemies) {
+      if (!isEnemyTargetable(enemy) || distSq(enemy.pos, robot.pos) > blast.radius ** 2) continue;
+      applyDamage(world, enemy, blast.damage, blast.damageType, variant.tint, 5, false, {
+        fromRobot: true,
+      });
+      applyFrost(world, enemy, dashSpec.frost);
+    }
+    spawnParticles(world, robot.pos, 24, variant.tint, [3, 7], 0.5);
+  }
+  const baseSpeed = channeling ? 0 : robot.speed * robot.speedMul;
   const speed = dashing ? dashSpec.speed : baseSpeed;
 
   // Auto-clear an expired pre-dash aim — an aim ignored for a few
@@ -797,7 +930,7 @@ export const updateRobot = (world: World, dt: number) => {
     }
   }
   const ky = 1 - Math.exp(-ROBOT_TURN_RATE * dt);
-  robot.facing += shortAngleDelta(robot.facing, targetYaw) * ky;
+  if (!channeling) robot.facing += shortAngleDelta(robot.facing, targetYaw) * ky;
 
   // Skirmish lock + continuous melee. A robot can fight up to
   // MAX_ENGAGED_DINOS attackers at once — closest-N in melee range get
@@ -870,7 +1003,7 @@ export const updateRobot = (world: World, dt: number) => {
 
   // Auto-attack — pick the closest in-range enemy. Doesn't fire while
   // dashing because the upper-body pose flips into the dash anim.
-  const target = !dashing ? findRobotTarget(world, robot, buff.rangeMul) : null;
+  const target = !dashing && !channeling ? findRobotTarget(world, robot, buff.rangeMul) : null;
   robot.targetId = target?.id ?? null;
   if (target && robot.attackCooldown === 0) {
     fireRobotShot(world, robot, target);
@@ -942,6 +1075,7 @@ export const orderRobotMove = (world: World, pos: Vec2): boolean => {
     x: Math.max(-reachHalfW, Math.min(reachHalfW, projection.pos.x)),
     y: Math.max(-reachHalfH, Math.min(reachHalfH, projection.pos.y)),
   };
+  if (robot.payload?.kind === "barrage") robot.payload = null;
   robot.pathIndex = projection.pathIndex;
   return true;
 };
@@ -964,6 +1098,7 @@ const commitDash = (
   spec: DashSpec,
   dir: Vec2,
 ) => {
+  if (robot.payload?.kind === "barrage") robot.payload = null;
   robot.facing = Math.atan2(dir.x, -dir.y);
   robot.abilityActiveUntil[0] = world.time + spec.duration;
   if (robot.variant === "mike") robot.mikeCoalDropAt = world.time;
@@ -994,7 +1129,7 @@ const commitDash = (
     }
     if (points.length > 1) createBeam(world, points, "#7ee0ff", 0.18);
   }
-  if (spec.landingBlast) {
+  if (spec.landingBlast && !spec.frost) {
     const lbX = robot.pos.x + Math.sin(robot.facing) * spec.speed * spec.duration;
     const lbY = robot.pos.y + -Math.cos(robot.facing) * spec.speed * spec.duration;
     const lbPos: Vec2 = { x: lbX, y: lbY };
@@ -1002,7 +1137,17 @@ const commitDash = (
     for (const e of world.enemies) {
       if (!isEnemyTargetable(e)) continue;
       if (distSq(e.pos, lbPos) > r2) continue;
-      applyDamage(world, e, spec.landingBlast.damage, spec.landingBlast.damageType, "#ffb054", 8);
+      applyDamage(
+        world,
+        e,
+        spec.landingBlast.damage,
+        spec.landingBlast.damageType,
+        variant.tint,
+        8,
+        false,
+        { fromRobot: true },
+      );
+      if (spec.frost) applyFrost(world, e, spec.frost);
       e.flashUntil = world.time + 0.12;
     }
     createExplosion(world, lbPos, spec.landingBlast.radius, 0.45);
@@ -1014,7 +1159,7 @@ const commitDash = (
 };
 
 // Variant-aware ability dispatch. Slot 0 always = dash, slot 1 = burst,
-// slot 2 = the variant's payload (barrage/mark/incinerate). The cooldown
+// slot 2 = self-buff, slot 3 = ultimate. The cooldown
 // stored on the spec is scaled by robot.abilityCooldownMul (from the
 // Power Core skill node) at trigger time so re-spec is one tick away.
 export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boolean => {
@@ -1062,16 +1207,33 @@ export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boole
   }
 
   if (spec.type === "burst") {
+    if (spec.coneAngle) {
+      const target = findRobotTarget(world, robot);
+      const facing = target
+        ? Math.atan2(target.pos.x - robot.pos.x, -(target.pos.y - robot.pos.y))
+        : robot.facing;
+      fireBulletFan(world, robot, facing, spec.radius, spec.coneAngle, spec.damage, 13);
+      for (const enemy of world.enemies) {
+        if (
+          isEnemyTargetable(enemy) &&
+          spec.knockback &&
+          insideRobotCone(robot.pos, enemy.pos, facing, spec.radius, spec.coneAngle)
+        )
+          applyPathKnockback(world, enemy, spec.knockback.pathPush);
+      }
+      return true;
+    }
     const r2 = spec.radius * spec.radius;
     const hit: Enemy[] = [];
     for (const e of world.enemies) {
       if (!isEnemyTargetable(e)) continue;
       if (distSq(e.pos, robot.pos) > r2) continue;
-      applyDamage(world, e, spec.damage, spec.damageType, "#ffb054", 10, false, {
+      applyDamage(world, e, spec.damage, spec.damageType, variant.tint, 10, false, {
         fromRobot: true,
       });
       e.flashUntil = world.time + 0.12;
       hit.push(e);
+      if (spec.frost) applyFrost(world, e, spec.frost);
       if (spec.burn) {
         applyRobotBurn(world, e, spec.burn.duration, spec.burn.totalDamage);
       }
@@ -1101,7 +1263,7 @@ export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boole
       }
       if (points.length > 1) createBeam(world, points, "#7ee0ff", 0.18);
     }
-    createExplosion(world, robot.pos, spec.radius, 0.45, spec.damageType);
+    if (!spec.frost) createExplosion(world, robot.pos, spec.radius, 0.45, spec.damageType);
     // Burst particles now key off variant tint instead of a hard-coded
     // orange — an electric burst no longer reads as flame.
     spawnParticles(
@@ -1135,9 +1297,34 @@ export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boole
     return true;
   }
 
+  if (spec.type === "barrage") {
+    const target = findRobotTarget(world, robot, spec.range / robot.range);
+    const facing = target
+      ? Math.atan2(target.pos.x - robot.pos.x, -(target.pos.y - robot.pos.y))
+      : robot.facing;
+    robot.payload = {
+      kind: "barrage",
+      endAt: world.time + spec.duration,
+      nextTickAt: world.time,
+      tickInterval: spec.tickInterval,
+      range: spec.range,
+      halfAngle: spec.halfAngle,
+      facing,
+      damage: spec.damage,
+      damageType: spec.damageType,
+    };
+    robot.moveTarget = null;
+    robot.vel = { x: 0, y: 0 };
+    robot.abilityActiveUntil[0] = world.time;
+    robot.dashAim = null;
+    robot.facing = facing;
+    emit(world, { type: "robot-ability", kind: "barrage", pos: robot.pos });
+    return true;
+  }
   if (spec.type === "storm") {
     robot.payload = {
       kind: "storm",
+      frost: spec.frost,
       endAt: world.time + spec.duration,
       nextTickAt: world.time,
       tickInterval: spec.tickInterval,

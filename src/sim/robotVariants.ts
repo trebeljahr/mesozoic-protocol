@@ -8,31 +8,29 @@ import type { DamageType, RobotAbilitySlot, RobotVariant } from "./types";
 
 export const ROBOT_VARIANTS: readonly RobotVariant[] = ["george", "leela", "mike", "stan"];
 
-// Slot 0 — high-mobility burst that grants i-frames during the lunge.
-// Optional riders give each pilot a distinct dash payoff: George flags
-// the next auto-attack as a crit, Leela emits chain lightning at lunge
-// end, Stan detonates an explosion at landing position.
+// Shared status tuning for cryo shots, dash landings, bursts, and blizzards.
+export type FrostSpec = { factor: number; duration: number; freezeDuration: number };
+
 export type DashSpec = {
   type: "dash";
   cooldown: number;
   duration: number;
   speed: number;
+  frost?: FrostSpec;
   nextShotCrit?: { mul: number; pierce: boolean };
   endChain?: { hops: number; damagePerHop: number; radius: number; damageType: DamageType };
   landingBlast?: { radius: number; damage: number; damageType: DamageType };
 };
 
-// Slot 1 — instant radial AoE around the robot. Damage type varies by
-// variant so the burst hits its biggest-resist matchup.
-// Optional riders: Leela's burst forks chain lightning beams to extra
-// targets; Mike's burst applies a burn DoT to every enemy hit; Stan's
-// burst nudges enemies backwards along the path.
+// Instant area attack: radial by default, or a forward cone for kinetic fans.
 export type BurstSpec = {
   type: "burst";
   cooldown: number;
   radius: number;
   damage: number;
   damageType: DamageType;
+  frost?: FrostSpec;
+  coneAngle?: number;
   chainHops?: { hops: number; damagePerHop: number; radius: number };
   burn?: { duration: number; totalDamage: number };
   knockback?: { pathPush: number };
@@ -62,10 +60,19 @@ export type BuffSpec = {
 // without extra control flags on Robot.
 export type PayloadSpec =
   | {
-      // Leela R — Storm Surge. AoE chain-lightning storm centered on the
-      // robot for `duration` seconds. Every `tickInterval`, picks up to
-      // `arcsPerTick` nearest enemies inside `radius` and zaps each.
+      type: "barrage";
+      cooldown: number;
+      duration: number;
+      range: number;
+      halfAngle: number;
+      tickInterval: number;
+      damage: number;
+      damageType: DamageType;
+    }
+  | {
+      // Frost storms pulse across every enemy in radius; other storms chain.
       type: "storm";
+      frost?: FrostSpec;
       cooldown: number;
       duration: number;
       radius: number;
@@ -90,7 +97,7 @@ export type PayloadSpec =
       burn?: { duration: number; totalDamage: number };
     }
   | {
-      // George R — Bullet Storm. Time-limited frenzy that multiplies
+      // George R — Deadeye. Time-limited frenzy that multiplies
       // outgoing damage AND fire rate. Auto-attacks naturally pump
       // through the buffed cadence during the window.
       type: "frenzy";
@@ -100,7 +107,7 @@ export type PayloadSpec =
       fireRateMul: number;
     }
   | {
-      // Stan R — Annihilator Missile. Locks the highest-progress enemy
+      // Legacy charged missile payload. Locks the highest-progress enemy
       // in range, charges for `chargeTime`, then drops a single huge
       // explosive payload with massive splash at impact.
       type: "killshot";
@@ -116,7 +123,7 @@ export type PayloadSpec =
 export type RobotAbilitySpec = DashSpec | BurstSpec | BuffSpec | PayloadSpec;
 
 // Per-robot auto-attack rider. Each shot can also chain to nearby
-// enemies (Leela), draw a tracer beam (George), or apply burn DoT
+// enemies, draw a tracer beam, or apply burn DoT
 // during a buff window (Mike — driven by buff.igniteOnHit instead).
 export type AttackChainSpec = {
   hops: number;
@@ -143,9 +150,11 @@ export type RobotVariantSpec = {
   // Per-shot splash for the auto-attack — 0 = single-target projectile,
   // >0 turns each shot into a tight splash hit.
   attackSplashRadius: number;
-  // Optional auto-attack chain (Leela). Each shot, after its primary hit,
+  // Optional auto-attack chain. Each shot, after its primary hit,
   // forks lightning beams to up to `hops` nearby enemies for damagePerHop.
   attackChain?: AttackChainSpec;
+  attackFrost?: FrostSpec;
+  attackConeAngle?: number;
   // Render hint — when true, every auto-attack draws a hitscan tracer
   // beam from the robot to the target instead of (or alongside) the
   // projectile. George uses this for the sniper read.
@@ -173,7 +182,7 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
     callsign: "Vanguard",
     blurb: "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
     strengths:
-      "Longest engagement range. Massive single-shot damage. Bullet Storm unleashes an absurd-cadence frenzy on demand.",
+      "Longest engagement range. Massive single-shot damage. Deadeye unleashes an focused firing frenzy on demand.",
     weakness:
       "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
     maxHp: 220,
@@ -216,7 +225,7 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
         damageResist: 0.4,
         rangeMul: 1.6,
       },
-      // R — Bullet Storm: time-limited frenzy. ×7 fire rate + ×1.5
+      // R — Deadeye: time-limited frenzy. ×7 fire rate + ×1.5
       // damage for 3.5s. Tracer beams pour out as continuous bullet
       // hell on whatever the auto-aim picks.
       {
@@ -228,7 +237,7 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
       },
     ],
     tint: "#9fd8ff",
-    abilityLabels: ["Sidestep", "Shockwave", "Spotter", "Bullet Storm"],
+    abilityLabels: ["Sidestep", "Shockwave", "Spotter", "Deadeye"],
     abilityGlyphs: ["»", "✺", "◎", "✦"],
     abilityBlurbs: [
       "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
@@ -241,39 +250,38 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
   leela: {
     variant: "leela",
     label: "Leela",
-    callsign: "Strider",
-    blurb: "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
+    callsign: "Frostbite",
+    blurb: "Cryo skirmisher. Frost shots slow the front line; ice bursts freeze nearby packs.",
     strengths:
-      "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
-    weakness: "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "Highest mobility. Slows enemies with every shot. Frost Nova freezes packs; Blizzard controls a wide area.",
+    weakness: "Thin armor and low burst damage. Cold-resistant enemies blunt her damage and slows.",
     maxHp: 200,
     speed: 6.0,
     range: 6.5,
     damage: 7,
     fireRate: 5.5,
-    damageType: "electric",
+    damageType: "cold",
     attackSplashRadius: 0,
-    attackChain: { hops: 2, damagePerHop: 5, radius: 2.6 },
+    attackTracer: true,
+    attackFrost: { factor: 0.55, duration: 1.2, freezeDuration: 0 },
     unlockBolts: 250,
     abilities: [
-      // Q — Phase Step: forward dash, on lunge end arcs to 3 closest dinos.
       {
         type: "dash",
         cooldown: 4.0,
         duration: 0.4,
         speed: 13.0,
-        endChain: { hops: 3, damagePerHop: 24, radius: 3.5, damageType: "electric" },
+        landingBlast: { radius: 2.5, damage: 24, damageType: "cold" },
+        frost: { factor: 0.5, duration: 2, freezeDuration: 0.6 },
       },
-      // W — Tesla Pulse: radial blast that forks beams to 4 more targets.
       {
         type: "burst",
         cooldown: 9.0,
         radius: 4.0,
         damage: 70,
-        damageType: "electric",
-        chainHops: { hops: 4, damagePerHop: 35, radius: 6.0 },
+        damageType: "cold",
+        frost: { factor: 0.4, duration: 3, freezeDuration: 1.2 },
       },
-      // E — Phase Veil: hit-and-run buff. Pure mobility + offence.
       {
         type: "buff",
         cooldown: 13.0,
@@ -283,28 +291,27 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
         speedMul: 1.7,
         damageResist: 0.8,
       },
-      // R — Storm Surge: ring of lightning around the robot for 5s.
-      // Every 0.2s, lashes the 4 nearest enemies in 7 range.
       {
         type: "storm",
+        frost: { factor: 0.4, duration: 1.2, freezeDuration: 0.25 },
         cooldown: 16.0,
         duration: 5.0,
         radius: 7.0,
-        tickInterval: 0.2,
+        tickInterval: 0.5,
         arcsPerTick: 4,
-        damagePerArc: 26,
-        damageType: "electric",
+        damagePerArc: 18,
+        damageType: "cold",
       },
     ],
     tint: "#5ad6ff",
-    abilityLabels: ["Phase Step", "Tesla Pulse", "Phase Veil", "Storm Surge"],
-    abilityGlyphs: ["»", "⚡", "◈", "✺"],
+    abilityLabels: ["Ice Slide", "Frost Nova", "Ice Veil", "Blizzard"],
+    abilityGlyphs: ["»", "❄", "◈", "❄"],
     abilityBlurbs: [
-      "Fast electric zap. Each shot chains to two nearby targets.",
-      "I-frame dash; end arcs hit 3 enemies for 24 electric.",
-      "4-radius electric pulse, then 4 chain hops for 35 each.",
+      "Rapid frost shots slow enemies by up to 45% for 1.2s.",
+      "I-frame slide; frost at the destination deals 24 cold and freezes for 0.6s.",
+      "4-radius nova deals 70 cold, freezes for 1.2s, and slows for 3s.",
       "3s veil: speed, fire rate, damage, and 80% resist.",
-      "5s storm: 4 electric arcs every 0.2s inside 7 radius.",
+      "5s blizzard: all enemies within 7 radius take 18 cold and briefly freeze every 0.5s.",
     ],
   },
   mike: {
@@ -375,72 +382,62 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
   stan: {
     variant: "stan",
     label: "Stan",
-    callsign: "Mauler",
+    callsign: "Barrage",
     blurb:
-      "Explosive artillery. Every shell detonates; ground pounds and giant warheads chunk packs.",
+      "Kinetic gunner. Rapid bullet fans rake packs; Bullet Hell blankets a cone with sustained fire.",
     strengths:
-      "Every auto-attack is a splash. Ground Pound lands a 110-dmg blast. Annihilator drops a single warhead that flattens the lane.",
+      "Hits every enemy in a bullet cone. Crossfire clears close packs. Bullet Hell rewards lining up a crowded lane.",
     weakness:
-      "Slowest mobility — positioning drift hurts. Explosive resist on armored matriarchs softens the kit.",
+      "Slow movement. Enemies behind him escape the cone. Kinetic-resistant armor reduces his damage.",
     maxHp: 300,
     speed: 3.3,
-    range: 9.0,
-    damage: 34,
-    fireRate: 1.0,
-    damageType: "explosive",
-    attackSplashRadius: 1.5,
+    range: 8,
+    damage: 9,
+    fireRate: 5,
+    damageType: "kinetic",
+    attackSplashRadius: 0,
+    attackConeAngle: 0.22,
     unlockBolts: 1200,
     abilities: [
-      // Q — Ground Pound: short dash; detonates an explosion at landing.
-      {
-        type: "dash",
-        cooldown: 7.0,
-        duration: 0.3,
-        speed: 9.5,
-        landingBlast: { radius: 3.5, damage: 110, damageType: "explosive" },
-      },
-      // W — Quake: radial blast + knockback.
+      { type: "dash", cooldown: 7, duration: 0.3, speed: 9.5 },
       {
         type: "burst",
-        cooldown: 9.0,
-        radius: 5.0,
-        damage: 160,
-        damageType: "explosive",
-        knockback: { pathPush: 1.6 },
+        cooldown: 9,
+        radius: 6,
+        damage: 120,
+        damageType: "kinetic",
+        coneAngle: 0.8,
+        knockback: { pathPush: 1.2 },
       },
-      // E — Bulwark (kept).
       {
         type: "buff",
-        cooldown: 13.0,
-        duration: 5.0,
-        damageMul: 1.4,
-        fireRateMul: 1.0,
-        speedMul: 0.5,
-        damageResist: 0.75,
+        cooldown: 13,
+        duration: 5,
+        damageMul: 1.15,
+        fireRateMul: 1.8,
+        speedMul: 0.7,
+        damageResist: 0.5,
       },
-      // R — Annihilator Missile: locks the highest-progress enemy in
-      // range, charges, then drops a single huge warhead with massive
-      // splash at impact.
       {
-        type: "killshot",
-        cooldown: 18.0,
-        range: 12.0,
-        chargeTime: 0.9,
-        damage: 700,
-        splashDamage: 320,
-        splashRadius: 4.0,
-        damageType: "explosive",
+        type: "barrage",
+        cooldown: 18,
+        duration: 3.5,
+        range: 11,
+        halfAngle: 0.6,
+        tickInterval: 0.14,
+        damage: 24,
+        damageType: "kinetic",
       },
     ],
     tint: "#ffd24a",
-    abilityLabels: ["Ground Pound", "Quake", "Bulwark", "Annihilator"],
-    abilityGlyphs: ["»", "✺", "▣", "❖"],
+    abilityLabels: ["Combat Roll", "Crossfire", "Overdrive", "Bullet Hell"],
+    abilityGlyphs: ["»", "✺", "▣", "✦"],
     abilityBlurbs: [
-      "Long-range explosive shells. Slow, wide splash, high impact.",
-      "Short i-frame leap; landing blast deals 110 explosive.",
-      "5-radius quake for 160 explosive and heavy path push.",
-      "5s brace: +40% damage, 75% resist, half speed.",
-      "Charged warhead: 700 direct, 320 splash.",
+      "Rapid kinetic bullet fans hit all enemies in a narrow cone.",
+      "Short i-frame roll to line up the next firing lane.",
+      "Wide 6-range bullet fan deals 120 kinetic and pushes enemies back.",
+      "5s overdrive: +80% fire rate, +15% damage, 50% resist, slower movement.",
+      "3.5s fixed-direction barrage: 24 kinetic every 0.14s in an 11-range cone. Move or dash to cancel.",
     ],
   },
 };

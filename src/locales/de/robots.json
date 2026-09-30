@@ -2,13 +2,13 @@
   "variants": {
     "george": {
       "blurb": "Kinetischer Langstrecken-Scharfschütze. Langsam, bedacht, jeder Schuss ein Leuchtspurgeschoss, das Panzerung durchschlägt.",
-      "strengths": "Größte Gefechtsreichweite. Massiver Einzelschuss-Schaden. Kugelhagel entfesselt auf Abruf einen Rausch mit absurder Kadenz.",
+      "strengths": "Größte Gefechtsreichweite. Massiver Einzelschuss-Schaden. Adlerauge entfesselt auf Abruf einen Rausch mit absurder Kadenz.",
       "weakness": "Langsame Grundfeuerkadenz — Schwärme schlüpfen zwischen den Schüssen vorbei. Kinetik-resistente Panzerchassis stecken Treffer weg.",
       "abilityLabel": {
         "0": "Ausweichschritt",
         "1": "Schockwelle",
         "2": "Späher",
-        "3": "Kugelhagel"
+        "3": "Adlerauge"
       },
       "abilityBlurb": {
         "0": "Scharfschützenstrahl. Große Reichweite, langsame Kadenz, riesiger kinetischer Treffer.",
@@ -19,21 +19,21 @@
       }
     },
     "leela": {
-      "blurb": "Elektrischer Plänkler. Jeder Schuss springt über. Stürme zerreißen alles, was nah kommt.",
-      "strengths": "Höchste Mobilität. Auto-Angriffe springen auf zwei nahe Ziele über. Sturmwoge zappt sekundenlang jeden Gegner in einem weiten Ring.",
-      "weakness": "Dünne Panzerung — kassiert Treffer auf mittlere Distanz. Elektro-resistente Titanen schlucken das Arsenal.",
+      "blurb": "Kryo-Plänklerin. Frostschüsse verlangsamen die Front; Eisstöße frieren nahe Gegnergruppen ein.",
+      "strengths": "Höchste Mobilität. Jeder Schuss verlangsamt. Frostnova friert Gruppen ein; Blizzard kontrolliert ein großes Gebiet.",
+      "weakness": "Schwache Panzerung und geringer Sofortschaden. Kälteresistente Gegner schwächen Schaden und Verlangsamung.",
       "abilityLabel": {
-        "0": "Phasenschritt",
-        "1": "Tesla-Puls",
-        "2": "Phasenschleier",
-        "3": "Sturmwoge"
+        "0": "Eisgleiten",
+        "1": "Frostnova",
+        "2": "Eisschleier",
+        "3": "Blizzard"
       },
       "abilityBlurb": {
-        "0": "Schneller elektrischer Zap. Jeder Schuss springt auf zwei nahe Ziele über.",
-        "1": "Sprint mit Unverwundbarkeit; am Ende treffen Bögen 3 Gegner für 24 Elektro.",
-        "2": "Elektrischer Puls mit Radius 4, dann 4 Kettensprünge für je 35.",
-        "3": "3s Schleier: Tempo, Feuerrate, Schaden und 80% Resistenz.",
-        "4": "5s Sturm: 4 elektrische Bögen alle 0,2s im Radius 7."
+        "0": "Schnelle Frostschüsse verlangsamen Gegner 1,2s lang um bis zu 45%.",
+        "1": "Kurzes unverwundbares Gleiten; am Ziel 24 Kälteschaden und 0,6s Einfrieren.",
+        "2": "Nova mit Radius 4: 70 Kälteschaden, 1,2s Einfrieren und 3s Verlangsamung.",
+        "3": "3s Schleier: mehr Tempo, Feuerrate, Schaden und 80% Resistenz.",
+        "4": "5s Blizzard: alle Gegner in Radius 7 erleiden alle 0,5s 18 Kälteschaden und frieren kurz ein."
       }
     },
     "mike": {
@@ -55,21 +55,21 @@
       }
     },
     "stan": {
-      "blurb": "Explosive Artillerie. Jede Granate detoniert; Bodenstampfer und riesige Sprengköpfe zerfetzen Schwärme.",
-      "strengths": "Jeder Auto-Angriff ist Flächenschaden. Bodenstampfer landet eine 110-Schaden-Explosion. Vernichter wirft einen einzelnen Sprengkopf, der die Spur plattmacht.",
-      "weakness": "Langsamste Mobilität — Positionierungsdrift schmerzt. Explosiv-Resistenz bei Panzer-Matriarchinnen dämpft das Arsenal.",
+      "blurb": "Kinetischer Schütze. Schnelle Kugelfächer treffen Gruppen; Kugelhölle überzieht einen Kegel mit Dauerfeuer.",
+      "strengths": "Trifft alle Gegner im Schusskegel. Kreuzfeuer räumt nahe Gruppen; Kugelhölle belohnt das Ausrichten auf volle Wege.",
+      "weakness": "Langsame Bewegung. Gegner hinter ihm entgehen dem Kegel. Kinetikresistente Panzerung senkt seinen Schaden.",
       "abilityLabel": {
-        "0": "Bodenstampfer",
-        "1": "Beben",
-        "2": "Bollwerk",
-        "3": "Vernichter"
+        "0": "Kampfrolle",
+        "1": "Kreuzfeuer",
+        "2": "Überlastung",
+        "3": "Kugelhölle"
       },
       "abilityBlurb": {
-        "0": "Explosive Langstreckengranaten. Langsam, weiter Flächenschaden, hohe Wucht.",
-        "1": "Kurzer Sprung mit Unverwundbarkeit; Aufschlagsexplosion verursacht 110 Explosiv.",
-        "2": "Beben mit Radius 5 für 160 Explosiv und schwerer Pfad-Rückstoß.",
-        "3": "5s Verschanzung: +40% Schaden, 75% Resistenz, halbes Tempo.",
-        "4": "Aufgeladener Sprengkopf: 700 direkt, 320 Flächenschaden."
+        "0": "Schnelle kinetische Kugelfächer treffen alle Gegner in einem schmalen Kegel.",
+        "1": "Kurze unverwundbare Rolle zum Ausrichten auf die nächste Schussbahn.",
+        "2": "Breiter Kugelfächer mit Reichweite 6: 120 kinetischer Schaden und Rückstoß.",
+        "3": "5s Überlastung: +80% Feuerrate, +15% Schaden, 50% Resistenz, langsamere Bewegung.",
+        "4": "3,5s feste Schussrichtung: alle 0,14s 24 kinetischer Schaden im Kegel mit Reichweite 11. Bewegung oder Sprint bricht ab."
       }
     }
   },
@@ -77,22 +77,38 @@
     "vitality": {
       "name": "Verstärkte Panzerung",
       "blurb": "Dauerhafte Erhöhung der maximalen HP.",
-      "rankDesc": { "0": "+25 HP", "1": "+60 HP", "2": "+120 HP" }
+      "rankDesc": {
+        "0": "+25 HP",
+        "1": "+60 HP",
+        "2": "+120 HP"
+      }
     },
     "firepower": {
       "name": "Zielsoftware",
       "blurb": "Anhaltende Steigerung des Waffenschadens.",
-      "rankDesc": { "0": "+10% Schaden", "1": "+22% Schaden", "2": "+38% Schaden" }
+      "rankDesc": {
+        "0": "+10% Schaden",
+        "1": "+22% Schaden",
+        "2": "+38% Schaden"
+      }
     },
     "mobility": {
       "name": "Servo-Tuning",
       "blurb": "Läuft zwischen den Kämpfen schneller.",
-      "rankDesc": { "0": "+0,5 Tempo", "1": "+1,1 Tempo", "2": "+1,8 Tempo" }
+      "rankDesc": {
+        "0": "+0,5 Tempo",
+        "1": "+1,1 Tempo",
+        "2": "+1,8 Tempo"
+      }
     },
     "ultimate": {
       "name": "Energiekern",
       "blurb": "Verkürzt jede Fähigkeiten-Abklingzeit.",
-      "rankDesc": { "0": "-10% Abklingzeit", "1": "-22% Abklingzeit", "2": "-35% Abklingzeit" }
+      "rankDesc": {
+        "0": "-10% Abklingzeit",
+        "1": "-22% Abklingzeit",
+        "2": "-35% Abklingzeit"
+      }
     }
   }
 }

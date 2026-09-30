@@ -2,13 +2,13 @@
   "variants": {
     "george": {
       "blurb": "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-      "strengths": "Longest engagement range. Massive single-shot damage. Bullet Storm unleashes an absurd-cadence frenzy on demand.",
+      "strengths": "Longest engagement range. Massive single-shot damage. Deadeye unleashes an focused firing frenzy on demand.",
       "weakness": "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
       "abilityLabel": {
         "0": "Sidestep",
         "1": "Shockwave",
         "2": "Spotter",
-        "3": "Bullet Storm"
+        "3": "Deadeye"
       },
       "abilityBlurb": {
         "0": "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
@@ -19,21 +19,21 @@
       }
     },
     "leela": {
-      "blurb": "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
-      "strengths": "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
-      "weakness": "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "blurb": "Cryo skirmisher. Frost shots slow the front line; ice bursts freeze nearby packs.",
+      "strengths": "Highest mobility. Slows enemies with every shot. Frost Nova freezes packs; Blizzard controls a wide area.",
+      "weakness": "Thin armor and low burst damage. Cold-resistant enemies blunt her damage and slows.",
       "abilityLabel": {
-        "0": "Phase Step",
-        "1": "Tesla Pulse",
-        "2": "Phase Veil",
-        "3": "Storm Surge"
+        "0": "Ice Slide",
+        "1": "Frost Nova",
+        "2": "Ice Veil",
+        "3": "Blizzard"
       },
       "abilityBlurb": {
-        "0": "Fast electric zap. Each shot chains to two nearby targets.",
-        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
-        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
+        "0": "Rapid frost shots slow enemies by up to 45% for 1.2s.",
+        "1": "I-frame slide; frost at the destination deals 24 cold and freezes for 0.6s.",
+        "2": "4-radius nova deals 70 cold, freezes for 1.2s, and slows for 3s.",
         "3": "3s veil: speed, fire rate, damage, and 80% resist.",
-        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
+        "4": "5s blizzard: all enemies within 7 radius take 18 cold and briefly freeze every 0.5s."
       }
     },
     "mike": {
@@ -55,21 +55,21 @@
       }
     },
     "stan": {
-      "blurb": "Explosive artillery. Every shell detonates; ground pounds and giant warheads chunk packs.",
-      "strengths": "Every auto-attack is a splash. Ground Pound lands a 110-dmg blast. Annihilator drops a single warhead that flattens the lane.",
-      "weakness": "Slowest mobility — positioning drift hurts. Explosive resist on armored matriarchs softens the kit.",
+      "blurb": "Kinetic gunner. Rapid bullet fans rake packs; Bullet Hell blankets a cone with sustained fire.",
+      "strengths": "Hits every enemy in a bullet cone. Crossfire clears close packs. Bullet Hell rewards lining up a crowded lane.",
+      "weakness": "Slow movement. Enemies behind him escape the cone. Kinetic-resistant armor reduces his damage.",
       "abilityLabel": {
-        "0": "Ground Pound",
-        "1": "Quake",
-        "2": "Bulwark",
-        "3": "Annihilator"
+        "0": "Combat Roll",
+        "1": "Crossfire",
+        "2": "Overdrive",
+        "3": "Bullet Hell"
       },
       "abilityBlurb": {
-        "0": "Long-range explosive shells. Slow, wide splash, high impact.",
-        "1": "Short i-frame leap; landing blast deals 110 explosive.",
-        "2": "5-radius quake for 160 explosive and heavy path push.",
-        "3": "5s brace: +40% damage, 75% resist, half speed.",
-        "4": "Charged warhead: 700 direct, 320 splash."
+        "0": "Rapid kinetic bullet fans hit all enemies in a narrow cone.",
+        "1": "Short i-frame roll to line up the next firing lane.",
+        "2": "Wide 6-range bullet fan deals 120 kinetic and pushes enemies back.",
+        "3": "5s overdrive: +80% fire rate, +15% damage, 50% resist, slower movement.",
+        "4": "3.5s fixed-direction barrage: 24 kinetic every 0.14s in an 11-range cone. Move or dash to cancel."
       }
     }
   },
@@ -77,22 +77,38 @@
     "vitality": {
       "name": "Reinforced Plating",
       "blurb": "Permanent maximum HP boost.",
-      "rankDesc": { "0": "+25 HP", "1": "+60 HP", "2": "+120 HP" }
+      "rankDesc": {
+        "0": "+25 HP",
+        "1": "+60 HP",
+        "2": "+120 HP"
+      }
     },
     "firepower": {
       "name": "Targeting Software",
       "blurb": "Sustained weapon damage uplift.",
-      "rankDesc": { "0": "+10% damage", "1": "+22% damage", "2": "+38% damage" }
+      "rankDesc": {
+        "0": "+10% damage",
+        "1": "+22% damage",
+        "2": "+38% damage"
+      }
     },
     "mobility": {
       "name": "Servo Tuning",
       "blurb": "Walks faster between fights.",
-      "rankDesc": { "0": "+0.5 speed", "1": "+1.1 speed", "2": "+1.8 speed" }
+      "rankDesc": {
+        "0": "+0.5 speed",
+        "1": "+1.1 speed",
+        "2": "+1.8 speed"
+      }
     },
     "ultimate": {
       "name": "Power Core",
       "blurb": "Cuts every ability cooldown.",
-      "rankDesc": { "0": "-10% cooldowns", "1": "-22% cooldowns", "2": "-35% cooldowns" }
+      "rankDesc": {
+        "0": "-10% cooldowns",
+        "1": "-22% cooldowns",
+        "2": "-35% cooldowns"
+      }
     }
   }
 }

@@ -2,13 +2,13 @@
   "variants": {
     "george": {
       "blurb": "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-      "strengths": "Longest engagement range. Massive single-shot damage. Bullet Storm unleashes an absurd-cadence frenzy on demand.",
+      "strengths": "Longest engagement range. Massive single-shot damage. Mira Certeira unleashes an absurd-cadence frenzy on demand.",
       "weakness": "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
       "abilityLabel": {
         "0": "Sidestep",
         "1": "Shockwave",
         "2": "Spotter",
-        "3": "Bullet Storm"
+        "3": "Mira Certeira"
       },
       "abilityBlurb": {
         "0": "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
@@ -19,21 +19,21 @@
       }
     },
     "leela": {
-      "blurb": "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
-      "strengths": "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
-      "weakness": "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "blurb": "Escaramuçadora criogênica. Tiros de gelo desaceleram a frente; rajadas congelam grupos próximos.",
+      "strengths": "Maior mobilidade. Cada tiro desacelera. Nova Gélida congela grupos; Nevasca controla uma área ampla.",
+      "weakness": "Blindagem fraca e pouco dano imediato. Resistência ao frio reduz seu dano e suas lentidões.",
       "abilityLabel": {
-        "0": "Phase Step",
-        "1": "Tesla Pulse",
-        "2": "Phase Veil",
-        "3": "Storm Surge"
+        "0": "Deslize Glacial",
+        "1": "Nova Gélida",
+        "2": "Véu de Gelo",
+        "3": "Nevasca"
       },
       "abilityBlurb": {
-        "0": "Fast electric zap. Each shot chains to two nearby targets.",
-        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
-        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
-        "3": "3s veil: speed, fire rate, damage, and 80% resist.",
-        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
+        "0": "Tiros rápidos de gelo desaceleram inimigos em até 45% por 1,2s.",
+        "1": "Deslize invulnerável; causa 24 de frio e congela por 0,6s no destino.",
+        "2": "Nova de raio 4: 70 de frio, congelamento de 1,2s e lentidão de 3s.",
+        "3": "Véu de 3s: velocidade, cadência, dano e 80% de resistência.",
+        "4": "Nevasca de 5s: todos os inimigos no raio 7 recebem 18 de frio e congelam brevemente a cada 0,5s."
       }
     },
     "mike": {
@@ -55,21 +55,21 @@
       }
     },
     "stan": {
-      "blurb": "Explosive artillery. Every shell detonates; ground pounds and giant warheads chunk packs.",
-      "strengths": "Every auto-attack is a splash. Ground Pound lands a 110-dmg blast. Annihilator drops a single warhead that flattens the lane.",
-      "weakness": "Slowest mobility — positioning drift hurts. Explosive resist on armored matriarchs softens the kit.",
+      "blurb": "Atirador cinético. Leques rápidos de balas atingem grupos; Inferno de Balas cobre um cone com fogo contínuo.",
+      "strengths": "Atinge todos no cone de tiro. Fogo Cruzado limpa grupos próximos; alinhe o Inferno de Balas com uma rota cheia.",
+      "weakness": "Movimento lento. Inimigos atrás escapam do cone. Blindagem resistente a dano cinético reduz seu dano.",
       "abilityLabel": {
-        "0": "Ground Pound",
-        "1": "Quake",
-        "2": "Bulwark",
-        "3": "Annihilator"
+        "0": "Rolamento",
+        "1": "Fogo Cruzado",
+        "2": "Sobrecarga",
+        "3": "Inferno de Balas"
       },
       "abilityBlurb": {
-        "0": "Long-range explosive shells. Slow, wide splash, high impact.",
-        "1": "Short i-frame leap; landing blast deals 110 explosive.",
-        "2": "5-radius quake for 160 explosive and heavy path push.",
-        "3": "5s brace: +40% damage, 75% resist, half speed.",
-        "4": "Charged warhead: 700 direct, 320 splash."
+        "0": "Leques rápidos de balas cinéticas atingem todos os inimigos em um cone estreito.",
+        "1": "Rolamento curto e invulnerável para alinhar a próxima linha de tiro.",
+        "2": "Leque amplo com alcance 6: 120 de dano cinético e empurrão.",
+        "3": "Sobrecarga de 5s: +80% de cadência, +15% de dano, 50% de resistência e movimento mais lento.",
+        "4": "Rajada fixa de 3,5s: 24 cinético a cada 0,14s num cone de alcance 11. Mover ou avançar cancela."
       }
     }
   },
@@ -77,22 +77,38 @@
     "vitality": {
       "name": "Reinforced Plating",
       "blurb": "Permanent maximum HP boost.",
-      "rankDesc": { "0": "+25 HP", "1": "+60 HP", "2": "+120 HP" }
+      "rankDesc": {
+        "0": "+25 HP",
+        "1": "+60 HP",
+        "2": "+120 HP"
+      }
     },
     "firepower": {
       "name": "Targeting Software",
       "blurb": "Sustained weapon damage uplift.",
-      "rankDesc": { "0": "+10% damage", "1": "+22% damage", "2": "+38% damage" }
+      "rankDesc": {
+        "0": "+10% damage",
+        "1": "+22% damage",
+        "2": "+38% damage"
+      }
     },
     "mobility": {
       "name": "Servo Tuning",
       "blurb": "Walks faster between fights.",
-      "rankDesc": { "0": "+0.5 speed", "1": "+1.1 speed", "2": "+1.8 speed" }
+      "rankDesc": {
+        "0": "+0.5 speed",
+        "1": "+1.1 speed",
+        "2": "+1.8 speed"
+      }
     },
     "ultimate": {
       "name": "Power Core",
       "blurb": "Cuts every ability cooldown.",
-      "rankDesc": { "0": "-10% cooldowns", "1": "-22% cooldowns", "2": "-35% cooldowns" }
+      "rankDesc": {
+        "0": "-10% cooldowns",
+        "1": "-22% cooldowns",
+        "2": "-35% cooldowns"
+      }
     }
   }
 }

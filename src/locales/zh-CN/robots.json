@@ -2,13 +2,13 @@
   "variants": {
     "george": {
       "blurb": "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-      "strengths": "Longest engagement range. Massive single-shot damage. Bullet Storm unleashes an absurd-cadence frenzy on demand.",
+      "strengths": "Longest engagement range. Massive single-shot damage. 神射手 unleashes an absurd-cadence frenzy on demand.",
       "weakness": "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
       "abilityLabel": {
         "0": "Sidestep",
         "1": "Shockwave",
         "2": "Spotter",
-        "3": "Bullet Storm"
+        "3": "神射手"
       },
       "abilityBlurb": {
         "0": "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
@@ -19,21 +19,21 @@
       }
     },
     "leela": {
-      "blurb": "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
-      "strengths": "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
-      "weakness": "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "blurb": "冰冻游击机甲。冰霜射击减缓前线，寒冰爆发冻结附近敌群。",
+      "strengths": "机动性最高。每次射击都会减速。冰霜新星冻结敌群，暴风雪控制大片区域。",
+      "weakness": "装甲薄，爆发伤害低。抗寒敌人能削弱其伤害和减速效果。",
       "abilityLabel": {
-        "0": "Phase Step",
-        "1": "Tesla Pulse",
-        "2": "Phase Veil",
-        "3": "Storm Surge"
+        "0": "冰滑",
+        "1": "冰霜新星",
+        "2": "冰幕",
+        "3": "暴风雪"
       },
       "abilityBlurb": {
-        "0": "Fast electric zap. Each shot chains to two nearby targets.",
-        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
-        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
-        "3": "3s veil: speed, fire rate, damage, and 80% resist.",
-        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
+        "0": "快速冰霜射击使敌人减速最多45%，持续1.2秒。",
+        "1": "短暂无敌滑行；落点造成24点寒冷伤害并冻结0.6秒。",
+        "2": "半径4的新星造成70点寒冷伤害，冻结1.2秒并减速3秒。",
+        "3": "持续3秒的冰幕：提升移速、射速和伤害，获得80%减伤。",
+        "4": "持续5秒的暴风雪：半径7内所有敌人每0.5秒受到18点寒冷伤害并短暂冻结。"
       }
     },
     "mike": {
@@ -55,21 +55,21 @@
       }
     },
     "stan": {
-      "blurb": "Explosive artillery. Every shell detonates; ground pounds and giant warheads chunk packs.",
-      "strengths": "Every auto-attack is a splash. Ground Pound lands a 110-dmg blast. Annihilator drops a single warhead that flattens the lane.",
-      "weakness": "Slowest mobility — positioning drift hurts. Explosive resist on armored matriarchs softens the kit.",
+      "blurb": "动能枪手机甲。快速扇形弹幕扫射敌群，枪林弹雨持续覆盖前方锥形区域。",
+      "strengths": "命中射击锥内的所有敌人。交叉火力清扫近处敌群，将枪林弹雨对准密集路线可发挥威力。",
+      "weakness": "移动缓慢。身后敌人不受锥形弹幕影响。动能抗性装甲会降低其伤害。",
       "abilityLabel": {
-        "0": "Ground Pound",
-        "1": "Quake",
-        "2": "Bulwark",
-        "3": "Annihilator"
+        "0": "战术翻滚",
+        "1": "交叉火力",
+        "2": "超频",
+        "3": "枪林弹雨"
       },
       "abilityBlurb": {
-        "0": "Long-range explosive shells. Slow, wide splash, high impact.",
-        "1": "Short i-frame leap; landing blast deals 110 explosive.",
-        "2": "5-radius quake for 160 explosive and heavy path push.",
-        "3": "5s brace: +40% damage, 75% resist, half speed.",
-        "4": "Charged warhead: 700 direct, 320 splash."
+        "0": "快速动能扇形弹幕命中狭窄锥形区域内的所有敌人。",
+        "1": "短暂无敌翻滚，调整下一轮射击方向。",
+        "2": "射程6的宽幅扇形弹幕造成120点动能伤害并击退敌人。",
+        "3": "超频持续5秒：射速+80%，伤害+15%，减伤50%，移动变慢。",
+        "4": "固定方向持续扫射3.5秒：射程11的锥形区域每0.14秒受到24点动能伤害。移动或冲刺可取消。"
       }
     }
   },
@@ -77,22 +77,38 @@
     "vitality": {
       "name": "Reinforced Plating",
       "blurb": "Permanent maximum HP boost.",
-      "rankDesc": { "0": "+25 HP", "1": "+60 HP", "2": "+120 HP" }
+      "rankDesc": {
+        "0": "+25 HP",
+        "1": "+60 HP",
+        "2": "+120 HP"
+      }
     },
     "firepower": {
       "name": "Targeting Software",
       "blurb": "Sustained weapon damage uplift.",
-      "rankDesc": { "0": "+10% damage", "1": "+22% damage", "2": "+38% damage" }
+      "rankDesc": {
+        "0": "+10% damage",
+        "1": "+22% damage",
+        "2": "+38% damage"
+      }
     },
     "mobility": {
       "name": "Servo Tuning",
       "blurb": "Walks faster between fights.",
-      "rankDesc": { "0": "+0.5 speed", "1": "+1.1 speed", "2": "+1.8 speed" }
+      "rankDesc": {
+        "0": "+0.5 speed",
+        "1": "+1.1 speed",
+        "2": "+1.8 speed"
+      }
     },
     "ultimate": {
       "name": "Power Core",
       "blurb": "Cuts every ability cooldown.",
-      "rankDesc": { "0": "-10% cooldowns", "1": "-22% cooldowns", "2": "-35% cooldowns" }
+      "rankDesc": {
+        "0": "-10% cooldowns",
+        "1": "-22% cooldowns",
+        "2": "-35% cooldowns"
+      }
     }
   }
 }
