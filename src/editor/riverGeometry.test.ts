@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { lakeRadius } from "../lakeShape";
 import type { AuthoredLake, RiverPoint } from "../sim/types";
 import {
   anchorRiverEnd,
@@ -76,13 +77,13 @@ describe("wouldSelfIntersect", () => {
 });
 
 describe("lake geometry", () => {
-  it("measures normalised distance in the rotated ellipse frame", () => {
+  it("measures normalised distance against the rotated shoreline", () => {
     const l = lake();
     expect(lakeNorm(l, 0, 0)).toBeCloseTo(0);
-    expect(lakeNorm(l, 6, 0)).toBeCloseTo(1);
-    expect(lakeNorm(l, 0, 4)).toBeCloseTo(1);
+    expect(lakeNorm(l, 6 * lakeRadius(0), 0)).toBeCloseTo(1);
+    expect(lakeNorm(l, 0, 4 * lakeRadius(Math.PI / 2))).toBeCloseTo(1);
     // Rotating by 90° swaps which axis the 6-unit half-axis points down.
-    expect(lakeNorm(lake({ rot: Math.PI / 2 }), 0, 6)).toBeCloseTo(1);
+    expect(lakeNorm(lake({ rot: Math.PI / 2 }), 0, 6 * lakeRadius(0))).toBeCloseTo(1);
   });
 
   it("blocks placement inside the rim, padded by the candidate radius", () => {

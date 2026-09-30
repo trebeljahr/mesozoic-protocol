@@ -4,6 +4,7 @@ import * as THREE from "three";
 import type { Bridge, FlowPalette } from "../flowGeometry";
 import type { Vec2 } from "../sim/types";
 import { buildFluidField } from "./fluidField";
+import { makeLakeGeometry } from "./lakeGeometry";
 import { makeWaterMaterial } from "./waterShader";
 
 // Per-level flow renderer for every biome that has flow features. Builds
@@ -37,16 +38,7 @@ export const FlowWaterGroup = ({
     [palette, bridges, field],
   );
 
-  // One disc shared by every lake — scaled per instance. Built here rather
-  // than via <circleGeometry> so it can carry the `aFlow` attribute the
-  // shader reads; lakes have no flow direction, so it is all zeros and the
-  // shader falls back to its drift mode.
-  const lakeGeo = useMemo(() => {
-    const geo = new THREE.CircleGeometry(1, 28);
-    const count = geo.getAttribute("position").count;
-    geo.setAttribute("aFlow", new THREE.BufferAttribute(new Float32Array(count * 2), 2));
-    return geo;
-  }, []);
+  const lakeGeo = useMemo(() => makeLakeGeometry(), []);
 
   useEffect(
     () => () => {

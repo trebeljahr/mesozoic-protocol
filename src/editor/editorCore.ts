@@ -6,6 +6,7 @@ import {
   propGroundRadius,
   TARGET_SIZE_BY_ROLE,
 } from "../biomes";
+import { lakeLocalNorm } from "../lakeShape";
 import { clampPropScale, MAX_PROP_SCALE, MIN_PROP_SCALE, normalizeYaw } from "../sim/propTransform";
 import type {
   AuthoredLake,
@@ -220,9 +221,9 @@ export const DEFAULT_LAKE_RY = 4;
 export const clampLakeRadius = (r: number): number =>
   Math.min(MAX_LAKE_RADIUS, Math.max(MIN_LAKE_RADIUS, r));
 
-// Normalised radial distance of (x, y) in the lake's local ellipse frame.
-// <1 inside, 1 on the rim, >1 outside. `pad` grows both half-axes first, so
-// `lakeNorm(l, x, y, r) <= 1` answers "does a disc of radius r touch the lake".
+// Normalised radial distance of (x, y) against the irregular lake shoreline.
+// <1 inside, 1 on the rim, >1 outside. Padding matches the shared bank field.
+// Padding is a conservative placement approximation, not an exact disc intersection.
 export const lakeNorm = (l: AuthoredLake, x: number, y: number, pad = 0): number => {
   const c = Math.cos(-l.rot);
   const s = Math.sin(-l.rot);
@@ -230,9 +231,9 @@ export const lakeNorm = (l: AuthoredLake, x: number, y: number, pad = 0): number
   const dy = y - l.pos.y;
   const lx = dx * c - dy * s;
   const ly = dx * s + dy * c;
-  const rx = Math.max(1e-6, l.rx + pad);
-  const ry = Math.max(1e-6, l.ry + pad);
-  return Math.hypot(lx / rx, ly / ry);
+  const rx = Math.max(1e-6, l.rx);
+  const ry = Math.max(1e-6, l.ry);
+  return lakeLocalNorm(lx, ly, rx, ry) / (1 + pad / Math.min(rx, ry));
 };
 
 // True if (x, y) lies within `padding` world units of any authored lake.
@@ -274,7 +275,7 @@ export const findLakeMouth = (lakes: AuthoredLake[], x: number, y: number): Auth
 export const snapIntoLake = (l: AuthoredLake, p: Vec2): Vec2 => {
   const dx = p.x - l.pos.x;
   const dy = p.y - l.pos.y;
-  if (dx * dx + dy * dy < 1e-9) return { x: l.pos.x + l.rx * LAKE_MOUTH_INSET, y: l.pos.y };
+  if (dx * dx + dy * dy < 1e-9) return { x: l.pos.x, y: l.pos.y };
   const n = lakeNorm(l, p.x, p.y);
   if (n <= LAKE_MOUTH_INSET) return { x: p.x, y: p.y };
   const k = LAKE_MOUTH_INSET / n;

@@ -1,4 +1,5 @@
 import type { Biome } from "./biomes";
+import { lakeDistance, lakeRadius } from "./lakeShape";
 import { MAP_HEIGHT, MAP_WIDTH, PATH_WIDTH } from "./level";
 import { mulberry32 } from "./sim/random";
 import type { Vec2 } from "./sim/types";
@@ -829,9 +830,9 @@ const sampleOnce = (surface: FlowSurface, rand: () => number): { x: number; y: n
       const ny = dx / len;
       return { x: cx + nx * off, y: cy + ny * off };
     }
-    // Uniform sample inside an ellipse via sqrt-radius polar.
+    // Sample inside the same irregular shoreline used by the mesh.
     const angle = rand() * Math.PI * 2;
-    const radius = Math.sqrt(rand());
+    const radius = Math.sqrt(rand()) * lakeRadius(angle);
     const lx = Math.cos(angle) * radius * item.rx;
     const ly = Math.sin(angle) * radius * item.ry;
     const c = Math.cos(item.rot);
@@ -901,15 +902,7 @@ export const isOnFlowSurface = (
 ): boolean => {
   if (!features) return false;
   for (const l of features.lakes) {
-    const dx = x - l.x;
-    const dy = y - l.y;
-    const c = Math.cos(-l.rot);
-    const s = Math.sin(-l.rot);
-    const lx = dx * c - dy * s;
-    const ly = dx * s + dy * c;
-    const rx = l.rx + padding;
-    const ry = l.ry + padding;
-    if ((lx * lx) / (rx * rx) + (ly * ly) / (ry * ry) <= 1) return true;
+    if (lakeDistance(l, x, y) <= padding) return true;
   }
   for (const river of features.rivers) {
     const pts = river.points;
@@ -954,15 +947,7 @@ export const buildWetnessProbe = (
       if (best >= 1) return 1;
     }
     for (const l of lakes) {
-      const dx = x - l.x;
-      const dy = y - l.y;
-      const c = Math.cos(-l.rot);
-      const s = Math.sin(-l.rot);
-      const lx = (dx * c - dy * s) / Math.max(0.001, l.rx);
-      const ly = (dx * s + dy * c) / Math.max(0.001, l.ry);
-      // Normalized ellipse distance → world-ish distance via the mean radius.
-      const meanR = (l.rx + l.ry) / 2;
-      const d = (Math.sqrt(lx * lx + ly * ly) - 1) * meanR;
+      const d = lakeDistance(l, x, y);
       const w = 1 - Math.max(0, d) / SHORE_FALLOFF;
       if (w > best) best = w;
       if (best >= 1) return 1;

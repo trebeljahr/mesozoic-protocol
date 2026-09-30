@@ -5,6 +5,7 @@ import { type Bridge, computeBridges, type FlowPalette } from "../flowGeometry";
 import { PATH_WIDTH } from "../level";
 import type { AuthoredLake, River, RiverMaterial, Vec2 } from "../sim/types";
 import { buildFluidField } from "./fluidField";
+import { makeLakeGeometry } from "./lakeGeometry";
 import { makeWaterMaterial } from "./waterShader";
 
 // Universal renderer for hand-painted rivers. Reads from a `rivers` prop
@@ -251,23 +252,27 @@ const useRiverMaterials = (
   return mats;
 };
 
-// Authored lake — a rotated ellipse disc under the shared water shader's
+// Authored lake — an irregular shoreline mesh under the shared water shader's
 // pool variant (radial silhouette coordinates). Lifted a
 // hair below the river ribbons so a river feeding a lake draws on top of the
 // pool rather than z-fighting with it.
 const LAKE_Y_OFFSET = Y_OFFSET - 0.005;
 
-const LakeMesh = ({ lake, material }: { lake: AuthoredLake; material: THREE.ShaderMaterial }) => (
-  <mesh
-    position={[lake.pos.x, LAKE_Y_OFFSET, -lake.pos.y]}
-    rotation={[-Math.PI / 2, 0, lake.rot]}
-    scale={[lake.rx, lake.ry, 1]}
-    material={material}
-    renderOrder={0}
-  >
-    <circleGeometry args={[1, 40]} />
-  </mesh>
-);
+const LakeMesh = ({ lake, material }: { lake: AuthoredLake; material: THREE.ShaderMaterial }) => {
+  const geometry = useMemo(() => makeLakeGeometry(), []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <mesh
+      position={[lake.pos.x, LAKE_Y_OFFSET, -lake.pos.y]}
+      rotation={[-Math.PI / 2, 0, lake.rot]}
+      scale={[lake.rx, lake.ry, 1]}
+      material={material}
+      renderOrder={0}
+    >
+      <primitive object={geometry} attach="geometry" />
+    </mesh>
+  );
+};
 
 // Prod-safe — rivers are world data, not editor surface. The renderer ships
 // in both per-level and world-map scenes. Tree-shaking is driven by whether

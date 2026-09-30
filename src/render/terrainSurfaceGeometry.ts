@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { lakeDistance } from "../lakeShape";
 import { PATH_WIDTH } from "../level";
 import type { Vec2 } from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
@@ -24,14 +25,7 @@ export function fluidDistance(x: number, y: number, rivers: FluidRibbon[], lakes
       d = Math.min(d, Math.sqrt(distPointToSegSq(x, y, a.x, a.y, b.x, b.y)) - r.width / 2);
     }
   for (const l of lakes) {
-    const c = Math.cos(l.rot),
-      s = Math.sin(l.rot),
-      dx = x - l.x,
-      dy = y - l.y;
-    d = Math.min(
-      d,
-      (Math.hypot((c * dx + s * dy) / l.rx, (-s * dx + c * dy) / l.ry) - 1) * Math.min(l.rx, l.ry),
-    );
+    d = Math.min(d, lakeDistance(l, x, y));
   }
   return d;
 }

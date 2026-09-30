@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { lakeDistance } from "../lakeShape";
 import type { Vec2 } from "../sim/types";
 
 export type FluidRibbon = { points: Vec2[]; width: number };
@@ -65,21 +66,12 @@ export function buildFluidField(rivers: FluidRibbon[], lakes: FluidLake[]) {
   // Pools first; the deepest covering shape supplies the local current.
   for (const l of lakes) {
     const radius = Math.max(l.rx, l.ry);
-    const c = Math.cos(l.rot),
-      s = Math.sin(l.rot);
     paint(
       l.x - radius,
       l.y - radius,
       l.x + radius,
       l.y + radius,
-      (x, y) => {
-        const dx = x - l.x,
-          dy = y - l.y;
-        return (
-          (1 - Math.hypot((c * dx + s * dy) / l.rx, (-s * dx + c * dy) / l.ry)) *
-          Math.min(l.rx, l.ry)
-        );
-      },
+      (x, y) => -lakeDistance(l, x, y),
       0,
       0,
     );

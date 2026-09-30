@@ -17,6 +17,7 @@ import {
 } from "../editor/editorCore";
 import type { AuthoredLake, PlacedProp, River, Vec2 } from "../sim/types";
 import { InstancedGroup } from "./InstancedGroup";
+import { makeLakeGeometry } from "./lakeGeometry";
 import { collectMeshSource, type MeshSource } from "./meshSource";
 
 // Shared dev-only render + interaction layer for both editors. Renders the
@@ -970,7 +971,7 @@ const RiverPreviewSegment = ({
   );
 };
 
-// Per-lake overlay: a rim ring showing the ellipse the author is editing
+// Per-lake overlay: a rim ring showing the shoreline the author is editing
 // plus a centre handle to select and drag it. Under the river tool the same
 // rings render non-interactive, so the author can see where a river will be
 // captured by a lake mouth.
@@ -1021,6 +1022,8 @@ const LakeHandle = ({
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const capturePointerIdRef = useRef<number | null>(null);
   const color = isSelected ? "#ffd66a" : interactive ? "#76d6ff" : "#3aa8d8";
+  const rimGeometry = useMemo(() => makeLakeGeometry(true), []);
+  useEffect(() => () => rimGeometry.dispose(), [rimGeometry]);
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (!interactive) return;
@@ -1073,7 +1076,7 @@ const LakeHandle = ({
 
   return (
     <group position={[lake.pos.x, 0.16, -lake.pos.y]}>
-      {/* Rim ring — scaled unit ring so the ellipse's rotation and half-axes
+      {/* Rim ring — shared shoreline so the lake's rotation and half-axes
           read directly off the lake record. */}
       <mesh
         rotation={[-Math.PI / 2, 0, lake.rot]}
@@ -1081,7 +1084,7 @@ const LakeHandle = ({
         renderOrder={21}
         raycast={noRaycast}
       >
-        <ringGeometry args={[0.97, 1.0, 64]} />
+        <primitive object={rimGeometry} attach="geometry" />
         <meshBasicMaterial
           color={color}
           transparent
