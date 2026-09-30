@@ -17,6 +17,7 @@ import { LevelNode } from "./LevelNode";
 import { MapRoute } from "./MapRoute";
 import { MapOrbitControls } from "./useMapGestures";
 import { WorldMapEditorProps } from "./WorldMapEditorProps";
+import { WorldMapFog } from "./WorldMapFog";
 import { WorldMapOutposts } from "./WorldMapOutposts";
 import { WorldMapPrewarm } from "./WorldMapPrewarm";
 import { WorldMapRivers } from "./WorldMapRivers";
@@ -28,6 +29,7 @@ import {
   PAN_LIMIT_X,
   PAN_LIMIT_Z,
 } from "./worldMapBounds";
+import { isMapLevelDiscovered } from "./worldMapDiscovery";
 
 // Level node bounds span x: [-24, 22], y: [-14, 26] — content grew taller
 // after the 6-biome-band layout (alien band tops out at y=26).
@@ -188,6 +190,8 @@ const MapFocusTarget = ({ focus }: { focus: CameraFocus | null }) => {
 export const WorldMapScene = () => {
   const size = useThree((s) => s.size);
   const progress = useGame((s) => s.progress);
+  const activeSlot = useGame((s) => s.activeSlot);
+  const editorActive = useWorldMapEditor((s) => s.active);
   // Match useIsMobile (not a bare width check) so landscape phones — wider
   // than 720px but coarse-pointer / short-viewport — also get the focused
   // entry view instead of the desktop whole-map fit.
@@ -271,10 +275,13 @@ export const WorldMapScene = () => {
 
       {import.meta.env.DEV && <WorldMapEditorProps />}
 
-      {LEVELS.map((level) => (
-        <LevelNode key={level.id} level={level} />
-      ))}
+      {LEVELS.filter((level) => editorActive || isMapLevelDiscovered(level.id, progress)).map(
+        (level) => (
+          <LevelNode key={level.id} level={level} />
+        ),
+      )}
 
+      <WorldMapFog key={activeSlot ?? "no-slot"} />
       <WorldMapPrewarm />
     </>
   );

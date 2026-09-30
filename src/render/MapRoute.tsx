@@ -1,13 +1,16 @@
 import { Line } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
+import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { LEVELS } from "../levels";
 import { isLevelUnlocked } from "../progress";
 import { useGame } from "../store";
+import { isMapLevelDiscovered } from "./worldMapDiscovery";
 import { MAP_ROUTES } from "./worldMapLandscape";
 
 export const MapRoute = () => {
   const progress = useGame((s) => s.progress);
+  const editorActive = useWorldMapEditor((s) => s.active);
 
   type Seg = { id: number; outline: THREE.Vector3[]; fill: THREE.Vector3[] };
   const { reachedSegments, lockedSegments } = useMemo(() => {
@@ -17,6 +20,7 @@ export const MapRoute = () => {
     for (let i = 0; i < LEVELS.length - 1; i++) {
       const a = LEVELS[i];
       const b = LEVELS[i + 1];
+      if (!editorActive && !isMapLevelDiscovered(a.id, progress)) continue;
       const bothUnlocked = isLevelUnlocked(a.id, progress) && isLevelUnlocked(b.id, progress);
       const yOutline = 0.02;
       const yFill = 0.025;
@@ -30,7 +34,7 @@ export const MapRoute = () => {
     }
 
     return { reachedSegments: reached, lockedSegments: locked };
-  }, [progress]);
+  }, [progress, editorActive]);
 
   return (
     <group>

@@ -62,3 +62,12 @@ stochastic sampling and rotated tangent normals; low quality omits normals.
 The map uses `SceneryBatches` for bounded instancing and shares campaign
 `ResearchDeck`/`ServiceAnnex` architecture at six reserved regional sites.
 Procedural prop and facility erasure keys remain position-derived.
+
+World-map discovery is derived from standard campaign stars, with no additional
+save fields. Unlocked outposts reveal a local clearing; cleared outposts widen
+it. Only discovered node labels and outgoing route segments mount. `WorldMapFog`
+projects a single screen-covering quad onto the ground, so unseen scenery cannot
+protrude through the fog. Reveal history is transient and isolated per save slot;
+returning after a win eases newly earned radii outward, while resets clamp at once.
+Reduced motion freezes drift and skips reveal interpolation. The editor bypasses
+fog; finishing the full campaign removes it, while demo progress remains capped.
