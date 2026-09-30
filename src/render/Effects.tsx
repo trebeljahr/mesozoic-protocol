@@ -12,6 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
+import { BallisticTracers } from "./BallisticTracers";
 import { CombatBillows } from "./CombatBillows";
 import { CryoWaves } from "./CryoWaves";
 import { FlameParticles } from "./FlameParticles";
@@ -171,7 +172,7 @@ export const Effects = () => {
         continue;
       }
       // Tower and cyan robot lightning share ChainArcsFx; keep one owner.
-      if (isLightningBeam(b.color)) continue;
+      if (b.ballistic || isLightningBeam(b.color)) continue;
 
       const pair = beamPairs[idx];
       const coreArr = pair.core.line.geometry.attributes.position.array as Float32Array;
@@ -231,6 +232,7 @@ export const Effects = () => {
     <SoftParticles>
       <group>
         <FlameParticles />
+        <BallisticTracers />
         <instancedMesh
           ref={particleRef}
           args={[undefined, undefined, MAX_PARTICLES]}

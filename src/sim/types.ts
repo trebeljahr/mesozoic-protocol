@@ -679,6 +679,7 @@ export type Projectile = {
 };
 
 export type Beam = {
+  ballistic?: { spawnedAt: number; speed: number; delay: number };
   id: EntityId;
   points: BeamPoint[];
   color: string;

@@ -299,8 +299,12 @@ const fireBulletFan = (
   }
   const source = robotMuzzlePoint(robot);
   for (let i = 0; i < rays; i++) {
-    const angle = facing - halfAngle + (2 * halfAngle * i) / (rays - 1);
-    createBeam(
+    // Stratified spread keeps the silhouette irregular without changing hits.
+    const seed = (world.nextEntityId * 0.61803398875) % 1;
+    const angle = facing - halfAngle + 2 * halfAngle * ((i + 0.2 + seed * 0.6) / rays);
+    const speed = 34 + seed * 12;
+    const delay = seed * 0.035;
+    const beam = createBeam(
       world,
       [
         source,
@@ -310,9 +314,10 @@ const fireBulletFan = (
           h: source.h,
         },
       ],
-      "#ffd24a",
-      0.09,
+      "#ffc475",
+      range / speed + delay + 0.04,
     );
+    beam.ballistic = { spawnedAt: world.time, speed, delay };
   }
   robot.shootFlashUntil = world.time + 0.14;
   emit(world, { type: "shoot", towerId: robot.id, towerKind: "pulse", pos: robot.pos });
