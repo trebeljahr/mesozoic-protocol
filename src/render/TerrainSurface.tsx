@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useMemo } from "react";
 import { BIOME_STYLE } from "../biomes";
 import { useGame } from "../store";
+import { TERRAIN_EDGE } from "./terrainPalette";
 import { TerrainSoilMaterial } from "./TerrainSoilMaterial";
 import { buildTerrainSurface } from "./terrainSurfaceGeometry";
 
@@ -13,13 +14,13 @@ export const TerrainSurface = () => {
   const geometry = useMemo(() => {
     // Authored layouts retain their exact rendering; their fluid curves
     // need the editor's spline sampling before this surface can be reused.
-    if (override || (level !== 4 && !flow)) return null;
+    if (override) return null;
     return buildTerrainSurface(
       paths,
       flow?.rivers ?? [],
       flow?.lakes ?? [],
       BIOME_STYLE[biome].groundColor,
-      level === 4,
+      true,
       biome === "lava"
         ? { wet: "#332822", gravel: "#5a4636" }
         : biome === "alien"
@@ -31,13 +32,9 @@ export const TerrainSurface = () => {
   if (!geometry) return null;
   return (
     <mesh geometry={geometry} receiveShadow raycast={() => {}}>
-      {level === 4 ? (
-        <Suspense fallback={<meshStandardMaterial color="#625d4e" roughness={0.98} />}>
-          <TerrainSoilMaterial groundColor="#59594c" />
-        </Suspense>
-      ) : (
-        <meshStandardMaterial vertexColors roughness={0.98} />
-      )}
+      <Suspense fallback={<meshStandardMaterial vertexColors roughness={0.98} />}>
+        <TerrainSoilMaterial groundColor={TERRAIN_EDGE[biome]} biome={biome} />
+      </Suspense>
     </mesh>
   );
 };

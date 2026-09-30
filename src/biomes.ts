@@ -389,9 +389,9 @@ const DESERT_LAYERS: BiomeLayerSpec = [
   {
     seed: 4242,
     urls: [
-      "/models/biomes/desert/Rock1.glb",
-      "/models/biomes/desert/Rock2.glb",
-      "/models/biomes/desert/Rock3.glb",
+      "/models/natural/DesertRock1.glb",
+      "/models/natural/DesertRock2.glb",
+      "/models/natural/DesertRock3.glb",
     ],
     count: 18,
     clearance: PATH_WIDTH / 2 + 0.9,
@@ -413,9 +413,9 @@ const DESERT_LAYERS: BiomeLayerSpec = [
     // clearable, so they got mistaken for stuck obstacles.
     seed: 5959,
     urls: [
-      "/models/biomes/desert/Rock1.glb",
-      "/models/biomes/desert/Rock2.glb",
-      "/models/biomes/desert/Rock3.glb",
+      "/models/natural/DesertRock1.glb",
+      "/models/natural/DesertRock2.glb",
+      "/models/natural/DesertRock3.glb",
     ],
     count: 140,
     clearance: GROUND_COVER_CLEARANCE,
@@ -433,7 +433,7 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // Rock2 + Rock3 pulled — both render as hollow/shelf half-domes you can
     // see into, which reads as a broken mesh (open interior). Rock1 is the
     // solid variant that stays.
-    urls: ["/models/biomes/snow/Rock1.glb"],
+    urls: ["/models/natural/SnowRock1.glb"],
     count: 8,
     clearance: PATH_WIDTH / 2 + 0.9,
     minScale: 0.7,
@@ -460,9 +460,9 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // A single conifer family keeps the young-tree layer coherent with the
     // mature grove silhouettes; archived source models remain on disk.
     urls: [
-      "/models/biomes/snow/PineTreeSnow1.glb",
-      "/models/biomes/snow/PineTreeSnow2.glb",
-      "/models/biomes/snow/PineTreeSnow4.glb",
+      "/models/natural/SnowPine1.glb",
+      "/models/natural/SnowPine2.glb",
+      "/models/natural/SnowPine4.glb",
     ],
     count: 12,
     clearance: PATH_WIDTH / 2 + 1.0,
@@ -546,7 +546,7 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // as frosted pebbles. Same model as the chunky blocker layer so the
     // material reads as a family; size differential keeps the role clear.
     seed: 5959,
-    urls: ["/models/biomes/snow/Rock1.glb"],
+    urls: ["/models/natural/SnowRock1.glb"],
     count: 30,
     clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.13,
@@ -598,11 +598,11 @@ const WASTELAND_LAYERS: BiomeLayerSpec = [
   {
     seed: 4242,
     urls: [
-      "/models/biomes/wasteland/Rock1.glb",
-      "/models/biomes/wasteland/Rock2.glb",
-      "/models/biomes/wasteland/Rock3.glb",
-      "/models/biomes/wasteland/Rock4.glb",
-      "/models/biomes/wasteland/Rock5.glb",
+      "/models/natural/WasteRock1.glb",
+      "/models/natural/WasteRock2.glb",
+      "/models/natural/WasteRock3.glb",
+      "/models/natural/WasteRock4.glb",
+      "/models/natural/WasteRock5.glb",
     ],
     count: 20,
     clearance: PATH_WIDTH / 2 + 0.8,
@@ -619,11 +619,11 @@ const WASTELAND_LAYERS: BiomeLayerSpec = [
     // with debris instead of barren. Non-blocking.
     seed: 3131,
     urls: [
-      "/models/biomes/wasteland/Rock1.glb",
-      "/models/biomes/wasteland/Rock2.glb",
-      "/models/biomes/wasteland/Rock3.glb",
-      "/models/biomes/wasteland/Rock4.glb",
-      "/models/biomes/wasteland/Rock5.glb",
+      "/models/natural/WasteRock1.glb",
+      "/models/natural/WasteRock2.glb",
+      "/models/natural/WasteRock3.glb",
+      "/models/natural/WasteRock4.glb",
+      "/models/natural/WasteRock5.glb",
     ],
     count: 80,
     clearance: GROUND_COVER_CLEARANCE,
@@ -663,11 +663,11 @@ const LAVA_LAYERS: BiomeLayerSpec = [
   {
     seed: 4242,
     urls: [
-      "/models/biomes/wasteland/Rock1.glb",
-      "/models/biomes/wasteland/Rock2.glb",
-      "/models/biomes/wasteland/Rock3.glb",
-      "/models/biomes/wasteland/Rock4.glb",
-      "/models/biomes/wasteland/Rock5.glb",
+      "/models/natural/WasteRock1.glb",
+      "/models/natural/WasteRock2.glb",
+      "/models/natural/WasteRock3.glb",
+      "/models/natural/WasteRock4.glb",
+      "/models/natural/WasteRock5.glb",
     ],
     count: 14,
     clearance: PATH_WIDTH / 2 + 0.8,
@@ -697,11 +697,11 @@ const LAVA_LAYERS: BiomeLayerSpec = [
     // on the near-black basin every chunk is a high-contrast mark.
     seed: 3131,
     urls: [
-      "/models/biomes/wasteland/Rock1.glb",
-      "/models/biomes/wasteland/Rock2.glb",
-      "/models/biomes/wasteland/Rock3.glb",
-      "/models/biomes/wasteland/Rock4.glb",
-      "/models/biomes/wasteland/Rock5.glb",
+      "/models/natural/WasteRock1.glb",
+      "/models/natural/WasteRock2.glb",
+      "/models/natural/WasteRock3.glb",
+      "/models/natural/WasteRock4.glb",
+      "/models/natural/WasteRock5.glb",
     ],
     count: 70,
     clearance: GROUND_COVER_CLEARANCE,
@@ -762,9 +762,9 @@ const ALIEN_LAYERS: BiomeLayerSpec = [
   {
     seed: 4242,
     urls: [
-      "/models/biomes/wasteland/Rock1.glb",
-      "/models/biomes/wasteland/Rock3.glb",
-      "/models/biomes/wasteland/Rock5.glb",
+      "/models/natural/WasteRock1.glb",
+      "/models/natural/WasteRock3.glb",
+      "/models/natural/WasteRock5.glb",
     ],
     count: 22,
     clearance: PATH_WIDTH / 2 + 0.9,
@@ -888,10 +888,10 @@ export const BIOME_TREE_URLS: Record<Biome, string[]> = {
     "/models/biomes/desert/Tree4.glb",
   ],
   snow: [
-    "/models/biomes/snow/PineTreeSnow1.glb",
-    "/models/biomes/snow/PineTreeSnow2.glb",
-    "/models/biomes/snow/PineTreeSnow4.glb",
-    "/models/biomes/snow/PineTreeSnow1.glb",
+    "/models/natural/SnowPine1.glb",
+    "/models/natural/SnowPine2.glb",
+    "/models/natural/SnowPine4.glb",
+    "/models/natural/SnowPine1.glb",
   ],
   wasteland: [
     "/models/biomes/wasteland/Tree1.glb",

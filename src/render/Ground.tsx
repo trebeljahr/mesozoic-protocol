@@ -1,3 +1,4 @@
+import { TERRAIN_EDGE } from "./terrainPalette";
 import { useGLTF } from "@react-three/drei";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useRef } from "react";
@@ -441,7 +442,7 @@ export const Ground = () => {
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[MAP_WIDTH * 6, MAP_HEIGHT * 8]} />
         <meshStandardMaterial
-          color={levelId === 4 && !overrideActive ? "#59594c" : style.groundColor}
+          color={!overrideActive ? TERRAIN_EDGE[biome] : style.groundColor}
           roughness={0.98}
           metalness={0}
         />

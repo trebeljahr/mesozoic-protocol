@@ -10,7 +10,7 @@ export const PathLine = () => {
   const paths = useGame((s) => s.world.paths);
   const biome = useGame((s) => s.world.biome);
   const pathDebug = useGame((s) => s.pathDebug);
-  const terrainPath = useGame((s) => s.world.levelId === 4 && !s.world.overrideActive);
+  const terrainPath = useGame((s) => !s.world.overrideActive);
   const style = BIOME_STYLE[biome];
   const pathsWithIds = useMemo(
     () =>

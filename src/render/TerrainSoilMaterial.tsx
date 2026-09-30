@@ -1,6 +1,8 @@
 import { useLoader, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
+import type { Biome } from "../biomes";
+import { TERRAIN_PALETTE } from "./terrainPalette";
 import { GRAPHICS_QUALITY } from "./effectsTunables";
 
 const LOW = GRAPHICS_QUALITY === "low";
@@ -23,7 +25,13 @@ const MAPS = [
 
 // Standard PBR lighting/shadows, with a world-scaled photographic surface.
 // No displacement: props, actors and the placement plane keep their heights.
-export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) => {
+export const TerrainSoilMaterial = ({
+  groundColor,
+  biome,
+}: {
+  groundColor: string;
+  biome: Biome;
+}) => {
   const sources = useLoader(
     THREE.TextureLoader,
     MAPS.map((name) => ROOT + name),
@@ -48,7 +56,13 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
       normalScale: new THREE.Vector2(0.32, 0.32),
       roughness: 1,
     });
+    const palette = TERRAIN_PALETTE[biome];
     mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uMineralTint = { value: new THREE.Color(palette.mineral) };
+      shader.uniforms.uRoadTint = { value: new THREE.Color(palette.road) };
+      shader.uniforms.uCoverTint = { value: new THREE.Color(palette.cover) };
+      shader.uniforms.uCoverAmount = { value: palette.coverAmount };
+      shader.uniforms.uForest = { value: biome === "forest" ? 1 : 0 };
       shader.uniforms.uRoadMap = { value: textures[2] };
       shader.uniforms.uRoadNormal = { value: textures[6] ?? null };
       shader.uniforms.uLeafMap = { value: textures[3] };
@@ -68,6 +82,8 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
           `#include <common>
           varying vec3 vTerrainSurface;
           uniform vec3 uTerrainEdgeColor;
+          uniform vec3 uMineralTint, uRoadTint, uCoverTint;
+          uniform float uCoverAmount, uForest;
           uniform sampler2D uRoadMap, uRoadNormal, uLeafMap, uGrassMap, uLeafNormal, uGrassNormal;
           vec2 surfaceHash(vec2 p) {
             return fract(sin(vec2(dot(p, vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)))) * 43758.5453);
@@ -131,6 +147,16 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
           vec3 road = mix(roadTex*3.4,vec3(0.38,0.285,0.17),0.38);
           vec3 surface = mix(soil,leaves,leafWeight);
           surface = mix(surface,grass,grassWeight);
+          if (uForest < 0.5) {
+            float grain = dot(soil,vec3(0.2126,0.7152,0.0722));
+            float fineGrain = dot(roadTex,vec3(0.2126,0.7152,0.0722));
+            surface = uMineralTint * (0.72 + grain*0.85);
+            surface = mix(surface,uCoverTint*(0.82+fineGrain*1.1),
+              smoothstep(0.22,0.78,habitat)*uCoverAmount*(1.0-vTerrainSurface.y));
+            road = uRoadTint * (0.5 + fineGrain*5.0);
+            leafWeight = 0.0;
+            grassWeight = 0.0;
+          }
           surface = mix(surface,road,vTerrainSurface.x);
           diffuseColor *= vec4(surface,1.0);
         `,
@@ -171,9 +197,9 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
             ),
         );
     };
-    mat.customProgramCacheKey = () => "terrain-stochastic-soil-v4";
+    mat.customProgramCacheKey = () => "terrain-stochastic-biomes-v2";
     return { mat, textures };
-  }, [sources, gl, groundColor]);
+  }, [sources, gl, groundColor, biome]);
   useEffect(
     () => () => {
       material.mat.dispose();

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import * as THREE from "three";
+import type { Biome } from "../biomes";
 import type { Outpost, Vec2 } from "../sim/types";
 import { BattleDamage, ScorchMark } from "./BattleDamage";
 import { CANISTER_PALETTE } from "./biomeColors";
@@ -157,7 +158,13 @@ export const ContainmentWallRun = ({ wall }: { wall: ContainmentWall }) => {
 // This replaces the former solar pod inside its EXISTING reserved circle.
 // Low open work deck, two connected tanks and a service cabinet: no new
 // closed room or fake barrier across the pilot's traversable ground.
-export const ResearchDeck = ({ outpost }: { outpost: Outpost }) => {
+export const ResearchDeck = ({
+  outpost,
+  biome = "forest",
+}: {
+  outpost: Outpost;
+  biome?: Biome;
+}) => {
   const scale = Math.min(1, outpost.radius / 4.12);
   const service: PlacedOutpost[] = useMemo(
     () => [
@@ -191,7 +198,7 @@ export const ResearchDeck = ({ outpost }: { outpost: Outpost }) => {
           worldX={0}
           worldZ={0}
           yaw={0}
-          palette={CANISTER_PALETTE.forest}
+          palette={CANISTER_PALETTE[biome]}
           seed={41}
         />
       </group>
@@ -200,7 +207,7 @@ export const ResearchDeck = ({ outpost }: { outpost: Outpost }) => {
           worldX={0}
           worldZ={0}
           yaw={0.4}
-          palette={CANISTER_PALETTE.forest}
+          palette={CANISTER_PALETTE[biome]}
           seed={47}
         />
       </group>
@@ -216,10 +223,14 @@ export const ResearchDeck = ({ outpost }: { outpost: Outpost }) => {
 // The same restrained service architecture fits the two existing outer
 // colony reservations. Roofs sit outside the pilot rectangle; doors face the
 // compound, with tanks and crates grouped on an attached apron.
-const ServiceAnnex = ({ outpost }: { outpost: Outpost }) => {
+const ServiceAnnex = ({ outpost, biome = "forest" }: { outpost: Outpost; biome?: Biome }) => {
   const west = outpost.pos.x < 0;
   return (
-    <group position={[outpost.pos.x, 0, -outpost.pos.y]} rotation={[0, west ? Math.PI / 2 : 0, 0]}>
+    <group
+      position={[outpost.pos.x, 0, -outpost.pos.y]}
+      rotation={[0, west ? Math.PI / 2 : 0, 0]}
+      scale={Math.min(1, outpost.radius / 4.5)}
+    >
       <Block at={[0, 0.1, 0]} size={[6.8, 0.2, 5.2]} color={STEEL} />
       <Block at={[-0.4, 1.25, -0.8]} size={[5.7, 2.3, 3.1]} />
       <Block at={[-0.4, 2.46, -0.8]} size={[6, 0.16, 3.4]} color={EDGE} />
@@ -237,7 +248,7 @@ const ServiceAnnex = ({ outpost }: { outpost: Outpost }) => {
           worldX={0}
           worldZ={0}
           yaw={0}
-          palette={CANISTER_PALETTE.forest}
+          palette={CANISTER_PALETTE[biome]}
           seed={outpost.id + 80}
         />
       </group>
@@ -298,14 +309,20 @@ const BreachDebris = () => (
 export const ContainmentCompound = ({
   outposts,
   paths,
+  biome = "forest",
+  perimeter = true,
 }: {
+  biome?: Biome;
+  perimeter?: boolean;
   outposts: Outpost[];
   paths: Vec2[][];
 }) => {
   const walls = useMemo(
     () =>
-      hasMarshPerimeter(outposts) ? MARSH_WALLS.filter((w) => wallClearsRoutes(w, paths)) : [],
-    [outposts, paths],
+      perimeter && hasMarshPerimeter(outposts)
+        ? MARSH_WALLS.filter((w) => wallClearsRoutes(w, paths))
+        : [],
+    [outposts, paths, perimeter],
   );
   return (
     <group>
@@ -321,12 +338,12 @@ export const ContainmentCompound = ({
       {outposts
         .filter((o) => !o.interior && o.pos.x < 0)
         .map((o) => (
-          <ServiceAnnex key={o.id} outpost={o} />
+          <ServiceAnnex key={o.id} outpost={o} biome={biome} />
         ))}
       {outposts
         .filter((o) => o.interior)
         .map((o) => (
-          <ResearchDeck key={o.id} outpost={o} />
+          <ResearchDeck key={o.id} outpost={o} biome={biome} />
         ))}
     </group>
   );
