@@ -54,6 +54,7 @@ export type TowerFinish = { metalness: number; roughness: number };
 // tint colour is what the player actually sees.
 export const TOWER_FINISH: Partial<Record<TowerKind, TowerFinish>> = {
   pulse: { metalness: 0.05, roughness: 0.68 },
+  chain: { metalness: 0.05, roughness: 0.68 },
 };
 
 const tier = (upgrades: TowerUpgrades) => ({
@@ -143,47 +144,43 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
       //   x=16 #33085F dark purple base of coil
       //   x=20 #232B39 dark navy shroud
       //
-      // Path A (Arc Reach) handles the orb in TowerVfx; here we use it
-      // to subtly lift the navy shroud so a high-reach chain reads as
-      // "alert / scanning". Path B (Voltage) is the dominant signal:
-      // drifts the purple coils toward a saturated royal blue and
-      // deepens the base.
+      // Arc Reach (A) recolours the broad housing and shroud, so its
+      // investment stays readable even when the orb is dim or obscured.
+      // Voltage (B) owns the coils independently. Deliberate hue steps
+      // keep adjacent tiers distinct instead of blending similar blues.
+      // A stays teal/cyan while B stays magenta/indigo/blue, including
+      // mixed upgrades. The dark foot anchors both against the terrain.
       const coilPurple: [number, number, number] = [
         [0.486, 0.071, 0.863],
-        [0.4, 0.2, 0.9],
-        [0.28, 0.35, 0.95],
-        [0.18, 0.45, 1.0],
+        [0.9, 0.025, 0.42],
+        [0.24, 0.035, 0.95],
+        [0.025, 0.38, 1.0],
       ][b] as [number, number, number];
       const coilPurpleDark: [number, number, number] = [
         [0.2, 0.031, 0.373],
-        [0.15, 0.1, 0.45],
-        [0.1, 0.18, 0.55],
-        [0.06, 0.25, 0.66],
+        [0.46, 0.012, 0.16],
+        [0.1, 0.015, 0.5],
+        [0.012, 0.17, 0.62],
       ][b] as [number, number, number];
       const navyShroud: [number, number, number] = [
         [0.137, 0.169, 0.224],
-        [0.16, 0.22, 0.32],
-        [0.18, 0.28, 0.42],
-        [0.2, 0.36, 0.55],
+        [0.015, 0.32, 0.16],
+        [0.015, 0.6, 0.46],
+        [0.035, 0.85, 0.95],
       ][a] as [number, number, number];
       const grayMid: [number, number, number] = [
         [0.192, 0.192, 0.192],
-        [0.18, 0.2, 0.24],
-        [0.16, 0.22, 0.3],
-        [0.14, 0.24, 0.36],
-      ][b] as [number, number, number];
-      const baseBlack: [number, number, number] = [
-        [0.086, 0.075, 0.063],
-        [0.07, 0.08, 0.1],
-        [0.06, 0.09, 0.13],
-        [0.05, 0.1, 0.16],
-      ][b] as [number, number, number];
+        [0.02, 0.25, 0.12],
+        [0.025, 0.46, 0.34],
+        [0.045, 0.68, 0.78],
+      ][a] as [number, number, number];
+      const baseBlack: [number, number, number] = [0.086, 0.075, 0.063];
       const warmDark: [number, number, number] = [
         [0.22, 0.2, 0.184],
-        [0.2, 0.21, 0.22],
-        [0.18, 0.22, 0.26],
-        [0.16, 0.24, 0.32],
-      ][b] as [number, number, number];
+        [0.012, 0.14, 0.065],
+        [0.015, 0.28, 0.2],
+        [0.025, 0.43, 0.51],
+      ][a] as [number, number, number];
       return [
         {
           kind: "atlas",
