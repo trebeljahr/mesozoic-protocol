@@ -1,112 +1,89 @@
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import type { Biome } from "../biomes";
 import type { Vec2 } from "../sim/types";
-import { BattleDamage, ScorchMark } from "./BattleDamage";
-import { HQ_GUN_DECK_HEIGHT } from "./commandBaseLayout";
+import { commandComplexPlan, HQ_CONNECTOR_WIDTH } from "./commandBaseLayout";
+import { COMMAND_PALETTES, commandBuildingPlan } from "./commandBuildingPlan";
+import type { BaseBlock } from "./modularBasePlan";
 
-const GUN_DECK_CAP_THICKNESS = 0.12;
-const GUN_DECK_SUPPORT_HEIGHT = HQ_GUN_DECK_HEIGHT - GUN_DECK_CAP_THICKNESS;
+const noRaycast: THREE.Mesh["raycast"] = () => {};
+type Panel = BaseBlock & { yaw: number };
 
-// Command building with a forward roof deck for the functional defence turret.
-// Local +Z faces the route. Footprint remains within the existing HQ reservation.
-const Block = ({
-  p,
-  size,
-  color = "#737b77",
-  metal = 0.15,
+/** Command wings and rear service galleries share one instanced draw call. */
+export const CommandBase = ({
+  paths,
+  biome = "forest",
+  seed = 0,
 }: {
-  p: [number, number, number];
-  size: [number, number, number];
-  color?: string;
-  metal?: number;
-}) => (
-  <mesh position={p} castShadow receiveShadow raycast={() => {}}>
-    <boxGeometry args={size} />
-    <meshStandardMaterial color={color} roughness={0.76} metalness={metal} />
-  </mesh>
-);
-
-export const CommandBase = ({ paths }: { paths: Vec2[][] }) => {
-  const poses = useMemo(
-    () =>
-      paths
-        .filter((p) => p.length > 1)
-        .map((path) => {
-          const end = path[path.length - 1],
-            prev = path[path.length - 2];
-          return { end, yaw: Math.atan2(prev.x - end.x, -(prev.y - end.y)) };
-        }),
-    [paths],
-  );
+  paths: Vec2[][];
+  biome?: Biome;
+  seed?: number;
+}) => {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const panels = useMemo(() => {
+    const { poses, links } = commandComplexPlan(paths);
+    const result: Panel[] = [];
+    for (const pose of poses) {
+      const cos = Math.cos(pose.yaw),
+        sin = Math.sin(pose.yaw);
+      for (const panel of commandBuildingPlan(biome, seed + pose.index))
+        result.push({
+          ...panel,
+          at: [
+            pose.end.x + panel.at[0] * cos + panel.at[2] * sin,
+            panel.at[1],
+            -pose.end.y - panel.at[0] * sin + panel.at[2] * cos,
+          ],
+          yaw: pose.yaw,
+        });
+    }
+    const [, trim, steel, lamp] = COMMAND_PALETTES[biome];
+    for (const link of links) {
+      const length = Math.hypot(link.b.x - link.a.x, link.b.y - link.a.y);
+      const yaw = Math.atan2(link.b.x - link.a.x, -(link.b.y - link.a.y));
+      const add = (y: number, height: number, width: number, color: string) =>
+        result.push({
+          at: [(link.a.x + link.b.x) / 2, y, -(link.a.y + link.b.y) / 2],
+          size: [width, height, length],
+          color,
+          yaw,
+        });
+      add(0.16, 0.24, HQ_CONNECTOR_WIDTH, steel);
+      add(0.92, 1.28, HQ_CONNECTOR_WIDTH * 0.72, steel);
+      add(1.72, 0.14, HQ_CONNECTOR_WIDTH, trim);
+      // Inset illuminated roof guide: a single continuous service spine.
+      add(1.8, 0.025, HQ_CONNECTOR_WIDTH * 0.28, lamp);
+    }
+    return result;
+  }, [paths, biome, seed]);
+  useLayoutEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const dummy = new THREE.Object3D(),
+      color = new THREE.Color();
+    panels.forEach((panel, i) => {
+      dummy.position.set(...panel.at);
+      dummy.rotation.set(0, panel.yaw, 0);
+      dummy.scale.set(...panel.size);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      mesh.setColorAt(i, color.set(panel.color));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [panels]);
+  if (!panels.length) return null;
   return (
-    <group>
-      {poses.map(({ end, yaw }) => (
-        <group key={`${end.x}:${end.y}`} position={[end.x, 0, -end.y]} rotation={[0, yaw, 0]}>
-          <Block p={[0, 0.1, -0.4]} size={[5.8, 0.2, 4.6]} color="#515a57" />
-          <Block p={[0, 0.24, -1.35]} size={[4.9, 0.28, 2.55]} color="#999d91" />
-          <Block p={[0, 1.1, -1.45]} size={[4.55, 1.6, 2.1]} color="#8c9185" />
-          <Block p={[0, 1.96, -1.45]} size={[4.85, 0.19, 2.4]} color="#444f4c" />
-          {/* Forward gun deck keeps the functional turret above the roofline. */}
-          {/* Stop the support at the cap underside: coplanar top faces flicker
-              through the turret shadow as the camera moves. */}
-          <Block
-            p={[0, GUN_DECK_SUPPORT_HEIGHT / 2, 0]}
-            size={[2.2, GUN_DECK_SUPPORT_HEIGHT, 2.15]}
-            color="#68736d"
-          />
-          <Block
-            p={[0, HQ_GUN_DECK_HEIGHT - GUN_DECK_CAP_THICKNESS / 2, 0]}
-            size={[2.5, GUN_DECK_CAP_THICKNESS, 2.45]}
-            color="#a3a795"
-          />
-          <BattleDamage position={[2.5, 0.22, -1.2]} seed={7} />
-          <ScorchMark
-            position={[2.281, 1.05, -1.2]}
-            rotation={[0, Math.PI / 2, 0]}
-            size={[1.8, 1.7]}
-          />
-          <group position={[-2.25, 1.8, -1.9]} rotation={[0.15, 0.1, -0.3]}>
-            <Block p={[0, 0, 0]} size={[0.7, 0.14, 0.7]} color="#434b45" />
-          </group>
-          {/* Recessed entrance and a continuous shaded observation band. */}
-          <Block p={[0, 0.88, -0.375]} size={[0.85, 1.25, 0.06]} color="#263b3a" />
-          <Block p={[0, 1.62, -0.15]} size={[1.35, 0.12, 0.65]} color="#454f4a" />
-          {[-1.5, 1.5].map((x) => (
-            <group key={x}>
-              <Block p={[x, 1.37, -0.38]} size={[1.25, 0.43, 0.07]} color="#233e40" metal={0.45} />
-              <Block p={[x, 1.64, -0.28]} size={[1.48, 0.1, 0.3]} color="#56615c" />
-              <Block p={[x, 0.58, -0.37]} size={[1.24, 0.06, 0.06]} color="#b08c51" />
-            </group>
-          ))}
-          {[-2.14, -0.57, 0.57, 2.14].map((x) => (
-            <Block key={x} p={[x, 1.13, -0.3]} size={[0.13, 1.53, 0.25]} color="#b3b2a0" />
-          ))}
-          {/* Roof service equipment, parapet and a modest communications mast. */}
-          <Block p={[0, 2.1, -2.52]} size={[4.8, 0.25, 0.13]} color="#80897f" />
-          {[-2.35, 2.35].map((x) => (
-            <Block key={x} p={[x, 2.1, -1.45]} size={[0.13, 0.25, 2.2]} color="#80897f" />
-          ))}
-          <Block p={[-1.25, 2.24, -1.5]} size={[1.3, 0.35, 1.1]} color="#63706b" />
-          {[-1.65, -1.45, -1.25, -1.05, -0.85].map((x) => (
-            <Block key={x} p={[x, 2.425, -1.5]} size={[0.055, 0.02, 0.85]} color="#263a37" />
-          ))}
-          <Block p={[0.8, 2.12, -1.5]} size={[1.6, 0.1, 1.45]} color="#233d4d" metal={0.5} />
-          {[0.2, 0.6, 1, 1.4].map((x) => (
-            <Block key={x} p={[x, 2.18, -1.5]} size={[0.025, 0.015, 1.4]} color="#798b8c" />
-          ))}
-          <mesh position={[1.85, 2.75, -2.15]} castShadow raycast={() => {}}>
-            <cylinderGeometry args={[0.035, 0.065, 1.5, 12]} />
-            <meshStandardMaterial color="#b5b7ac" roughness={0.5} metalness={0.6} />
-          </mesh>
-          <Block p={[1.85, 3.35, -2.15]} size={[0.7, 0.045, 0.045]} color="#afb8af" />
-          {/* The turret retains the clear apron in front of the doorway. */}
-          {[-2.5, 2.5].map((x) => (
-            <group key={x}>
-              <Block p={[x, 0.45, 1.35]} size={[0.28, 0.8, 0.28]} color="#465653" />
-              <Block p={[x, 0.86, 1.35]} size={[0.32, 0.08, 0.32]} color="#add1c5" />
-            </group>
-          ))}
-        </group>
-      ))}
-    </group>
+    <instancedMesh
+      ref={ref}
+      args={[undefined, undefined, panels.length]}
+      castShadow
+      receiveShadow
+      raycast={noRaycast}
+    >
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial roughness={0.78} metalness={0.18} />
+    </instancedMesh>
   );
 };

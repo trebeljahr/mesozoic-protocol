@@ -7,6 +7,8 @@ import { distToSegmentSq } from "../sim/vec2";
 import { TOWER_FOOTPRINT } from "../sim/world";
 import { useGame } from "../store";
 import { CommandBase } from "./CommandBase";
+import { commandComplexPlan, overlapsCommandLink } from "./commandBaseLayout";
+import { commandBuildingPlan } from "./commandBuildingPlan";
 import {
   DEAD_DINO_SPECS,
   DeadDinoInstancer,
@@ -311,14 +313,16 @@ const FencePostsOffset = ({ items, sign }: { items: PrimitiveInstance[]; sign: 1
 export const HQBase = () => {
   const paths = useGame((s) => s.world.paths);
   const levelId = useGame((s) => s.world.levelId);
+  const biome = useGame((s) => s.world.biome);
+  const complex = useMemo(() => commandComplexPlan(paths), [paths]);
   const towerVersion = useGame((s) => s.ui.towerVersion);
   const towers = useGame.getState().world.towers;
 
   const { primitives } = useMemo(() => {
     const primitiveList: PrimitiveInstance[] = [];
 
-    for (const path of paths) {
-      if (path.length < 2) continue;
+    for (const pose of complex.poses) {
+      const path = paths[pose.index];
       const last = path[path.length - 1];
       const prev = path[path.length - 2];
       const dx = prev.x - last.x;
@@ -329,10 +333,34 @@ export const HQBase = () => {
       const rightX = faceY;
       const rightY = -faceX;
       const yaw = Math.atan2(dx, -dy);
+      const panels = commandBuildingPlan(biome, levelId + pose.index);
 
       for (const def of BASE_PRIMITIVES) {
         const wx = last.x + def.right * rightX + def.fwd * faceX;
         const wy = last.y + def.right * rightY + def.fwd * faceY;
+        const pos = { x: wx, y: wy };
+        const localX = (wx - last.x) * Math.cos(yaw) + (wy - last.y) * Math.sin(yaw);
+        const localZ = (wx - last.x) * Math.sin(yaw) - (wy - last.y) * Math.cos(yaw);
+        if (
+          def.kind === "fence" &&
+          panels.some((panel) => {
+            if (panel.at[1] + panel.size[1] / 2 < 0.5) return false;
+            const px = Math.max(0, Math.abs(localX - panel.at[0]) - panel.size[0] / 2);
+            const pz = Math.max(0, Math.abs(localZ - panel.at[2]) - panel.size[2] / 2);
+            return Math.hypot(px, pz) < (def.length ?? 1) / 2 + 0.1;
+          })
+        )
+          continue;
+        if (overlapsCommandLink(pos, (def.length ?? 0.6) / 2, complex.links)) continue;
+        if (
+          complex.poses.some(
+            (other) =>
+              other.index !== pose.index &&
+              other.group === pose.group &&
+              Math.hypot(wx - other.end.x, wy - other.end.y) < 3.35,
+          )
+        )
+          continue;
         primitiveList.push({
           kind: def.kind,
           pos: { x: wx, y: wy },
@@ -343,7 +371,7 @@ export const HQBase = () => {
       }
     }
     return { primitives: primitiveList };
-  }, [paths]);
+  }, [paths, complex, biome, levelId]);
 
   // Only the perimeter fence/lights cull around towers + the path; the
   // command base itself is a fixed fixture on the pad.
@@ -505,6 +533,7 @@ export const HQBase = () => {
         }
         if (blocked) continue;
 
+        if (overlapsCommandLink({ x: wx, y: wy }, corpseR, complex.links)) continue;
         placedHere.push({ x: wx, y: wy, r: corpseR });
         const item: DeadDinoItem = {
           id: `hq-${levelId}-${pathIndex}-${si}-${spec.url}`,
@@ -519,12 +548,12 @@ export const HQBase = () => {
       }
     }
     return Array.from(byUrl.entries());
-  }, [paths, levelId, primitives]);
+  }, [paths, levelId, primitives, complex]);
 
   return (
     <>
       <BasePrimitives items={visiblePrimitives} />
-      <CommandBase paths={paths} />
+      <CommandBase paths={paths} biome={biome} seed={levelId} />
       {corpseGroups.map(([url, items]) => (
         <DeadDinoInstancer key={url} url={url} items={items} />
       ))}
