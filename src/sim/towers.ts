@@ -457,7 +457,7 @@ const spawnFlameStream = (world: World, t: Tower, target: Enemy) => {
   spawnParticles(
     world,
     nozzle,
-    4,
+    2,
     "#ffa040",
     speedRange(orangeLife, 0.9),
     orangeLife,
@@ -468,7 +468,7 @@ const spawnFlameStream = (world: World, t: Tower, target: Enemy) => {
   spawnParticles(
     world,
     nozzle,
-    2,
+    1,
     "#e8492a",
     speedRange(redLife, 1.0),
     redLife,

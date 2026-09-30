@@ -1,0 +1,28 @@
+{
+  "asset": "flame-billow-atlas.png",
+  "origin": "Original generated VFX artwork; not extracted from Factorio",
+  "generator": "Built-in image_gen tool",
+  "created": "2026-10-01",
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frames": 16,
+    "frameWidth": 256,
+    "frameHeight": 256,
+    "order": "left-to-right, top-to-bottom"
+  },
+  "processing": "Resized the transparent 1254x1254 source to 1024x1024 RGBA with sharp. Mipmapped at runtime to reduce shimmer and texture bandwidth at gameplay zoom; padded cells, cell inset and border fade suppress atlas bleeding.",
+  "prompt": "Create a production game VFX texture atlas: exactly 4 columns by 4 rows, 16 equal square cells on a square transparent RGBA image, no borders or text. Each cell contains ONE isolated small rounded billow of turbulent burning fuel, centered with at least 12% fully transparent padding on ALL sides. Read left to right then top to bottom as 16 successive animation frames of the same rolling flame puff, gradually evolving its internal curls, not a growth/explosion sequence; roughly constant volume and luminosity across all frames. This is for overlapping particles in a flamethrower stream in a top-down industrial strategy game. Look: realistic pre-rendered volumetric fire simulation, rich amber and orange translucent outer folds, bright yellow pockets, small pale cream hot regions, detailed lacy wisps and irregular soft scalloped silhouettes, many rounded rolling lobes and dark transparent holes, high contrast within each puff. Light rolls through the gas. Compact squat roughly circular or oval billows, NOT a standing campfire, NOT triangular or conical, NOT a teardrop, NOT an arrowhead. No black smoke, no sparks, no ground, no source nozzle, no shadows, no background glow disk, no drawn outlines, no hard geometric shapes, no grid lines, no numbers, no watermark. Fire wisps must dissolve fully to transparent before each cell boundary. Consistent cell centers, clean transparent background. Original artwork.",
+  "techniqueReferences": [
+    "https://www.factorio.com/blog/post/fff-172",
+    "https://www.factorio.com/blog/post/fff-146",
+    "https://www.opengl-tutorial.org/intermediate-tutorials/billboards-particles/particles-instancing/"
+  ],
+  "runtimeBudget": {
+    "maximumSprites": 768,
+    "lowQualityMaximumSprites": 384,
+    "textureReadsPerFragment": 2,
+    "drawCallsPerScenePass": 1,
+    "rgbaTextureBytesIncludingMipmaps": 5592404
+  }
+}
