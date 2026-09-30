@@ -56,7 +56,10 @@ for (const asset of catalog.assets) {
 const manifest = `${JSON.stringify({ schemaVersion: 1, selection: catalog.selection, assets: entries, missing: catalog.missing }, null, 2)}\n`;
 const manifestPath = resolve(current, "manifest.json");
 if (check) {
-  if ((await readFile(manifestPath, "utf8")) !== manifest) {
+  if (
+    JSON.stringify(JSON.parse(await readFile(manifestPath, "utf8"))) !==
+    JSON.stringify(JSON.parse(manifest))
+  ) {
     throw new Error("Manifest is stale. Run pnpm assets:store and review the diff.");
   }
 } else {
