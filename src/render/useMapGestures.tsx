@@ -5,6 +5,8 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 export type MapGestureConfig = {
+  // PlayScene orders this clamp before camera shake and simulation.
+  framePriority?: number;
   panLimitX: number;
   panLimitZ: number;
   // Optional dynamic limits keyed off current camera zoom. When provided,
@@ -36,6 +38,7 @@ export type MapGestureConfig = {
 export const MapOrbitControls = forwardRef<OrbitControlsImpl | null, MapGestureConfig>(
   function MapOrbitControls(
     {
+      framePriority = 0,
       panLimitX,
       panLimitZ,
       panLimitFor,
@@ -80,7 +83,7 @@ export const MapOrbitControls = forwardRef<OrbitControlsImpl | null, MapGestureC
         c.object.position.y += dy;
         c.object.position.z += dz;
       }
-    });
+    }, framePriority);
 
     useDragGate(controlsRef, reserveLeftClick, gl, toolOwnsPointerRef);
 

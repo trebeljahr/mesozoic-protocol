@@ -16,6 +16,7 @@ import {
   START_ZOOM_MULT,
   TILT_HALF_FACTOR,
 } from "./cameraFraming";
+import { PLAY_CAMERA_FRAME_PRIORITY, PLAY_PAN_CLAMP_FRAME_PRIORITY } from "./playFrameOrder";
 import { MapOrbitControls } from "./useMapGestures";
 
 export const CameraRig = () => {
@@ -160,7 +161,7 @@ export const CameraRig = () => {
       last.x = desiredX;
       last.z = desiredZ;
     }
-  });
+  }, PLAY_CAMERA_FRAME_PRIORITY);
 
   return (
     <>
@@ -174,6 +175,7 @@ export const CameraRig = () => {
         far={200}
       />
       <MapOrbitControls
+        framePriority={PLAY_PAN_CLAMP_FRAME_PRIORITY}
         ref={controlsRef}
         panLimitX={0}
         panLimitZ={0}

@@ -13,9 +13,11 @@ import { BOSS_VARIANT_FOOTSTEP } from "../sim/world";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
 import { disposeModelInstance } from "./disposeModelInstance";
+import { useEnemyRenderPartition } from "./EnemyRenderPartitionProvider";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
 import { measureVisibleBox } from "./measureModel";
 import { OUTLINE_LAYER } from "./PaintedPostFx";
+import { ENEMY_MODEL_FRAME_PRIORITY } from "./playFrameOrder";
 
 type Props = {
   kind: EnemyKind;
@@ -34,6 +36,7 @@ type Props = {
 
 type Item = {
   enemyId: number;
+  lastLiveFrame: number;
   obj: THREE.Object3D;
   proxy: THREE.Mesh | null;
   mixer: THREE.AnimationMixer;
@@ -152,6 +155,7 @@ export const ModelEnemyMesh = ({
   timeScale = 1,
   bossVariant,
 }: Props) => {
+  const partition = useEnemyRenderPartition();
   const { scene, animations } = useGLTF(url);
   const groupRef = useRef<THREE.Group>(null);
   const itemsRef = useRef<Map<number, Item>>(new Map());
@@ -305,7 +309,8 @@ export const ModelEnemyMesh = ({
   useFrame((_, delta) => {
     const parent = groupRef.current;
     if (!parent) return;
-    const { world } = useGame.getState();
+    const world = partition.world;
+    if (!world) return;
     if (worldRef.current !== null && worldRef.current !== world) {
       for (const [, item] of itemsRef.current) recycleOrDispose(item);
       itemsRef.current.clear();
@@ -313,16 +318,8 @@ export const ModelEnemyMesh = ({
     worldRef.current = world;
     const frozen = world.status !== "running";
 
-    const live = new Set<number>();
-    for (const e of world.enemies) {
-      if (e.kind !== kind) continue;
-      // Boss meshes are partitioned by variant: each variant owns its own
-      // GLB, so the apex apatosaurus mesh shouldn't claim a raptor
-      // matriarch entity. When `bossVariant` is unset on Props (kind !==
-      // "boss"), this branch is a no-op.
-      if (bossVariant !== undefined && e.bossVariant !== bossVariant) continue;
-      if (!e.alive) continue;
-      live.add(e.id);
+    const { enemies } = partition.get(kind, bossVariant);
+    for (const e of enemies) {
       let item = itemsRef.current.get(e.id);
       if (!item) {
         const recycled = poolRef.current.pop();
@@ -415,6 +412,7 @@ export const ModelEnemyMesh = ({
 
           item = {
             enemyId: e.id,
+            lastLiveFrame: partition.frame,
             obj,
             proxy,
             mixer,
@@ -434,6 +432,8 @@ export const ModelEnemyMesh = ({
         }
         itemsRef.current.set(e.id, item);
       }
+      // Mark both new and pooled items; missing items retain an older frame.
+      item.lastLiveFrame = partition.frame;
 
       const leak = e.leak;
       // Stash for the dead-detection pass: leaked enemies (made it to
@@ -596,7 +596,7 @@ export const ModelEnemyMesh = ({
     }
 
     for (const [id, item] of itemsRef.current) {
-      if (live.has(id)) continue;
+      if (item.lastLiveFrame === partition.frame) continue;
 
       if (item.dying) {
         // Death anim in flight: keep ticking the mixer (or tilt-fall the
@@ -668,7 +668,7 @@ export const ModelEnemyMesh = ({
         item.dyingDuration = DEATH_FALLBACK_SEC;
       }
     }
-  });
+  }, ENEMY_MODEL_FRAME_PRIORITY);
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (useEditor.getState().active) {

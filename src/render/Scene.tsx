@@ -16,6 +16,7 @@ import { EasterEggs } from "./EasterEggs";
 import { EditorEasterEggMarkers } from "./EditorEasterEggMarkers";
 import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
+import { EnemyRenderPartitionProvider } from "./EnemyRenderPartitionProvider";
 import { GRAPHICS_QUALITY } from "./effectsTunables";
 import { FlowFeatures } from "./FlowFeatures";
 import { Ground } from "./Ground";
@@ -54,7 +55,7 @@ export const PlayScene = () => {
   const proceduralHidden = useGame((s) => s.world.overrideActive);
   const style = BIOME_STYLE[biome];
   return (
-    <>
+    <EnemyRenderPartitionProvider>
       <color attach="background" args={[style.sceneBg]} />
       <fog attach="fog" args={[style.fogColor, style.fogNear, style.fogFar]} />
 
@@ -224,7 +225,7 @@ export const PlayScene = () => {
         <AmbientHaze />
       </Defer>
       <SunProxy biome={biome} />
-    </>
+    </EnemyRenderPartitionProvider>
   );
 };
 
