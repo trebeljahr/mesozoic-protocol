@@ -151,7 +151,13 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          keychains=("$KEYCHAIN_PATH")
+          while IFS= read -r keychain; do
+            keychain=${keychain#*\"}
+            keychain=${keychain%\"*}
+            keychains+=("$keychain")
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "${keychains[@]}"
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
 
@@ -182,8 +188,8 @@ jobs:
       # like a fresh DMG download does.
       - name: Build + sign + notarize (Tauri, universal binary)
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEVELOPER_ID_CERT_BASE64 }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASSWORD }}
+          # The certificate is already in the runner's temporary keychain.
+          # APPLE_CERTIFICATE would trigger a second import by Tauri.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build --target universal-apple-darwin ${{ steps.updater.outputs.args }}
