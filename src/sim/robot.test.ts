@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getLevel } from "../levels";
+import { updateProjectiles } from "./projectiles";
 import {
   damageRobot,
   insideRobotCone,
@@ -103,9 +104,31 @@ describe("robot combat identities", () => {
       behind = enemyAt(w, 0, 6);
     updateRobot(w, 1 / 60);
     expect(w.robot.damageType).toBe("kinetic");
+    expect(a.hp).toBe(10000);
+    expect(b.hp).toBe(10000);
+    expect(w.projectiles.map((p) => p.targetId).sort()).toEqual([a.id, b.id].sort());
+    // The target moves while the bullet is in flight; its visual position
+    // and collision use the same updated target coordinates.
+    a.pos.x += 0.5;
+    updateProjectiles(w, 0.01);
+    expect(a.hp).toBe(10000);
+    updateProjectiles(w, 0.2);
     expect(a.hp).toBeLessThan(10000);
     expect(b.hp).toBeLessThan(10000);
     expect(behind.hp).toBe(10000);
+  });
+  it("Stan's cone ability waits for impact and drops shots whose target dies", () => {
+    const w = setup("stan");
+    const target = enemyAt(w, 0, -4);
+    triggerRobotAbility(w, 1);
+    expect(target.hp).toBe(10000);
+    expect(w.projectiles).toHaveLength(1);
+    expect(w.projectiles[0].targetId).toBe(target.id);
+    expect(w.projectiles[0].ballistic).toBeDefined();
+    target.alive = false;
+    updateProjectiles(w, 0.2);
+    expect(w.projectiles).toHaveLength(0);
+    expect(target.hp).toBe(10000);
   });
   it("Bullet Hell holds direction, repeats area damage, then expires", () => {
     const w = setup("stan"),
@@ -114,9 +137,11 @@ describe("robot combat identities", () => {
       far = enemyAt(w, 0, -12);
     triggerRobotAbility(w, 3);
     updateRobot(w, 1 / 60);
+    updateProjectiles(w, 0.2);
     const hp = front.hp;
     w.time += 0.15;
     updateRobot(w, 0.15);
+    updateProjectiles(w, 0.2);
     expect(front.hp).toBeLessThan(hp);
     expect(side.hp).toBe(10000);
     expect(far.hp).toBe(10000);

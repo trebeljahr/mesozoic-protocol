@@ -644,6 +644,13 @@ export type Base = {
 export type ProjectileKind = "direct" | "splash";
 
 export type Projectile = {
+  ballistic?: {
+    tail: Vec2;
+    height: number;
+    tailHeight: number;
+    targetHeight: number;
+    knockback: number;
+  };
   id: EntityId;
   kind: ProjectileKind;
   damageType: DamageType;
@@ -679,7 +686,6 @@ export type Projectile = {
 };
 
 export type Beam = {
-  ballistic?: { spawnedAt: number; speed: number; delay: number };
   id: EntityId;
   points: BeamPoint[];
   color: string;

@@ -287,37 +287,27 @@ const fireBulletFan = (
   range: number,
   halfAngle: number,
   damage: number,
-  rays = 7,
+  knockback = 0,
 ) => {
+  const source = robotMuzzlePoint(robot);
   for (const enemy of world.enemies) {
     if (
       !isEnemyTargetable(enemy) ||
       !insideRobotCone(robot.pos, enemy.pos, facing, range, halfAngle)
     )
       continue;
-    applyDamage(world, enemy, damage, "kinetic", "#ffd24a", 2, false, { fromRobot: true });
-  }
-  const source = robotMuzzlePoint(robot);
-  for (let i = 0; i < rays; i++) {
-    // Stratified spread keeps the silhouette irregular without changing hits.
-    const seed = (world.nextEntityId * 0.61803398875) % 1;
-    const angle = facing - halfAngle + 2 * halfAngle * ((i + 0.2 + seed * 0.6) / rays);
-    const speed = 34 + seed * 12;
-    const delay = seed * 0.035;
-    const beam = createBeam(
-      world,
-      [
-        source,
-        {
-          x: robot.pos.x + Math.sin(angle) * range,
-          y: robot.pos.y - Math.cos(angle) * range,
-          h: source.h,
-        },
-      ],
-      "#ffc475",
-      range / speed + delay + 0.04,
-    );
-    beam.ballistic = { spawnedAt: world.time, speed, delay };
+    // Every damaging round has a real target and travels through the same
+    // simulation position used by its renderer. No cosmetic miss rays.
+    const p = createProjectile(world, "direct", "kinetic", source, enemy, damage, 0, 40, false, {
+      fromRobot: true,
+    });
+    p.ballistic = {
+      tail: { ...source },
+      height: source.h ?? 0.85,
+      tailHeight: source.h ?? 0.85,
+      targetHeight: enemyLightningHeight(enemy),
+      knockback,
+    };
   }
   robot.shootFlashUntil = world.time + 0.14;
   emit(world, { type: "shoot", towerId: robot.id, towerKind: "pulse", pos: robot.pos });
@@ -345,7 +335,6 @@ const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
       robot.range,
       variant.attackConeAngle,
       dmg,
-      3,
     );
   } else if (variant.attackChain) {
     const { hops, damagePerHop, radius } = variant.attackChain;
@@ -607,7 +596,7 @@ const tickPayload = (
     }
     robot.facing = p.facing;
     if (world.time >= p.nextTickAt) {
-      fireBulletFan(world, robot, p.facing, p.range, p.halfAngle, p.damage, 11);
+      fireBulletFan(world, robot, p.facing, p.range, p.halfAngle, p.damage);
       p.nextTickAt += p.tickInterval;
     }
     return idle;
@@ -1216,15 +1205,15 @@ export const triggerRobotAbility = (world: World, slot: RobotAbilitySlot): boole
       const facing = target
         ? Math.atan2(target.pos.x - robot.pos.x, -(target.pos.y - robot.pos.y))
         : robot.facing;
-      fireBulletFan(world, robot, facing, spec.radius, spec.coneAngle, spec.damage, 13);
-      for (const enemy of world.enemies) {
-        if (
-          isEnemyTargetable(enemy) &&
-          spec.knockback &&
-          insideRobotCone(robot.pos, enemy.pos, facing, spec.radius, spec.coneAngle)
-        )
-          applyPathKnockback(world, enemy, spec.knockback.pathPush);
-      }
+      fireBulletFan(
+        world,
+        robot,
+        facing,
+        spec.radius,
+        spec.coneAngle,
+        spec.damage,
+        spec.knockback?.pathPush,
+      );
       return true;
     }
     const r2 = spec.radius * spec.radius;

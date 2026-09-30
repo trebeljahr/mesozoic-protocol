@@ -34,23 +34,18 @@ export const BallisticTracers = () => {
     const { matrix, direction, across, normal, position, view } = scratch;
     camera.getWorldDirection(view);
     let count = 0;
-    for (let i = world.beams.length - 1; i >= 0 && count < capacity; i--) {
-      const beam = world.beams[i];
-      if (!beam.ballistic || beam.points.length !== 2) continue;
-      const a = beam.points[0],
-        b = beam.points[1];
-      direction.set(b.x - a.x, (b.h ?? 0.85) - (a.h ?? 0.85), a.y - b.y);
-      const distance = direction.length();
-      if (distance < 0.001) continue;
-      direction.divideScalar(distance);
-      const age = world.time - beam.ballistic.spawnedAt - beam.ballistic.delay;
-      const head = Math.min(distance, age * beam.ballistic.speed);
-      const tail = Math.max(0, age * beam.ballistic.speed - 0.85);
-      const length = head - tail;
-      if (age < 0 || length <= 0) continue;
+    for (let i = world.projectiles.length - 1; i >= 0 && count < capacity; i--) {
+      const p = world.projectiles[i];
+      if (!p.ballistic) continue;
+      const a = p.ballistic.tail,
+        b = p.pos;
+      direction.set(b.x - a.x, p.ballistic.height - p.ballistic.tailHeight, a.y - b.y);
+      const length = Math.min(0.85, direction.length());
+      if (length < 0.001) continue;
+      direction.normalize();
       across.crossVectors(direction, view).normalize();
       normal.crossVectors(direction, across).normalize();
-      position.set(a.x, a.h ?? 0.85, -a.y).addScaledVector(direction, (head + tail) / 2);
+      position.set(b.x, p.ballistic.height, -b.y).addScaledVector(direction, -length / 2);
       matrix.makeBasis(direction, across, normal);
       matrix.scale(scratch.scale.set(length, 0.095, 1));
       matrix.setPosition(position);

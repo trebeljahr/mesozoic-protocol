@@ -1,7 +1,14 @@
 import { isEnemyTargetable } from "./enemyState";
 import type { Projectile, World } from "./types";
 import { distSq } from "./vec2";
-import { addShake, applyDamage, createExplosion, emit, spawnParticles } from "./world";
+import {
+  addShake,
+  applyDamage,
+  applyPathKnockback,
+  createExplosion,
+  emit,
+  spawnParticles,
+} from "./world";
 
 const HIT_RADIUS = 0.5;
 
@@ -63,6 +70,8 @@ const applyHit = (world: World, p: Projectile) => {
     if (target && isEnemyTargetable(target)) {
       spawnParticles(world, p.pos, 3, "#ffe866", [1, 3], 0.2);
       applyDamage(world, target, p.damage, p.damageType, "#c44848", 8, p.pierceShield, hitOpts);
+      if (p.ballistic?.knockback && isEnemyTargetable(target))
+        applyPathKnockback(world, target, p.ballistic.knockback);
     }
   }
 };
@@ -87,7 +96,14 @@ export const updateProjectiles = (world: World, dt: number) => {
     const dx = p.targetPos.x - p.pos.x;
     const dy = p.targetPos.y - p.pos.y;
     const d = Math.sqrt(dx * dx + dy * dy);
-    if (d <= Math.max(step, HIT_RADIUS)) {
+    if (p.ballistic) {
+      p.ballistic.tail.x = p.pos.x;
+      p.ballistic.tail.y = p.pos.y;
+      p.ballistic.tailHeight = p.ballistic.height;
+      p.ballistic.height +=
+        (p.ballistic.targetHeight - p.ballistic.height) * Math.min(1, step / Math.max(d, 0.001));
+    }
+    if (d <= (p.ballistic ? step : Math.max(step, HIT_RADIUS))) {
       p.pos.x = p.targetPos.x;
       p.pos.y = p.targetPos.y;
       applyHit(world, p);

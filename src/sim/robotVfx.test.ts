@@ -15,8 +15,10 @@ it.each<[RobotVariant, string, boolean]>([
   expect(triggerRobotAbility(world, 1)).toBe(true);
   if (variant === "stan" || variant === "george") {
     expect(world.explosions).toHaveLength(0);
-    if (variant === "stan") expect(world.beams.length).toBeGreaterThan(0);
-    else expect(world.particles.length).toBeGreaterThan(0);
+    if (variant === "stan") {
+      expect(world.beams).toHaveLength(0);
+      expect(world.projectiles).toHaveLength(0); // No targets, no false-hit tracers.
+    } else expect(world.particles.length).toBeGreaterThan(0);
   } else expect(world.explosions.at(-1)?.damageType).toBe(type);
   expect(world.puffs.length > 0).toBe(soot);
   expect(world.particles.some((p) => p.kind === "flame")).toBe(type === "flame");

@@ -19,6 +19,7 @@ export const ProjectileMesh = () => {
     let d = 0;
     let s = 0;
     for (const p of world.projectiles) {
+      if (p.ballistic) continue;
       if (p.kind === "splash") {
         if (s < MAX_PROJECTILES) {
           const arcH = 0.3 + Math.sin((p.pos.x + p.pos.y) * 0.1) * 0.2;
