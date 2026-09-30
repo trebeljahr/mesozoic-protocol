@@ -1,6 +1,6 @@
 {
   "date": "2026-09-30",
-  "status": "A5_original_A_palette_review_ready",
+  "status": "approved_visual_direction_local_exports_ready",
   "supersedes": "../a4-steam/manifest.json",
   "feedback": "User rejected A4 palette and explicitly requested colors closer to version A.",
   "colorReference": "../originals/a-containment-breach.jpg",
@@ -83,5 +83,9 @@
     "verification": "Official Valve template overlay and local narrow-window/position proofs; live Steam preview not performed"
   },
   "handoff": "/Users/rico/projects/ai-work-notes/projects/mesozoic-protocol/mesozoic-protocol-a5-steam-artwork-handoff.md",
-  "scope": "Marketing artwork only; game code, storefronts and disclosures unchanged"
+  "scope": "Marketing artwork only; game code, storefronts and disclosures unchanged",
+  "approval": {
+    "date": "2026-09-30",
+    "scope": "Artwork and palette approved by user; live Steam verification and publication remain separate"
+  }
 }

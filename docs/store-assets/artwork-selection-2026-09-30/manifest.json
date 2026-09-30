@@ -2,7 +2,7 @@
   "project": "Mesozoic Protocol",
   "date": "2026-09-30",
   "timezone": "Australia/Sydney",
-  "status": "A5_original_A_palette_ready_for_review",
+  "status": "A5_artwork_and_palette_approved",
   "flowProject": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29",
   "flowHistory": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29/edit/5db7c0a7-e206-4fcc-ac37-9f27a3087e44",
   "newGenerationRequests": 11,
@@ -16,7 +16,7 @@
   ],
   "references": "Ten pre-existing game model ingredients from original prompt, plus selected existing key art; reused in Flow. No new external uploads.",
   "preservation": "All five originals exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
-  "selection": "A3 action approved. A4 saturated blue/yellow palette rejected. User explicitly requested version A colors. A5 retains the portrait and Steam hero layouts with a palette matched to A.",
+  "selection": "User approved A5 as perfect: original A palette with A3 action and the portrait/Steam hero layouts. A5 is the approved artwork direction; A4 remains rejected.",
   "files": [
     {
       "file": "originals/a-containment-breach.jpg",
@@ -123,5 +123,10 @@
   "modelForFlowRequests": "Nano Banana 2",
   "builtInTool": "ChatGPT image_gen",
   "a4Package": "a4-steam/manifest.json",
-  "a5Package": "a5-original-palette/manifest.json"
+  "a5Package": "a5-original-palette/manifest.json",
+  "approval": {
+    "date": "2026-09-30",
+    "userFeedback": "this is perfect! wtf, so nice :)",
+    "scope": "A5 visual direction and palette; no new upload or publication authorization"
+  }
 }
