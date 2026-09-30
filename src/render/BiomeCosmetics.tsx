@@ -51,7 +51,7 @@ const STORY_TARGET_HEIGHT = new Map<string, number>([
   ["/models/landmarks/desert/Chest.glb", 0.34],
   ["/models/landmarks/desert/Skull.glb", 0.32],
   ["/models/landmarks/wasteland/Skull.glb", 0.32],
-  ["/models/landmarks/snow/Tent.glb", 1.5],
+  ["/models/landmarks/snow/Tent.glb", 0.62],
   ["/models/landmarks/snow/Torch.glb", 0.66],
   ["/models/scifi/barrels.glb", 0.44],
   ["/models/scifi/machine_barrel.glb", 0.52],
@@ -69,7 +69,7 @@ const STORY_TARGET_HEIGHT = new Map<string, number>([
 
 const STORY_CLEAR_RADIUS = new Map<string, number>([
   ["/models/landmarks/desert/Tent.glb", 2.1],
-  ["/models/landmarks/snow/Tent.glb", 2.1],
+  ["/models/landmarks/snow/Tent.glb", 0.72],
   ["/models/scifi/rover.glb", 0.7],
   ["/models/scifi/machine_generatorLarge.glb", 0.65],
   ["/models/scifi/machine_barrelLarge.glb", 0.6],
