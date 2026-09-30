@@ -94,10 +94,12 @@ void main() {
     ? clamp(length(vUv - 0.5) * 2.0, 0.0, 1.0)
     : clamp(abs(vUv.y - 0.5) * 2.0, 0.0, 1.0);
 
+  float shapeDistance = (1.0 - edge) * 0.9;
+
   vec3 field = texture2D(uSurfaceField,
     (vec2(vWorldPos.x, -vWorldPos.z) - uFieldBounds.xy) / uFieldBounds.zw).rgb;
   vec2 current = mix(vFlow, field.gb * 2.0 - 1.0, uHasField);
-  float bankDistance = mix((1.0 - edge) * 0.9, field.r * 1.2, uHasField);
+  float bankDistance = mix(shapeDistance, field.r * 1.2, uHasField);
   // Quiet pools wash back and forth perpendicular to their actual bank.
   // Fade this motion out where a river brings a directional current.
   float pool = uIsJoint * (1.0 - smoothstep(0.03, 0.25, length(current)))
@@ -150,9 +152,9 @@ void main() {
   wet = mix(wet, uColorFoam, (ripple * 0.04 + crest * (0.018 + wake * 0.045)) * depth * (1.0 - toxic * 0.65));
   wet += uEmissiveTint * toxic * smoothstep(0.52, 0.76, height) * 0.16 * depth;
   // Broken, advecting foam gathers at the union shoreline, not ribbon joins.
-  float foamNoise = noised(vWorldPos.xz*5.2 - velocity*uTime*0.6).x;
-  float foamFine = noised(vWorldPos.xz*18.0 + velocity*uTime*0.3).x;
-  float foamPatch = noised(vWorldPos.xz*1.7-uTime*velocity*0.18).x;
+  float foamNoise;
+  float foamFine;
+  float foamPatch;
   float foamSway = 0.0;
   if (uMolten < 0.001 && toxic < 0.001) {
     // Move every foam scale downstream together, in world units. Bounded
@@ -165,6 +167,10 @@ void main() {
     foamPatch = mix(noised(foamA * 1.7).x, noised(foamB * 1.7).x, blend);
     // A small, slow lap at the bank; geometry and shoreline stay fixed.
     foamSway = sin(uTime * 0.65 + broad.x * 6.283185) * 0.018;
+  } else {
+    foamNoise = noised(vWorldPos.xz*5.2 - velocity*uTime*0.6).x;
+    foamFine = noised(vWorldPos.xz*18.0 + velocity*uTime*0.3).x;
+    foamPatch = noised(vWorldPos.xz*1.7-uTime*velocity*0.18).x;
   }
   float foamWidth = 0.12 + foamNoise*0.32 + foamSway;
   float foamBand = (1.0-smoothstep(0.03,foamWidth,washDistance));
@@ -207,9 +213,6 @@ void main() {
   float aa = max(fwidth(bankDistance), 0.015);
   // Keep the mesh silhouette at miter corners, where the sampled capsule
   // field is conservative. The union distance fills interior join edges.
-  float shapeDistance = (1.0 - (uIsJoint > 0.5
-    ? clamp(length(vUv - 0.5) * 2.0, 0.0, 1.0)
-    : clamp(abs(vUv.y - 0.5) * 2.0, 0.0, 1.0))) * 0.9;
   float silhouette = mix(max(bankDistance, shapeDistance), bankDistance, pool * uHasField);
   float alpha = smoothstep(0.0, max(0.07, aa), silhouette - retreat);
 
