@@ -21,7 +21,8 @@
   "runtimeBudget": {
     "maximumSprites": 768,
     "lowQualityMaximumSprites": 384,
-    "textureReadsPerFragment": 2,
+    "textureReadsPerFragment": 3,
+    "depthCopiesPerActiveFrame": 1,
     "drawCallsPerScenePass": 1,
     "rgbaTextureBytesIncludingMipmaps": 5592404
   }
