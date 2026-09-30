@@ -186,7 +186,7 @@ export const useAudioBridge = () => {
               break;
             case "burst":
               audio.play(
-                state.world.robot.variant === "leela" ? "shoot-cryo" : "shoot-mortar",
+                state.world.robot.damageType === "cold" ? "shoot-cryo" : "shoot-mortar",
                 "towers",
                 0.5,
                 120,
@@ -200,7 +200,13 @@ export const useAudioBridge = () => {
               audio.play("shoot-pulse", "towers", 0.6, 120, 0.9);
               break;
             case "storm":
-              audio.play("shoot-cryo", "towers", 0.6, 120, 0.9);
+              audio.play(
+                state.world.robot.damageType === "cold" ? "shoot-cryo" : "shoot-chain",
+                "towers",
+                0.6,
+                120,
+                0.9,
+              );
               break;
             case "flameRings":
               audio.play("shoot-flame", "towers", 0.55, 120, 0.9);

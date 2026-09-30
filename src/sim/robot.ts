@@ -320,7 +320,7 @@ const fireBulletFan = (
 
 const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
   const variant = ROBOT_SPECS[robot.variant];
-  // George Sidestep flags the next shot as a piercing crit (×mul, no
+  // A critical dash flags the next shot as a piercing crit (×mul, no
   // projectile travel — applied as a hitscan tracer so the lunge → shot
   // combo reads instantly). Consumed on fire.
   const crit = robot.pendingCrit;
@@ -361,7 +361,7 @@ const fireRobotShot = (world: World, robot: Robot, target: Enemy) => {
     }
     createBeam(world, points, "#7ee0ff", 0.12);
   } else if (variant.attackTracer || crit?.pierce) {
-    // Hitscan tracer (George sniper) — direct hit, no projectile entity.
+    // Hitscan frost or critical tracer — direct hit, no projectile entity.
     // Draw a thin beam from the animated muzzle to the target for the
     // visual read.
     applyDamage(world, target, dmg, robot.damageType, "#fff4d6", crit ? 12 : 5, false, {
@@ -578,11 +578,11 @@ const dashDir = (robot: Robot): Vec2 => {
 };
 
 // Mid-tick payload servicing for slot 3 ongoing effects (ultimate).
-// - storm (Leela): pulse cryo damage and freeze across enemies in radius.
+// - storm: Leela chains lightning; George pulses cryo damage and freezes.
 // - barrage (Stan): sustained kinetic area fire along a fixed cone.
 // - flameRings (Mike): spawn rings on cadence, advance each ring's
 //   radius and damage any enemy newly inside the circle.
-// - frenzy (George): pure stat multipliers, no per-tick effect of its
+// - frenzy: pure stat multipliers, no per-tick effect of its
 //   own — auto-attacks naturally pump through the buffed cadence.
 // - killshot: charge timer, then delete the locked target with
 //   splash at impact.
@@ -742,7 +742,7 @@ const tickPayload = (
 // Slot-2 self-buff servicing. Stacks multiplicatively with payload muls
 // (mark) so a buff + mark combo lands the planned burst damage. Cleared
 // when the window expires. rangeMul is sourced from the variant's slot-2
-// spec while the buff is active (George Spotter Drone scope-in).
+// spec while the buff is active.
 const tickBuff = (
   world: World,
   robot: Robot,
@@ -786,8 +786,7 @@ export const updateRobot = (world: World, dt: number) => {
   robot.attackCooldown = Math.max(0, robot.attackCooldown - dt);
   // Ultimate (slot 3) and self-buff (slot 2) refresh the robot's per-tick
   // multipliers. Damage and fire rate stack multiplicatively across the
-  // payload + buff (George's Deadeye + Spotter Drone is the
-  // intended combo). damageResist clamped <1 inside damageRobot.
+  // payload + buff. damageResist is clamped <1 inside damageRobot.
   const payloadMul = tickPayload(world, robot, dt);
   const buff = tickBuff(world, robot);
   robot.damageMul = payloadMul.dmgMul * buff.damageMul;
@@ -1088,7 +1087,7 @@ export const selectRobot = (world: World, on: boolean) => {
 
 // Commit a dash in the supplied direction: orients the robot, marks
 // the dash window for i-frames + velocity, and fires variant riders
-// (Mike coal trail, George next-shot crit, Leela end-chain arcs, Stan
+// (Mike coal trail, Leela end-chain arcs, optional critical shot or
 // landing blast). Caller owns cooldown bookkeeping so this helper
 // stays purely about effects.
 const commitDash = (

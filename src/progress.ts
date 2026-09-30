@@ -142,10 +142,11 @@ export const DEFAULT_DIFFICULTY: Difficulty = "medium";
 // copies the legacy keys into the new slots, and unlocked-achievement IDs
 // `heroic_effort` / `iron_will` are rewritten to `breach_holdout` /
 // `containment_holdout` so prior earners keep their badges.
-export const PROGRESS_VERSION = 4 as const;
+// v5 makes Leela the starter; existing saves retain their free George unlock.
+export const PROGRESS_VERSION = 5 as const;
 
 export type ProgressData = {
-  version: 4;
+  version: 5;
   starsByLevel: Record<number, ModeStars>;
   encountered: Partial<Record<EnemyKind, boolean>>;
   // Per-variant matriarch encounter set. The Compendium's matriarch
@@ -162,9 +163,9 @@ export type ProgressData = {
   // not exceed totalStars(progress) — enforced at the store layer.
   metaSkills: AllMetaSkills;
   // Active robot variant — drives robotDefaults at every level start.
-  // Defaults to "george" so legacy saves run unchanged.
+  // New saves start with Leela; existing explicit selections are preserved.
   activeRobot: RobotVariant;
-  // Permanent unlock map. George is implicitly unlocked even when
+  // Permanent unlock map. Leela is implicitly unlocked even when
   // missing from the map; the others must be purchased from the robot
   // shop with dropped metal bolts.
   robotUnlocks: Partial<Record<RobotVariant, boolean>>;
@@ -231,8 +232,8 @@ export const emptyProgress = (): ProgressData => ({
   difficulty: DEFAULT_DIFFICULTY,
   seenIntros: {},
   metaSkills: {},
-  activeRobot: "george",
-  robotUnlocks: { george: true },
+  activeRobot: "leela",
+  robotUnlocks: { leela: true },
   robotXp: {},
   robotSkills: {},
   bolts: 0,
@@ -248,7 +249,7 @@ const isDifficulty = (v: unknown): v is Difficulty =>
 const isProgressLike = (parsed: unknown): parsed is Partial<ProgressData> => {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = (parsed as { version?: unknown }).version;
-  if (v !== 1 && v !== 2 && v !== 3 && v !== 4) return false;
+  if (v !== 1 && v !== 2 && v !== 3 && v !== 4 && v !== 5) return false;
   return typeof (parsed as { starsByLevel?: unknown }).starsByLevel === "object";
 };
 
@@ -299,14 +300,13 @@ const normalizeEndlessBest = (raw: unknown): Record<string, number> => {
 };
 
 const pickActiveRobot = (raw: Partial<ProgressData>): RobotVariant => {
-  const candidate =
-    raw.activeRobot ?? (raw as { activeHero?: RobotVariant }).activeHero ?? "george";
+  const candidate = raw.activeRobot ?? (raw as { activeHero?: RobotVariant }).activeHero ?? "leela";
   return candidate === "leela" ||
     candidate === "mike" ||
     candidate === "stan" ||
     candidate === "george"
     ? candidate
-    : "george";
+    : "leela";
 };
 
 const pickRecord = <K extends string, V>(
@@ -375,10 +375,12 @@ const normalizeProgress = (raw: Partial<ProgressData>): ProgressData => {
     // tree ranks after the rename.
     activeRobot: pickActiveRobot(raw),
     robotUnlocks: {
-      george: true,
+      // Preserve the former starter for saves created before the roster change.
+      ...((raw.version ?? 0) < 5 ? { george: true } : {}),
       ...((raw.robotUnlocks ??
         (raw as { heroUnlocks?: Partial<Record<RobotVariant, boolean>> }).heroUnlocks ??
         {}) as Partial<Record<RobotVariant, boolean>>),
+      leela: true,
     },
     robotXp: pickRecord<RobotVariant, number>(
       raw.robotXp,

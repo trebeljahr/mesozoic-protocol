@@ -1,24 +1,6 @@
 {
   "variants": {
     "george": {
-      "blurb": "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-      "strengths": "Longest engagement range. Massive single-shot damage. 神射手 unleashes an absurd-cadence frenzy on demand.",
-      "weakness": "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
-      "abilityLabel": {
-        "0": "Sidestep",
-        "1": "Shockwave",
-        "2": "Spotter",
-        "3": "神射手"
-      },
-      "abilityBlurb": {
-        "0": "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
-        "1": "Short i-frame hop; next shot is a piercing x2.5 crit.",
-        "2": "Close kinetic pulse for 95 damage and a small path push.",
-        "3": "Scope stance: more range and damage, slower feet, 40% resist.",
-        "4": "3.5s frenzy: x7 fire rate and +50% damage."
-      }
-    },
-    "leela": {
       "blurb": "冰冻游击机甲。冰霜射击减缓前线，寒冰爆发冻结附近敌群。",
       "strengths": "机动性最高。每次射击都会减速。冰霜新星冻结敌群，暴风雪控制大片区域。",
       "weakness": "装甲薄，爆发伤害低。抗寒敌人能削弱其伤害和减速效果。",
@@ -34,6 +16,24 @@
         "2": "半径4的新星造成70点寒冷伤害，冻结1.2秒并减速3秒。",
         "3": "持续3秒的冰幕：提升移速、射速和伤害，获得80%减伤。",
         "4": "持续5秒的暴风雪：半径7内所有敌人每0.5秒受到18点寒冷伤害并短暂冻结。"
+      }
+    },
+    "leela": {
+      "blurb": "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
+      "strengths": "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
+      "weakness": "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "abilityLabel": {
+        "0": "Phase Step",
+        "1": "Tesla Pulse",
+        "2": "Phase Veil",
+        "3": "Storm Surge"
+      },
+      "abilityBlurb": {
+        "0": "Fast electric zap. Each shot chains to two nearby targets.",
+        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
+        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
+        "3": "3s veil: speed, fire rate, damage, and 80% resist.",
+        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
       }
     },
     "mike": {

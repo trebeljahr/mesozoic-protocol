@@ -607,7 +607,7 @@ export type RobotContext = {
 };
 
 const DEFAULT_ROBOT_CONTEXT: RobotContext = {
-  variant: "george",
+  variant: "leela",
   xp: 0,
   skills: {},
 };

@@ -1,25 +1,7 @@
 {
   "variants": {
     "george": {
-      "blurb": "Kinetischer Langstrecken-Scharfschütze. Langsam, bedacht, jeder Schuss ein Leuchtspurgeschoss, das Panzerung durchschlägt.",
-      "strengths": "Größte Gefechtsreichweite. Massiver Einzelschuss-Schaden. Adlerauge entfesselt auf Abruf einen Rausch mit absurder Kadenz.",
-      "weakness": "Langsame Grundfeuerkadenz — Schwärme schlüpfen zwischen den Schüssen vorbei. Kinetik-resistente Panzerchassis stecken Treffer weg.",
-      "abilityLabel": {
-        "0": "Ausweichschritt",
-        "1": "Schockwelle",
-        "2": "Späher",
-        "3": "Adlerauge"
-      },
-      "abilityBlurb": {
-        "0": "Scharfschützenstrahl. Große Reichweite, langsame Kadenz, riesiger kinetischer Treffer.",
-        "1": "Kurzer Sprung mit Unverwundbarkeit; nächster Schuss ist ein durchschlagender x2,5-Krit.",
-        "2": "Naher kinetischer Puls für 95 Schaden und ein kleiner Pfad-Rückstoß.",
-        "3": "Zielfernrohr-Haltung: mehr Reichweite und Schaden, langsamere Füße, 40% Resistenz.",
-        "4": "3,5s Rausch: x7 Feuerrate und +50% Schaden."
-      }
-    },
-    "leela": {
-      "blurb": "Kryo-Plänklerin. Frostschüsse verlangsamen die Front; Eisstöße frieren nahe Gegnergruppen ein.",
+      "blurb": "Kryo-Plänkler. Frostschüsse verlangsamen die Front; Eisstöße frieren nahe Gegnergruppen ein.",
       "strengths": "Höchste Mobilität. Jeder Schuss verlangsamt. Frostnova friert Gruppen ein; Blizzard kontrolliert ein großes Gebiet.",
       "weakness": "Schwache Panzerung und geringer Sofortschaden. Kälteresistente Gegner schwächen Schaden und Verlangsamung.",
       "abilityLabel": {
@@ -34,6 +16,24 @@
         "2": "Nova mit Radius 4: 70 Kälteschaden, 1,2s Einfrieren und 3s Verlangsamung.",
         "3": "3s Schleier: mehr Tempo, Feuerrate, Schaden und 80% Resistenz.",
         "4": "5s Blizzard: alle Gegner in Radius 7 erleiden alle 0,5s 18 Kälteschaden und frieren kurz ein."
+      }
+    },
+    "leela": {
+      "blurb": "Elektrischer Plänkler. Jeder Schuss springt über. Stürme zerreißen alles, was nah kommt.",
+      "strengths": "Höchste Mobilität. Auto-Angriffe springen auf zwei nahe Ziele über. Sturmwoge zappt sekundenlang jeden Gegner in einem weiten Ring.",
+      "weakness": "Dünne Panzerung — kassiert Treffer auf mittlere Distanz. Elektro-resistente Titanen schlucken das Arsenal.",
+      "abilityLabel": {
+        "0": "Phasenschritt",
+        "1": "Tesla-Puls",
+        "2": "Phasenschleier",
+        "3": "Sturmwoge"
+      },
+      "abilityBlurb": {
+        "0": "Schneller elektrischer Zap. Jeder Schuss springt auf zwei nahe Ziele über.",
+        "1": "Sprint mit Unverwundbarkeit; am Ende treffen Bögen 3 Gegner für 24 Elektro.",
+        "2": "Elektrischer Puls mit Radius 4, dann 4 Kettensprünge für je 35.",
+        "3": "3s Schleier: Tempo, Feuerrate, Schaden und 80% Resistenz.",
+        "4": "5s Sturm: 4 elektrische Bögen alle 0,2s im Radius 7."
       }
     },
     "mike": {

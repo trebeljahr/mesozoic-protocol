@@ -383,11 +383,11 @@ export type RobotPendingShot = {
 };
 
 // Ongoing slot-3 effect that ticks per frame.
-// - storm (Leela): cryo pulses damage, slow, and briefly freeze enemies in radius.
+// - storm: Leela chains lightning; George pulses cold damage and freeze.
 // - barrage (Stan): repeated kinetic fans along a locked firing direction.
 // - flameRings (Mike): spawns N expanding rings sequentially; each ring
 //   walks outward at expandSpeed, damaging enemies as it passes them.
-// - frenzy (George): time-windowed damage + fire-rate multipliers
+// - frenzy: time-windowed damage + fire-rate multipliers
 //   stacked on top of the slot-2 self-buff.
 // - killshot: charges then drops a single high-damage projectile
 //   with splash at the locked target.
@@ -585,7 +585,7 @@ export type Robot = {
   // `dir`. Esc or right-click clears it. Auto-clears after
   // world.time >= expiresAt.
   dashAim: { dir: Vec2; expiresAt: number } | null;
-  // George — set by Sidestep dash; the next auto-attack lands with the
+  // Optional critical dash rider; the next auto-attack lands with the
   // crit multiplier and (optionally) a piercing flag. Consumed on fire.
   pendingCrit: { mul: number; pierce: boolean } | null;
   // Render-authored muzzle point for robot shots/bolts. The model layer

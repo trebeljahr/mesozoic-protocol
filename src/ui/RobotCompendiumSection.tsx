@@ -7,7 +7,7 @@ import { useGame } from "../store";
 import { IconBolt } from "./MenuIcons";
 import { RobotDiorama } from "./RobotDiorama";
 
-const ROSTER: RobotVariant[] = ["george", "leela", "mike", "stan"];
+const ROSTER: RobotVariant[] = ["leela", "george", "mike", "stan"];
 
 export const RobotCompendiumSection = ({ progress }: { progress: ProgressData }) => {
   const { t } = useTranslation();

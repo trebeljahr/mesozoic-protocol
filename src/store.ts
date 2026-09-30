@@ -1720,7 +1720,7 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   unlockRobot: (variant) => {
-    // Demo build: pilots past George are locked full-game teasers, never
+    // Demo build: pilots past Leela are locked full-game teasers, never
     // purchasable. The shop UI hides the buy button, but reject here too so no
     // path can spend the demo player's bolts on locked content.
     if (IS_DEMO) return;
@@ -1740,7 +1740,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   setActiveRobot: (variant) => {
     const s = get();
-    if (!s.progress.robotUnlocks[variant] && variant !== "george") return;
+    if (!s.progress.robotUnlocks[variant] && variant !== "leela") return;
     if (s.progress.activeRobot === variant) return;
     const progress: ProgressData = { ...s.progress, activeRobot: variant };
     persistProgress(s.activeSlot, progress);

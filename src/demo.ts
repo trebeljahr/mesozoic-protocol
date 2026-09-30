@@ -23,14 +23,14 @@ export const IS_DEMO: boolean = import.meta.env.VITE_DEMO === "1";
 // outposts (L1–L5).
 export const DEMO_MAX_LEVEL = 5;
 
-// The pilot the demo dangles as locked full-game content. Leela's unlock cost
-// is 250 bolts (ROBOT_SPECS in src/sim/robotVariants.ts), so her teaser card
-// appears the moment the player has banked enough to have bought her in the
+// The pilot the demo dangles as locked full-game content. George's unlock cost
+// is 250 bolts (ROBOT_SPECS in src/sim/robotVariants.ts), so his teaser card
+// appears the moment the player has banked enough to have bought him in the
 // full build — the hook that drives the wishlist.
-export const DEMO_TEASER_ROBOT: RobotVariant = "leela";
+export const DEMO_TEASER_ROBOT: RobotVariant = "george";
 
-// Bolt balance that reveals the teaser pilot. Kept in sync with Leela's
-// unlockBolts on purpose: "you could have unlocked her — get the full game."
+// Bolt balance that reveals the teaser pilot. Kept in sync with George's
+// unlockBolts on purpose: "you could have unlocked him — get the full game."
 export const DEMO_TEASER_ROBOT_BOLTS = 250;
 
 // Wishlist destination for the demo CTAs. Placeholder until the Steam App ID

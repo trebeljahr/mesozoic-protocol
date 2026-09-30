@@ -9,7 +9,7 @@ const ROBOT_URL: Record<RobotVariant, string> = {
   stan: "/models/robots/Stan.glb",
 };
 
-const VARIANTS: RobotVariant[] = ["george", "leela", "mike", "stan"];
+const VARIANTS: RobotVariant[] = ["leela", "george", "mike", "stan"];
 
 const specFor = (variant: RobotVariant): BakeSpec => ({
   cacheKey: `robot:${variant}`,

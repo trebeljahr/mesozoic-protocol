@@ -235,3 +235,41 @@ describe("save migrations", () => {
     expect(storage.getItem(LEGACY_KEY)).toBeNull();
   });
 });
+
+describe("electric starter roster migration", () => {
+  it("starts new saves with only Leela unlocked, including after a reload", () => {
+    const fresh = emptyProgress();
+    expect(fresh.activeRobot).toBe("leela");
+    expect(fresh.robotUnlocks).toEqual({ leela: true });
+    saveSlot(2, fresh, "New roster");
+    const loaded = loadSlot(2)!.progress;
+    expect(loaded.activeRobot).toBe("leela");
+    expect(loaded.robotUnlocks).toEqual({ leela: true });
+  });
+
+  it("keeps old selections, unlocks, XP, skill ranks, and bolts while granting Leela", () => {
+    storage.setItem(
+      slotKey(2),
+      JSON.stringify({
+        progress: {
+          version: 4,
+          starsByLevel: {},
+          activeRobot: "george",
+          robotUnlocks: { mike: true, leela: false },
+          robotXp: { george: 321, leela: 456 },
+          robotSkills: { george: { vitality: 2 } },
+          bolts: 99,
+        },
+      }),
+    );
+    const migrated = loadSlot(2)!.progress;
+    expect(migrated.version).toBe(PROGRESS_VERSION);
+    expect(migrated.activeRobot).toBe("george");
+    expect(migrated.robotUnlocks).toEqual({ george: true, leela: true, mike: true });
+    expect(migrated.robotXp).toEqual({ george: 321, leela: 456 });
+    expect(migrated.robotSkills).toEqual({ george: { vitality: 2 } });
+    expect(migrated.bolts).toBe(99);
+    saveSlot(2, migrated, "Migrated");
+    expect(loadSlot(2)!.progress.robotUnlocks).toEqual(migrated.robotUnlocks);
+  });
+});

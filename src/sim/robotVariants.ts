@@ -6,7 +6,7 @@
 
 import type { DamageType, RobotAbilitySlot, RobotVariant } from "./types";
 
-export const ROBOT_VARIANTS: readonly RobotVariant[] = ["george", "leela", "mike", "stan"];
+export const ROBOT_VARIANTS: readonly RobotVariant[] = ["leela", "george", "mike", "stan"];
 
 // Shared status tuning for cryo shots, dash landings, bursts, and blizzards.
 export type FrostSpec = { factor: number; duration: number; freezeDuration: number };
@@ -40,7 +40,7 @@ export type BurstSpec = {
 // for a window so each pilot has an identity-fitting "third gear" between
 // dash + burst + ultimate. Damage type isn't carried — the buff just
 // modulates outgoing damage / fire rate / move speed / damage resist.
-// Optional riders: George's Spotter Drone multiplies range too; Mike's
+// Optional riders can multiply range; Mike's
 // Ignition tags every auto-attack with a short burn DoT.
 export type BuffSpec = {
   type: "buff";
@@ -97,7 +97,7 @@ export type PayloadSpec =
       burn?: { duration: number; totalDamage: number };
     }
   | {
-      // George R — Deadeye. Time-limited frenzy that multiplies
+      // Time-limited frenzy that multiplies
       // outgoing damage AND fire rate. Auto-attacks naturally pump
       // through the buffed cadence during the window.
       type: "frenzy";
@@ -157,10 +157,10 @@ export type RobotVariantSpec = {
   attackConeAngle?: number;
   // Render hint — when true, every auto-attack draws a hitscan tracer
   // beam from the robot to the target instead of (or alongside) the
-  // projectile. George uses this for the sniper read.
+  // projectile. Frost shots use a pale ice tracer.
   attackTracer?: boolean;
   // Metal bolt cost to unlock this robot from the roster. 0 = starter
-  // (george). Dinosaur drops feed the persistent bolt wallet.
+  // (leela). Dinosaur drops feed the persistent bolt wallet.
   unlockBolts: number;
   abilities: [DashSpec, BurstSpec, BuffSpec, PayloadSpec];
   tint: string;
@@ -176,85 +176,83 @@ export type RobotVariantSpec = {
 };
 
 export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
-  george: {
-    variant: "george",
-    label: "George",
-    callsign: "Vanguard",
-    blurb: "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-    strengths:
-      "Longest engagement range. Massive single-shot damage. Deadeye unleashes an focused firing frenzy on demand.",
-    weakness:
-      "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
-    maxHp: 220,
-    speed: 4.0,
-    range: 11.0,
-    damage: 44,
-    fireRate: 0.85,
-    damageType: "kinetic",
-    attackSplashRadius: 0,
-    attackTracer: true,
-    unlockBolts: 0,
-    abilities: [
-      // Q — Sidestep: short lateral hop; flags the next auto-attack as a
-      // piercing crit that ignores splash falloff and lands ×2.5 damage.
-      {
-        type: "dash",
-        cooldown: 5.5,
-        duration: 0.3,
-        speed: 12.0,
-        nextShotCrit: { mul: 2.5, pierce: true },
-      },
-      // W — Shockwave: radial kinetic pulse + small path push. Synergy
-      // with Sidestep's i-frame ringout when packs close in.
-      {
-        type: "burst",
-        cooldown: 9.0,
-        radius: 3.0,
-        damage: 95,
-        damageType: "kinetic",
-        knockback: { pathPush: 0.9 },
-      },
-      // E — Spotter Drone: scope-in stance. Big damage + range + slow.
-      {
-        type: "buff",
-        cooldown: 12.0,
-        duration: 5.0,
-        damageMul: 1.8,
-        fireRateMul: 0.85,
-        speedMul: 0.5,
-        damageResist: 0.4,
-        rangeMul: 1.6,
-      },
-      // R — Deadeye: time-limited frenzy. ×7 fire rate + ×1.5
-      // damage for 3.5s. Tracer beams pour out as continuous bullet
-      // hell on whatever the auto-aim picks.
-      {
-        type: "frenzy",
-        cooldown: 18.0,
-        duration: 3.5,
-        damageMul: 1.5,
-        fireRateMul: 7.0,
-      },
-    ],
-    tint: "#9fd8ff",
-    abilityLabels: ["Sidestep", "Shockwave", "Spotter", "Deadeye"],
-    abilityGlyphs: ["»", "✺", "◎", "✦"],
-    abilityBlurbs: [
-      "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
-      "Short i-frame hop; next shot is a piercing x2.5 crit.",
-      "Close kinetic pulse for 95 damage and a small path push.",
-      "Scope stance: more range and damage, slower feet, 40% resist.",
-      "3.5s frenzy: x7 fire rate and +50% damage.",
-    ],
-  },
   leela: {
     variant: "leela",
     label: "Leela",
+    callsign: "Strider",
+    blurb: "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
+    strengths:
+      "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
+    weakness: "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+    maxHp: 200,
+    speed: 6.0,
+    range: 6.5,
+    damage: 7,
+    fireRate: 5.5,
+    damageType: "electric",
+    attackSplashRadius: 0,
+    attackChain: { hops: 2, damagePerHop: 5, radius: 2.6 },
+    unlockBolts: 0,
+    abilities: [
+      // Q — Phase Step: forward dash, on lunge end arcs to 3 closest dinos.
+      {
+        type: "dash",
+        cooldown: 4.0,
+        duration: 0.4,
+        speed: 13.0,
+        endChain: { hops: 3, damagePerHop: 24, radius: 3.5, damageType: "electric" },
+      },
+      // W — Tesla Pulse: radial blast that forks beams to 4 more targets.
+      {
+        type: "burst",
+        cooldown: 9.0,
+        radius: 4.0,
+        damage: 70,
+        damageType: "electric",
+        chainHops: { hops: 4, damagePerHop: 35, radius: 6.0 },
+      },
+      // E — Phase Veil: hit-and-run buff. Pure mobility + offence.
+      {
+        type: "buff",
+        cooldown: 13.0,
+        duration: 3.0,
+        damageMul: 1.15,
+        fireRateMul: 1.6,
+        speedMul: 1.7,
+        damageResist: 0.8,
+      },
+      // R — Storm Surge: ring of lightning around the robot for 5s.
+      // Every 0.2s, lashes the 4 nearest enemies in 7 range.
+      {
+        type: "storm",
+        cooldown: 16.0,
+        duration: 5.0,
+        radius: 7.0,
+        tickInterval: 0.2,
+        arcsPerTick: 4,
+        damagePerArc: 26,
+        damageType: "electric",
+      },
+    ],
+    tint: "#5ad6ff",
+    abilityLabels: ["Phase Step", "Tesla Pulse", "Phase Veil", "Storm Surge"],
+    abilityGlyphs: ["»", "⚡", "◈", "✺"],
+    abilityBlurbs: [
+      "Fast electric zap. Each shot chains to two nearby targets.",
+      "I-frame dash; end arcs hit 3 enemies for 24 electric.",
+      "4-radius electric pulse, then 4 chain hops for 35 each.",
+      "3s veil: speed, fire rate, damage, and 80% resist.",
+      "5s storm: 4 electric arcs every 0.2s inside 7 radius.",
+    ],
+  },
+  george: {
+    variant: "george",
+    label: "George",
     callsign: "Frostbite",
     blurb: "Cryo skirmisher. Frost shots slow the front line; ice bursts freeze nearby packs.",
     strengths:
       "Highest mobility. Slows enemies with every shot. Frost Nova freezes packs; Blizzard controls a wide area.",
-    weakness: "Thin armor and low burst damage. Cold-resistant enemies blunt her damage and slows.",
+    weakness: "Thin armor and low burst damage. Cold-resistant enemies blunt his damage and slows.",
     maxHp: 200,
     speed: 6.0,
     range: 6.5,
@@ -303,7 +301,7 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
         damageType: "cold",
       },
     ],
-    tint: "#5ad6ff",
+    tint: "#b8fff4",
     abilityLabels: ["Ice Slide", "Frost Nova", "Ice Veil", "Blizzard"],
     abilityGlyphs: ["»", "❄", "◈", "❄"],
     abilityBlurbs: [

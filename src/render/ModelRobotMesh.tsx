@@ -61,7 +61,7 @@ const isCorpseClickBlocker = (object: THREE.Object3D): boolean => {
 
 export const ModelRobotMesh = () => {
   const variant = useGame((s) => s.world.robot.variant);
-  const url = ROBOT_URL[variant] ?? ROBOT_URL.george;
+  const url = ROBOT_URL[variant] ?? ROBOT_URL.leela;
   const jetColor = useMemo(() => new THREE.Color(ROBOT_SPECS[variant].tint), [variant]);
   const { scene, animations } = useGLTF(url);
 

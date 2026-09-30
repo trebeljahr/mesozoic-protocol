@@ -1,27 +1,9 @@
 {
   "variants": {
     "george": {
-      "blurb": "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-      "strengths": "Longest engagement range. Massive single-shot damage. Deadeye unleashes an focused firing frenzy on demand.",
-      "weakness": "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
-      "abilityLabel": {
-        "0": "Sidestep",
-        "1": "Shockwave",
-        "2": "Spotter",
-        "3": "Deadeye"
-      },
-      "abilityBlurb": {
-        "0": "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
-        "1": "Short i-frame hop; next shot is a piercing x2.5 crit.",
-        "2": "Close kinetic pulse for 95 damage and a small path push.",
-        "3": "Scope stance: more range and damage, slower feet, 40% resist.",
-        "4": "3.5s frenzy: x7 fire rate and +50% damage."
-      }
-    },
-    "leela": {
       "blurb": "Cryo skirmisher. Frost shots slow the front line; ice bursts freeze nearby packs.",
       "strengths": "Highest mobility. Slows enemies with every shot. Frost Nova freezes packs; Blizzard controls a wide area.",
-      "weakness": "Thin armor and low burst damage. Cold-resistant enemies blunt her damage and slows.",
+      "weakness": "Thin armor and low burst damage. Cold-resistant enemies blunt his damage and slows.",
       "abilityLabel": {
         "0": "Ice Slide",
         "1": "Frost Nova",
@@ -34,6 +16,24 @@
         "2": "4-radius nova deals 70 cold, freezes for 1.2s, and slows for 3s.",
         "3": "3s veil: speed, fire rate, damage, and 80% resist.",
         "4": "5s blizzard: all enemies within 7 radius take 18 cold and briefly freeze every 0.5s."
+      }
+    },
+    "leela": {
+      "blurb": "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
+      "strengths": "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
+      "weakness": "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "abilityLabel": {
+        "0": "Phase Step",
+        "1": "Tesla Pulse",
+        "2": "Phase Veil",
+        "3": "Storm Surge"
+      },
+      "abilityBlurb": {
+        "0": "Fast electric zap. Each shot chains to two nearby targets.",
+        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
+        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
+        "3": "3s veil: speed, fire rate, damage, and 80% resist.",
+        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
       }
     },
     "mike": {

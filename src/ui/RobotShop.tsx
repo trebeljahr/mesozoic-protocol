@@ -33,13 +33,13 @@ import { RobotDiorama } from "./RobotDiorama";
 import { RobotPreview } from "./RobotPreview";
 import { type AbilitySlot, formatAbilityStats } from "./robotAbilityStats";
 
-const ROSTER: RobotVariant[] = ["george", "leela", "mike", "stan"];
+const ROSTER: RobotVariant[] = ["leela", "george", "mike", "stan"];
 
-// Demo roster: George is playable; Leela shows up as a locked full-game
-// teaser once the player has banked enough bolts to have bought her. Mike and
+// Demo roster: Leela is playable; George shows up as a locked full-game
+// teaser once the player has banked enough bolts to have bought him. Mike and
 // Stan stay out of the demo entirely. Full build always shows the whole ROSTER.
 const demoRoster = (bolts: number): RobotVariant[] =>
-  bolts >= DEMO_TEASER_ROBOT_BOLTS ? ["george", DEMO_TEASER_ROBOT] : ["george"];
+  bolts >= DEMO_TEASER_ROBOT_BOLTS ? ["leela", DEMO_TEASER_ROBOT] : ["leela"];
 
 const SKILL_ICONS: Record<RobotSkillId, FC<MenuIconProps>> = {
   vitality: IconShield,

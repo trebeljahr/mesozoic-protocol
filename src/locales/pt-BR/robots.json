@@ -1,25 +1,7 @@
 {
   "variants": {
     "george": {
-      "blurb": "Long-range kinetic sniper. Slow, deliberate, every shot a tracer that pierces armor.",
-      "strengths": "Longest engagement range. Massive single-shot damage. Mira Certeira unleashes an absurd-cadence frenzy on demand.",
-      "weakness": "Slow base fire cadence — packs of swarmers slip past between shots. Kinetic-resistant armored chassis shrug body hits.",
-      "abilityLabel": {
-        "0": "Sidestep",
-        "1": "Shockwave",
-        "2": "Spotter",
-        "3": "Mira Certeira"
-      },
-      "abilityBlurb": {
-        "0": "Sniper beam. Long reach, slow cadence, huge kinetic hit.",
-        "1": "Short i-frame hop; next shot is a piercing x2.5 crit.",
-        "2": "Close kinetic pulse for 95 damage and a small path push.",
-        "3": "Scope stance: more range and damage, slower feet, 40% resist.",
-        "4": "3.5s frenzy: x7 fire rate and +50% damage."
-      }
-    },
-    "leela": {
-      "blurb": "Escaramuçadora criogênica. Tiros de gelo desaceleram a frente; rajadas congelam grupos próximos.",
+      "blurb": "Escaramuçador criogênico. Tiros de gelo desaceleram a frente; rajadas congelam grupos próximos.",
       "strengths": "Maior mobilidade. Cada tiro desacelera. Nova Gélida congela grupos; Nevasca controla uma área ampla.",
       "weakness": "Blindagem fraca e pouco dano imediato. Resistência ao frio reduz seu dano e suas lentidões.",
       "abilityLabel": {
@@ -34,6 +16,24 @@
         "2": "Nova de raio 4: 70 de frio, congelamento de 1,2s e lentidão de 3s.",
         "3": "Véu de 3s: velocidade, cadência, dano e 80% de resistência.",
         "4": "Nevasca de 5s: todos os inimigos no raio 7 recebem 18 de frio e congelam brevemente a cada 0,5s."
+      }
+    },
+    "leela": {
+      "blurb": "Electric skirmisher. Every shot chains. Storms tear apart anything that gets close.",
+      "strengths": "Highest mobility. Auto-attacks chain to two nearby targets. Storm Surge zaps every enemy in a wide ring for several seconds.",
+      "weakness": "Thin armor — eats hits at midrange. Electric-resistant titans absorb the kit.",
+      "abilityLabel": {
+        "0": "Phase Step",
+        "1": "Tesla Pulse",
+        "2": "Phase Veil",
+        "3": "Storm Surge"
+      },
+      "abilityBlurb": {
+        "0": "Fast electric zap. Each shot chains to two nearby targets.",
+        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
+        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
+        "3": "3s veil: speed, fire rate, damage, and 80% resist.",
+        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
       }
     },
     "mike": {

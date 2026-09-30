@@ -291,9 +291,9 @@ const satisfies = (id: AchievementId, p: ProgressData, w: World, ev: GameEvent |
     case "matriarch_apex":
       return matriarchDefeated(ev, "apex");
     case "robot_roster":
-      // George is implicitly unlocked, so a fresh save only needs the
+      // Leela is implicitly unlocked, so a fresh save only needs the
       // three purchasable pilots flagged.
-      return ROBOT_VARIANTS.every((v) => v === "george" || p.robotUnlocks[v] === true);
+      return ROBOT_VARIANTS.every((v) => v === "leela" || p.robotUnlocks[v] === true);
     case "robot_ascendant":
       return ROBOT_VARIANTS.some((v) => robotFullyUpgraded(p, v));
     case "robot_legion":

@@ -7,6 +7,7 @@ import {
   triggerRobotAbility,
   updateRobot,
 } from "./robot";
+import { ROBOT_SPECS, ROBOT_VARIANTS } from "./robotVariants";
 import type { RobotVariant } from "./types";
 import { createWorld, spawnEnemy } from "./world";
 
@@ -34,8 +35,43 @@ const enemyAt = (world: ReturnType<typeof setup>, x: number, y: number) => {
 };
 
 describe("robot combat identities", () => {
-  it("Leela's basic shot deals cold damage and slows its target", () => {
-    const w = setup("leela"),
+  it("starts with electric Leela and offers frost George next for 250 bolts", () => {
+    expect(ROBOT_VARIANTS).toEqual(["leela", "george", "mike", "stan"]);
+    expect(ROBOT_SPECS.leela.unlockBolts).toBe(0);
+    expect(ROBOT_SPECS.george.unlockBolts).toBe(250);
+    expect(createWorld(getLevel(1)).robot.variant).toBe("leela");
+  });
+  it("Leela's restored electric shots chain to two nearby targets without freezing", () => {
+    const w = setup("leela");
+    const pack = [enemyAt(w, 0, -4), enemyAt(w, 0, -5), enemyAt(w, 0, -6)];
+    updateRobot(w, 1 / 60);
+    expect(w.robot.damageType).toBe("electric");
+    expect(pack.every((e) => e.hp < 10000)).toBe(true);
+    expect(pack.every((e) => e.freezeUntil === 0 && e.slowUntil === 0)).toBe(true);
+    expect(w.beams.some((b) => b.points.length === 4)).toBe(true);
+  });
+  it("Leela keeps her original lightning dash, pulse, veil, and storm", () => {
+    const w = setup("leela");
+    const enemies = [enemyAt(w, 0, -4), enemyAt(w, 0, -5), enemyAt(w, 0, -6)];
+    triggerRobotAbility(w, 0);
+    triggerRobotAbility(w, 0);
+    expect(enemies.every((e) => e.hp < 10000)).toBe(true);
+    triggerRobotAbility(w, 1);
+    triggerRobotAbility(w, 2);
+    expect(w.robot.selfBuff).toMatchObject({ fireRateMul: 1.6, speedMul: 1.7, damageResist: 0.8 });
+    const before = enemies.map((e) => e.hp);
+    triggerRobotAbility(w, 3);
+    updateRobot(w, 1 / 60);
+    expect(w.robot.payload).toMatchObject({
+      kind: "storm",
+      damageType: "electric",
+      tickInterval: 0.2,
+      damagePerArc: 26,
+    });
+    expect(enemies.every((e, i) => e.hp < before[i] && e.freezeUntil === 0)).toBe(true);
+  });
+  it("George's basic shot deals cold damage and slows its target", () => {
+    const w = setup("george"),
       e = enemyAt(w, 0, -4);
     updateRobot(w, 1 / 60);
     expect(w.robot.damageType).toBe("cold");
@@ -44,7 +80,7 @@ describe("robot combat identities", () => {
     expect(e.slowFactor).toBeLessThan(1);
   });
   it("Frost Nova freezes only enemies within its radius", () => {
-    const w = setup("leela"),
+    const w = setup("george"),
       near = enemyAt(w, 0, -3),
       far = enemyAt(w, 0, -5);
     triggerRobotAbility(w, 1);
@@ -52,7 +88,7 @@ describe("robot combat identities", () => {
     expect(far.freezeUntil).toBe(0);
   });
   it("Blizzard affects all enemies in range without chaining beyond its radius", () => {
-    const w = setup("leela");
+    const w = setup("george");
     const pack = Array.from({ length: 6 }, (_, i) => enemyAt(w, i * 0.4, -5));
     const far = enemyAt(w, 0, -8);
     triggerRobotAbility(w, 3);
@@ -100,7 +136,7 @@ describe("robot combat identities", () => {
     expect(w.robot.payload).toBeNull();
   });
   it("Ice Slide freezes at landing rather than at cast time", () => {
-    const w = setup("leela"),
+    const w = setup("george"),
       enemy = enemyAt(w, 0, -3.5);
     w.robot.attackCooldown = 10;
     triggerRobotAbility(w, 0);
