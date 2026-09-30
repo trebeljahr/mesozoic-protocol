@@ -1,0 +1,84 @@
+{
+  "project": "Mesozoic Protocol",
+  "date": "2026-09-30",
+  "timezone": "Australia/Sydney",
+  "status": "awaiting_user_direction_selection",
+  "flowProject": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29",
+  "flowHistory": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29/edit/5db7c0a7-e206-4fcc-ac37-9f27a3087e44",
+  "newGenerationRequests": 2,
+  "sequence": [
+    "B Tactical Outpost completed before C submitted",
+    "C Mech versus Dinosaur completed"
+  ],
+  "displayedCostPerRequest": 0,
+  "modelForNewRequests": "Nano Banana 2",
+  "references": "Ten pre-existing game model ingredients from original prompt, plus selected existing key art; reused in Flow. No new external uploads.",
+  "preservation": "Original A and generated B/C exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
+  "selection": "None yet",
+  "files": [
+    {
+      "file": "originals/a-containment-breach.jpg",
+      "dimensions": "896x1200",
+      "sha256": "96364f3676d383351058785a46c6c947d72611033b1dc4ee5285ba1d121eba8b",
+      "origin": "Existing Google Flow creation, exported original on 2026-09-30; original model not verified",
+      "usage": "Marketing concept for selection; not a gameplay screenshot; not store-ready"
+    },
+    {
+      "file": "originals/b-tactical-outpost.jpg",
+      "dimensions": "1376x768",
+      "sha256": "c1c33ff82265d71fa2f91dac2921f85ca587acf91448c6ee331b9dee924b2c31",
+      "origin": "Google Flow Nano Banana 2, generated 2026-09-30 with existing project references",
+      "usage": "Marketing concept for selection; not a gameplay screenshot; not store-ready"
+    },
+    {
+      "file": "originals/c-mech-versus-dinosaur.jpg",
+      "dimensions": "1376x768",
+      "sha256": "212d2c077f42219773f098af1bcb29f5f5131768bd5c8d61c4411b737c31462c",
+      "origin": "Google Flow Nano Banana 2, generated 2026-09-30 with existing project references",
+      "usage": "Marketing concept for selection; not a gameplay screenshot; not store-ready"
+    }
+  ],
+  "previews": ["selection-sheet.jpg", "crop-studies.jpg", "flow-result-c.jpg"],
+  "previewMethod": "ImageMagick resize, crop and sheet layout; originals unchanged. Temporary Arial Bold title demonstrates small-scale legibility, not final approved logo.",
+  "gameplay": "Existing public/screenshots desktop captures remain unchanged. Mobile captures still needed.",
+  "disclosure": "User reports shipped game art/music/voices contain no generative AI. A/B/C here are AI-generated marketing artwork. No disclosure form edited.",
+  "sources": {
+    "steamStore": "https://partner.steamgames.com/doc/store/assets/standard",
+    "steamLibrary": "https://partner.steamgames.com/doc/store/assets/libraryassets",
+    "steamRules": "https://partner.steamgames.com/doc/store/assets/rules",
+    "steamIcons": "https://partner.steamgames.com/doc/store/assets/community?l=english",
+    "play": "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en",
+    "appleScreenshots": "https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications",
+    "appleIcon": "https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon",
+    "itch": "https://itch.io/docs/creators/getting-started"
+  },
+  "plannedExports": [
+    ["Steam header", 920, 430, "PNG"],
+    ["Steam small", 462, 174, "PNG"],
+    ["Steam main", 1232, 706, "PNG"],
+    ["Steam vertical", 748, 896, "PNG"],
+    ["Steam library capsule", 600, 900, "PNG"],
+    ["Steam library header", 920, 430, "PNG"],
+    ["Steam library hero", 3840, 1240, "PNG, no text"],
+    [
+      "Steam library logo",
+      1280,
+      720,
+      "Transparent PNG; width 1280 OR height 720, choose natural logo ratio"
+    ],
+    ["Steam shortcut", 256, 256, "PNG or ICO; 512 square also accepted"],
+    ["Steam app icon", 184, 184, "JPG"],
+    ["Steam mac shortcut", null, null, "ICNS; reuse native icon if suitable"],
+    ["Steam optional background", 1438, 810, "subtle art"],
+    ["itch cover", 630, 500, "PNG or JPG"],
+    ["Play icon", 512, 512, "32-bit PNG, max 1024KB"],
+    ["Play feature", 1024, 500, "JPG or 24-bit PNG, no alpha"],
+    [
+      "Apple icon master",
+      1024,
+      1024,
+      "Opaque flat PNG for asset catalog handoff; changing compiled app assets is separate rollout work"
+    ]
+  ],
+  "validation": "Three originals and two comparison sheets visually reviewed. Final size matrix intentionally not produced pending selection."
+}
