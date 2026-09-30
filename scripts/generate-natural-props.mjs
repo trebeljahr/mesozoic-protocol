@@ -169,3 +169,53 @@ async function save(name, model) {
 for (let i = 1; i <= 4; i++) await save(`Tree${i}`, tree(i * 179));
 for (let i = 1; i <= 3; i++) await save(`Bush${i}`, tree(i * 397, true));
 console.log("Generated four branching trees and three shrubs.");
+
+// Thin tapered ribbons bend progressively toward their tips, never cone-shaped tufts.
+function grass(seed) {
+  const random = rng(seed),
+    parts = [];
+  for (let i = 0; i < 34; i++) {
+    const angle = random() * Math.PI * 2,
+      radius = Math.sqrt(random()) * 0.22;
+    const h = 0.13 + random() * 0.22,
+      bend = 0.06 + random() * 0.16,
+      width = 0.009 + random() * 0.012;
+    const verts = [];
+    const point = (t, side) => [
+      Math.cos(angle) * bend * t * t + side * width * (1 - t),
+      h * t,
+      Math.sin(angle) * bend * t * t,
+    ];
+    for (let j = 0; j < 3; j++) {
+      const a = j / 3,
+        b = (j + 1) / 3;
+      verts.push(
+        ...point(a, -1),
+        ...point(a, 1),
+        ...point(b, -1),
+        ...point(a, 1),
+        ...point(b, 1),
+        ...point(b, -1),
+      );
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    g.rotateY(random() * 6.28);
+    g.translate(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    g.computeVertexNormals();
+    colored(
+      g,
+      new THREE.Color().setHSL(
+        0.2 + random() * 0.07,
+        0.25 + random() * 0.2,
+        0.09 + random() * 0.07,
+      ),
+    );
+    parts.push(g);
+  }
+  return new THREE.Mesh(
+    mergeGeometries(parts),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide }),
+  );
+}
+for (let i = 1; i <= 3; i++) await save(`Grass${i}`, grass(i * 719));

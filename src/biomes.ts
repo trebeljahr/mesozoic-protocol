@@ -264,19 +264,18 @@ const GROUND_COVER_CLEARANCE = PATH_WIDTH / 2 + 1.1;
 const FOREST_LAYERS: BiomeLayerSpec = [
   {
     seed: 1337,
-    urls: ["/models/nature/Grass1.glb", "/models/nature/Grass2.glb", "/models/nature/Grass3.glb"],
-    // Ground-cover mode — Ground.tsx tiles the map with many small Worley
-    // features and a tight rMin/rMax ratio so grass reads as a near-
-    // uniform sprinkle across the whole field, only thinning around path
-    // clearance + blockers. Count is deliberately below "carpet" density:
-    // the field should read as textured ground the eye skims over, not as
-    // a mass of individual marks competing with towers and enemies.
-    count: 130,
+    urls: [
+      "/models/natural/Grass1.glb",
+      "/models/natural/Grass2.glb",
+      "/models/natural/Grass3.glb",
+    ],
+    // Fine bent blades cover meadows as well as the larger vegetation masses.
+    count: 750,
     clearance: GROUND_COVER_CLEARANCE,
-    minScale: 0.5,
-    maxScale: 0.9,
+    minScale: 0.65,
+    maxScale: 1.15,
     castShadow: false,
-    footprint: 0.26,
+    footprint: 0.22,
     groundCover: true,
   },
   {

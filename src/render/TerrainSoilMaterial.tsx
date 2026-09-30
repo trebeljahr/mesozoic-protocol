@@ -79,21 +79,26 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
           }
           // Triangular stochastic patches: random rotation, scale and offset.
           // Explicit derivatives prevent mip seams; normal XY follows the rotation.
-          vec4 patchSample(sampler2D tex, vec2 uv, vec2 cell, bool normalData) {
+          vec4 patchSample(sampler2D tex, vec2 uv, vec2 cell, bool normalData, bool grassData) {
             vec2 h=surfaceHash(cell);
             float angle=h.x*6.2831853;
             mat2 turn=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
             float scale=0.75+h.y*0.65;
             vec4 sampleValue=texture2DGradEXT(tex,turn*uv*scale+h*11.0,
               turn*dFdx(uv)*scale,turn*dFdy(uv)*scale);
+            if(grassData) {
+              vec3 mean=texture2DLodEXT(tex,turn*uv*scale+h*11.0,7.0).rgb;
+              sampleValue.rgb=clamp(sampleValue.rgb-mean*0.65+vec3(0.11,0.13,0.065),0.025,0.65);
+            }
             if(normalData) {
               vec2 n=sampleValue.xy*2.0-1.0;
               sampleValue.xy=vec2(dot(turn[0],n),dot(turn[1],n))*0.5+0.5;
             }
             return sampleValue;
           }
-          vec4 stochastic(sampler2D tex, vec2 uv, bool normalData) {
-            vec2 q=uv*0.72, cell=floor(q), f=fract(q);
+          vec4 stochastic(sampler2D tex, vec2 uv, bool normalData, bool grassData) {
+            vec2 warp=vec2(habitatNoise(uv*0.31),habitatNoise(uv*0.31+43.7));
+            vec2 q=uv*0.72+(warp-0.5)*1.8, cell=floor(q), f=fract(q);
             vec2 a=cell, b=cell+vec2(1,0), c=cell+vec2(0,1);
             vec3 weights=vec3(1.0-f.x-f.y,f.x,f.y);
             if(f.x+f.y>1.0) {
@@ -102,12 +107,12 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
             }
             weights=pow(max(weights,vec3(0.0)),vec3(1.5));
             weights/=dot(weights,vec3(1.0));
-            return patchSample(tex,uv,a,normalData)*weights.x
-                 + patchSample(tex,uv,b,normalData)*weights.y
-                 + patchSample(tex,uv,c,normalData)*weights.z;
+            return patchSample(tex,uv,a,normalData,grassData)*weights.x
+                 + patchSample(tex,uv,b,normalData,grassData)*weights.y
+                 + patchSample(tex,uv,c,normalData,grassData)*weights.z;
           }
-          vec4 untiled(sampler2D tex, vec2 uv) { return stochastic(tex,uv,false); }
-          vec4 untiledNormal(sampler2D tex, vec2 uv) { return stochastic(tex,uv,true); }
+          vec4 untiled(sampler2D tex, vec2 uv) { return stochastic(tex,uv,false,false); }
+          vec4 untiledNormal(sampler2D tex, vec2 uv) { return stochastic(tex,uv,true,false); }
 
         `,
         )
@@ -120,7 +125,8 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
           float leafWeight = (1.0-grassWeight) * (1.0-vTerrainSurface.y) * 0.58;
           vec3 soil = untiled(map,vMapUv).rgb * 1.7;
           vec3 leaves = untiled(uLeafMap,vMapUv*1.3).rgb * 1.2;
-          vec3 grass = untiled(uGrassMap,vMapUv*1.55).rgb * vec3(1.12,1.28,1.1);
+          // Suppress broad sandy stripes in each rotated patch before blending.
+          vec3 grass = stochastic(uGrassMap,vMapUv*1.55,false,true).rgb;
           vec3 roadTex = untiled(uRoadMap,vMapUv*1.2).rgb;
           vec3 road = mix(roadTex*3.4,vec3(0.38,0.285,0.17),0.38);
           vec3 surface = mix(soil,leaves,leafWeight);
@@ -165,7 +171,7 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
             ),
         );
     };
-    mat.customProgramCacheKey = () => "terrain-stochastic-soil-v3";
+    mat.customProgramCacheKey = () => "terrain-stochastic-soil-v4";
     return { mat, textures };
   }, [sources, gl, groundColor]);
   useEffect(

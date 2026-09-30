@@ -174,7 +174,8 @@ const placeLayerInBand = (
 
   const isValid = (x: number, y: number): boolean => {
     if (insideInner(x, y)) return false;
-    if (compositionDensity(masses, mask, x, y) <= 0) return false;
+    if (!layer.urls[0]?.includes("/natural/Grass") && compositionDensity(masses, mask, x, y) <= 0)
+      return false;
     for (const path of paths) {
       for (let i = 1; i < path.length; i++) {
         if (

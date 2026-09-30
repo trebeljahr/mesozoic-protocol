@@ -65,8 +65,8 @@ export function buildTerrainSurface(
   const rock = new THREE.Color("#b4b9b4"),
     soil = new THREE.Color("#c8c2b2");
   const road = new THREE.Color("#d5c8ae"),
-    wet = new THREE.Color(bankPalette.wet);
-  const gravel = new THREE.Color(bankPalette.gravel);
+    wet = new THREE.Color(showcase ? "#b6ab91" : bankPalette.wet);
+  const gravel = new THREE.Color(showcase ? "#c5bea7" : bankPalette.gravel);
   const step = showcase ? 0.55 : 0.4;
   const halfX = 34,
     halfY = 26;

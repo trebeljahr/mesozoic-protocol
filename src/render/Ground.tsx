@@ -122,7 +122,9 @@ const buildLayer = (
   const sparseMul = isGroundCover ? GROUND_COVER_SPARSE_MUL : SPARSE_SPACING_MUL;
   const sparse = Math.max(dense, even * sparseMul);
   const mask = compositionMask(spec.urls, landscapeMaskForUrls(spec.urls, isGroundCover));
-  const densityAt = (x: number, y: number): number => compositionDensity(masses, mask, x, y);
+  const meadow = isGroundCover && spec.urls[0]?.includes("/natural/Grass");
+  const densityAt = (x: number, y: number): number =>
+    meadow ? field.density("groundCover", x, y) : compositionDensity(masses, mask, x, y);
   const radiusAt = (x: number, y: number): number =>
     spacingForDensity(densityAt(x, y), dense, sparse);
   // Ground cover keeps a high floor so clearings stay grassy; sparser
@@ -182,7 +184,9 @@ const buildLayer = (
   for (const p of points) {
     // One species per mass keeps neighbouring detail in the same family.
     const mass = nearestMass(masses, mask, p.x, p.y).mass;
-    const variant = (mass?.species ?? 0) % spec.urls.length;
+    const variant = meadow
+      ? Math.floor(detailRng() * spec.urls.length)
+      : (mass?.species ?? 0) % spec.urls.length;
     const scaleT = scaleTFromDensity(densityAt(p.x, p.y), detailRng());
     const scale = spec.minScale + scaleT * (spec.maxScale - spec.minScale);
     const r = footprint * scale;
@@ -436,7 +440,11 @@ export const Ground = () => {
           as flat outer ground; fog blends its far edges into the sky. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
         <planeGeometry args={[MAP_WIDTH * 6, MAP_HEIGHT * 8]} />
-        <meshStandardMaterial color={style.groundColor} roughness={0.98} metalness={0} />
+        <meshStandardMaterial
+          color={levelId === 4 && !overrideActive ? "#59594c" : style.groundColor}
+          roughness={0.98}
+          metalness={0}
+        />
       </mesh>
 
       <TerrainSurface />

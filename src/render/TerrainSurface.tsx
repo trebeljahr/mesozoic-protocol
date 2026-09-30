@@ -33,7 +33,7 @@ export const TerrainSurface = () => {
     <mesh geometry={geometry} receiveShadow raycast={() => {}}>
       {level === 4 ? (
         <Suspense fallback={<meshStandardMaterial color="#625d4e" roughness={0.98} />}>
-          <TerrainSoilMaterial groundColor={BIOME_STYLE[biome].groundColor} />
+          <TerrainSoilMaterial groundColor="#59594c" />
         </Suspense>
       ) : (
         <meshStandardMaterial vertexColors roughness={0.98} />
