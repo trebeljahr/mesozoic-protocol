@@ -76,3 +76,10 @@ venv/
 .env.keys
 .envrc.local
 .vercel/
+
+# Local release signing material. CI receives copies through Actions secrets.
+.signing/
+*.p12
+*.pfx
+*.p8
+*.key
