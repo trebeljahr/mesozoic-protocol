@@ -30,6 +30,11 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
+      upload:
+        description: Upload to Google Play (disable for the first manual AAB upload)
+        required: true
+        default: false
+        type: boolean
       track:
         description: Play Console track
         required: true
@@ -61,6 +66,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          UPLOAD_TO_PLAY: ${{ github.event_name == 'push' || inputs.upload }}
         run: |
           set -euo pipefail
           required=(
@@ -68,8 +74,10 @@ jobs:
             ANDROID_KEYSTORE_PASSWORD
             ANDROID_KEY_ALIAS
             ANDROID_KEY_PASSWORD
-            PLAY_SERVICE_ACCOUNT_JSON
           )
+          if [ "$UPLOAD_TO_PLAY" = "true" ]; then
+            required+=(PLAY_SERVICE_ACCOUNT_JSON)
+          fi
           missing=()
           for name in "${required[@]}"; do
             [ -n "${!name:-}" ] || missing+=("$name")
@@ -102,22 +110,20 @@ jobs:
       - name: Typecheck
         run: pnpm exec tsc -b
 
-      # Android's versionName comes from the tag rather than a file, so this
-      # mainly asserts the env-var wiring in android/app/build.gradle is intact
-      # and that the tag being built matches the rest of the repo.
+      # The build helper reads package.json and rejects mismatched release tags.
       - name: Version declarations agree
         run: node scripts/sync-version.mjs --check
 
       - name: Unit tests
         run: pnpm test
 
+      - name: Release version tests
+        run: node --test scripts/ci/mobile-build-version.test.mjs
+
   build:
     needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      ANDROID_VERSION_CODE: ${{ github.run_number }}
-      ANDROID_VERSION_NAME: ${{ github.ref_type == 'tag' && github.ref_name || format('0.0.{0}', github.run_number) }}
     steps:
       - uses: actions/checkout@v5
 
@@ -133,17 +139,20 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: |
             platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+            platforms;android-36
+            build-tools;36.0.0
 
       - run: pnpm install --frozen-lockfile
+
+      - name: Resolve store version and build number
+        run: node scripts/ci/mobile-build-version.mjs
 
       - name: Build web bundle and sync Android
         run: |
@@ -180,10 +189,22 @@ jobs:
           set -euo pipefail
           AAB=android/app/build/outputs/bundle/release/app-release.aab
           test -f "$AAB" || { echo "AAB not produced"; exit 1; }
-          unzip -p "$AAB" META-INF/MANIFEST.MF | head -5
+          jarsigner -verify "$AAB" > "$RUNNER_TEMP/aab-signature.txt"
+          if ! grep -q 'jar verified' "$RUNNER_TEMP/aab-signature.txt"; then
+            echo "::error::The release AAB is not signed."
+            cat "$RUNNER_TEMP/aab-signature.txt"
+            exit 1
+          fi
           ls -lah "$AAB"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
       - name: Upload to Play Console
+        if: github.event_name == 'push' || inputs.upload
         uses: r0adkll/upload-google-play@v1.1.3
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -197,9 +218,3 @@ jobs:
         if: always()
         run: |
           rm -f android/app/upload.keystore android/keystore.properties
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-aab
-          path: android/app/build/outputs/bundle/release/app-release.aab
-          if-no-files-found: error

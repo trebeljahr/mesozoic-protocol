@@ -111,6 +111,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Release version tests
+        run: node --test scripts/ci/mobile-build-version.test.mjs
+
   build:
     needs: preflight
     runs-on: macos-15
@@ -155,7 +158,11 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          keychains=()
+          while IFS= read -r path; do
+            keychains+=("$path")
+          done < <(security list-keychains -d user | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//')
+          security list-keychains -d user -s "$KEYCHAIN_PATH" "${keychains[@]}"
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Install provisioning profile
@@ -176,12 +183,8 @@ jobs:
             > "$RUNNER_TEMP/ExportOptions.plist"
           cat "$RUNNER_TEMP/ExportOptions.plist"
 
-      - name: Bump CFBundleVersion from run number
-        run: |
-          set -euo pipefail
-          cd ios/App
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/Info.plist
+      - name: Resolve store version and build number
+        run: node scripts/ci/mobile-build-version.mjs
 
       - name: Archive
         run: |
@@ -197,6 +200,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE_SPECIFIER="$APPLE_PROVISIONING_PROFILE_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
             archive
 
       - name: Export IPA
@@ -209,13 +213,34 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
           ls -lah "$RUNNER_TEMP/ipa"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ${{ runner.temp }}/ipa/*.ipa
+          if-no-files-found: error
+
+      - name: Decode App Store Connect private key
+        id: api-key
+        env:
+          API_KEY_B64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { createPrivateKey, randomUUID } from 'node:crypto';
+          const key = Buffer.from(process.env.API_KEY_B64, 'base64').toString('utf8').trim();
+          createPrivateKey(key);
+          console.log(`::add-mask::${key.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')}`);
+          const delimiter = randomUUID();
+          appendFileSync(process.env.GITHUB_OUTPUT, `private-key<<${delimiter}\n${key}\n${delimiter}\n`);
+          NODE
+
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v3
         with:
           app-path: ${{ runner.temp }}/ipa/App.ipa
           issuer-id: ${{ secrets.APPSTORE_API_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
-          api-private-key: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+          api-private-key: ${{ steps.api-key.outputs.private-key }}
 
       - name: Clean up keychain
         if: always()
@@ -223,9 +248,3 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
         run: |
           security delete-keychain "$RUNNER_TEMP/build.keychain" || true
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa
-          path: ${{ runner.temp }}/ipa/*.ipa
-          if-no-files-found: error

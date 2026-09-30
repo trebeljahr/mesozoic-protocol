@@ -25,7 +25,7 @@ The version has to be stated in five places that can silently drift apart:
 | `src-tauri/Cargo.lock` | the `mesozoic-protocol` `[[package]]` entry — cargo refuses to build if this disagrees with Cargo.toml |
 | `ios/App/App.xcodeproj/project.pbxproj` | `MARKETING_VERSION`, in both the Debug and Release build configs |
 
-Android is the exception: `versionName` is derived from the git tag at build
+Android is the exception: `versionName` is read from `package.json` at build
 time via the `ANDROID_VERSION_NAME` env var read by
 [android/app/build.gradle](android/app/build.gradle), so there is no sixth file
 to edit.
@@ -312,7 +312,7 @@ Capacitor bundles the Vite build inside a native shell. No RN rewrite, no Expo. 
 ### One-time prerequisites
 
 - iOS: Xcode 15+, an Apple Developer account ($99/yr) for App Store distribution. CocoaPods is **not** required — Capacitor 8 uses Swift Package Manager.
-- Android: JDK 17+ and Android Studio (or just the Android SDK + `gradle`). Set `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) to the SDK directory.
+- Android: JDK 21+ and Android Studio (or just the Android SDK + `gradle`). Set `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) to the SDK directory.
 
 The first time you sync on a new machine, install the Android SDK platform tools through Android Studio's SDK Manager.
 
@@ -358,7 +358,7 @@ base64 -i profile.mobileprovision | pbcopy     # → APPLE_PROVISIONING_PROFILE_
 base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy       # → APPSTORE_API_KEY_P8_BASE64
 ```
 
-`CFBundleVersion` is auto-bumped from `GITHUB_RUN_NUMBER` so every TestFlight upload has a fresh build number. `MARKETING_VERSION` (the visible version) lives in `project.pbxproj` and is written by [scripts/sync-version.mjs](scripts/sync-version.mjs) — see [Versioning](#versioning). The workflow's preflight job runs `--check`, so a tag whose pbxproj was not bumped fails before the archive starts rather than shipping a mislabelled TestFlight build.
+`CFBundleVersion` is set to `GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT` so every TestFlight upload has a fresh build number. `MARKETING_VERSION` (the visible version) lives in `project.pbxproj` and is written by [scripts/sync-version.mjs](scripts/sync-version.mjs) — see [Versioning](#versioning). The workflow's preflight job runs `--check`, so a tag whose pbxproj was not bumped fails before the archive starts rather than shipping a mislabelled TestFlight build.
 
 **Local fallback:** Xcode → set Team, Product → Archive → Distribute App → App Store Connect.
 
@@ -383,7 +383,9 @@ Automated in [.github/workflows/build-android.yml](.github/workflows/build-andro
 
 **Required GitHub secrets:** `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
 
-`versionCode` is auto-bumped from `GITHUB_RUN_NUMBER` (Play Console requires monotonically increasing integers). `versionName` comes from the git tag (e.g. `v0.2.0`) or falls back to `0.0.<run>` on manual dispatch. Both are read by [android/app/build.gradle](android/app/build.gradle) from env vars.
+`versionCode` is `GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT`, so a retry gets a new build number. `versionName` comes from `package.json` for both tagged and manual builds. The helper rejects a release tag that does not match that version. Both values reach [android/app/build.gradle](android/app/build.gradle) through environment variables.
+
+For the first upload, dispatch **Build Android** with `upload=false` (the default). The four Android signing secrets are required; the Play service-account secret is only required when uploading. Download the signed `android-aab` artifact and upload it in Play Console. Later dispatches can set `upload=true` and select a track. Tag builds upload to internal testing. Signed AAB and IPA artifacts are preserved before store upload, so a store rejection does not discard the build.
 
 **Local fallback:** drop a `mesozoic-protocol.keystore` + `keystore.properties` in `android/` (see workflow for format), then `cd android && ./gradlew bundleRelease`. Or use Android Studio: Build → Generate Signed Bundle / APK.
 
@@ -484,8 +486,8 @@ git tag v0.2.0 && git push origin v0.2.0
 
 `sync-version.mjs` replaces the old "bump it in package.json and
 tauri.conf.json and hope" step — see [Versioning](#versioning). iOS
-`CFBundleVersion` and Android `versionCode` still auto-bump from the run number,
-and Android's `versionName` still comes from the tag.
+`CFBundleVersion` and Android `versionCode` include the run number and attempt,
+and Android's `versionName` comes from the synchronized package version.
 
 The tag triggers, in parallel:
 

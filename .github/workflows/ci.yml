@@ -64,5 +64,8 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Release version tests
+        run: node --test scripts/ci/mobile-build-version.test.mjs
+
       - name: Build web bundle
         run: pnpm build
