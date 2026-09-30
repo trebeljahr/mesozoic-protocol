@@ -3,7 +3,7 @@ import { chromium } from "playwright";
 // Development QA only; not a store screenshot producer.
 if (!process.argv[2] || !process.env.BASE_URL)
   throw new Error(
-    "Usage: BASE_URL=http://127.0.0.1:PORT node scripts/capture-terrain-review.mjs OUTPUT.png [LEVEL=4] [low]",
+    "Usage: BASE_URL=http://127.0.0.1:PORT node scripts/capture-terrain-review.mjs OUTPUT.png [LEVEL=4] [low] [--build]",
   );
 const browser = await chromium.launch({
   headless: true,
@@ -34,11 +34,35 @@ try {
     const g = window.__game;
     g.setState({ levelIntroVisible: false, newEnemyQueue: [], achievementToasts: [] });
   });
+  if (process.argv.includes("--build")) {
+    await page.evaluate(() => {
+      const g = window.__game;
+      g.getState().debugSetFreeTowers(true);
+      const path = g.getState().world.paths[0];
+      for (let i = 9; i < path.length - 9; i += 9) {
+        const p = path[i],
+          q = path[i + 1];
+        const dx = q.x - p.x,
+          dy = q.y - p.y,
+          length = Math.hypot(dx, dy) || 1;
+        for (const side of [-1, 1]) {
+          g.getState().setSelectedKind("pulse");
+          g.getState().tryPlaceOrSelect(
+            { x: p.x - (dy / length) * 2.6 * side, y: p.y + (dx / length) * 2.6 * side },
+            { clearSelectionAfterPlacement: true },
+          );
+        }
+      }
+      g.getState().setSelectedKind(null);
+    });
+    await page.waitForTimeout(1500);
+  }
   await page.screenshot({ path: process.argv[2] });
   console.log(
     await page.evaluate(() => {
       const w = window.__game.getState().world;
       return {
+        towers: w.towers.length,
         level: w.levelId,
         seed: w.proceduralSeed,
         biome: w.biome,
