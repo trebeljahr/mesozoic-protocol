@@ -24,7 +24,7 @@ by hand and as the written-down record of your depot IDs.
    fee per app, refundable against revenue). You get a numeric **App ID**.
 2. **Create three depots** — Steamworks → your app → SteamPipe → Depots. Add one
    each for Windows, macOS, and Linux, and set each depot's OS in its properties.
-   Steamworks numbers new depots `<APP_ID>1`, `<APP_ID>2`, `<APP_ID>3` by default.
+   Verify the actual IDs shown in Steamworks; this app uses the IDs below.
 3. **Create a dedicated build account.** Do not use your personal Steam account:
    it needs the *Edit App Metadata* / *Publish* permission on this app only, and
    its Steam Guard state lives in a CI secret. Steamworks → Users & Permissions.
@@ -53,6 +53,21 @@ by hand and as the written-down record of your depot IDs.
 
    Steam Guard sessions expire. When `steam.yml` starts failing on login, redo
    step 4 and replace `STEAM_CONFIG_VDF`.
+
+## Configured app and depots
+
+Steamworks app **4798230** uses these platform depots and launch targets:
+
+| Platform | Depot | Launch executable |
+| --- | --- | --- |
+| Windows | 4798231 | `mesozoic-protocol.exe` |
+| macOS | 4798232 | `Mesozoic Protocol.app` |
+| Linux | 4798233 | `mesozoic-protocol` |
+
+All three depots belong to the store package 1667773, beta package 1667772,
+and developer package 1667771. Each depot is restricted to its platform;
+English and German are the base languages. Builds still need installation
+and launch checks before promotion.
 
 ## Depot IDs
 

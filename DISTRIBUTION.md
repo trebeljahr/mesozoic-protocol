@@ -13,6 +13,39 @@ The web build is a static Vite bundle in `dist/`. Both shells just wrap that bun
 
 So `pnpm build` always runs first; both shells then sync the result.
 
+## Running a store test build
+
+Use the existing main branch for a test upload without creating a public
+release tag:
+
+```bash
+gh workflow run build-ios.yml --repo trebeljahr/mesozoic-protocol --ref main
+gh workflow run build-android.yml --repo trebeljahr/mesozoic-protocol --ref main -f upload=true -f track=internal
+```
+
+For the first manual Android upload, pass `-f upload=false`, download the
+`android-aab` artifact, and upload it in Play Console. The first manual
+upload is complete for this app. Keep the existing upload keystore.
+
+The iOS distribution profile must target
+`4BHY8H2J25.com.ricoslabs.mesozoicprotocol`. Its configured name is
+`Mesozoic Protocol App Store`. CI checks this before archiving. A successful
+upload still needs processing in TestFlight, a tester group, and device QA.
+Match the App Store version draft to the build's marketing version before
+submission; do not equate an internal build with a production release.
+
+The Android workflow saves a signature-verified AAB before upload; iOS saves
+an IPA before upload. If upload fails, preserve the artifact and inspect the
+store response before rebuilding. Reruns get a higher build number.
+
+For rollback, pause a bad testing rollout or restore a previously tested
+Steam build. Mobile stores require a new, higher build number for replacement
+binaries; an older artifact cannot overwrite an accepted build number.
+
+The current store checklist and account blockers live in the project vault's
+`mesozoic-protocol-store-rollout-audit.md`. Store agreement, payment, artwork,
+and review requirements are separate from CI success.
+
 ## Versioning
 
 The version has to be stated in five places that can silently drift apart:
