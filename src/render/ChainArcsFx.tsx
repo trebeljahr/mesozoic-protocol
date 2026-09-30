@@ -2,33 +2,23 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
-import { CHAIN_BEAM_COLOR } from "./Effects";
 import { GRAPHICS_QUALITY } from "./effectsTunables";
+import {
+  CHAIN_BEAM_COLOR,
+  isLightningBeam,
+  lightningEnvelope,
+  writeLightningSegment,
+} from "./lightningGeometry";
 import { BLOOM_LAYER } from "./PaintedPostFx";
 
-// Forked lightning render for the Chain Coil tower. Sim still emits
-// the chain shot via createBeam(world, points, CHAIN_BEAM_COLOR, ...),
-// which we identify by the unique color string (no sim-side flag was
-// added). Effects.tsx skips beams of this color so the regular polyline
-// path doesn't double-render under us.
-//
-// Output is built from a single LineSegments pool per pass — additive
-// core + halo — plus an instanced impact-flash billboard at each chain
-// hit point. Each frame we regenerate jagged offsets bucketed at ~16Hz
-// so the arc shimmers across its short (~100ms) lifetime without
-// allocating, and per-vertex colour carries the life-driven fade (alpha
-// baked into RGB because additive blending sums — with normal blending
-// the fade would darken the arc to black instead of dissolving it).
-//
-// Every emissive surface here opts into the selective-bloom pass via
-// `obj.layers.enable(BLOOM_LAYER)` — same convention PulseTracerFx and
-// the post-FX pipeline use.
+// Shared tower/robot lightning: fixed-capacity triangular tubes with an aligned
+// cyan sheath. HDR vertex colors feed the existing selective bloom contract.
+// Geometry and scratch paths are reused; no lights or per-hop allocations.
 
 const MAX_BEAMS = 24;
-const MAX_HOPS = 5;
+const MAX_HOPS = 15;
 const SUBDIVS = 8;
 const MAIN_NOISE = 0.36;
-const HALO_NOISE = 0.6;
 const FORK_SUBDIVS = 4;
 const FORK_LEN_MIN = 0.18;
 const FORK_LEN_MAX = 0.34;
@@ -49,13 +39,19 @@ const FORK_PAIRS = FORK_SUBDIVS;
 const MAX_FORKS_PER_HOP = FORKS_PER_HOP.high;
 const MAX_PAIRS_PER_BEAM = MAX_HOPS * (MAIN_PAIRS_PER_HOP + MAX_FORKS_PER_HOP * FORK_PAIRS);
 const MAX_PAIRS = MAX_BEAMS * MAX_PAIRS_PER_BEAM;
-const MAX_VERTS = MAX_PAIRS * 2;
-const MAX_FLASHES = MAX_BEAMS * MAX_HOPS;
+const MAX_VERTS = MAX_PAIRS * 18;
+const MAX_FLASHES = MAX_BEAMS * 5;
 
-const makeLineGeom = () => {
+const makeArcGeometry = () => {
   const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MAX_VERTS * 3), 3));
-  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(MAX_VERTS * 3), 3));
+  g.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(MAX_VERTS * 3), 3).setUsage(THREE.DynamicDrawUsage),
+  );
+  g.setAttribute(
+    "color",
+    new THREE.BufferAttribute(new Float32Array(MAX_VERTS * 3), 3).setUsage(THREE.DynamicDrawUsage),
+  );
   g.setDrawRange(0, 0);
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e4);
   return g;
@@ -70,12 +66,12 @@ const seeded = (seed: number) => {
 };
 
 export const ChainArcsFx = () => {
-  const coreRef = useRef<THREE.LineSegments>(null);
-  const haloRef = useRef<THREE.LineSegments>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
+  const haloRef = useRef<THREE.Mesh>(null);
   const flashRef = useRef<THREE.InstancedMesh>(null);
 
-  const coreGeom = useMemo(makeLineGeom, []);
-  const haloGeom = useMemo(makeLineGeom, []);
+  const coreGeom = useMemo(makeArcGeometry, []);
+  const haloGeom = useMemo(makeArcGeometry, []);
   const flashGeom = useMemo(() => new THREE.PlaneGeometry(0.9, 0.9), []);
   const flashTexture = useMemo(() => {
     // Radial gradient sprite so the impact flash reads as a soft glow,
@@ -98,6 +94,14 @@ export const ChainArcsFx = () => {
     tex.needsUpdate = true;
     return tex;
   }, []);
+
+  const path = useMemo(() => Array.from({ length: 3 }, () => new Float32Array(SUBDIVS + 1)), []);
+  useEffect(
+    () => () => {
+      flashTexture?.dispose();
+    },
+    [flashTexture],
+  );
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const flashColor = useMemo(() => new THREE.Color(), []);
@@ -150,38 +154,44 @@ export const ChainArcsFx = () => {
       r: number,
       g: number,
       b: number,
+      width = 1,
     ) => {
-      const pi = idx * 6;
-      pos[pi + 0] = ax;
-      pos[pi + 1] = ay;
-      pos[pi + 2] = az;
-      pos[pi + 3] = bx;
-      pos[pi + 4] = by;
-      pos[pi + 5] = bz;
-      col[pi + 0] = r;
-      col[pi + 1] = g;
-      col[pi + 2] = b;
-      col[pi + 3] = r;
-      col[pi + 4] = g;
-      col[pi + 5] = b;
+      const sheath = pos === haloPos;
+      writeLightningSegment(
+        pos,
+        col,
+        idx,
+        ax,
+        ay,
+        az,
+        bx,
+        by,
+        bz,
+        (sheath ? 0.095 : 0.042) * width,
+        (sheath ? 0.075 : 0.03) * width,
+        r,
+        g,
+        b,
+      );
     };
 
-    for (let bi = 0; bi < world.beams.length; bi++) {
+    for (let bi = world.beams.length - 1; bi >= 0; bi--) {
       if (beamSlots >= MAX_BEAMS) break;
       const beam = world.beams[bi];
-      if (beam.color !== CHAIN_BEAM_COLOR) continue;
+      if (!isLightningBeam(beam.color)) continue;
       if (beam.points.length < 2) continue;
 
       const life = Math.max(0, beam.expiresAt - now);
+      if (life <= 0) continue;
       const lifeNorm = Math.min(1, life * 10);
-      const fadeIn = Math.min(1, (1 - life * 10) * 4); // brief 25ms-ish strike-in flash
-      const alpha = lifeNorm * (0.55 + 0.45 * fadeIn);
+      const fadeIn = lightningEnvelope(life);
+      const alpha = fadeIn * 3.8;
       const coreR = CORE_TINT.r * alpha;
       const coreG = CORE_TINT.g * alpha;
       const coreB = CORE_TINT.b * alpha;
-      const haloR = HALO_TINT.r * alpha * 0.95;
-      const haloG = HALO_TINT.g * alpha * 0.95;
-      const haloB = HALO_TINT.b * alpha;
+      const haloR = HALO_TINT.r * alpha * 0.28;
+      const haloG = HALO_TINT.g * alpha * 0.28;
+      const haloB = HALO_TINT.b * alpha * 0.34;
 
       const rng = seeded((beam.id * 1597 + tBucket * 9176) ^ 0x9e3779b9);
 
@@ -189,7 +199,7 @@ export const ChainArcsFx = () => {
       for (let h = 0; h < hops; h++) {
         const a = beam.points[h];
         const c = beam.points[h + 1];
-        const ah = a.h ?? (h === 0 ? 1.35 : 0.85);
+        const ah = a.h ?? (h === 0 && beam.color === CHAIN_BEAM_COLOR ? 1.35 : 0.85);
         const ch = c.h ?? 0.85;
         const dx = c.x - a.x;
         const dy = c.y - a.y;
@@ -197,9 +207,10 @@ export const ChainArcsFx = () => {
         const perpX = -dy / len;
         const perpZ = -dx / len;
 
-        const mainXs: number[] = [a.x];
-        const mainYs: number[] = [ah];
-        const mainZs: number[] = [-a.y];
+        const [mainXs, mainYs, mainZs] = path;
+        mainXs[0] = a.x;
+        mainYs[0] = ah;
+        mainZs[0] = -a.y;
         for (let s = 1; s <= SUBDIVS; s++) {
           const t = s / SUBDIVS;
           const taper = Math.sin(t * Math.PI);
@@ -208,28 +219,11 @@ export const ChainArcsFx = () => {
           const baseH = ah + (ch - ah) * t;
           const n = rng() * MAIN_NOISE * taper;
           const px = baseX + perpX * n;
-          const py = baseH + rng() * 0.08 * taper;
+          const py = baseH + rng() * 0.24 * taper;
           const pz = -baseY + perpZ * n;
-          mainXs.push(px);
-          mainYs.push(py);
-          mainZs.push(pz);
-        }
-
-        // Halo points — wider perpendicular jitter, small h lift so the
-        // glow strip sits visibly above the bright core line.
-        const haloXs: number[] = [a.x];
-        const haloYs: number[] = [ah + 0.05];
-        const haloZs: number[] = [-a.y];
-        for (let s = 1; s <= SUBDIVS; s++) {
-          const t = s / SUBDIVS;
-          const taper = Math.sin(t * Math.PI);
-          const baseX = a.x + dx * t;
-          const baseY = a.y + dy * t;
-          const baseH = ah + (ch - ah) * t;
-          const n = rng() * HALO_NOISE * taper;
-          haloXs.push(baseX + perpX * n);
-          haloYs.push(baseH + 0.05 + rng() * 0.14 * taper);
-          haloZs.push(-baseY + perpZ * n);
+          mainXs[s] = px;
+          mainYs[s] = py;
+          mainZs[s] = pz;
         }
 
         for (let s = 0; s < SUBDIVS; s++) {
@@ -252,12 +246,12 @@ export const ChainArcsFx = () => {
             haloPos,
             haloCol,
             pairIdx,
-            haloXs[s],
-            haloYs[s],
-            haloZs[s],
-            haloXs[s + 1],
-            haloYs[s + 1],
-            haloZs[s + 1],
+            mainXs[s],
+            mainYs[s],
+            mainZs[s],
+            mainXs[s + 1],
+            mainYs[s + 1],
+            mainZs[s + 1],
             haloR,
             haloG,
             haloB,
@@ -276,7 +270,7 @@ export const ChainArcsFx = () => {
           // forks splay out rather than running parallel to the strike.
           const side = rng() > 0 ? 1 : -1;
           const lenRand = FORK_LEN_MIN + (rng() * 0.5 + 0.5) * (FORK_LEN_MAX - FORK_LEN_MIN);
-          const forkLen = len * lenRand;
+          const forkLen = Math.min(1.6, len * lenRand);
           const fdx = perpX * side * forkLen + (dx / len) * forkLen * 0.18 * rng();
           const fdz = perpZ * side * forkLen + (-dy / len) * forkLen * 0.18 * rng();
           let prevX = sx;
@@ -288,10 +282,9 @@ export const ChainArcsFx = () => {
             const taper = (1 - t) * 0.9 + 0.1;
             const jitter = rng() * MAIN_NOISE * 0.7 * taper;
             const nx = sx + fdx * t + perpX * jitter * (side > 0 ? -1 : 1);
-            const ny = sy + rng() * 0.06 * taper - 0.02 * t;
+            const ny = sy + rng() * 0.22 * taper + 0.25 * t;
             const nz = sz + fdz * t + perpZ * jitter * (side > 0 ? -1 : 1);
-            // Core only — keep forks single-pass, halo would obscure the
-            // crisp split shape and isn't worth the verts.
+            // Taper branch width and energy toward its dead end.
             writePair(
               corePos,
               coreCol,
@@ -305,21 +298,23 @@ export const ChainArcsFx = () => {
               coreR * taper,
               coreG * taper,
               coreB * taper,
+              taper * 0.65,
             );
-            // Mirror the empty pair into halo so vertex counts stay aligned.
+            // Glow follows exactly the same branch, avoiding detached ghost arcs.
             writePair(
               haloPos,
               haloCol,
               pairIdx,
               prevX,
-              prevY + 0.04,
+              prevY,
               prevZ,
               nx,
-              ny + 0.04,
+              ny,
               nz,
               haloR * taper * 0.6,
               haloG * taper * 0.6,
               haloB * taper * 0.6,
+              taper * 0.65,
             );
             prevX = nx;
             prevY = ny;
@@ -336,7 +331,7 @@ export const ChainArcsFx = () => {
           dummy.scale.setScalar(flashScale);
           dummy.updateMatrix();
           flash.setMatrixAt(flashCount, dummy.matrix);
-          const fl = lifeNorm * (0.6 + fadeIn * 0.4);
+          const fl = fadeIn * 2.5;
           flashColor.setRGB(FLASH_TINT.r * fl, FLASH_TINT.g * fl, FLASH_TINT.b * fl);
           flash.setColorAt(flashCount, flashColor);
           flashCount++;
@@ -346,12 +341,19 @@ export const ChainArcsFx = () => {
       beamSlots++;
     }
 
-    core.geometry.setDrawRange(0, pairIdx * 2);
-    halo.geometry.setDrawRange(0, pairIdx * 2);
-    core.geometry.attributes.position.needsUpdate = true;
-    core.geometry.attributes.color.needsUpdate = true;
-    halo.geometry.attributes.position.needsUpdate = true;
-    halo.geometry.attributes.color.needsUpdate = true;
+    core.geometry.setDrawRange(0, pairIdx * 18);
+    halo.geometry.setDrawRange(0, pairIdx * 18);
+    // Upload only active vertices; dense pool capacity must not tax quiet frames.
+    for (const geometry of [core.geometry, halo.geometry]) {
+      for (const name of ["position", "color"]) {
+        const attribute = geometry.getAttribute(name) as THREE.BufferAttribute;
+        attribute.clearUpdateRanges();
+        if (pairIdx > 0) {
+          attribute.addUpdateRange(0, pairIdx * 54);
+          attribute.needsUpdate = true;
+        }
+      }
+    }
     core.visible = pairIdx > 0;
     halo.visible = pairIdx > 0;
 
@@ -362,8 +364,8 @@ export const ChainArcsFx = () => {
 
   return (
     <group>
-      <lineSegments ref={haloRef} args={[haloGeom]} renderOrder={2} frustumCulled={false}>
-        <lineBasicMaterial
+      <mesh ref={haloRef} args={[haloGeom]} renderOrder={2} frustumCulled={false}>
+        <meshBasicMaterial
           vertexColors
           transparent
           opacity={1}
@@ -371,9 +373,9 @@ export const ChainArcsFx = () => {
           depthWrite={false}
           toneMapped={false}
         />
-      </lineSegments>
-      <lineSegments ref={coreRef} args={[coreGeom]} renderOrder={3} frustumCulled={false}>
-        <lineBasicMaterial
+      </mesh>
+      <mesh ref={coreRef} args={[coreGeom]} renderOrder={3} frustumCulled={false}>
+        <meshBasicMaterial
           vertexColors
           transparent
           opacity={1}
@@ -381,7 +383,7 @@ export const ChainArcsFx = () => {
           depthWrite={false}
           toneMapped={false}
         />
-      </lineSegments>
+      </mesh>
       <instancedMesh
         ref={flashRef}
         args={[flashGeom, undefined, MAX_FLASHES]}
