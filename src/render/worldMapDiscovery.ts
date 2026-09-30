@@ -8,7 +8,7 @@ export const isMapLevelDiscovered = (id: number, progress: ProgressData) =>
 export type MapDiscovery = { radii: number[]; complete: boolean };
 export const mapDiscovery = (progress: ProgressData): MapDiscovery => ({
   radii: LEVELS.map((level) =>
-    !isMapLevelDiscovered(level.id, progress) ? 0 : getStars(progress, level.id) > 0 ? 11 : 8.5,
+    !isMapLevelDiscovered(level.id, progress) ? 0 : getStars(progress, level.id) > 0 ? 6.5 : 5,
   ),
   complete: !IS_DEMO && LEVELS.every((level) => getStars(progress, level.id) > 0),
 });
