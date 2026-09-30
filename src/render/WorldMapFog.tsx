@@ -84,11 +84,10 @@ export const WorldMapFog = () => {
               distanceToClear=min(distanceToClear,d)-h*h*1.25;
             }
           }
-          // A long atmospheric tail avoids the visible rim of a bounded
-          // smoothstep. Keep the outpost clear, then accumulate haze slowly
-          // across roughly three times the former transition width.
-          float hazeDistance=max(0.0,distanceToClear+5.0+(cloud-0.5)*0.8);
-          float opticalDepth=hazeDistance/14.0;
+          // Keep the soft atmospheric curve, but concentrate the transition
+          // near the frontier so distant land stays concealed rather than hazy.
+          float hazeDistance=max(0.0,distanceToClear+3.0+(cloud-0.5)*0.8);
+          float opticalDepth=hazeDistance/8.5;
           float opacity=(1.0-exp(-opticalDepth*opticalDepth))*(1.0-uCleared);
           gl_FragColor=vec4(mix(uDark,uLight,cloud*0.72),opacity);
           #include <colorspace_fragment>
