@@ -10,19 +10,15 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="file" path="app_webview" />
+        <include domain="root" path="app_webview" />
         <include domain="sharedpref" path="." />
-        <exclude domain="file" path="app_webview/Default/GPUCache" />
-        <exclude domain="file" path="app_webview/GPUCache" />
-        <exclude domain="root" path="cache" />
-        <exclude domain="external" path="." />
+        <exclude domain="root" path="app_webview/Default/GPUCache" />
+        <exclude domain="root" path="app_webview/GPUCache" />
     </cloud-backup>
     <device-transfer>
-        <include domain="file" path="app_webview" />
+        <include domain="root" path="app_webview" />
         <include domain="sharedpref" path="." />
-        <exclude domain="file" path="app_webview/Default/GPUCache" />
-        <exclude domain="file" path="app_webview/GPUCache" />
-        <exclude domain="root" path="cache" />
-        <exclude domain="external" path="." />
+        <exclude domain="root" path="app_webview/Default/GPUCache" />
+        <exclude domain="root" path="app_webview/GPUCache" />
     </device-transfer>
 </data-extraction-rules>
