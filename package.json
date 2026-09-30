@@ -27,7 +27,9 @@
     "screenshots:store:list": "node scripts/store-screenshots.mjs --list",
     "version:sync": "node scripts/sync-version.mjs",
     "version:check": "node scripts/sync-version.mjs --check",
-    "prepare": "husky"
+    "prepare": "husky",
+    "assets:store": "node scripts/store-assets.mjs",
+    "assets:store:check": "node scripts/store-assets.mjs --check"
   },
   "dependencies": {
     "@capacitor/core": "^8.3.1",

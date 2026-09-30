@@ -1,0 +1,71 @@
+{
+  "masterDirectory": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette",
+  "font": "docs/store-assets/sources/fonts/Rajdhani-Bold.ttf",
+  "logo": {
+    "words": [["MESOZOIC", "#e7e1cf"], ["PROTOCOL", "#bfe4df"]],
+    "outline": "#0d1f20",
+    "pointSize": 240,
+    "strokeWidth": 5,
+    "wordWidth": 1248,
+    "border": 16,
+    "width": 1280
+  },
+  "capsules": [
+    {
+      "name": "library-capsule",
+      "source": "portrait-master.png",
+      "width": 600,
+      "height": 900,
+      "logoWidth": 500,
+      "x": 50,
+      "y": 55,
+      "gravity": "center"
+    },
+    {
+      "name": "vertical-capsule",
+      "source": "portrait-master.png",
+      "width": 748,
+      "height": 896,
+      "logoWidth": 500,
+      "x": 124,
+      "y": 25,
+      "gravity": "center"
+    },
+    {
+      "name": "main-capsule",
+      "source": "landscape-master.png",
+      "width": 1232,
+      "height": 706,
+      "logoWidth": 475,
+      "x": 42,
+      "y": 36,
+      "gravity": "center"
+    },
+    {
+      "name": "header-capsule",
+      "source": "landscape-master.png",
+      "width": 920,
+      "height": 430,
+      "logoWidth": 330,
+      "x": 24,
+      "y": 15,
+      "gravity": "south"
+    }
+  ],
+  "smallCapsule": {
+    "width": 462,
+    "height": 174,
+    "logoWidth": 420,
+    "gravity": "south",
+    "overlay": "#101f2099"
+  },
+  "hero": {
+    "width": 3840,
+    "height": 1240,
+    "gravity": "center",
+    "nativeMaster": [2170, 725],
+    "upscaled": true
+  },
+  "libraryHeader": "copy header-capsule.png unchanged",
+  "origin": "Recovered from the original A5 ImageMagick assembly script on 2026-09-30. Exact image generation prompts are archived beside masters."
+}

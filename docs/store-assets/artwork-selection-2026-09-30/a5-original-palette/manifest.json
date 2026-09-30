@@ -87,5 +87,13 @@
   "approval": {
     "date": "2026-09-30",
     "scope": "Artwork and palette approved by user; live Steam verification and publication remain separate"
+  },
+  "currentCatalog": "../../catalog.json",
+  "subsequentVerification": {
+    "date": "2026-09-30",
+    "steam": "User reported all uploads complete; store, screenshot and library checklists verified complete. Saved bottom-left logo placement visually inspected. Store remains unpublished.",
+    "identityCaveat": "Steam UI reports logo 1280x720; archived local export is 1280x441. Uploaded bytes were not retrieved or hash-compared.",
+    "disclosure": "Steam content survey now includes AI-generated marketing art; published survey verified complete.",
+    "history": "Earlier status/validation fields describe the original local assembly checkpoint."
   }
 }

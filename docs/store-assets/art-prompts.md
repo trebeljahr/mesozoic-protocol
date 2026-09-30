@@ -1,3 +1,5 @@
+> Historical prompt reference. Current selection and exports: [store asset library](README.md).
+
 # Mesozoic Protocol — store art generation prompts
 
 Copy-paste, self-contained image prompts for every store asset, anchored to the existing key art

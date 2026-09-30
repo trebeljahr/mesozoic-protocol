@@ -1,3 +1,5 @@
+> Historical reference. For selected files, current sizes and known gaps, start with the [store asset library](../README.md). Do not use this older document as live upload status.
+
 # Mesozoic Protocol — App Store listing copy (paste-ready)
 
 Bundle `com.ricoslabs.mesozoicprotocol`, Apple team `4BHY8H2J25`. **Confirm an app record

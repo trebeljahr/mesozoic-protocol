@@ -1,3 +1,5 @@
+> Historical reference. For selected files, current sizes and known gaps, start with the [store asset library](../README.md). Do not use this older document as live upload status.
+
 # Mesozoic Protocol — Google Play listing (captured 2026-09-22 from the draft app; package `com.ricoslabs.mesozoicprotocol`, Play app id 4972014174140347180)
 
 App name: Mesozoic Protocol

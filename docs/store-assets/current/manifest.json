@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "selection": "A5 original palette, approved 2026-09-30",
+  "assets": [
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/header-capsule.png",
+      "output": "steam/header-capsule.png",
+      "slot": "Header Capsule",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [920, 430],
+      "bytes": 542680,
+      "sha256": "cd92e70fb96581b7189148cd3af5f6c4516e817912338134611f2c45cc46f680",
+      "dimensions": [920, 430],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/small-capsule.png",
+      "output": "steam/small-capsule.png",
+      "slot": "Small Capsule",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [462, 174],
+      "bytes": 84842,
+      "sha256": "9075a1aad54a8cac2b4ae167b0a7e62024959af34a2f902ee3d9511a9313ad7e",
+      "dimensions": [462, 174],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/main-capsule.png",
+      "output": "steam/main-capsule.png",
+      "slot": "Main Capsule",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [1232, 706],
+      "bytes": 1070063,
+      "sha256": "2c7dc159b88b64f7443c4473642e45e50d5cdcf0eb4096b7bc6eae5b77889fa4",
+      "dimensions": [1232, 706],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/vertical-capsule.png",
+      "output": "steam/vertical-capsule.png",
+      "slot": "Vertical Capsule",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [748, 896],
+      "bytes": 927449,
+      "sha256": "e20b47cc70acf33a597daa72ae7caf3d47b6b5298eb03c5f346a50ae4bf09f0d",
+      "dimensions": [748, 896],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/library-capsule.png",
+      "output": "steam/library-capsule.png",
+      "slot": "Library Capsule",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [600, 900],
+      "bytes": 729537,
+      "sha256": "c332a54e3cdb9ed470aba01bcb8db33f37c339cf952843ad10e950c2f4bd3b84",
+      "dimensions": [600, 900],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/library-header.png",
+      "output": "steam/library-header.png",
+      "slot": "Library Header",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [920, 430],
+      "bytes": 542680,
+      "sha256": "cd92e70fb96581b7189148cd3af5f6c4516e817912338134611f2c45cc46f680",
+      "dimensions": [920, 430],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/library-hero.png",
+      "output": "steam/library-hero.png",
+      "slot": "Library Hero",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [3840, 1240],
+      "bytes": 3865122,
+      "sha256": "2280ceb696308cd9b0d794dc3729e1e3e620f7b0683310f6a3f14ed32611b7cf",
+      "dimensions": [3840, 1240],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/artwork-selection-2026-09-30/a5-original-palette/exports/library-logo.png",
+      "output": "steam/library-logo.png",
+      "slot": "Library Logo",
+      "status": "approved-local; Steam slots verified populated 2026-09-30",
+      "size": [1280, 441],
+      "alpha": "transparent",
+      "bytes": 330172,
+      "sha256": "4545670c93508ab881eb1084e279c3ce81e237afe6a3669582f1f35c8a00901b",
+      "dimensions": [1280, 441],
+      "hasAlphaChannel": true
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-01-forest-defense.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-01-forest-defense.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 278680,
+      "sha256": "926c67f189f3f5379a39f3ee7d40811a148fadb110261ab7e73b51b5058b9b6f",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-02-world-map.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-02-world-map.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 260309,
+      "sha256": "5eeda316d1fe7a56d74757777dcf5b9a4335cbeb3c39953c39be3346874ecbc9",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-03-lava-firefight.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-03-lava-firefight.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 243278,
+      "sha256": "9aab3c44c4c5a7fc366c4c690567a24b2b6c69e290850749db7d79870976443c",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-04-alien-biome.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-04-alien-biome.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 288266,
+      "sha256": "499200cca2e8a8c46543e9787471047b4fd5383c07fa5303b012dbba679d47c4",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-05-desert-crossing.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-05-desert-crossing.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 266830,
+      "sha256": "fe05723089aaa00c694bce701e5cf5369bb39cba29da346ce7cafc9181eebec9",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-06-snow-outpost.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-06-snow-outpost.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 295459,
+      "sha256": "43b636169e1fa1efcc4d0dff05e68c7c2a579c80eedb204bb7aabb41ad4852e0",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-07-wasteland-serpentine.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-07-wasteland-serpentine.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 225834,
+      "sha256": "1e7597b5523921ad34858aa1dc595e1b5e5fc4ef2500009f7a6cc3a2baa8ecb4",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "public/screenshots/mesozoic-protocol-screenshot-08-compendium.jpg",
+      "output": "shared/gameplay-desktop/mesozoic-protocol-screenshot-08-compendium.jpg",
+      "slot": "Desktop gameplay screenshot",
+      "status": "existing capture; selection and freshness review required",
+      "bytes": 130877,
+      "sha256": "e32927ac0e03f7a51958c3a0bc87eb14a3e7eae35607c676ff4ed0a0a51a6cd9",
+      "dimensions": [1920, 1080],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "docs/store-assets/google-play/icon-512.png",
+      "output": "google-play/icon-512.png",
+      "slot": "Play app icon",
+      "status": "uploaded to draft per rollout audit",
+      "size": [512, 512],
+      "bytes": 127221,
+      "sha256": "079001a29d4c82a80d14ca4b7bd8a48b3fae4435c22b0a8464164ead1001f03e",
+      "dimensions": [512, 512],
+      "hasAlphaChannel": true
+    },
+    {
+      "source": "docs/store-assets/google-play/feature-graphic.jpg",
+      "output": "google-play/feature-graphic.jpg",
+      "slot": "Play feature graphic",
+      "status": "uploaded to draft per rollout audit",
+      "size": [1024, 500],
+      "alpha": "none",
+      "bytes": 78928,
+      "sha256": "d742e15ad41ef1b9edde35cee5aa180e38a17e695a02e696f78fc6d4d0081814",
+      "dimensions": [1024, 500],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",
+      "output": "app-store/icon-1024.png",
+      "slot": "App Store build icon",
+      "status": "existing native icon; distributed through build",
+      "size": [1024, 1024],
+      "alpha": "none",
+      "bytes": 188776,
+      "sha256": "c162e9b8f7ff2cd6f23cb0c72bbdca81686b2cbcd508f34d7d1d0bbe7c899835",
+      "dimensions": [1024, 1024],
+      "hasAlphaChannel": false
+    },
+    {
+      "source": "src-tauri/icons/source.png",
+      "output": "shared/icon-source-1024.png",
+      "slot": "Native icon source",
+      "status": "local-export",
+      "size": [1024, 1024],
+      "bytes": 605754,
+      "sha256": "39df32dc2cf6cfe70c3c1f6a7b4d1c64364ee8d0e63647ff44c2cafbaff9588f",
+      "dimensions": [1024, 1024],
+      "hasAlphaChannel": true
+    },
+    {
+      "source": "src-tauri/icons/icon.ico",
+      "output": "shared/native-icons/icon.ico",
+      "slot": "Native app icon; not proof of identical Steam upload",
+      "status": "local-export",
+      "bytes": 69181,
+      "sha256": "74ef1a4adb1fe93964bba96476a35a8abdf7d219859fbc9c2f4ab65161754ffc"
+    },
+    {
+      "source": "src-tauri/icons/icon.icns",
+      "output": "shared/native-icons/icon.icns",
+      "slot": "Native app icon; not proof of identical Steam upload",
+      "status": "local-export",
+      "bytes": 663997,
+      "sha256": "7541d6d245a77c3c111e9a575d11f0f9ffe066001e5df80aac3204b32af2f19c"
+    },
+    {
+      "source": "docs/store-assets/sources/steam-client/linux-icons.zip",
+      "output": "steam/client/linux-icons.zip",
+      "slot": "Linux client icons",
+      "status": "retained upload bundle from 2026-09-30",
+      "bytes": 82534,
+      "sha256": "8c1c6f1fe1971e9ba53b3a8458f08df5ed55941b9a5b93afe70d2069eb05d1c0"
+    }
+  ],
+  "missing": [
+    {
+      "store": "Steam",
+      "asset": "Gameplay trailer",
+      "status": "not created"
+    },
+    {
+      "store": "Steam",
+      "asset": "Exact uploaded Windows shortcut and app-icon files",
+      "status": "not recovered; native ICO preserved as reference, do not claim exact upload identity"
+    },
+    {
+      "store": "App Store",
+      "asset": "iPhone and iPad screenshots",
+      "status": "capture script exists; no device-validated approved set archived"
+    },
+    {
+      "store": "Google Play",
+      "asset": "Phone and tablet screenshots",
+      "status": "legacy screenshot-1..6.png retained outside current; not approved mobile captures"
+    },
+    {
+      "store": "itch.io",
+      "asset": "Exact uploaded cover and screenshot selection",
+      "status": "draft upload reported in rollout audit; exact uploaded cover source not identified, shared desktop screenshots available"
+    },
+    {
+      "store": "Microsoft Store",
+      "asset": "Listing artwork and screenshot package",
+      "status": "product not yet created; requirements and assets must be selected for actual product type"
+    }
+  ]
+}

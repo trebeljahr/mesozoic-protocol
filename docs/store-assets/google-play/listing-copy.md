@@ -1,3 +1,5 @@
+> Historical reference. For selected files, current sizes and known gaps, start with the [store asset library](../README.md). Do not use this older document as live upload status.
+
 # Mesozoic Protocol — Google Play store listing copy (paste-ready)
 
 Companion to `listing.md` (which captures the draft's console state). Package

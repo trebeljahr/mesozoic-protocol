@@ -1,3 +1,5 @@
+> Historical reference. For selected files, current sizes and known gaps, start with the [store asset library](../README.md). Do not use this older document as live upload status.
+
 # Mesozoic Protocol — Steam store page (paste-ready field values)
 
 Captured 2026-09-23. **Steam App ID: `4798230`** (Ricos Labs LLC, PartnerID 404275).

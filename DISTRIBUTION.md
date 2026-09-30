@@ -457,7 +457,7 @@ pnpm screenshots:store:list   # print the size table and per-set counts, capture
 pnpm screenshots:store        # capture everything
 ```
 
-Output lands in `store-screenshots/` at the repo root — **gitignored on purpose**. It is 29 MB of regenerable binaries, and anything under `public/` would be copied into `dist/` and from there into the shipped Capacitor and Tauri bundles. These are console upload artifacts; they must not travel inside the app.
+Raw output lands in `store-screenshots/` at the repo root — **gitignored on purpose**. Review native-device fidelity, then archive selected captures under `docs/store-assets/` and add them to its catalog. The committed [store asset library](docs/store-assets/README.md) owns approved upload snapshots, provenance and the reusable assembly workflow. It is 29 MB of regenerable binaries, and anything under `public/` would be copied into `dist/` and from there into the shipped Capacitor and Tauri bundles. These are console upload artifacts; they must not travel inside the app.
 
 Sets produced (all landscape, all alpha flattened onto `#0b1016` — both stores reject alpha):
 
