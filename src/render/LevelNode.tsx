@@ -184,9 +184,11 @@ export const LevelNode = ({ level }: Props) => {
         <mesh position={[0, 0.5, 0]} castShadow>
           <cylinderGeometry args={[0.9, 1.1, 0.6, 24]} />
           <meshStandardMaterial
-            color={unlocked ? "#596165" : "#42494b"}
-            roughness={0.72}
-            metalness={0.35}
+            color={baseColor}
+            emissive={emissive}
+            emissiveIntensity={emissiveIntensity + (hovered && unlocked ? 0.5 : 0)}
+            roughness={0.45}
+            metalness={0.25}
           />
         </mesh>
         <mesh position={[0, 0.85, 0]} castShadow>
