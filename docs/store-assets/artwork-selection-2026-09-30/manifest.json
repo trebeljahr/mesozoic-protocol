@@ -2,19 +2,20 @@
   "project": "Mesozoic Protocol",
   "date": "2026-09-30",
   "timezone": "Australia/Sydney",
-  "status": "awaiting_user_direction_selection",
+  "status": "A_and_B_preferred_A2_landscape_pending_review",
   "flowProject": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29",
   "flowHistory": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29/edit/5db7c0a7-e206-4fcc-ac37-9f27a3087e44",
-  "newGenerationRequests": 2,
+  "newGenerationRequests": 3,
   "sequence": [
     "B Tactical Outpost completed before C submitted",
-    "C Mech versus Dinosaur completed"
+    "C Mech versus Dinosaur completed",
+    "A2 clean landscape completed after user preferred A and B and requested cleaner landscape A"
   ],
   "displayedCostPerRequest": 0,
   "modelForNewRequests": "Nano Banana 2",
   "references": "Ten pre-existing game model ingredients from original prompt, plus selected existing key art; reused in Flow. No new external uploads.",
-  "preservation": "Original A and generated B/C exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
-  "selection": "None yet",
+  "preservation": "All four originals exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
+  "selection": "User prefers A and B; C least. B is desired actual-game visual target. A2 refines A for landscape; final artwork treatment remains under review.",
   "files": [
     {
       "file": "originals/a-containment-breach.jpg",
@@ -36,9 +37,25 @@
       "sha256": "212d2c077f42219773f098af1bcb29f5f5131768bd5c8d61c4411b737c31462c",
       "origin": "Google Flow Nano Banana 2, generated 2026-09-30 with existing project references",
       "usage": "Marketing concept for selection; not a gameplay screenshot; not store-ready"
+    },
+    {
+      "file": "originals/a2-clean-landscape.jpg",
+      "dimensions": "1376x768",
+      "sha256": "46d151cd5a119cf1fab8ee2a89f076e136468732fbf39be2ac6214b2751642a0",
+      "origin": "Google Flow Nano Banana 2, generated 2026-09-30; zero-credit setting; existing original A and game model ingredients reused",
+      "usage": "Marketing refinement and landscape composition study; not gameplay or final store art",
+      "review": "Cleaner faceted shapes, calm title area, whole mech visible. Loses some original A drama. Generated three turrets despite prompt requesting two; not pixel-exact game geometry."
     }
   ],
-  "previews": ["selection-sheet.jpg", "crop-studies.jpg", "flow-result-c.jpg"],
+  "previews": [
+    "selection-sheet.jpg",
+    "crop-studies.jpg",
+    "flow-result-c.jpg",
+    "flow-result-a2.jpg",
+    "a2-landscape-studies.jpg",
+    "previews/a2-main-crop-study.jpg",
+    "previews/a2-header-crop-study.jpg"
+  ],
   "previewMethod": "ImageMagick resize, crop and sheet layout; originals unchanged. Temporary Arial Bold title demonstrates small-scale legibility, not final approved logo.",
   "gameplay": "Existing public/screenshots desktop captures remain unchanged. Mobile captures still needed.",
   "disclosure": "User reports shipped game art/music/voices contain no generative AI. A/B/C here are AI-generated marketing artwork. No disclosure form edited.",
@@ -80,5 +97,15 @@
       "Opaque flat PNG for asset catalog handoff; changing compiled app assets is separate rollout work"
     ]
   ],
-  "validation": "Three originals and two comparison sheets visually reviewed. Final size matrix intentionally not produced pending selection."
+  "validation": "Four originals visually reviewed. A2 main/header crop studies produced for review; final title and full size matrix remain pending.",
+  "gameVisualTarget": {
+    "direction": "B Tactical Outpost",
+    "status": "Renderer inspected read-only. Playable prototype scope question pending; no game code changed.",
+    "priorities": [
+      "Warm directional lighting versus cooler shadows; reduce competing ambient fill",
+      "More coherent forest/path/water palette and less visual clutter",
+      "Explore lower camera angle with map-fit, pan, touch-picking and HUD occlusion validation"
+    ],
+    "validationNeeded": "Side-by-side captures of same level and state, desktop and mobile, low/medium/high quality; preserve placement and path readability; compare frame time."
+  }
 }
