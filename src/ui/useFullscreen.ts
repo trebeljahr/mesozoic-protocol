@@ -25,7 +25,7 @@ type KeyboardLock = {
 let releaseKeyboardLock: (() => void) | undefined;
 
 // Fullscreen owns Escape unless the browser grants Keyboard Lock.
-// Keep a fallback for screens without their own Escape action.
+// The browser retains hold-to-exit; individual presses belong to the game.
 const captureFullscreenEscape = async (): Promise<void> => {
   const keyboard = (navigator as Navigator & { keyboard?: KeyboardLock }).keyboard;
   if (!keyboard?.lock) return;
@@ -37,11 +37,7 @@ const captureFullscreenEscape = async (): Promise<void> => {
       event.stopImmediatePropagation();
       return;
     }
-    // Let selection and dialog handlers claim this press first.
-    setTimeout(() => {
-      if (releaseKeyboardLock === release && !event.defaultPrevented && isFullscreen())
-        void exitFullscreen();
-    }, 0);
+    // Do not exit for an unhandled press: repeated taps must stay fullscreen.
   };
   const release = () => {
     if (releaseKeyboardLock !== release) return;

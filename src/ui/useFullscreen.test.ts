@@ -49,17 +49,24 @@ describe("fullscreen Escape ownership", () => {
     expect(doc.exitFullscreen).not.toHaveBeenCalled();
   });
 
-  it("exits when Escape has nothing left to dismiss", async () => {
+  it("stays fullscreen after repeated unhandled Escape taps", async () => {
     await enterFullscreen();
-    win.dispatchEvent(escapeEvent());
-    await vi.runAllTimersAsync();
-    expect(doc.exitFullscreen).toHaveBeenCalledOnce();
-    expect(keyboard.unlock).toHaveBeenCalledOnce();
+    for (let tap = 0; tap < 5; tap++) {
+      win.dispatchEvent(escapeEvent());
+      win.dispatchEvent(Object.assign(new Event("keyup"), { code: "Escape" }));
+      await vi.runAllTimersAsync();
+    }
+    expect(doc.exitFullscreen).not.toHaveBeenCalled();
+    expect(keyboard.unlock).not.toHaveBeenCalled();
+    expect(doc.fullscreenElement).not.toBeNull();
   });
 
-  it("does not turn a held Escape into a second exit action", async () => {
+  it("leaves hold-to-exit to the browser and suppresses repeated game actions", async () => {
     await enterFullscreen();
-    win.dispatchEvent(escapeEvent(true));
+    win.dispatchEvent(escapeEvent());
+    const repeated = escapeEvent(true);
+    win.dispatchEvent(repeated);
+    expect(repeated.defaultPrevented).toBe(true);
     await vi.runAllTimersAsync();
     expect(doc.exitFullscreen).not.toHaveBeenCalled();
   });
