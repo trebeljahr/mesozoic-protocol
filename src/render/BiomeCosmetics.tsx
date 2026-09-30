@@ -80,14 +80,6 @@ const STORY_CLEAR_RADIUS = new Map<string, number>([
 const noRaycast: THREE.Mesh["raycast"] = () => {};
 
 type Instance = { url: string; pos: Vec2; scale: number; rotY: number; clearRadius?: number };
-type TraceMark = {
-  pos: Vec2;
-  rotY: number;
-  sx: number;
-  sy: number;
-  color: string;
-  opacity: number;
-};
 type WarningMarker = {
   pos: Vec2;
   rotY: number;
@@ -112,8 +104,7 @@ const buildInstances = (
   const bounds = { minX: -halfW, maxX: halfW, minY: -halfH, maxY: halfH };
   const pathR2 = PATH_CLEARANCE * PATH_CLEARANCE;
 
-  // HQ-pad blocker per path endpoint — keep procedural cosmetics out of
-  // the home-base compound where HQBase.tsx renders authored set-dressing.
+  // Keep story props outside the home-base compound.
   const hqCenters = paths.filter((p) => p.length >= 2).map((p) => p[p.length - 1]);
   const hqR2 = HQ_PAD_BLOCKER_RADIUS * HQ_PAD_BLOCKER_RADIUS;
 
@@ -178,16 +169,14 @@ const storyRadiusFor = (url: string): number => STORY_CLEAR_RADIUS.get(url) ?? 0
 const buildStoryDetails = (
   biome: Biome,
   paths: Vec2[][],
-  levelId: number,
   blockers: { pos: Vec2; radius: number }[],
   flow: FlowFeatures | null,
-): { instances: Instance[]; traces: TraceMark[]; markers: WarningMarker[] } => {
+): { instances: Instance[]; markers: WarningMarker[] } => {
   const urls = BIOME_STORY_PROPS[biome];
   const style = BIOME_STORY_TRACE_STYLE[biome];
   const instances: Instance[] = [];
-  const traces: TraceMark[] = [];
   const markers: WarningMarker[] = [];
-  if (urls.length === 0) return { instances, traces, markers };
+  if (urls.length === 0) return { instances, markers };
 
   const halfW = MAP_WIDTH * 0.49;
   const halfH = MAP_HEIGHT * 0.49;
@@ -225,44 +214,6 @@ const buildStoryDetails = (
     }
     return false;
   };
-
-  for (let pathIndex = 0; pathIndex < paths.length; pathIndex++) {
-    const path = paths[pathIndex];
-    if (path.length < 2) continue;
-    const last = path[path.length - 1];
-    const prev = path[path.length - 2];
-    const dx = prev.x - last.x;
-    const dy = prev.y - last.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len < 1.8) continue;
-
-    const faceX = dx / len;
-    const faceY = dy / len;
-    const rightX = faceY;
-    const rightY = -faceX;
-    const yaw = Math.atan2(dx, -dy);
-    const rng = mulberry32(levelId * 9209 + pathIndex * 577 + 101);
-    const sideSign = rng() < 0.5 ? -1 : 1;
-    const maxFwd = Math.max(1.6, Math.min(6.1, len - 0.35));
-    const clampFwd = (v: number) => Math.min(v, maxFwd);
-    const at = (fwd: number, side: number): Vec2 => ({
-      x: last.x + faceX * fwd + rightX * side,
-      y: last.y + faceY * fwd + rightY * side,
-    });
-
-    for (let i = 0; i < 3; i++) {
-      const p = at(clampFwd(1.6 + i * 1.25 + rng() * 0.35), sideSign * (rng() - 0.5) * 0.7);
-      if (!inBounds(p.x, p.y) || isOnFlowSurface(flow, p.x, p.y, 0.15)) continue;
-      traces.push({
-        pos: p,
-        rotY: yaw + (rng() - 0.5) * 0.22,
-        sx: 0.16 + rng() * 0.1,
-        sy: 0.42 + rng() * 0.2,
-        color: style.trace,
-        opacity: style.traceOpacity,
-      });
-    }
-  }
 
   // Two small field stations with a shared facing and fixed role hierarchy.
   // Accept complete groups only: dropping whichever piece happens to fit
@@ -313,7 +264,7 @@ const buildStoryDetails = (
     }
   }
 
-  return { instances, traces, markers };
+  return { instances, markers };
 };
 
 // Cosmetic URLs come from packs with wildly varying authored max-dims;
@@ -325,17 +276,12 @@ const cosmeticBaseScale = (source: MeshSource, url: string): number => {
   return TARGET_SIZE_BY_ROLE[classifyPropUrl(url)] / source.maxDim;
 };
 
-// Shared instanced geometry/material caches. Every level's traces +
-// markers collapse to four draw calls (one per part) regardless of how
-// many individual marks the layer produced.
+// Shared geometry/material caches keep warning markers to three draw calls.
 const STORY_GEOMS = {
-  trace: new THREE.CircleGeometry(1, 18),
   markerPole: new THREE.CylinderGeometry(0.025, 0.035, 0.36, 7),
   markerTri: new THREE.CircleGeometry(0.18, 3),
 };
 
-const traceMaterial = (color: string, opacity: number) =>
-  new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
 const markerPoleMaterial = (accent: string) =>
   new THREE.MeshStandardMaterial({ color: accent, roughness: 0.7, metalness: 0.15 });
 const markerTriMaterial = (color: string) =>
@@ -345,7 +291,6 @@ const STORY_MATERIALS: Partial<
   Record<
     Biome,
     {
-      trace: THREE.Material;
       pole: THREE.Material;
       tri: THREE.Material;
       accent: THREE.Material;
@@ -358,49 +303,12 @@ const storyMaterialsFor = (biome: Biome) => {
   if (cached) return cached;
   const style = BIOME_STORY_TRACE_STYLE[biome];
   const built = {
-    trace: traceMaterial(style.trace, style.traceOpacity),
     pole: markerPoleMaterial(style.markerAccent),
     tri: markerTriMaterial(style.marker),
     accent: markerTriMaterial(style.markerAccent),
   };
   STORY_MATERIALS[biome] = built;
   return built;
-};
-
-const InstancedTraces = ({ items, biome }: { items: TraceMark[]; biome: Biome }) => {
-  const ref = useRef<THREE.InstancedMesh | null>(null);
-  const material = storyMaterialsFor(biome).trace;
-
-  useEffect(() => {
-    if (!ref.current) return;
-    const dummy = new THREE.Object3D();
-    for (let i = 0; i < items.length; i++) {
-      const m = items[i];
-      dummy.position.set(m.pos.x, 0.046, -m.pos.y);
-      // YXZ Euler so the composition is RotY(rotY) * RotX(-π/2) — same
-      // as the original group(rotY) + mesh(-π/2,0,0) nesting.
-      dummy.rotation.set(-Math.PI / 2, m.rotY, 0, "YXZ");
-      dummy.scale.set(m.sx, m.sy, 1);
-      dummy.updateMatrix();
-      ref.current.setMatrixAt(i, dummy.matrix);
-    }
-    ref.current.count = items.length;
-    ref.current.instanceMatrix.needsUpdate = true;
-  }, [items]);
-
-  if (items.length === 0) return null;
-  return (
-    <instancedMesh
-      ref={ref}
-      args={[STORY_GEOMS.trace, material, items.length]}
-      raycast={noRaycast}
-      // Positions are baked into per-instance matrices, so the default
-      // origin-centered bounding sphere fails the frustum test once the
-      // player zooms in and pans away from origin — culling the whole
-      // batch and making the cosmetics vanish. Disable per-batch culling.
-      frustumCulled={false}
-    />
-  );
 };
 
 // Per-instance matrix for a marker sub-part. The local offset is the
@@ -519,7 +427,7 @@ export const BiomeCosmetics = () => {
     ];
     const proceduralKey = levelId + proceduralSeed;
     const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, proceduralKey, biome) : null;
-    const story = buildStoryDetails(biome, paths, proceduralKey, blockers, flow);
+    const story = buildStoryDetails(biome, paths, blockers, flow);
     const field = levelLandscape(proceduralKey, biome, flow);
     const instances = [
       ...buildInstances(biome, paths, proceduralKey, blockers, flow, field),
@@ -531,7 +439,7 @@ export const BiomeCosmetics = () => {
       list.push(inst);
       byUrl.set(inst.url, list);
     }
-    return { groups: Array.from(byUrl.entries()), traces: story.traces, markers: story.markers };
+    return { groups: Array.from(byUrl.entries()), markers: story.markers };
   }, [biome, paths, levelId, proceduralSeed, trees, rocks, outposts]);
 
   // Cull cosmetics that overlap a tower so the base sits on clean ground.
@@ -554,7 +462,6 @@ export const BiomeCosmetics = () => {
         const filtered = items.filter((it) => !nearTower(it.pos, it.clearRadius ?? 0.3));
         return [url, filtered];
       }),
-      traces: details.traces,
       markers: details.markers.filter((m) => !nearTower(m.pos, m.clearRadius)),
     };
   }, [details, towers, towerVersion]);
@@ -565,7 +472,6 @@ export const BiomeCosmetics = () => {
 
   return (
     <group>
-      <InstancedTraces items={culledDetails.traces} biome={biome} />
       <InstancedMarkers items={culledDetails.markers} biome={biome} />
       {culledDetails.groups.map(([url, items]) => (
         <InstancedGroup

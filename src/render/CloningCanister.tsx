@@ -252,16 +252,19 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
           position={[Math.cos(a) * 0.4, 0.05, Math.sin(a) * 0.4]}
           raycast={noRaycast}
           castShadow
+          receiveShadow
         />
       ))}
-      {/* Glass cylinder. Hollow (openEnded) so the inner fluid surface is
-          visible through the transmission pass. */}
+      {/* Cast the full tank silhouette so the lid shadow stays connected to
+          the base. Shadow maps treat the translucent glass as an occluder. */}
       <mesh
         geometry={GEOMS.glass}
         material={glassMat}
         position={[0, GLASS_CENTER_Y, 0]}
         renderOrder={2}
         raycast={noRaycast}
+        castShadow
+        receiveShadow
       />
       {/* Glowing fluid — additive blend onto whatever sits behind, so the
           specimen reads as suspended in the medium rather than blocked by it. */}
@@ -285,6 +288,7 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
         position={[0, CAP_PLATE_Y, 0]}
         raycast={noRaycast}
         castShadow
+        receiveShadow
       />
       <mesh
         geometry={GEOMS.capRing}
@@ -292,12 +296,16 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
         position={[0, CAP_RING_Y, 0]}
         rotation={[Math.PI / 2, 0, 0]}
         raycast={noRaycast}
+        castShadow
+        receiveShadow
       />
       <mesh
         geometry={GEOMS.valve}
         material={STEEL_DARK}
         position={[0.3, CAP_PLATE_Y + 0.04, 0]}
         raycast={noRaycast}
+        castShadow
+        receiveShadow
       />
       <mesh
         geometry={GEOMS.valve}
@@ -305,6 +313,8 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
         position={[-0.28, CAP_PLATE_Y + 0.04, 0.1]}
         rotation={[0, Math.PI / 3, 0]}
         raycast={noRaycast}
+        castShadow
+        receiveShadow
       />
       {/* Indicator lights — additive bloom dots on the cap rim. */}
       {pipeAngles.map((a, i) => (
