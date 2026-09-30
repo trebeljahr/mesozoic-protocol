@@ -46,12 +46,12 @@ const PATH_CLEARANCE = PATH_WIDTH / 2 + 1.2;
 const PROP_SPACING = 2.4;
 
 const STORY_TARGET_HEIGHT = new Map<string, number>([
-  ["/models/landmarks/desert/Tent.glb", 0.62],
+  ["/models/landmarks/desert/Tent.glb", 1.5],
   ["/models/landmarks/forest/Barrel.glb", 0.38],
   ["/models/landmarks/desert/Chest.glb", 0.34],
   ["/models/landmarks/desert/Skull.glb", 0.32],
   ["/models/landmarks/wasteland/Skull.glb", 0.32],
-  ["/models/landmarks/snow/Tent.glb", 0.62],
+  ["/models/landmarks/snow/Tent.glb", 1.5],
   ["/models/landmarks/snow/Torch.glb", 0.66],
   ["/models/scifi/barrels.glb", 0.44],
   ["/models/scifi/machine_barrel.glb", 0.52],
@@ -68,8 +68,8 @@ const STORY_TARGET_HEIGHT = new Map<string, number>([
 ]);
 
 const STORY_CLEAR_RADIUS = new Map<string, number>([
-  ["/models/landmarks/desert/Tent.glb", 0.72],
-  ["/models/landmarks/snow/Tent.glb", 0.72],
+  ["/models/landmarks/desert/Tent.glb", 2.1],
+  ["/models/landmarks/snow/Tent.glb", 2.1],
   ["/models/scifi/rover.glb", 0.7],
   ["/models/scifi/machine_generatorLarge.glb", 0.65],
   ["/models/scifi/machine_barrelLarge.glb", 0.6],
@@ -230,12 +230,17 @@ const buildStoryDetails = (
       const fx = (b.x - a.x) / length,
         fy = (b.y - a.y) / length;
       for (const side of [1, -1]) {
-        const center = { x: a.x - fy * side * 4.5, y: a.y + fx * side * 4.5 };
+        const stationRadius = storyRadiusFor(urls[0]) * 1.1;
+        const setback = Math.max(4.5, PATH_WIDTH / 2 + stationRadius + 1.2);
+        const center = { x: a.x - fy * side * setback, y: a.y + fx * side * setback };
         if (instances.some((p) => Math.hypot(p.pos.x - center.x, p.pos.y - center.y) < 7)) continue;
+        // Keep tent ropes and nearby supplies outside each other's footprints.
+        const tentStation = urls[0].endsWith("/Tent.glb");
+        const accessoryOffset = tentStation ? stationRadius + 0.8 : 1.25;
         const offsets = [
           [0, 0, 1.1],
-          [1.25, 0.35, 0.85],
-          [0.7, -0.9, 0.72],
+          [accessoryOffset, 0.35, 0.85],
+          tentStation ? [-accessoryOffset, 0.35, 0.72] : [0.7, -0.9, 0.72],
         ];
         const group = offsets.map(([along, depth, scale], index): Instance => {
           const url = urls[index % urls.length];
@@ -249,7 +254,11 @@ const buildStoryDetails = (
         });
         if (group.some((p) => blockedByWorld(p.pos.x, p.pos.y, p.clearRadius ?? 0.5))) continue;
         instances.push(...group);
-        const markerPos = { x: center.x - fx * 0.9, y: center.y - fy * 0.9 };
+        const markerOffset = tentStation ? stationRadius + 0.5 : 0.9;
+        const markerPos = {
+          x: center.x - fx * markerOffset,
+          y: center.y - fy * markerOffset,
+        };
         if (!blockedByWorld(markerPos.x, markerPos.y, 0.28))
           markers.push({
             pos: markerPos,

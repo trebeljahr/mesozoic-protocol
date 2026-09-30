@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
-import { useMemo } from "react";
-import type * as THREE from "three";
+import { useEffect, useMemo } from "react";
+import * as THREE from "three";
 import type { Vec2 } from "../sim/types";
 import { setGroundedTransform } from "./groundedTransform";
 import { collectMeshSource, type MeshSource } from "./meshSource";
@@ -23,6 +23,7 @@ type Props<T extends GroupItem> = {
   baseScaleFor?: (source: MeshSource, url: string) => number;
   castShadow?: boolean;
   receiveShadow?: boolean;
+  tint?: [number, number, number];
   raycast?: THREE.Mesh["raycast"];
 };
 
@@ -33,14 +34,31 @@ export const InstancedGroup = <T extends GroupItem>({
   castShadow = true,
   receiveShadow = true,
   raycast,
+  tint,
 }: Props<T>) => {
   const { scene } = useGLTF(url);
   const source = useMemo(() => collectMeshSource(scene), [scene]);
+  const parts = useMemo(() => {
+    if (!source || !tint) return source?.parts ?? [];
+    const wash = new THREE.Color(...tint);
+    return source.parts.map((part) => {
+      const material = part.material.clone();
+      const colored = material as THREE.MeshStandardMaterial;
+      if (colored.color) colored.color.multiply(wash);
+      return { ...part, material };
+    });
+  }, [source, tint]);
+  useEffect(
+    () => () => {
+      if (tint) for (const part of parts) part.material.dispose();
+    },
+    [parts, tint],
+  );
   const baseScale = source && baseScaleFor ? baseScaleFor(source, url) : 1;
   if (!source || items.length === 0) return null;
   return (
     <SceneryBatches
-      parts={source.parts}
+      parts={parts}
       items={items}
       position={itemPosition}
       transform={(dummy, it) =>

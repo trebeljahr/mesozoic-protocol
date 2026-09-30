@@ -8,7 +8,7 @@ import { prepareGroundPlacement } from "./groundPlacement";
 import { prepareOuterPlacement } from "./outerSceneryPlacement";
 import { memoizeCandidate } from "./sceneryCandidateCache";
 // SHA-256 of JSON.stringify on the full ordered placement objects, generated
-// from the unmodified Ground/OuterScenery generators at c199cc5. Includes
+// from Ground/OuterScenery, refreshed for the dry/alien ground-cover layers. Includes
 // URLs/specs, coordinates, scales, rotations and radii; excludes render IDs.
 import expected from "./sceneryPlacement.fixture.json";
 
@@ -47,7 +47,7 @@ const scenarios = (id: number, seed: number) => {
 };
 
 describe("scenery candidate replay", () => {
-  it.each(expected)("matches original placements for level $id seed $seed", ({
+  it.each(expected)("matches recorded placements for level $id seed $seed", ({
     id,
     seed,
     hashes,

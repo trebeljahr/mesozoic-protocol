@@ -4,6 +4,7 @@ import type * as THREE from "three";
 import { BIOME_COSMETICS, BIOME_LAYERS, classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import { HQ_PAD_BLOCKER_RADIUS } from "../level";
 import { useGame } from "../store";
+import { CliffScenery } from "./CliffScenery";
 import { containmentSceneryBlockers } from "./containmentLayout";
 import { InstancedGroup } from "./InstancedGroup";
 import type { MeshSource } from "./meshSource";
@@ -50,9 +51,8 @@ export const OuterScenery = () => {
     () => (overrideActive ? null : prepareOuterPlacement(biome, levelId + proceduralSeed, paths)),
     [biome, levelId, proceduralSeed, paths, overrideActive],
   );
-  const groups = useMemo(() => {
-    if (!generatePlacement) return [];
-    const blockers = [
+  const blockers = useMemo(
+    () => [
       ...containmentSceneryBlockers({ levelId, proceduralSeed, overrideActive, outposts, paths }),
       ...outposts.map((o) => ({ pos: o.pos, radius: o.radius })),
       ...trees.map((t) => ({ pos: t.pos, radius: 0.85 * t.scale })),
@@ -60,7 +60,11 @@ export const OuterScenery = () => {
       ...paths
         .filter((p) => p.length > 1)
         .map((p) => ({ pos: p[p.length - 1], radius: HQ_PAD_BLOCKER_RADIUS })),
-    ];
+    ],
+    [levelId, proceduralSeed, overrideActive, outposts, paths, trees, rocks],
+  );
+  const groups = useMemo(() => {
+    if (!generatePlacement) return [];
     const instances = generatePlacement(blockers);
     const byUrl = new Map<string, ReturnType<typeof generatePlacement>>();
     for (const inst of instances) {
@@ -69,7 +73,7 @@ export const OuterScenery = () => {
       byUrl.set(inst.url, list);
     }
     return Array.from(byUrl.entries());
-  }, [generatePlacement, levelId, proceduralSeed, overrideActive, paths, outposts, trees, rocks]);
+  }, [generatePlacement, blockers]);
 
   // Per-biome URL→normalizeTo from the non-blocking layers (blocking layers
   // render via Rocks.tsx, not here). Only this biome's layers are consulted so
@@ -85,12 +89,23 @@ export const OuterScenery = () => {
 
   return (
     <group>
+      {!overrideActive && (
+        <CliffScenery
+          biome={biome}
+          levelId={levelId + proceduralSeed}
+          paths={paths}
+          blockers={blockers}
+        />
+      )}
       {groups.map(([url, items]) => (
         <InstancedGroup
           key={url}
           url={url}
           items={items}
           baseScaleFor={baseScaleFor}
+          tint={
+            BIOME_LAYERS[biome].find((layer) => !layer.blocks && layer.urls.includes(url))?.tint
+          }
           // The directional light's shadow camera spans the playable rect;
           // outer-band shadows would clip the shadow map edge anyway.
           castShadow={false}

@@ -425,6 +425,24 @@ const DESERT_LAYERS: BiomeLayerSpec = [
     footprint: 0.12,
     groundCover: true,
   },
+  {
+    // Low blades fill the clearings between larger, removable vegetation.
+    seed: 18181,
+    urls: [
+      "/models/natural/Grass1.glb",
+      "/models/natural/Grass2.glb",
+      "/models/natural/Grass3.glb",
+    ],
+    count: 420,
+    clearance: GROUND_COVER_CLEARANCE,
+    normalizeTo: 0.42,
+    minScale: 0.65,
+    maxScale: 1.15,
+    castShadow: false,
+    footprint: 0.18,
+    groundCover: true,
+    tint: [1.35, 0.85, 0.38],
+  },
 ];
 
 const SNOW_LAYERS: BiomeLayerSpec = [
@@ -646,6 +664,24 @@ const WASTELAND_LAYERS: BiomeLayerSpec = [
     footprint: 0.18,
     groundCover: true,
   },
+  {
+    // Low blades fill the clearings between larger, removable vegetation.
+    seed: 18181,
+    urls: [
+      "/models/natural/Grass1.glb",
+      "/models/natural/Grass2.glb",
+      "/models/natural/Grass3.glb",
+    ],
+    count: 330,
+    clearance: GROUND_COVER_CLEARANCE,
+    normalizeTo: 0.42,
+    minScale: 0.65,
+    maxScale: 1.15,
+    castShadow: false,
+    footprint: 0.18,
+    groundCover: true,
+    tint: [0.7, 0.55, 0.42],
+  },
 ];
 
 const BLUE_CRYSTAL_BLOCKER_URLS = [
@@ -852,6 +888,24 @@ const ALIEN_LAYERS: BiomeLayerSpec = [
     castShadow: false,
     footprint: 0.2,
     groundCover: true,
+  },
+  {
+    // Low blades fill the clearings between larger, removable vegetation.
+    seed: 18181,
+    urls: [
+      "/models/natural/Grass1.glb",
+      "/models/natural/Grass2.glb",
+      "/models/natural/Grass3.glb",
+    ],
+    count: 380,
+    clearance: GROUND_COVER_CLEARANCE,
+    normalizeTo: 0.42,
+    minScale: 0.65,
+    maxScale: 1.15,
+    castShadow: false,
+    footprint: 0.18,
+    groundCover: true,
+    tint: [0.65, 0.85, 1.35],
   },
 ];
 
