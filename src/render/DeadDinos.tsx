@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { mulberry32 } from "../sim/random";
 import { findClip } from "./animUtils";
+import { disposeModelInstance } from "./disposeModelInstance";
 import { measureVisibleBox } from "./measureModel";
 
 // Shared dead-dinosaur carcass renderer. Used both on the world map (under
@@ -214,6 +215,13 @@ export const DeadDinoInstancer = ({ url, items }: { url: string; items: DeadDino
       };
     });
   }, [gltf.scene, gltf.animations, items, footprint, url]);
+
+  useEffect(
+    () => () => {
+      for (const corpse of clones) disposeModelInstance(corpse.obj, gltf.scene);
+    },
+    [clones, gltf.scene],
+  );
 
   return (
     <group>

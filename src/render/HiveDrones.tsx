@@ -1,7 +1,7 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { nanoid } from "nanoid";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { HIVE_ORBIT_HEIGHT, hiveDroneAngle, hiveDronePosition } from "../sim/towers";
 import { useGame } from "../store";
@@ -56,6 +56,12 @@ const collectSource = (scene: THREE.Object3D): Source | null => {
 export const HiveDrones = () => {
   const { scene } = useGLTF(DRONE_URL);
   const source = useMemo(() => collectSource(scene), [scene]);
+  useEffect(
+    () => () => {
+      for (const part of source?.parts ?? []) part.geom.dispose();
+    },
+    [source],
+  );
   const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
 

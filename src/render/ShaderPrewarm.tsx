@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import type * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useGame } from "../store";
+import { disposeModelInstance } from "./disposeModelInstance";
 
 const PREWARM_URLS = [
   "/models/Velociraptor.glb",
@@ -40,6 +41,7 @@ const PrewarmModel = ({ url }: { url: string }) => {
   // with no bones (which still compiles the shader, but a plain clone
   // would silently break the actual gameplay path that uses cloneSkinned).
   const cloned = useMemo(() => cloneSkinned(scene) as THREE.Object3D, [scene]);
+  useEffect(() => () => disposeModelInstance(cloned, scene), [cloned, scene]);
   return <primitive object={cloned} />;
 };
 

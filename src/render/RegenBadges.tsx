@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
 import { buildPlusGeometry, buildPlusMaterial } from "./RegenBadges.geometry";
@@ -19,6 +19,13 @@ export const RegenBadges = () => {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const geom = useMemo(buildPlusGeometry, []);
   const mat = useMemo(buildPlusMaterial, []);
+  useEffect(
+    () => () => {
+      geom.dispose();
+      mat.dispose();
+    },
+    [geom, mat],
+  );
 
   useFrame(() => {
     const mesh = meshRef.current;

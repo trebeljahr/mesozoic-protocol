@@ -15,6 +15,7 @@ import type { EasterEgg } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
 import { EASTER_EGG_DESPAWN_FADE, useGame } from "../store";
 import { findClip } from "./animUtils";
+import { disposeModelInstance } from "./disposeModelInstance";
 import { measureVisibleBox } from "./measureModel";
 
 // Apply tint + opacity to every material under the clone. Each material is
@@ -646,6 +647,7 @@ const EasterEggMesh = ({ egg, def }: { egg: EasterEgg; def: EasterEggDef }) => {
     () => buildInstance(scene, def),
     [scene, def],
   );
+  useEffect(() => () => disposeModelInstance(clone, scene), [clone, scene]);
   const rollLift = Math.max(-minX, 0) * scale;
 
   // Triggered eggs with motion (the freed parasaur) swap their idle clip

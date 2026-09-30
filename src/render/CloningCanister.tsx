@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { CanisterPalette } from "./biomeColors";
+import { disposeModelInstance } from "./disposeModelInstance";
 import { measureVisibleBox } from "./measureModel";
 
 // Procedural cloning canister — biotech-outpost backstory prop. Glass tank
@@ -155,6 +156,11 @@ export const CloningCanister = ({ worldX, worldZ, yaw, palette, seed }: Props) =
     cloneObj.position.copy(src.centerOffset);
     return cloneObj;
   }, [scene, palette]);
+
+  useEffect(
+    () => () => disposeModelInstance(specimen, getSpecimenSource(scene, palette).source),
+    [specimen, scene, palette],
+  );
 
   // Fluid pulses opacity per-canister-seed, so the material must be per
   // instance — dispose it on unmount to avoid leaking on every level swap.

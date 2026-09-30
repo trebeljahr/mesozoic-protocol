@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import { type ThreeEvent, useFrame } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { audio } from "../audio/AudioManager";
@@ -12,6 +12,7 @@ import { clamp01 } from "../sim/vec2";
 import { BOSS_VARIANT_FOOTSTEP } from "../sim/world";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
+import { disposeModelInstance } from "./disposeModelInstance";
 import { clearEnemyRender, setEnemyRender } from "./enemyRenderRegistry";
 import { measureVisibleBox } from "./measureModel";
 import { OUTLINE_LAYER } from "./PaintedPostFx";
@@ -240,63 +241,66 @@ export const ModelEnemyMesh = ({
     [proxyGeom, proxyMat],
   );
 
-  useEffect(
+  // Imperative children must be released before host-tree removal.
+  useLayoutEffect(
     () => () => {
       const parent = groupRef.current;
-      if (!parent) return;
       for (const [, item] of itemsRef.current) {
         item.mixer.stopAllAction();
         clearEnemyRender(item.enemyId);
-        parent.remove(item.obj);
-        if (item.proxy) parent.remove(item.proxy);
+        disposeModelInstance(item.obj, scene);
+        item.mixer.uncacheRoot(item.obj);
+        parent?.remove(item.obj);
+        if (item.proxy) parent?.remove(item.proxy);
       }
       itemsRef.current.clear();
       for (const item of poolRef.current) {
         item.mixer.stopAllAction();
         clearEnemyRender(item.enemyId);
-        parent.remove(item.obj);
-        if (item.proxy) parent.remove(item.proxy);
+        disposeModelInstance(item.obj, scene);
+        item.mixer.uncacheRoot(item.obj);
+        parent?.remove(item.obj);
+        if (item.proxy) parent?.remove(item.proxy);
       }
       poolRef.current.length = 0;
     },
-    [],
+    [scene],
   );
 
-  const recycleOrDispose = useCallback((item: Item) => {
-    const parent = groupRef.current;
-    if (!parent) return;
-    item.mixer.stopAllAction();
-    resetEnemyMaterialState(item.obj);
-    item.obj.rotation.x = 0;
-    item.obj.rotation.z = 0;
-    clearEnemyRender(item.enemyId);
-    if (poolRef.current.length < POOL_LIMIT) {
-      item.obj.visible = false;
-      item.obj.userData.enemyId = undefined;
-      item.obj.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
-      // Clear the stale id from every descendant too — the click handler
-      // walks UP from the hit object, so a child that still carries the
-      // old id would resurface a panel for an enemy that's been pooled.
-      item.obj.traverse((o) => {
-        o.userData.enemyId = undefined;
-        o.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
-      });
-      if (item.proxy) {
-        item.proxy.visible = false;
-        item.proxy.userData.enemyId = undefined;
+  const recycleOrDispose = useCallback(
+    (item: Item) => {
+      const parent = groupRef.current;
+      if (!parent) return;
+      item.mixer.stopAllAction();
+      resetEnemyMaterialState(item.obj);
+      item.obj.rotation.x = 0;
+      item.obj.rotation.z = 0;
+      clearEnemyRender(item.enemyId);
+      if (poolRef.current.length < POOL_LIMIT) {
+        item.obj.visible = false;
+        item.obj.userData.enemyId = undefined;
+        item.obj.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
+        // Clear the stale id from every descendant too — the click handler
+        // walks UP from the hit object, so a child that still carries the
+        // old id would resurface a panel for an enemy that's been pooled.
+        item.obj.traverse((o) => {
+          o.userData.enemyId = undefined;
+          o.userData[DEAD_ENEMY_CLICK_BLOCKER] = undefined;
+        });
+        if (item.proxy) {
+          item.proxy.visible = false;
+          item.proxy.userData.enemyId = undefined;
+        }
+        poolRef.current.push(item);
+      } else {
+        disposeModelInstance(item.obj, scene);
+        item.mixer.uncacheRoot(item.obj);
+        parent.remove(item.obj);
+        if (item.proxy) parent?.remove(item.proxy);
       }
-      poolRef.current.push(item);
-    } else {
-      item.obj.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh || !m.material) return;
-        if (Array.isArray(m.material)) for (const mm of m.material) mm.dispose();
-        else (m.material as THREE.Material).dispose();
-      });
-      parent.remove(item.obj);
-      if (item.proxy) parent.remove(item.proxy);
-    }
-  }, []);
+    },
+    [scene],
+  );
 
   useFrame((_, delta) => {
     const parent = groupRef.current;

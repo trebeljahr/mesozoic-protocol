@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
+import { disposeModelInstance } from "./disposeModelInstance";
 import {
   bakeObjectToGeometry,
   type FractureChunk,
@@ -173,6 +174,14 @@ const HQOne = ({ pose }: { pose: Pose }) => {
       chunkMaterial: mat as THREE.Material,
     };
   }, [scene]);
+
+  useEffect(
+    () => () => {
+      disposeModelInstance(scaledClone, scene);
+      chunkMaterial.dispose();
+    },
+    [scaledClone, scene, chunkMaterial],
+  );
 
   // Voronoi fracture is N×N CSG and stalls the main thread long enough to
   // trip the WebGL watchdog if run during the same task as mount. Defer it

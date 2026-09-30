@@ -87,6 +87,16 @@ export const PulseTracerFx = () => {
   useEffect(() => () => flashTexture.dispose(), [flashTexture]);
   const ringGeom = useMemo(() => new THREE.RingGeometry(0.65, 1.0, 24), []);
 
+  useEffect(
+    () => () => {
+      coreGeom.dispose();
+      haloGeom.dispose();
+      billboardGeom.dispose();
+      ringGeom.dispose();
+    },
+    [coreGeom, haloGeom, billboardGeom, ringGeom],
+  );
+
   const trails = useMemo(() => new Map<number, TrailState>(), []);
   const flashes = useMemo<FlashEntry[]>(() => [], []);
   const seen = useMemo(() => new Set<number>(), []);

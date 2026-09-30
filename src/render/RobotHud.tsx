@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ROBOT_SPECS } from "../sim/robotVariants";
 import { useGame } from "../store";
@@ -77,6 +77,35 @@ export const RobotHud = () => {
   }, []);
   const aimLandingRing = useMemo(() => new THREE.RingGeometry(0.62, 0.78, 36), []);
   const aimLandingDot = useMemo(() => new THREE.CircleGeometry(0.18, 24), []);
+  useEffect(
+    () => () => {
+      ringGeom.dispose();
+      footGeom.dispose();
+      moveGeom.dispose();
+      selGeom.dispose();
+      stormFillGeom.dispose();
+      stormRingGeom.dispose();
+      stormPulseGeom.dispose();
+      aimShaftGeom.dispose();
+      aimHeadGeom.dispose();
+      aimLandingRing.dispose();
+      aimLandingDot.dispose();
+    },
+    [
+      ringGeom,
+      footGeom,
+      moveGeom,
+      selGeom,
+      stormFillGeom,
+      stormRingGeom,
+      stormPulseGeom,
+      aimShaftGeom,
+      aimHeadGeom,
+      aimLandingRing,
+      aimLandingDot,
+    ],
+  );
+
   // Death shockwave + flash — mirrors the HQ explosion sequence so a
   // robot wipe feels equally violent.
   const deathFlashRef = useRef<THREE.Mesh>(null);

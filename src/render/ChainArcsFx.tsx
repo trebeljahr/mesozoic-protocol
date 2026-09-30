@@ -73,6 +73,15 @@ export const ChainArcsFx = () => {
   const coreGeom = useMemo(makeArcGeometry, []);
   const haloGeom = useMemo(makeArcGeometry, []);
   const flashGeom = useMemo(() => new THREE.PlaneGeometry(0.9, 0.9), []);
+  useEffect(
+    () => () => {
+      coreGeom.dispose();
+      haloGeom.dispose();
+      flashGeom.dispose();
+    },
+    [coreGeom, haloGeom, flashGeom],
+  );
+
   const flashTexture = useMemo(() => {
     // Radial gradient sprite so the impact flash reads as a soft glow,
     // not the opaque bluish square the untextured plane was rendering as.

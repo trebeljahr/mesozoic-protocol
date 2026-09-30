@@ -263,6 +263,17 @@ const NatureInstances = ({
     };
   }, [scene, tint]);
 
+  useEffect(
+    () => () => {
+      if (!source) return;
+      for (const part of source.parts) {
+        part.geom.dispose();
+        if (tint) for (const material of [part.material].flat()) material.dispose();
+      }
+    },
+    [source, tint],
+  );
+
   // When the layer opts into size normalization, divide the target world size
   // by the model's measured maxDim so every variant renders at ~normalizeTo
   // before the per-instance scale band is applied. Otherwise raw GLTF scale.

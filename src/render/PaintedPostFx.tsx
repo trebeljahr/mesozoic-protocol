@@ -9,10 +9,11 @@ import {
   Vignette,
 } from "@react-three/postprocessing";
 import { BlendFunction, Effect, ToneMappingMode } from "postprocessing";
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { BIOME_PAINTED, type Biome } from "../biomes";
 import { useGame } from "../store";
+import { disposePrimitiveEffect } from "./disposePrimitiveEffect";
 import {
   BLOOM_INTENSITY,
   BLOOM_KERNEL,
@@ -48,6 +49,19 @@ import {
 
 // Re-export layer constants so model components import from one place.
 export { BLOOM_LAYER, OUTLINE_LAYER } from "./effectsTunables";
+
+// These library wrappers render primitives with disposal disabled. Release the
+// previous effect on ref replacement as well as unmount: SelectiveBloom and
+// GodRays may construct a new effect when their parent renders.
+const useOwnedEffectRef = () => {
+  const current = useRef<Effect | null>(null);
+  return useCallback((effect: Effect | null) => {
+    if (current.current && current.current !== effect) {
+      disposePrimitiveEffect(current.current);
+    }
+    current.current = effect;
+  }, []);
+};
 
 // Tiny external store sharing the GodRays sun mesh between SunProxy (mounts
 // inside PlayScene) and PaintedPostFx (mounts inside EffectComposer). The
@@ -153,6 +167,8 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
   const size = useThree((s) => s.size);
   const dpr = useThree((s) => s.viewport.dpr);
   const sunMesh = useSunMesh();
+  const bloomRef = useOwnedEffectRef();
+  const raysRef = useOwnedEffectRef();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: built once, uniforms updated by the effect below
   const splitTone = useMemo(
@@ -193,6 +209,7 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
   return (
     <>
       <SelectiveBloom
+        ref={bloomRef}
         lights={lightPlaceholders}
         ignoreBackground
         selectionLayer={BLOOM_LAYER}
@@ -204,6 +221,7 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
       />
       {includeGodRays && sunMesh && (
         <GodRays
+          ref={raysRef}
           sun={sunMesh}
           samples={GODRAYS_SAMPLES}
           density={GODRAYS_DENSITY}

@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import { type ThreeEvent, useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useEditor } from "../editor/editorStore";
@@ -9,6 +9,7 @@ import { ROBOT_SPECS } from "../sim/robotVariants";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
 import { cloneAndCaptureBase, findClip } from "./animUtils";
+import { disposeModelInstance } from "./disposeModelInstance";
 import { ROBOT_EMISSIVE_PATTERNS, ROBOT_VENT_PATTERNS } from "./emissiveRegistry";
 import {
   applyEmissiveSpec,
@@ -117,7 +118,8 @@ export const ModelRobotMesh = () => {
     };
   }, [animations]);
 
-  useEffect(() => {
+  // Release imperative children before R3F dismantles the group subtree.
+  useLayoutEffect(() => {
     const parent = groupRef.current;
     if (!parent) return;
     const obj = cloneSkinned(scene);
@@ -203,12 +205,7 @@ export const ModelRobotMesh = () => {
     return () => {
       mixer.stopAllAction();
       parent.remove(obj);
-      obj.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh || !m.material) return;
-        if (Array.isArray(m.material)) for (const mm of m.material) mm.dispose();
-        else (m.material as THREE.Material).dispose();
-      });
+      disposeModelInstance(obj, scene);
       objRef.current = null;
       muzzleAnchorRef.current = null;
       mixerRef.current = null;

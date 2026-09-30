@@ -27,6 +27,7 @@ import { useEffect, useMemo, useState } from "react";
 import type * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useGame } from "../store";
+import { disposeModelInstance } from "./disposeModelInstance";
 
 const PREWARM_URLS = [
   "/models/Velociraptor.glb",
@@ -52,6 +53,7 @@ for (const url of PREWARM_URLS) useGLTF.preload(url);
 const PrewarmModel = ({ url }: { url: string }) => {
   const { scene } = useGLTF(url);
   const cloned = useMemo(() => cloneSkinned(scene) as THREE.Object3D, [scene]);
+  useEffect(() => () => disposeModelInstance(cloned, scene), [cloned, scene]);
   return <primitive object={cloned} />;
 };
 

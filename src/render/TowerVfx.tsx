@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Tower } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
@@ -40,6 +40,13 @@ export const TowerVfx = () => {
   // silhouette can't show.
   const orbGeom = useMemo(() => new THREE.SphereGeometry(0.22, 12, 8), []);
   const arcGeom = useMemo(() => new THREE.TorusGeometry(0.38, 0.028, 6, 16), []);
+  useEffect(
+    () => () => {
+      orbGeom.dispose();
+      arcGeom.dispose();
+    },
+    [orbGeom, arcGeom],
+  );
 
   useFrame(() => {
     const { world } = useGame.getState();
