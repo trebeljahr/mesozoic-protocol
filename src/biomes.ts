@@ -1078,6 +1078,7 @@ export const TARGET_SIZE_BY_ROLE: Record<PropRole, number> = {
 };
 
 export const classifyPropUrl = (url: string): PropRole => {
+  if (url.includes("/base-structures/")) return "building";
   const f = url.toLowerCase();
   // Large sci-fi structures sit in the building slot so they anchor
   // bases the way houses/cabins anchor nature biomes. Modular pieces

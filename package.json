@@ -28,6 +28,7 @@
     "version:sync": "node scripts/sync-version.mjs",
     "version:check": "node scripts/sync-version.mjs --check",
     "prepare": "husky",
+    "assets:bases": "node --import tsx scripts/generate-base-structures.ts",
     "assets:store": "node scripts/store-assets.mjs",
     "assets:store:check": "node scripts/store-assets.mjs --check"
   },

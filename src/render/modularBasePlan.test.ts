@@ -14,7 +14,7 @@ const biomes: Biome[] = ["forest", "desert", "snow", "wasteland", "lava", "alien
 describe("modular base reservations", () => {
   it("keeps every panel and accessory inside the placement clearance at every compound size", () => {
     for (const biome of biomes)
-      for (let seed = 0; seed < 15; seed++)
+      for (let seed = 0; seed < 54; seed++)
         for (const radius of [1.5, 3, 4.5, 8]) {
           const blocks = modularBasePlan(biome, seed, radius);
           for (const { at, size } of blocks) {
@@ -27,7 +27,7 @@ describe("modular base reservations", () => {
   });
   it("keeps all courtyard damage states bounded and architecture clear of tanks", () => {
     for (const biome of biomes)
-      for (let seed = 0; seed < 18; seed++)
+      for (let seed = 0; seed < 54; seed++)
         for (const radius of [3.2, 4, 8]) {
           const scale = courtyardBaseScale(radius);
           const blocks = modularBasePlan(biome, seed, radius, true);

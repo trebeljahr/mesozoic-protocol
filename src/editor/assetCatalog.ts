@@ -5,6 +5,7 @@ import {
   classifyPropUrl,
   type PropRole,
 } from "../biomes";
+import { BASE_CONDITIONS, BASE_STRUCTURES } from "../render/baseStructures";
 import type { Stamp } from "./stampLibrary";
 
 // Shared role taxonomy + asset catalog for the dev-only editors
@@ -54,19 +55,28 @@ export type CatalogEntry =
 // story props); omit to get every asset across every biome.
 export const buildCatalog = (biome?: Biome): CatalogEntry[] => {
   const urls = biome ? biomeAssetUrls(biome) : ALL_BIOME_URLS;
-  return Array.from(new Set(urls))
-    .map(
+  const structures: CatalogEntry[] = BASE_STRUCTURES.flatMap(({ id, label }) =>
+    BASE_CONDITIONS.map((condition) => ({
+      kind: "model",
+      role: "building",
+      url: `/models/base-structures/${id}-${condition}.glb`,
+      label: `${label} · ${condition}`,
+    })),
+  );
+  return [
+    ...structures,
+    ...Array.from(new Set(urls)).map(
       (url): CatalogEntry => ({
         kind: "model",
         role: classifyPropUrl(url),
         url,
         label: labelFor(url),
       }),
-    )
-    .sort(
-      (a, b) =>
-        ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.label.localeCompare(b.label),
-    );
+    ),
+  ].sort(
+    (a, b) =>
+      ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.label.localeCompare(b.label),
+  );
 };
 
 // Build catalog entries from a stamp library. Each stamp's role is the role
