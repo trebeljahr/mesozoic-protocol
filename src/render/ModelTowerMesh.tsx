@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { TowerKind, TowerUpgrades } from "../sim/types";
 import { useGame } from "../store";
+import { findPulseMuzzle, pulseMuzzles } from "./pulseMuzzles";
 import { type AtlasSwatch, computeTowerTints, TOWER_FINISH, tierKey } from "./towerTints";
 
 type SolidAtlasState = {
@@ -196,6 +197,10 @@ export const ModelTowerMesh = ({
   idleSpin = false,
 }: Props) => {
   const { scene } = useGLTF(url);
+  const pulseMuzzle = useMemo(
+    () => (kind === "pulse" ? findPulseMuzzle(scene) : null),
+    [kind, scene],
+  );
   const groupRef = useRef<THREE.Group>(null);
   const itemsRef = useRef<Map<number, THREE.Object3D>>(new Map());
   // Last upgrade-tier pair we tinted each tower at. Lets the frame loop
@@ -303,6 +308,15 @@ export const ModelTowerMesh = ({
         }
       }
       item.rotation.set(0, baseRotY + yaw, 0);
+      if (pulseMuzzle) {
+        let muzzle = pulseMuzzles.get(t);
+        if (!muzzle) {
+          muzzle = new THREE.Vector3();
+          pulseMuzzles.set(t, muzzle);
+        }
+        item.updateMatrixWorld(true);
+        item.localToWorld(muzzle.copy(pulseMuzzle));
+      }
     }
 
     for (const [id, item] of itemsRef.current) {

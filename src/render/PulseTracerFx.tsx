@@ -5,6 +5,7 @@ import type { Projectile } from "../sim/types";
 import { useGame } from "../store";
 import { GRAPHICS_QUALITY } from "./effectsTunables";
 import { BLOOM_LAYER } from "./PaintedPostFx";
+import { pulseMuzzles } from "./pulseMuzzles";
 
 // Pulse Rifle tracer rendering. ProjectileMesh now skips direct projectiles
 // whose owning tower is the Pulse Rifle, leaving us in charge of the bolt
@@ -34,6 +35,7 @@ const MUZZLE_TINT = new THREE.Color("#d6f4ff");
 
 type TrailSample = { x: number; y: number; z: number; t: number };
 type TrailState = {
+  power: number;
   samples: TrailSample[];
   lastSeenAt: number;
   lastPos: THREE.Vector3;
@@ -43,6 +45,7 @@ type FlashEntry = {
   kind: "muzzle" | "impact";
   pos: THREE.Vector3;
   spawnAt: number;
+  power: number;
 };
 
 const makeLineGeom = () => {
@@ -58,11 +61,30 @@ export const PulseTracerFx = () => {
   const coreRef = useRef<THREE.LineSegments>(null);
   const haloRef = useRef<THREE.LineSegments>(null);
   const muzzleRef = useRef<THREE.InstancedMesh>(null);
+  const boltRef = useRef<THREE.InstancedMesh>(null);
   const ringRef = useRef<THREE.InstancedMesh>(null);
 
   const coreGeom = useMemo(makeLineGeom, []);
   const haloGeom = useMemo(makeLineGeom, []);
   const billboardGeom = useMemo(() => new THREE.PlaneGeometry(0.55, 0.55), []);
+  const flashTexture = useMemo(() => {
+    const size = 64;
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const r = Math.hypot((x + 0.5 - size / 2) / (size / 2), (y + 0.5 - size / 2) / (size / 2));
+        const i = (y * size + x) * 4;
+        data[i] = data[i + 1] = data[i + 2] = 255;
+        data[i + 3] = Math.round(255 * Math.max(0, 1 - r) ** 3);
+      }
+    }
+    const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return texture;
+  }, []);
+  useEffect(() => () => flashTexture.dispose(), [flashTexture]);
   const ringGeom = useMemo(() => new THREE.RingGeometry(0.65, 1.0, 24), []);
 
   const trails = useMemo(() => new Map<number, TrailState>(), []);
@@ -74,7 +96,7 @@ export const PulseTracerFx = () => {
 
   useEffect(() => {
     const big = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e4);
-    for (const ref of [muzzleRef, ringRef]) {
+    for (const ref of [muzzleRef, boltRef, ringRef]) {
       const m = ref.current;
       if (!m) continue;
       m.boundingSphere = big.clone();
@@ -83,7 +105,7 @@ export const PulseTracerFx = () => {
   }, []);
 
   useEffect(() => {
-    for (const ref of [coreRef, haloRef, muzzleRef, ringRef]) {
+    for (const ref of [coreRef, haloRef, muzzleRef, boltRef, ringRef]) {
       const obj = ref.current;
       if (obj) obj.layers.enable(BLOOM_LAYER);
     }
@@ -95,7 +117,8 @@ export const PulseTracerFx = () => {
     const halo = haloRef.current;
     const muzzle = muzzleRef.current;
     const ring = ringRef.current;
-    if (!core || !halo || !muzzle || !ring) return;
+    const bolt = boltRef.current;
+    if (!core || !halo || !muzzle || !ring || !bolt) return;
     const now = world.time;
     const drawImpactRing = GRAPHICS_QUALITY !== "low";
 
@@ -109,23 +132,24 @@ export const PulseTracerFx = () => {
       seen.add(p.id);
 
       const px = p.pos.x;
-      const py = 0.85;
+      const py = trails.get(p.id)?.lastPos.y ?? pulseMuzzles.get(owner)?.y ?? 0.85;
       const pz = -p.pos.y;
       let trail = trails.get(p.id);
       if (!trail) {
         trail = {
+          power: Math.min(3, owner.upgrades.a) + Math.min(3, owner.upgrades.b),
           samples: [],
           lastSeenAt: now,
           lastPos: new THREE.Vector3(px, py, pz),
         };
         trails.set(p.id, trail);
-        // New projectile -> muzzle flash at the owning tower's barrel tip.
-        // Tower position with a small lift gives a serviceable approximation
-        // without reading the model's animated muzzle bone.
-        if (flashes.length < MAX_FLASHES) {
+        // Use the rendered model's transformed barrel tip, including its aim.
+        const muzzlePos = pulseMuzzles.get(owner);
+        if (muzzlePos && flashes.length < MAX_FLASHES) {
           flashes.push({
             kind: "muzzle",
-            pos: new THREE.Vector3(owner.pos.x, 1.05, -owner.pos.y),
+            pos: muzzlePos.clone(),
+            power: trail.power,
             spawnAt: now,
           });
         }
@@ -150,6 +174,7 @@ export const PulseTracerFx = () => {
           flashes.push({
             kind: "impact",
             pos: trail.lastPos.clone(),
+            power: trail.power,
             spawnAt: now,
           });
         }
@@ -174,8 +199,9 @@ export const PulseTracerFx = () => {
         const b = ss[i + 1];
         // alpha: 1 at the head, fades back toward the tail.
         const tt = (i + 1) / head;
-        const alphaB = tt;
-        const alphaA = i / head;
+        const energy = 1 + trail.power * 0.45;
+        const alphaB = tt * energy;
+        const alphaA = (i / head) * energy;
         const cR = CORE_TINT.r * alphaB;
         const cG = CORE_TINT.g * alphaB;
         const cB = CORE_TINT.b * alphaB;
@@ -220,6 +246,22 @@ export const PulseTracerFx = () => {
     core.visible = pairIdx > 0;
     halo.visible = pairIdx > 0;
 
+    // Soft bolt heads grow with either upgrade path, even with bloom disabled.
+    let boltCount = 0;
+    for (const trail of trails.values()) {
+      if (boltCount >= MAX_BOLTS) break;
+      dummy.position.copy(trail.lastPos);
+      dummy.quaternion.copy(state.camera.quaternion);
+      dummy.scale.setScalar(0.24 + trail.power * 0.055);
+      dummy.updateMatrix();
+      bolt.setMatrixAt(boltCount, dummy.matrix);
+      tmpColor.copy(HALO_TINT).multiplyScalar(1.4 + trail.power * 0.6);
+      bolt.setColorAt(boltCount++, tmpColor);
+    }
+    bolt.count = boltCount;
+    bolt.instanceMatrix.needsUpdate = true;
+    if (bolt.instanceColor) bolt.instanceColor.needsUpdate = true;
+
     // 4) Flash entries: muzzle = quick additive billboard, impact = expanding ring.
     let muzzleCount = 0;
     let ringCount = 0;
@@ -237,10 +279,10 @@ export const PulseTracerFx = () => {
         if (muzzleCount >= MAX_FLASHES) continue;
         dummy.position.copy(f.pos);
         dummy.quaternion.copy(state.camera.quaternion);
-        dummy.scale.setScalar(0.35 + lifeRem * 0.4);
+        dummy.scale.setScalar((0.35 + lifeRem * 0.4) * (1 + f.power * 0.08));
         dummy.updateMatrix();
         muzzle.setMatrixAt(muzzleCount, dummy.matrix);
-        const bri = lifeRem;
+        const bri = lifeRem * (2 + f.power * 0.45);
         tmpColor.setRGB(MUZZLE_TINT.r * bri, MUZZLE_TINT.g * bri, MUZZLE_TINT.b * bri);
         muzzle.setColorAt(muzzleCount, tmpColor);
         muzzleCount++;
@@ -291,6 +333,20 @@ export const PulseTracerFx = () => {
         />
       </lineSegments>
       <instancedMesh
+        ref={boltRef}
+        args={[billboardGeom, undefined, MAX_BOLTS]}
+        renderOrder={3}
+        frustumCulled={false}
+      >
+        <meshBasicMaterial
+          map={flashTexture}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </instancedMesh>
+      <instancedMesh
         ref={muzzleRef}
         args={[billboardGeom, undefined, MAX_FLASHES]}
         renderOrder={3}
@@ -298,6 +354,7 @@ export const PulseTracerFx = () => {
       >
         <meshBasicMaterial
           color="#ffffff"
+          map={flashTexture}
           transparent
           opacity={1}
           blending={THREE.AdditiveBlending}
