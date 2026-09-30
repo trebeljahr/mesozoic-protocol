@@ -145,10 +145,24 @@ void main() {
   // Broken, advecting foam gathers at the union shoreline, not ribbon joins.
   float foamNoise = noised(vWorldPos.xz*5.2 - velocity*uTime*0.6).x;
   float foamFine = noised(vWorldPos.xz*18.0 + velocity*uTime*0.3).x;
-  float foamWidth = 0.12 + foamNoise*0.32;
+  float foamPatch = noised(vWorldPos.xz*1.7-uTime*velocity*0.18).x;
+  float foamSway = 0.0;
+  if (uMolten < 0.001 && toxic < 0.001) {
+    // Move every foam scale downstream together, in world units. Bounded
+    // phases keep the pattern from stretching around bends over long sessions.
+    vec2 foamVelocity = current * 0.065 + vec2(0.004, 0.003);
+    vec2 foamA = vWorldPos.xz - foamVelocity * phase * 10.0;
+    vec2 foamB = vWorldPos.xz - foamVelocity * phaseB * 10.0;
+    foamNoise = mix(noised(foamA * 5.2).x, noised(foamB * 5.2).x, blend);
+    foamFine = mix(noised(foamA * 18.0).x, noised(foamB * 18.0).x, blend);
+    foamPatch = mix(noised(foamA * 1.7).x, noised(foamB * 1.7).x, blend);
+    // A small, slow lap at the bank; geometry and shoreline stay fixed.
+    foamSway = sin(uTime * 0.65 + broad.x * 6.283185) * 0.018;
+  }
+  float foamWidth = 0.12 + foamNoise*0.32 + foamSway;
   float foamBand = (1.0-smoothstep(0.03,foamWidth,bankDistance));
   float bubbles = smoothstep(0.32,0.66,foamNoise*0.65+foamFine*0.35);
-  float foam = foamBand*(0.08+bubbles*0.92) * smoothstep(0.24,0.52,noised(vWorldPos.xz*1.7-uTime*velocity*0.18).x);
+  float foam = foamBand*(0.08+bubbles*0.92) * smoothstep(0.24,0.52,foamPatch);
   wet = mix(wet,uColorFoam,foam*0.88*(1.0-uMolten)*(1.0-toxic*0.6));
   edge = 1.0 - depth;
 
