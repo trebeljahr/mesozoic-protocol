@@ -184,34 +184,21 @@ itch.io) and `linux-portable` (the raw executable, for the Steam depot).
 
 Steam distributes through its own DRM and doesn't require notarization, but unsigned binaries trigger Gatekeeper / SmartScreen warnings if a user runs the bundle outside Steam.
 
-Windows signing is wired through **Azure Artifact Signing** — Microsoft's managed signing service, no hardware token. The cert lives in Azure and `signtool.exe` calls the signing dlib with a service-principal token. CI runs in [.github/workflows/build-windows.yml](.github/workflows/build-windows.yml).
+Windows builds use the shared Azure Artifact Signing account `ricoslabs-signing`, West Europe endpoint `https://weu.codesigning.azure.net/`, and Active Public Trust profile `ricoslabs-public`. The publisher is `Ricos Labs LLC`. Do not create another profile for this app.
 
-> **Renamed January 2026.** The service was called **Trusted Signing** until 2026-01-14. Docs moved from `/azure/trusted-signing/` to [`/azure/artifact-signing/`](https://learn.microsoft.com/en-us/azure/artifact-signing/overview), the CLI extension is now `az extension add --name artifact-signing`, and the GitHub Action is `Azure/artifact-signing-action@v2` (the old `Azure/trusted-signing-action` repo still exists but is unmaintained). The resource provider is still `Microsoft.CodeSigning`, and the dlib path and `http://timestamp.acs.microsoft.com` are unchanged — **the `signCommand` in `tauri.conf.json` needs no edit.** Only names in prose changed.
+**CI identity:** `mesozoic-protocol-signing`, client ID `1aa3ffa3-7841-4c8c-82f2-91a9f64b9146`, tenant `ce0c906e-8a84-4877-afd9-cdf103ddaacb`. Its only Azure role is **Artifact Signing Certificate Profile Signer**, scoped to:
 
-**Prerequisites.** The existing `ricoslabs-signing` account is in West Europe. Windows signing requires completed organization identity validation, a Public Trust certificate profile, and the CI credentials listed below. The user performing identity validation needs the Artifact Signing Identity Verifier role scoped to the signing account. Track the current verification status in the rollout audit; a submitted request alone does not enable signing.
+```text
+/subscriptions/4aaef5a5-286b-46a0-b9e4-84622e8fdc4f/resourceGroups/ricoslabs-signing/providers/Microsoft.CodeSigning/codeSigningAccounts/ricoslabs-signing/certificateProfiles/ricoslabs-public
+```
 
-**Eligibility & cost:** ~$9.99/month for the Basic SKU (5,000 signatures/month; a Tauri release signs 3–6 files, so this is wildly oversized). Requires a **paid** Azure subscription — free, trial, and sponsored subscriptions are unsupported. Public Trust certificates are available to organizations in the US, Canada, EU, UK, Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway, and Israel; individual (non-organization) validation is US/Canada only. Identity validation takes **1–20 business days and cannot be expedited**.
+Authentication uses GitHub OIDC, with issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`, and exact subject `repo:trebeljahr/mesozoic-protocol:environment:windows-signing`. The GitHub `windows-signing` environment allows branch `main` and tags matching `v*`. It stores `AZURE_CLIENT_ID` as an environment variable. No client secret is created or shared with another app. The signing job alone receives `id-token: write`.
 
-> An earlier version of this document claimed Public Trust required 3+ years of verifiable business history. That requirement existed during public preview and does not appear in any current Microsoft documentation — not the quickstart, the FAQ, or the code-signing-options page. It appears to have been dropped at GA, though Microsoft never published a statement saying so.
+**Tauri integration:** `src-tauri/tauri.conf.json` invokes `scripts/ci/sign-windows.ps1` from Tauri's `src-tauri` working directory. The helper resolves the newest supported x64 SDK SignTool and reads paths from PowerShell environment variables. CI installs the pinned signing client and .NET 8, then creates metadata from `scripts/ci/windows-signing.json`. Metadata selects `AzureCliCredential`, using the preceding `azure/login` OIDC session. Microsoft documents the [SignTool integration and credential selection](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations).
 
-**The billing account is load-bearing.** Legal name and address on the certificate are pulled read-only from the Azure billing profile, and an "Individual" billing account cannot validate an organization identity. The billing account must be registered to `Ricos Labs LLC` with exactly the name and address you want on the cert.
+**Verification:** `scripts/ci/verify-windows-signatures.ps1` requires the app executable, at least one MSI, and at least one NSIS installer. Every file must pass `signtool verify /pa /all /v /tw`, have valid Authenticode status, exact publisher `Ricos Labs LLC`, and a timestamp certificate. Missing files or wrong publishers fail the job before bundle upload. The `windows-signature-evidence` artifact records hashes, signer identity, timestamp identity, commit, and run ID.
 
-**One-time Azure setup:**
-
-1. Azure Portal → create `Microsoft.CodeSigning/codeSigningAccounts` resource. Pick a region near the CI runners (e.g. `westus2`).
-2. Submit **Identity Validation** (LLC docs, EIN, address proof; a representative also completes personal Verified-ID). The primary email verification link **expires in 7 days and cannot be resent**. Documents must be issued within the last 12 months; three attempts allowed.
-3. Create a **Certificate Profile** — `Public Trust`. Subject CN = `Ricos Labs LLC`. Note the profile name + endpoint URL (`https://<region>.codesigning.azure.net`).
-4. Create a service principal for CI:
-   ```bash
-   az ad sp create-for-rbac --name "mesozoic-artifact-signing" --skip-assignment
-   az role assignment create \
-     --assignee <APP_ID> \
-     --role "Trusted Signing Certificate Profile Signer" \
-     --scope "/subscriptions/<SUB>/resourceGroups/<RG>/providers/Microsoft.CodeSigning/codeSigningAccounts/<ACCOUNT>"
-   ```
-   (The role name still says "Trusted Signing" — the RBAC role was not renamed with the service.)
-
-**Tauri integration:** `src-tauri/tauri.conf.json` sets `bundle.windows.signCommand` to invoke `signtool` with `/dlib` pointing at the signing client DLL and `/dmdf` at a JSON metadata file. CI installs the dlib via NuGet (`Microsoft.Trusted.Signing.Client`) and writes the metadata file at runtime.
+After this workflow is pushed with authorization, run `gh workflow run build-windows.yml --ref main`. This dispatch builds and signs artifacts only; it does not trigger the separate tag-driven release workflow. Inspect the successful verification log and evidence artifact before claiming a signed build. Tag pushes can trigger publication workflows and require separate authorization.
 
 #### What signing does and does not buy you
 
@@ -226,17 +213,7 @@ Consequences for this project:
 - **Steam is the escape hatch.** Steam-installed builds never touch SmartScreen's download path. Direct downloads will show the warning for the first several weeks regardless, so the download page should say so and name the publisher to verify.
 - Windows 11's Smart App Control can supersede SmartScreen entirely, and unlike SmartScreen it applies to all executables, not just downloaded ones.
 
-**Required GitHub secrets:** `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TS_ACCOUNT`, `AZURE_TS_PROFILE`, `AZURE_TS_ENDPOINT`. (Upgrade to OIDC later by configuring a federated identity credential on the Azure AD app and dropping the client secret.)
-
-**Local signing:** install the Windows SDK signtool (10.0.22621+) and the Trusted Signing client; export the same env vars; then `pnpm tauri build` signs as a side effect. To smoke-test signtool alone:
-
-```powershell
-signtool sign /v /debug /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 `
-  /dlib "C:\path\to\Azure.CodeSigning.Dlib.dll" `
-  /dmdf "C:\path\to\metadata.json" `
-  "path\to\some.exe"
-signtool verify /pa /v "path\to\some.exe"
-```
+**Local signing on Windows:** install Windows SDK 10.0.22621 or later, .NET 8, and signing client 1.0.60. Authenticate Azure CLI as an identity authorized on the profile, set `AZURE_CODE_SIGNING_DLIB` and `AZURE_CODE_SIGNING_METADATA`, and run `pnpm tauri build`. Do not reuse the CI identity with a client secret. Signature checks can then run with `pwsh -File scripts/ci/verify-windows-signatures.ps1` from the repository root.
 
 ### Code signing — macOS via Developer ID + notarization
 

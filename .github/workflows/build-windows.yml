@@ -1,16 +1,5 @@
-# Tauri Windows build, signed with Azure Trusted Signing.
-#
-# Required repo secrets:
-#   AZURE_TENANT_ID          — Azure AD tenant containing the Trusted Signing account
-#   AZURE_CLIENT_ID          — service principal app ID (or federated identity client ID)
-#   AZURE_CLIENT_SECRET      — service principal secret (omit if using OIDC; see below)
-#   AZURE_TS_ACCOUNT         — Trusted Signing account name
-#   AZURE_TS_PROFILE         — certificate profile name (Public Trust if eligible, else Private Trust)
-#   AZURE_TS_ENDPOINT        — e.g. https://wus2.codesigning.azure.net
-#
-# OIDC upgrade (recommended once secret-auth works): drop AZURE_CLIENT_SECRET,
-# add `permissions: id-token: write` to the job, and configure a federated
-# identity credential on the Azure AD app registration pointing at this repo.
+# Windows Authenticode signing uses OIDC in the restricted windows-signing environment.
+# See DISTRIBUTION.md for identity, profile scope, and verification instructions.
 
 name: Build Windows
 
@@ -27,50 +16,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Cheap gate on a Linux runner: catch a missing secret, a type error, or a
-  # half-applied version bump in ~90s instead of after a full Rust build plus
-  # a Trusted Signing round trip. Mirrors ci.yml plus the secret check
-  # specific to this workflow.
+  # Catch source failures before allocating a Windows runner.
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      # An empty Azure secret produces a metadata.json with blank fields and
-      # signtool fails with an unhelpful HRESULT. Assert presence up front.
-      # Names only are printed — never values.
-      - name: Verify required secrets are present
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_TS_ACCOUNT: ${{ secrets.AZURE_TS_ACCOUNT }}
-          AZURE_TS_PROFILE: ${{ secrets.AZURE_TS_PROFILE }}
-          AZURE_TS_ENDPOINT: ${{ secrets.AZURE_TS_ENDPOINT }}
-        run: |
-          set -euo pipefail
-          # AZURE_CLIENT_SECRET stays in this list until the OIDC upgrade
-          # described in the header comment is done; drop it from `required`
-          # at the same time you add `id-token: write`.
-          required=(
-            AZURE_TENANT_ID
-            AZURE_CLIENT_ID
-            AZURE_CLIENT_SECRET
-            AZURE_TS_ACCOUNT
-            AZURE_TS_PROFILE
-            AZURE_TS_ENDPOINT
-          )
-          missing=()
-          for name in "${required[@]}"; do
-            [ -n "${!name:-}" ] || missing+=("$name")
-          done
-          if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Missing or empty repo secret(s): ${missing[*]}"
-            echo "Set them under Settings → Secrets and variables → Actions."
-            echo "The header comment in this workflow file explains what each one is."
-            exit 1
-          fi
-          echo "All ${#required[@]} required secrets are present."
-
       - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v4
@@ -102,10 +52,12 @@ jobs:
   build:
     needs: preflight
     runs-on: windows-latest
+    timeout-minutes: 90
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
     env:
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
       AZURE_CODE_SIGNING_DLIB: ${{ github.workspace }}\dlib\bin\x64\Azure.CodeSigning.Dlib.dll
       AZURE_CODE_SIGNING_METADATA: ${{ github.workspace }}\dlib\metadata.json
     steps:
@@ -128,30 +80,30 @@ jobs:
           path: src-tauri/target
           key: cargo-windows-${{ hashFiles('src-tauri/Cargo.lock') }}
 
-      - name: Install Trusted Signing client (dlib)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dlib | Out-Null
-          nuget install Microsoft.Trusted.Signing.Client -Version 1.0.60 -OutputDirectory dlib-pkg -ExcludeVersion
-          Copy-Item -Recurse -Force dlib-pkg\Microsoft.Trusted.Signing.Client\bin dlib\
-          @"
-          {
-            "Endpoint": "${{ secrets.AZURE_TS_ENDPOINT }}",
-            "CodeSigningAccountName": "${{ secrets.AZURE_TS_ACCOUNT }}",
-            "CertificateProfileName": "${{ secrets.AZURE_TS_PROFILE }}"
-          }
-          "@ | Out-File -FilePath dlib\metadata.json -Encoding utf8
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
 
-      - name: Verify signtool sees dlib
+      - name: Install signing client and metadata
         shell: pwsh
         run: |
-          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe `
-            | Where-Object { $_.FullName -match "x64\\signtool.exe$" } | Select-Object -First 1).FullName
-          if (-not $signtool) { throw "signtool.exe not found" }
-          Write-Host "signtool: $signtool"
-          if (-not (Test-Path "$env:AZURE_CODE_SIGNING_DLIB")) {
-            throw "dlib missing at $env:AZURE_CODE_SIGNING_DLIB"
-          }
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dlib | Out-Null
+          nuget install Microsoft.Trusted.Signing.Client -Version 1.0.60 -OutputDirectory dlib-pkg -ExcludeVersion -Source https://api.nuget.org/v3/index.json -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw 'Signing client installation failed' }
+          Copy-Item -Recurse -Force dlib-pkg\Microsoft.Trusted.Signing.Client\bin dlib\
+          $config = Get-Content scripts/ci/windows-signing.json -Raw | ConvertFrom-Json
+          @{
+            Endpoint = $config.AZURE_TS_ENDPOINT
+            CodeSigningAccountName = $config.AZURE_TS_ACCOUNT
+            CertificateProfileName = $config.AZURE_TS_PROFILE
+            CorrelationId = "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+            ExcludeCredentials = @(
+              'EnvironmentCredential', 'WorkloadIdentityCredential', 'ManagedIdentityCredential',
+              'SharedTokenCacheCredential', 'VisualStudioCredential', 'VisualStudioCodeCredential',
+              'AzurePowerShellCredential', 'AzureDeveloperCliCredential', 'InteractiveBrowserCredential'
+            )
+          } | ConvertTo-Json | Set-Content $env:AZURE_CODE_SIGNING_METADATA
 
       - run: pnpm install --frozen-lockfile
 
@@ -165,6 +117,13 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: bash scripts/ci/updater-gate.sh
 
+      - name: Azure login with repository OIDC identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ce0c906e-8a84-4877-afd9-cdf103ddaacb
+          allow-no-subscriptions: true
+
       # The updater signature is generated over the already Trusted-Signing-
       # signed installer, so an installed update carries the same signature a
       # fresh download does.
@@ -174,16 +133,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build ${{ steps.updater.outputs.args }}
 
-      - name: Verify signatures
+      - name: Verify app and installer signatures and publisher
         shell: pwsh
-        run: |
-          $signtool = (Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe `
-            | Where-Object { $_.FullName -match "x64\\signtool.exe$" } | Select-Object -First 1).FullName
-          Get-ChildItem -Recurse -Include *.exe,*.msi -Path src-tauri\target\release\bundle | ForEach-Object {
-            Write-Host "Verifying $_"
-            & $signtool verify /pa /v $_.FullName
-            if ($LASTEXITCODE -ne 0) { throw "verify failed for $_" }
-          }
+        run: ./scripts/ci/verify-windows-signatures.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-signature-evidence
+          path: windows-signatures.json
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:

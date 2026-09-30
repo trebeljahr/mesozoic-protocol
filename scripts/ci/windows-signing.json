@@ -1,0 +1,6 @@
+{
+  "AZURE_TENANT_ID": "ce0c906e-8a84-4877-afd9-cdf103ddaacb",
+  "AZURE_TS_ACCOUNT": "ricoslabs-signing",
+  "AZURE_TS_ENDPOINT": "https://weu.codesigning.azure.net/",
+  "AZURE_TS_PROFILE": "ricoslabs-public"
+}
