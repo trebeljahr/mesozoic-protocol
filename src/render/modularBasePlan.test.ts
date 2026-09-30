@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Biome } from "../biomes";
-import { modularBasePlan } from "./modularBasePlan";
+import { getLevel } from "../levels";
+import { createWorld } from "../sim/world";
+import {
+  baseAppearance,
+  baseSeed,
+  courtyardBaseScale,
+  courtyardTanks,
+  modularBasePlan,
+} from "./modularBasePlan";
 
 const biomes: Biome[] = ["forest", "desert", "snow", "wasteland", "lava", "alien"];
 describe("modular base reservations", () => {
@@ -17,18 +25,48 @@ describe("modular base reservations", () => {
           }
         }
   });
-  it("bounds the courtyard buildings and leaves the central tank well clear", () => {
-    for (const biome of biomes) {
-      const blocks = modularBasePlan(biome, 2, 4, true);
-      for (const { at, size } of blocks) {
-        expect(
-          Math.hypot(Math.abs(at[0]) + size[0] / 2, Math.abs(at[2]) + size[2] / 2),
-        ).toBeLessThanOrEqual(4);
-        // No tall solid architecture inside the central specimen tank.
-        if (size[1] > 0.6) expect(Math.hypot(at[0], at[2])).toBeGreaterThan(1);
-      }
-      expect(blocks).not.toEqual(modularBasePlan(biome, 2, 4));
-    }
+  it("keeps all courtyard damage states bounded and architecture clear of tanks", () => {
+    for (const biome of biomes)
+      for (let seed = 0; seed < 18; seed++)
+        for (const radius of [3.2, 4, 8]) {
+          const scale = courtyardBaseScale(radius);
+          const blocks = modularBasePlan(biome, seed, radius, true);
+          const tanks = courtyardTanks(baseAppearance(seed).layout);
+          for (const { at, size } of blocks) {
+            expect(
+              Math.hypot(Math.abs(at[0]) + size[0] / 2, Math.abs(at[2]) + size[2] / 2),
+            ).toBeLessThanOrEqual(radius);
+            for (const tank of tanks) {
+              if (at[1] + size[1] / 2 <= 0.6 * scale) continue;
+              const dx = Math.max(0, Math.abs(at[0] - tank.x * scale) - size[0] / 2);
+              const dz = Math.max(0, Math.abs(at[2] - tank.z * scale) - size[2] / 2);
+              expect(Math.hypot(dx, dz)).toBeGreaterThan(tank.scale * 0.42 * scale);
+            }
+          }
+          // Includes fallen lid, shards, and corpse/spill cluster on the front apron.
+          for (const tank of tanks)
+            expect((Math.hypot(tank.x, tank.z) + tank.scale * 1.1) * scale).toBeLessThan(radius);
+          expect(3.6 * scale).toBeLessThan(radius);
+        }
+  });
+  it("gives every layout all three damage states without randomness on rerender", () => {
+    expect(
+      new Set(Array.from({ length: 9 }, (_, seed) => JSON.stringify(baseAppearance(seed)))).size,
+    ).toBe(9);
+    for (let seed = 0; seed < 9; seed++)
+      expect(modularBasePlan("forest", seed, 5, true)).toEqual(
+        modularBasePlan("forest", seed, 5, true),
+      );
+  });
+  it("actually distributes all layout and condition families through the campaign", () => {
+    const appearances = Array.from({ length: 30 }, (_, i) => {
+      const outposts = createWorld(getLevel(i + 1))
+        .outposts.filter((o) => !o.interior && o.radius >= 3.2)
+        .sort((a, b) => b.radius - a.radius || a.id - b.id);
+      return outposts[0] ? baseAppearance(baseSeed(outposts[0])) : null;
+    }).filter((a) => a !== null);
+    expect(new Set(appearances.map((a) => a.layout)).size).toBe(3);
+    expect(new Set(appearances.map((a) => a.condition)).size).toBe(3);
   });
   it("produces stable layouts and distinct climate treatments", () => {
     const plans = biomes.map((biome) => modularBasePlan(biome, 2, 5));

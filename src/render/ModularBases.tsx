@@ -2,9 +2,8 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Biome } from "../biomes";
 import type { Outpost } from "../sim/types";
-import { CANISTER_PALETTE } from "./biomeColors";
-import { CloningCanister } from "./CloningCanister";
-import { courtyardBaseScale, modularBasePlan } from "./modularBasePlan";
+import { CourtyardEquipment } from "./CourtyardEquipment";
+import { baseSeed, courtyardBaseScale, modularBasePlan } from "./modularBasePlan";
 
 const noRaycast: THREE.Mesh["raycast"] = () => {};
 
@@ -21,7 +20,7 @@ export function ModularBases({ outposts, biome }: { outposts: Outpost[]; biome: 
       outposts
         .filter((o) => !o.interior)
         .flatMap((o) => {
-          const seed = o.id + Math.round(Math.abs(o.pos.x * 7 + o.pos.y * 13));
+          const seed = baseSeed(o);
           return modularBasePlan(biome, seed, o.radius, o.id === courtyard?.id).map((block) => ({
             ...block,
             outpost: o,
@@ -72,15 +71,7 @@ export function ModularBases({ outposts, biome }: { outposts: Outpost[]; biome: 
           rotation={[0, courtyard.yaw, 0]}
           scale={courtyardBaseScale(courtyard.radius)}
         >
-          <group position={[0, 0.43, 0]} scale={2.8}>
-            <CloningCanister
-              worldX={0}
-              worldZ={0}
-              yaw={0}
-              palette={CANISTER_PALETTE[biome]}
-              seed={courtyard.id}
-            />
-          </group>
+          <CourtyardEquipment biome={biome} seed={baseSeed(courtyard)} />
         </group>
       )}
     </>

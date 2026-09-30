@@ -105,7 +105,15 @@ const hashString = (s: string): number => {
   return h >>> 0;
 };
 
-export const DeadDinoInstancer = ({ url, items }: { url: string; items: DeadDinoItem[] }) => {
+export const DeadDinoInstancer = ({
+  url,
+  items,
+  decorative = false,
+}: {
+  url: string;
+  items: DeadDinoItem[];
+  decorative?: boolean;
+}) => {
   const gltf = useGLTF(url);
   const footprint = DEAD_DINO_FOOTPRINT[url] ?? 2.0;
   const blockerGeom = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 24), []);
@@ -228,18 +236,20 @@ export const DeadDinoInstancer = ({ url, items }: { url: string; items: DeadDino
       {clones.map((c) => (
         <Fragment key={c.id}>
           <primitive object={c.obj} />
-          {/* biome-ignore lint/a11y/noStaticElementInteractions: invisible r3f hit shield blocks corpse click-through */}
-          <mesh
-            geometry={blockerGeom}
-            material={blockerMat}
-            position={[c.blockerPos.x, CORPSE_BLOCKER_HEIGHT / 2, c.blockerPos.z]}
-            scale={[c.blockerRadius, CORPSE_BLOCKER_HEIGHT, c.blockerRadius]}
-            onPointerDown={stopCorpseSelection}
-            onPointerUp={stopCorpseSelection}
-            onClick={stopCorpseSelection}
-            onContextMenu={stopCorpseSelection}
-            userData={{ corpseClickBlocker: true }}
-          />
+          {!decorative && (
+            // biome-ignore lint/a11y/noStaticElementInteractions: invisible r3f hit shield blocks corpse click-through
+            <mesh
+              geometry={blockerGeom}
+              material={blockerMat}
+              position={[c.blockerPos.x, CORPSE_BLOCKER_HEIGHT / 2, c.blockerPos.z]}
+              scale={[c.blockerRadius, CORPSE_BLOCKER_HEIGHT, c.blockerRadius]}
+              onPointerDown={stopCorpseSelection}
+              onPointerUp={stopCorpseSelection}
+              onClick={stopCorpseSelection}
+              onContextMenu={stopCorpseSelection}
+              userData={{ corpseClickBlocker: true }}
+            />
+          )}
           {c.splats.map((s, i) => (
             <mesh
               // biome-ignore lint/suspicious/noArrayIndexKey: deterministic per corpse id
