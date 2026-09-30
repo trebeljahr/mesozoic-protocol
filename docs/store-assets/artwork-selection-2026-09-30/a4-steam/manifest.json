@@ -1,0 +1,99 @@
+{
+  "date": "2026-09-30",
+  "status": "local_review_ready_not_uploaded",
+  "base": "../originals/a3-breach-action.jpg",
+  "generationTool": "ChatGPT built-in image_gen",
+  "generationRequests": 4,
+  "prompts": "prompts.json",
+  "files": [
+    {
+      "file": "landscape-master.png",
+      "dimensions": "1679x937",
+      "sha256": "a146cb47ec09c3f351ca619279642bdd51e71c9afcbefca5d8100739a14f20a6",
+      "kind": "built-in image generation"
+    },
+    {
+      "file": "portrait-master.png",
+      "dimensions": "1024x1536",
+      "sha256": "14ad41b3c492ff066f13c2e748a6df56d6ebc7b8da15acef3207f2286c96afa2",
+      "kind": "built-in image generation"
+    },
+    {
+      "file": "hero-master.png",
+      "dimensions": "2170x725",
+      "sha256": "79a4de8b0bdcbf8123d7605cbe402a7a9039b9f577bc2bc97e6b10913322ffc1",
+      "kind": "built-in image generation"
+    },
+    {
+      "file": "hero-first-study.png",
+      "dimensions": "2206x713",
+      "sha256": "701d76cceb3a38964f719b1292e5b81f9e50a6584ec15348630e1352ec77278b",
+      "kind": "built-in image generation"
+    },
+    {
+      "file": "exports/header-capsule.png",
+      "dimensions": "920x430",
+      "sha256": "3c0be6ed37cd456917cfbe26abc6a0ae0625d3d2b4e3a5e04b8330869640628a",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/library-capsule.png",
+      "dimensions": "600x900",
+      "sha256": "00d472b824465d5e1382225eac49d00f678009f623aa6417186862607914c8d2",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/library-header.png",
+      "dimensions": "920x430",
+      "sha256": "3c0be6ed37cd456917cfbe26abc6a0ae0625d3d2b4e3a5e04b8330869640628a",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/library-hero.png",
+      "dimensions": "3840x1240",
+      "sha256": "880378779df75c6c5a5001eb0e578b749a98cedcbf5e3fabf9c91542d0b5e57a",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/library-logo.png",
+      "dimensions": "1280x441",
+      "sha256": "861de17fcad36f8a9c06fa2d609f43118e8dba238dca46b2146163f6e6eec402",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/main-capsule.png",
+      "dimensions": "1232x706",
+      "sha256": "a444485800f6afd4929284f3fe73f433b636773869b3457c6dda36f0e0feb27e",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/small-capsule.png",
+      "dimensions": "462x174",
+      "sha256": "44f4dd5ae37c2a573622fe67c63bc5f7e3562a24613c36b2218d95f3b96b419a",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    },
+    {
+      "file": "exports/vertical-capsule.png",
+      "dimensions": "748x896",
+      "sha256": "38d46b20b7d1248e98ea15c65c07b212e7667b7f8ed286d6baff6ffbe9293f57",
+      "kind": "deterministic crop/resize and typeset title; hero text-free"
+    }
+  ],
+  "heroAlignment": {
+    "recommended": "left bottom corner",
+    "alternate": "centered top",
+    "avoid": ["centered middle", "centered bottom"],
+    "checked": "Current official Valve PSD overlay and local window/position simulations",
+    "liveSteamPreview": "not performed; finalize before publication",
+    "heroIsUpscaled": true
+  },
+  "logo": {
+    "font": "Rajdhani Bold",
+    "width": 1280,
+    "height": 441,
+    "background": "transparent",
+    "text": ["MESOZOIC", "PROTOCOL"]
+  },
+  "scope": "Marketing artwork only; no runtime/disclosure/store changes",
+  "handoff": "/Users/rico/projects/ai-work-notes/projects/mesozoic-protocol/mesozoic-protocol-a4-steam-artwork-handoff.md"
+}

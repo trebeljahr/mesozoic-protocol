@@ -2,21 +2,20 @@
   "project": "Mesozoic Protocol",
   "date": "2026-09-30",
   "timezone": "Australia/Sydney",
-  "status": "A3_action_refinement_pending_review",
+  "status": "A3_approved_A4_vibrant_portrait_and_hero_ready_for_review",
   "flowProject": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29",
   "flowHistory": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29/edit/5db7c0a7-e206-4fcc-ac37-9f27a3087e44",
-  "newGenerationRequests": 4,
+  "newGenerationRequests": 8,
   "sequence": [
     "B Tactical Outpost completed before C submitted",
     "C Mech versus Dinosaur completed",
     "A2 clean landscape completed after user preferred A and B and requested cleaner landscape A",
-    "A3 breach action completed after user said A2 was better but too calm"
+    "A3 breach action completed after user said A2 was better but too calm",
+    "A4 built-in color refinement, portrait, hero, and hero correction generated sequentially"
   ],
-  "displayedCostPerRequest": 0,
-  "modelForNewRequests": "Nano Banana 2",
   "references": "Ten pre-existing game model ingredients from original prompt, plus selected existing key art; reused in Flow. No new external uploads.",
   "preservation": "All five originals exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
-  "selection": "A and B preferred; C least. A2 improved A but user found it too calm. A3 restores action and light contrast; awaiting review. B remains game visual target.",
+  "selection": "User approved A3 direction and requested more vibrant color, portrait versions and Steam hero/logo alignment. A4 local package ready for review.",
   "files": [
     {
       "file": "originals/a-containment-breach.jpg",
@@ -106,7 +105,7 @@
       "Opaque flat PNG for asset catalog handoff; changing compiled app assets is separate rollout work"
     ]
   ],
-  "validation": "A3 original visually reviewed in Flow. Earlier wide A2 crops remain studies; final size matrix pending approved composition.",
+  "validation": "A4 Steam dimensions, portrait margins, transparent logo, official hero guide overlay, local wide/narrow and four-position logo proofs, and small title views checked. Live Steam preview not performed.",
   "gameVisualTarget": {
     "direction": "B Tactical Outpost",
     "status": "Renderer inspected read-only. Playable prototype scope question pending; no game code changed.",
@@ -116,5 +115,11 @@
       "Explore lower camera angle with map-fit, pan, touch-picking and HUD occlusion validation"
     ],
     "validationNeeded": "Side-by-side captures of same level and state, desktop and mobile, low/medium/high quality; preserve placement and path readability; compare frame time."
-  }
+  },
+  "flowGenerationRequests": 4,
+  "builtInGenerationRequests": 4,
+  "flowDisplayedCreditCostPerRequest": 0,
+  "modelForFlowRequests": "Nano Banana 2",
+  "builtInTool": "ChatGPT image_gen",
+  "a4Package": "a4-steam/manifest.json"
 }
