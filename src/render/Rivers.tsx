@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { type Bridge, computeBridges, type FlowPalette } from "../flowGeometry";
 import { PATH_WIDTH } from "../level";
 import type { AuthoredLake, River, RiverMaterial, Vec2 } from "../sim/types";
+import { buildFluidField } from "./fluidField";
 import { makeWaterMaterial } from "./waterShader";
 
 // Universal renderer for hand-painted rivers. Reads from a `rivers` prop
@@ -12,11 +13,8 @@ import { makeWaterMaterial } from "./waterShader";
 // can use the same component. Each river becomes a flat water ribbon
 // extruded along a Catmull-Rom curve through its control points.
 //
-// Material is the shared shader from waterShader.ts — same fresnel + ripple
-// + foam + bridge-wake treatment used by FlowWater for per-level biome
-// rivers — palette-themed per RiverMaterial (water/lava/toxic). The editor
-// preview now matches the gameplay look instead of falling back to a flat
-// meshStandardMaterial.
+// Shared waterShader treatment and union shoreline field keep authored
+// rivers/pools consistent with generated biome fluids (water/lava/toxic).
 
 // Lifted slightly above the ground plane so the ribbon doesn't z-fight with
 // the biome ground / placement plane. Matches the placement plane offset.
@@ -30,8 +28,8 @@ const MIN_SAMPLES = 32;
 
 const MATERIALS: Record<RiverMaterial, FlowPalette> = {
   water: {
-    fluidColor: "#3a82c6",
-    fluidEmissive: "#1a4870",
+    fluidColor: "#44666c",
+    fluidEmissive: "#28505a",
     fluidEmissiveIntensity: 0.18,
     bridgeDeck: "#5a3c20",
     bridgeTrim: "#3a2614",
@@ -44,8 +42,8 @@ const MATERIALS: Record<RiverMaterial, FlowPalette> = {
     bridgeTrim: "#7a3a1e",
   },
   toxic: {
-    fluidColor: "#3ad6b0",
-    fluidEmissive: "#5affc8",
+    fluidColor: "#277b68",
+    fluidEmissive: "#49cb99",
     fluidEmissiveIntensity: 0.55,
     bridgeDeck: "#1f1230",
     bridgeTrim: "#4a2a70",
@@ -178,8 +176,8 @@ const useRiverMaterials = (
   // Only build materials for the river materials actually present in the
   // scene. Editor sessions often only use water; building lava+toxic up
   // front would waste a shader compile each. Ribbons and pools need separate
-  // materials because the shader keys its flow direction and foam band off
-  // uIsJoint — a lake has no downstream, so it ripples radially instead.
+  // materials for their different silhouette UVs. The shared union field
+  // supplies bank distance and current across both kinds of geometry.
   const ribbonKinds = useMemo(() => {
     const set = new Set<RiverMaterial>();
     for (const r of rivers) set.add(r.material ?? "water");
@@ -193,18 +191,43 @@ const useRiverMaterials = (
 
   const mats = useMemo(() => {
     const ribbon = new Map<RiverMaterial, THREE.ShaderMaterial>();
-    for (const k of ribbonKinds) {
-      ribbon.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: false, bridges }));
-    }
     const pool = new Map<RiverMaterial, THREE.ShaderMaterial>();
-    for (const k of poolKinds) {
-      pool.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: true, bridges }));
+    const fields = new Set<ReturnType<typeof buildFluidField>>();
+    for (const k of new Set([...ribbonKinds, ...poolKinds])) {
+      // Sample the same spline as the visible ribbons, so shoreline shading
+      // follows authored bends instead of cutting across their control polygon.
+      const shapes = rivers
+        .filter((r) => (r.material ?? "water") === k && r.points.length > 1)
+        .map((r) => {
+          const curve = new THREE.CatmullRomCurve3(
+            r.points.map((p) => new THREE.Vector3(p.x, 0, p.y)),
+            false,
+            "catmullrom",
+            0.5,
+          );
+          const points = curve.getSpacedPoints(
+            Math.max(MIN_SAMPLES, (r.points.length - 1) * SAMPLES_PER_SEGMENT),
+          );
+          return { width: r.width, points: points.map((p) => ({ x: p.x, y: p.z })) };
+        });
+      const pools = lakes
+        .filter((l) => (l.material ?? "water") === k)
+        .map((l) => ({ ...l, x: l.pos.x, y: l.pos.y }));
+      const field = buildFluidField(shapes, pools);
+      fields.add(field);
+      if (ribbonKinds.includes(k))
+        ribbon.set(k, makeWaterMaterial(MATERIALS[k], { bridges, field }));
+      if (poolKinds.includes(k))
+        pool.set(k, makeWaterMaterial(MATERIALS[k], { isJoint: true, bridges, field }));
     }
-    return { ribbon, pool };
-  }, [ribbonKinds, poolKinds, bridges]);
+    return { ribbon, pool, fields };
+  }, [ribbonKinds, poolKinds, bridges, rivers, lakes]);
 
   useEffect(
     () => () => {
+      mats.fields.forEach((field) => {
+        field.texture.dispose();
+      });
       mats.ribbon.forEach((mat) => {
         mat.dispose();
       });
@@ -229,7 +252,7 @@ const useRiverMaterials = (
 };
 
 // Authored lake — a rotated ellipse disc under the shared water shader's
-// "joint" variant (radial ripple + rim foam, no downstream flow). Lifted a
+// pool variant (radial silhouette coordinates). Lifted a
 // hair below the river ribbons so a river feeding a lake draws on top of the
 // pool rather than z-fighting with it.
 const LAKE_Y_OFFSET = Y_OFFSET - 0.005;

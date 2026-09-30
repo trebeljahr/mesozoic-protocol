@@ -1,36 +1,10 @@
 import * as THREE from "three";
 import type { Bridge, FlowPalette } from "../flowGeometry";
 
-// Shared fluid-surface shader for rivers and lakes (water, lava, toxic, etc.).
-// Every biome's flow geometry goes through this material — FlowWater.tsx
-// builds the ribbon/disc meshes, this file gives them a surface.
-//
-// The previous version summed three sine waves in UV space, which produced a
-// visible diagonal plaid across every river and a hard white foam band down
-// both banks. Two structural problems fed that:
-//
-//   1. The ripple domain was UV-based, but the two geometry builders disagree
-//      on what U means (world arc length in FlowWater's ribbon, normalized
-//      0..1 in Rivers.tsx's spline). A long river got 1.6 ripple cycles
-//      smeared over its whole length; a short one got dozens.
-//   2. Sine sums have no gradient information, so the "specular" term used a
-//      near-constant normal and the surface never read as a height field.
-//
-// Both are fixed by working in WORLD space along a per-vertex flow direction
-// (the `aFlow` attribute, see FlowWater.tsx). Ripples are value-noise octaves
-// stretched along the flow axis and advected downstream, and the noise is
-// evaluated with analytic derivatives so we get a real surface normal for
-// free — that normal drives fresnel, specular glints and whitecaps.
-//
-// Palette-driven colours:
-//   - uColorDeep     = palette.fluidEmissive (channel centre)
-//   - uColorShallow  = palette.fluidColor    (mixed in toward the bank)
-//   - uColorFoam     = derived light tint    (foam band + wake foam)
-//   - uColorCrust    = derived dark tint     (lava's cooled crust)
-//   - uEmissiveBoost = palette.fluidEmissiveIntensity, which also selects
-//                      between the "wet" treatment (water/toxic) and the
-//                      "molten" treatment (lava crust over glowing cracks).
+import type { FluidField } from "./fluidField";
 
+// Shared, world-scale surface. The optional union field removes false banks
+// at ribbon/pool joins; the fallback also supports standalone material users.
 const VERT = /* glsl */ `
 #include <fog_pars_vertex>
 
@@ -72,9 +46,9 @@ uniform float uEmissiveBoost;
 uniform float uMolten;
 // Downstream advection speed, world units/sec. Lava creeps, water runs.
 uniform float uFlowSpeed;
-// 1 = directional ribbon (ripples stretch downstream), 0 = still water
-// (isotropic, so a pond doesn't read as smeared streaks).
-uniform float uAniso;
+uniform sampler2D uSurfaceField;
+uniform vec4 uFieldBounds;
+uniform float uHasField;
 
 varying vec2 vUv;
 varying vec3 vWorldPos;
@@ -120,40 +94,30 @@ void main() {
     ? clamp(length(vUv - 0.5) * 2.0, 0.0, 1.0)
     : clamp(abs(vUv.y - 0.5) * 2.0, 0.0, 1.0);
 
-  // Flow frame. Ribbons carry a real tangent; lakes fall back to a fixed
-  // diagonal so their two noise layers still slide past each other.
-  float flowLen = length(vFlow);
-  vec2 dir = flowLen > 1e-3 ? vFlow / flowLen : normalize(vec2(0.83, 0.56));
-  vec2 side = vec2(-dir.y, dir.x);
-  float s = dot(vWorldPos.xz, dir);
-  float t = dot(vWorldPos.xz, side);
+  vec3 field = texture2D(uSurfaceField,
+    (vec2(vWorldPos.x, -vWorldPos.z) - uFieldBounds.xy) / uFieldBounds.zw).rgb;
+  vec2 current = mix(vFlow, field.gb * 2.0 - 1.0, uHasField);
+  float bankDistance = mix((1.0 - edge) * 0.9, field.r * 1.2, uHasField);
+  float depth = smoothstep(0.02, 0.52, bankDistance);
+  float shore = 1.0 - smoothstep(0.02, 0.30, bankDistance);
 
-  // Rivers run faster mid-channel than at the banks, so ripples near the
-  // centre are dragged further downstream. Cheap, and it kills the "rigid
-  // conveyor belt" read the old uniform scroll had.
-  float shear = mix(1.0, 0.45, edge * edge);
-  float drift = uTime * uFlowSpeed * shear;
+  // Two overlapping, bounded advection phases prevent stretching at bends
+  // after long play sessions. Never rotate the absolute world coordinates
+  // by a changing tangent: that creates swimming/plaid patterns on curves.
+  vec2 velocity = vec2(0.025, 0.018) + current * uFlowSpeed;
+  float phase = fract(uTime * 0.10);
+  float phaseB = fract(phase + 0.5);
+  float blend = abs(phase * 2.0 - 1.0);
+  vec2 p = vWorldPos.xz * 0.85;
+  vec3 a = noised(p - velocity * phase * 8.5);
+  vec3 b = noised(p - velocity * phaseB * 8.5);
+  vec3 broad = mix(a, b, blend);
+  // Offset, rotated detail breaks the axis-aligned value-noise grid.
+  mat2 turn = mat2(0.8, -0.6, 0.6, 0.8);
+  vec3 detail = noised(turn * p * vec2(0.85, 3.2) + vec2(13.7, 5.2) - uTime * 0.035);
+  float height = broad.x * 0.80 + detail.x * 0.20;
+  vec2 gradW = broad.yz * 0.68 + vec2(dot(turn[0], detail.yz * vec2(0.85, 3.2)), dot(turn[1], detail.yz * vec2(0.85, 3.2))) * 0.17;
 
-  // Three octaves. A ribbon samples the along-flow axis ~2.5x coarser than the
-  // cross axis, so crests elongate downstream into streaks. A lake (uAniso=0)
-  // is isotropic and tighter — ponds are only a couple of world units across,
-  // so river-scale noise would give them two soft blobs and nothing else.
-  float fx = 0.62 * mix(4.2, 1.0, uAniso);
-  float fy = mix(2.60, 1.55, uAniso);
-  vec3 n1 = noised(vec2(s * fx - drift * 1.00, t * fy));
-  vec3 n2 = noised(vec2(s * fx * 2.34 - drift * 1.70, t * fy * 2.06 + 7.3));
-  vec3 n3 = noised(vec2(s * fx * 5.00 - drift * 2.55, t * fy * 4.13 - 3.1));
-  float height = n1.x * 0.55 + n2.x * 0.30 + n3.x * 0.15;
-
-  // Gradient in flow-local space, rotated back into world XZ. Each octave's
-  // derivative is scaled by its own domain frequency (chain rule).
-  vec2 grad = vec2(
-    n1.y * 0.55 * fx + n2.y * 0.30 * fx * 2.34 + n3.y * 0.15 * fx * 5.00,
-    n1.z * 0.55 * fy + n2.z * 0.30 * fy * 2.06 + n3.z * 0.15 * fy * 4.13
-  );
-  vec2 gradW = grad.x * dir + grad.y * side;
-
-  // Bridge wake — piers churn the surface into a foamy, choppier patch.
   float wake = 0.0;
   for (int i = 0; i < 8; i++) {
     if (i >= uBridgeCount) break;
@@ -161,84 +125,59 @@ void main() {
     wake += 1.0 - smoothstep(0.0, uBridges[i].z, d);
   }
   wake = clamp(wake, 0.0, 1.0);
-  vec3 chop = noised(vec2(s * 7.0 - drift * 4.0, t * 7.0));
-  height += chop.x * wake * 0.45;
-  gradW += (chop.y * dir + chop.z * side) * wake * 3.0;
-
-  // Still water gets a gentler height field — a pond's noise is tighter than
-  // a river's, and full-strength normals there turn the sun glint into speckle.
-  float bump = mix(0.55, 0.18, uMolten) * mix(0.6, 1.0, uAniso);
-  vec3 N = normalize(vec3(-gradW.x * bump, 1.0, -gradW.y * bump));
+  vec3 N = normalize(vec3(-gradW.x * 0.11, 1.0, -gradW.y * 0.11));
   vec3 V = normalize(vViewDir);
-
-  // Shoreline. The bank line is broken up by its own slow noise so the water
-  // doesn't end on a mathematically perfect ribbon edge.
-  float bankNoise = noised(vec2(s * 2.4 + uTime * 0.05, t * 2.4)).x;
-  float bankEdge = clamp(edge + (bankNoise - 0.5) * 0.14, 0.0, 1.0);
-
-  // The edge coord is normalized to the shape, so a fixed band there would be
-  // a thin trim on a wide river and half the surface of a 2-unit pond. fwidth
-  // gives the edge gradient per pixel, so this band keeps a roughly constant
-  // on-screen thickness on every body of water regardless of its size.
-  float band = clamp(fwidth(edge) * 16.0, 0.05, 0.32);
-  float shore = smoothstep(1.0 - band * 2.5, 1.0, bankEdge);
-
-  // Depth: opaque, dark channel in the middle grading to a lighter shallow
-  // shelf at the banks.
-  float depth = smoothstep(0.0, 0.80, 1.0 - bankEdge);
   vec3 col = mix(uColorShallow, uColorDeep, depth);
 
-  // -------- wet treatment (water, toxic goo) --------
-  // Sky-ish sheen where the surface tilts away from the viewer, plus tight
-  // sun glints off the ripple crests.
+  // Quiet petrol depths; highlights describe movement, not a crumpled foil
+  // normal map. Toxic pools keep localized emissive eddies instead of glitter.
+  float toxic = (1.0 - uMolten) * smoothstep(0.25, 0.55, uEmissiveBoost);
   float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 4.0);
-  vec3 sky = mix(uColorShallow, vec3(0.78, 0.88, 1.0), 0.85);
-  vec3 wet = col + height * 0.06;
-  wet = mix(wet, sky, fres * 0.20 * (1.0 - shore));
+  vec3 wet = col * (0.96 + height * 0.08);
+  wet += vec3(0.23, 0.32, 0.34) * fres * 0.12;
   vec3 H = normalize(SUN + V);
-  wet += pow(max(dot(N, H), 0.0), 64.0) * 0.38;
-  wet += pow(max(dot(N, H), 0.0), 12.0) * 0.035;
-
-  // Whitecaps on steep, tall crests — dense mid-channel where the flow is
-  // fastest, and inside bridge wakes.
-  float slope = clamp(length(gradW) * 0.55, 0.0, 1.0);
-  float caps = smoothstep(0.62, 1.05, height * 0.65 + slope * 0.5);
-  caps *= (1.0 - edge * 0.7) * (0.35 + 0.65 * wake);
-  wet = mix(wet, uColorFoam, clamp(caps, 0.0, 1.0) * 0.34);
-
-  // Bank foam — a lapping band, animated by the same noise field so it
-  // breathes instead of strobing.
-  float lap = 0.55 + 0.45 * sin(s * 2.2 - uTime * 1.1 + height * 6.0);
-  float foam = smoothstep(1.0 - band, 1.0 - band * 0.15, bankEdge) * lap;
-  wet = mix(wet, uColorFoam, foam * 0.34);
+  float glint = pow(max(dot(N, H), 0.0), 48.0);
+  wet += vec3(0.62, 0.73, 0.72) * glint * 0.065 * (1.0 - shore);
+  float crest = smoothstep(0.58, 0.72, height) * (1.0 - smoothstep(0.73, 0.84, height));
+  float ripple = smoothstep(0.35, 0.9, detail.z) * smoothstep(0.45, 0.70, detail.x);
+  wet = mix(wet, uColorFoam, (ripple * 0.04 + crest * (0.018 + wake * 0.045)) * depth * (1.0 - toxic * 0.65));
+  wet += uEmissiveTint * toxic * smoothstep(0.52, 0.76, height) * 0.16 * depth;
+  // Contact is a dark wet shelf, never a permanent white outline.
+  wet *= 1.0 - shore * 0.12;
+  edge = 1.0 - depth;
 
   // -------- molten treatment (lava) --------
   // Cooled crust floats on the flow: high, slow-moving parts of the height
   // field go dark and matte, troughs stay incandescent. Crust thickens toward
   // the banks where the flow is slowest.
-  float crust = smoothstep(0.42, 0.78, height + edge * 0.30);
+  if (uMolten > 0.001) {
+  float platesA = noised(p * 2.8 - velocity * phase * 8.5).x;
+  float platesB = noised(p * 2.8 - velocity * phaseB * 8.5).x;
+  float moltenHeight = mix(platesA, platesB, blend) * 0.65 + height * 0.35;
+  float crust = smoothstep(0.26, 0.56, moltenHeight + edge * 0.30);
   vec3 molten = mix(uColorDeep * 1.15, uColorCrust, crust);
   float cracks = pow(1.0 - crust, 2.0);
   molten += uEmissiveTint * cracks * 0.55;
   // Thin hot rim where crust plates part.
-  molten += uColorFoam * smoothstep(0.44, 0.52, height + edge * 0.30)
-                       * (1.0 - smoothstep(0.52, 0.62, height + edge * 0.30)) * 0.35;
+  molten += uColorFoam * smoothstep(0.44, 0.52, moltenHeight + edge * 0.30)
+                       * (1.0 - smoothstep(0.52, 0.62, moltenHeight + edge * 0.30)) * 0.35;
   molten = mix(molten, uColorCrust, wake * 0.35);
 
-  col = mix(wet, molten, uMolten);
+  wet = mix(wet, molten, uMolten);
+  }
+  col = wet;
 
   // Palette-driven trailing emissive — wet sheen for water, ambient heat for
   // lava/toxic. Scaled down for molten since the cracks already carry it.
   col += uEmissiveTint * (0.16 * uEmissiveBoost) * (1.0 - uMolten * 0.6);
 
-  // Shallow water lets a little ground colour through; molten stays opaque.
-  // Silhouette is only antialiased, not feathered — a wide alpha ramp turned
-  // ponds into blue haze with no readable shoreline. The bank still breaks up
-  // irregularly because bankEdge carries the noise offset.
-  float aa = max(fwidth(bankEdge) * 1.5, 0.004);
-  float feather = 1.0 - smoothstep(1.0 - aa, 1.0, bankEdge);
-  float alpha = (1.0 - 0.20 * smoothstep(0.45, 0.95, bankEdge)) * feather;
-  alpha = mix(alpha, feather, uMolten);
+  float aa = max(fwidth(bankDistance), 0.015);
+  // Keep the mesh silhouette at miter corners, where the sampled capsule
+  // field is conservative. The union distance fills interior join edges.
+  float shapeDistance = (1.0 - (uIsJoint > 0.5
+    ? clamp(length(vUv - 0.5) * 2.0, 0.0, 1.0)
+    : clamp(abs(vUv.y - 0.5) * 2.0, 0.0, 1.0))) * 0.9;
+  float alpha = smoothstep(0.0, max(0.07, aa), max(bankDistance, shapeDistance));
 
   gl_FragColor = vec4(col, alpha);
   #include <fog_fragment>
@@ -277,7 +216,7 @@ const deriveFoamColor = (palette: FlowPalette): THREE.Vector3 => {
 // basalt. Only visible on molten palettes.
 const deriveCrustColor = (palette: FlowPalette): THREE.Vector3 => {
   const fluid = hexToVec3(palette.fluidColor);
-  return lerpColor(fluid, new THREE.Vector3(0.06, 0.035, 0.03), 0.82);
+  return lerpColor(fluid, new THREE.Vector3(0.012, 0.009, 0.008), 0.96);
 };
 
 const buildBridgeUniforms = (bridges: Bridge[]) => {
@@ -295,18 +234,22 @@ const buildBridgeUniforms = (bridges: Bridge[]) => {
 export type WaterMaterialOpts = {
   isJoint?: boolean;
   bridges?: Bridge[];
+  field?: FluidField;
 };
 
 export const makeWaterMaterial = (
   palette: FlowPalette,
-  { isJoint = false, bridges = [] }: WaterMaterialOpts = {},
+  { isJoint = false, bridges = [], field }: WaterMaterialOpts = {},
 ): THREE.ShaderMaterial => {
   const bd = buildBridgeUniforms(bridges);
   const molten = moltenFactor(palette);
-  return new THREE.ShaderMaterial({
+  const material = new THREE.ShaderMaterial({
     uniforms: {
       ...THREE.UniformsLib.fog,
       uTime: { value: 0 },
+      uSurfaceField: { value: field?.texture ?? null },
+      uFieldBounds: { value: field?.bounds ?? new THREE.Vector4(0, 0, 1, 1) },
+      uHasField: { value: field ? 1 : 0 },
       uIsJoint: { value: isJoint ? 1.0 : 0.0 },
       uBridges: { value: bd.arr },
       uBridgeCount: { value: bd.count },
@@ -317,10 +260,8 @@ export const makeWaterMaterial = (
       uEmissiveTint: { value: hexToVec3(palette.fluidEmissive) },
       uEmissiveBoost: { value: palette.fluidEmissiveIntensity },
       uMolten: { value: molten },
-      // Lakes only drift; rivers run, and lava runs at a fraction of water's
-      // pace so it reads as viscous.
-      uFlowSpeed: { value: isJoint ? 0.06 : 0.42 - 0.3 * molten },
-      uAniso: { value: isJoint ? 0.0 : 1.0 },
+      // Field current is zero in pools. Lava moves at a fraction of water speed.
+      uFlowSpeed: { value: 0.18 - 0.13 * molten },
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -332,4 +273,6 @@ export const makeWaterMaterial = (
     // and self-sort badly where two rivers overlap.
     depthWrite: false,
   });
+  material.defaultAttributeValues.aFlow = [0, 0];
+  return material;
 };

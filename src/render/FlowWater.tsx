@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { Bridge, FlowPalette } from "../flowGeometry";
 import type { Vec2 } from "../sim/types";
+import { buildFluidField } from "./fluidField";
 import { makeWaterMaterial } from "./waterShader";
 
 // Per-level flow renderer for every biome that has flow features. Builds
@@ -26,12 +27,14 @@ export const FlowWaterGroup = ({
   lakes: { id: string; x: number; y: number; rx: number; ry: number; rot: number }[];
   bridges: Bridge[];
 }) => {
+  const field = useMemo(() => buildFluidField(rivers, lakes), [rivers, lakes]);
+  useEffect(() => () => field.texture.dispose(), [field]);
   const { segMat, jointMat } = useMemo(
     () => ({
-      segMat: makeWaterMaterial(palette, { isJoint: false, bridges }),
-      jointMat: makeWaterMaterial(palette, { isJoint: true, bridges }),
+      segMat: makeWaterMaterial(palette, { isJoint: false, bridges, field }),
+      jointMat: makeWaterMaterial(palette, { isJoint: true, bridges, field }),
     }),
-    [palette, bridges],
+    [palette, bridges, field],
   );
 
   // One disc shared by every lake — scaled per instance. Built here rather

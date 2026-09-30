@@ -43,8 +43,8 @@ const LAVA_PALETTE: FlowPalette = {
 // reads as wet under direct sun without glowing in fog. Bridges are a
 // warmer pine/oak deck on darker stained trim.
 const FOREST_PALETTE: FlowPalette = {
-  fluidColor: "#3a82c6",
-  fluidEmissive: "#1a4870",
+  fluidColor: "#44666c",
+  fluidEmissive: "#28505a",
   fluidEmissiveIntensity: 0.18,
   bridgeDeck: "#5a3c20",
   bridgeTrim: "#3a2614",
@@ -57,8 +57,8 @@ const FOREST_PALETTE: FlowPalette = {
 // Bridges aren't used since alien only has lakes, but the trim colors
 // are kept for completeness.
 const ALIEN_PALETTE: FlowPalette = {
-  fluidColor: "#3ad6b0",
-  fluidEmissive: "#5affc8",
+  fluidColor: "#277b68",
+  fluidEmissive: "#49cb99",
   fluidEmissiveIntensity: 0.55,
   bridgeDeck: "#1f1230",
   bridgeTrim: "#4a2a70",
