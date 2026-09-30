@@ -13,6 +13,7 @@ import { LevelEditorPanel } from "./editor/LevelEditorPanel";
 import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
 import { useWorldMapEditor } from "./editor/worldMapEditorStore";
 import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
+import { ComposerBufferCleanup } from "./render/ComposerBufferCleanup";
 import { ExpectedCanvasTeardown } from "./render/ExpectedCanvasTeardown";
 import { PaintedPostFx } from "./render/PaintedPostFx";
 import { PlayScene } from "./render/Scene";
@@ -307,6 +308,7 @@ export const App = () => {
             <ExpectedCanvasTeardown />
             <SceneRoot key={`scene-${glContextEpoch}`} />
             <EffectComposer key={`fx-${glContextEpoch}`} multisampling={composerMultisampling}>
+              <ComposerBufferCleanup />
               {screen === "playing" ? (
                 <PaintedPostFx />
               ) : (

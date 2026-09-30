@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { BIOME_STYLE, type Biome, biomeForPos } from "../biomes";
 import { LEVELS } from "../levels";
@@ -193,6 +193,8 @@ export const BiomeGround = ({
     geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     return geom;
   }, [width, height, segments]);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <mesh geometry={geometry} receiveShadow>
