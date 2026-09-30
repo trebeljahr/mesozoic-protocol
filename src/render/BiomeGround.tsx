@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import type { Biome } from "../biomes";
 import { TERRAIN_PALETTE } from "./terrainPalette";
 import { WorldMapSoilMaterial } from "./WorldMapSoilMaterial";
 import {
+  MAP_BIOMES,
   MAP_FACILITIES,
+  mapBiomeWeights,
   mapHabitatDensity,
-  mapHabitatY,
   mapNodeDistance,
   mapNoise,
   mapRouteDistance,
@@ -14,15 +14,7 @@ import {
   smoothMap,
 } from "./worldMapLandscape";
 
-const BANDS: { biome: Biome; upper: number }[] = [
-  { biome: "forest", upper: -9 },
-  { biome: "snow", upper: -2 },
-  { biome: "desert", upper: 5 },
-  { biome: "wasteland", upper: 12 },
-  { biome: "lava", upper: 19 },
-  { biome: "alien", upper: Infinity },
-];
-const PALETTES = BANDS.map(({ biome }) => ({
+const PALETTES = MAP_BIOMES.map((biome) => ({
   mineral: new THREE.Color(TERRAIN_PALETTE[biome].mineral),
   cover: new THREE.Color(TERRAIN_PALETTE[biome].cover),
   amount: TERRAIN_PALETTE[biome].coverAmount,
@@ -69,22 +61,19 @@ export const BiomeGround = ({
         y = -axis(pos.getZ(i), height);
       pos.setXYZ(i, x, 0, -y);
       uv.setXY(i, x / 3, -y / 3);
-      const hy = mapHabitatY(x, y);
-      let band = BANDS.findIndex((b) => hy <= b.upper);
-      let next = band,
-        blend = 0;
-      for (let j = 0; j < BANDS.length - 1; j++) {
-        if (Math.abs(hy - BANDS[j].upper) < 1.8) {
-          band = j;
-          next = j + 1;
-          blend = smoothMap(-1.8, 1.8, hy - BANDS[j].upper);
-          break;
-        }
-      }
-      const a = PALETTES[band],
-        b = PALETTES[next];
-      mineral.copy(a.mineral).lerp(b.mineral, blend);
-      cover.copy(a.cover).lerp(b.cover, blend);
+      const weights = mapBiomeWeights(x, y);
+      mineral.setRGB(0, 0, 0);
+      cover.setRGB(0, 0, 0);
+      let coverAmount = 0;
+      PALETTES.forEach((palette, j) => {
+        mineral.r += palette.mineral.r * weights[j];
+        mineral.g += palette.mineral.g * weights[j];
+        mineral.b += palette.mineral.b * weights[j];
+        cover.r += palette.cover.r * weights[j];
+        cover.g += palette.cover.g * weights[j];
+        cover.b += palette.cover.b * weights[j];
+        coverAmount += palette.amount * weights[j];
+      });
       mineral.toArray(colors, i * 3);
       cover.toArray(covers, i * 3);
       const inAtlas = Math.abs(x) < 52 && Math.abs(y) < 48;
@@ -104,9 +93,8 @@ export const BiomeGround = ({
       surfaces[i * 3] = Math.max(route, node * 0.85, apron * 0.85);
       surfaces[i * 3 + 1] = density.grove;
       surfaces[i * 3 + 2] = density.rock;
-      habitats[i * 3] = band === 0 ? 1 - blend : 0;
-      habitats[i * 3 + 1] =
-        (a.amount * (1 - blend) + b.amount * blend) * (0.28 + noise * 0.55 + density.grove * 0.3);
+      habitats[i * 3] = weights[0];
+      habitats[i * 3 + 1] = coverAmount * (0.28 + noise * 0.55 + density.grove * 0.3);
       habitats[i * 3 + 2] = smoothMap(
         0,
         24,

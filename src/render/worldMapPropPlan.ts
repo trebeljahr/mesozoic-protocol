@@ -18,6 +18,7 @@ import {
   mapRouteDistance,
   mapShoreDistance,
 } from "./worldMapLandscape";
+import { mapLevelPosition } from "./worldMapLayout";
 
 export type PropInstance = {
   id: string;
@@ -167,8 +168,8 @@ const buildPropPlan = (progress: ProgressData) => {
           plan,
           placed,
           DEAD_DINO_URLS[level.id % DEAD_DINO_URLS.length],
-          level.nodePos.x + Math.cos(a) * r,
-          level.nodePos.y + Math.sin(a) * r,
+          mapLevelPosition(level.id).x + Math.cos(a) * r,
+          mapLevelPosition(level.id).y + Math.sin(a) * r,
           0.65,
           rand() * Math.PI * 2,
         )

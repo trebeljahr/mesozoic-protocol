@@ -30,6 +30,7 @@ import {
   PAN_LIMIT_Z,
 } from "./worldMapBounds";
 import { isMapLevelDiscovered } from "./worldMapDiscovery";
+import { mapLevelPosition } from "./worldMapLayout";
 
 // Level node bounds span x: [-24, 22], y: [-14, 26] — content grew taller
 // after the 6-biome-band layout (alien band tops out at y=26).
@@ -59,9 +60,9 @@ const NEIGHBOR_FIT_PAD = 1.5;
 // readability.
 const MIN_FOCUS_HALF_X = 9;
 const MIN_FOCUS_HALF_Z = 6;
-// Fraction of the visible world-Z extent to drop the focused level below
-// screen center. Positive = node sits below midline.
-const MOBILE_Y_OFFSET_FRAC = 0.18;
+// Keep the current outpost slightly above center, leaving its label clear of
+// the bottom navigation. Positive values move the node below the midline.
+const MOBILE_Y_OFFSET_FRAC = -0.04;
 // Camera-to-target Z offset baked into the OrthographicCamera position
 // (0, 30, 18). Preserved when shifting target so the look angle stays
 // fixed.
@@ -115,18 +116,18 @@ const computeMobileFocus = (
   for (const j of [idx - 1, idx + 1]) {
     const n = LEVELS[j];
     if (!n) continue;
-    halfX = Math.max(halfX, Math.abs(level.nodePos.x - n.nodePos.x));
-    halfZ = Math.max(halfZ, Math.abs(level.nodePos.y - n.nodePos.y));
+    halfX = Math.max(halfX, Math.abs(mapLevelPosition(level.id).x - mapLevelPosition(n.id).x));
+    halfZ = Math.max(halfZ, Math.abs(mapLevelPosition(level.id).y - mapLevelPosition(n.id).y));
   }
   const zoomX = viewportWidthPx / (2 * halfX * NEIGHBOR_FIT_PAD);
   const zoomZ = (viewportHeightPx * TILT_GROUND_FACTOR) / (2 * halfZ * NEIGHBOR_FIT_PAD);
   const zoom = THREE.MathUtils.clamp(Math.min(zoomX, zoomZ), fitZoom, maxZoom);
   const visibleHeightWorld = (viewportHeightPx / zoom) * TILT_GROUND_FACTOR;
-  const nodeWorldZ = -level.nodePos.y;
+  const nodeWorldZ = -mapLevelPosition(level.id).y;
   const rawTargetZ = nodeWorldZ - visibleHeightWorld * MOBILE_Y_OFFSET_FRAC;
   return {
     zoom,
-    targetX: THREE.MathUtils.clamp(level.nodePos.x, -PAN_LIMIT_X, PAN_LIMIT_X),
+    targetX: THREE.MathUtils.clamp(mapLevelPosition(level.id).x, -PAN_LIMIT_X, PAN_LIMIT_X),
     targetZ: THREE.MathUtils.clamp(rawTargetZ, -PAN_LIMIT_Z, PAN_LIMIT_Z),
   };
 };

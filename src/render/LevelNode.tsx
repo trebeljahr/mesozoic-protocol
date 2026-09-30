@@ -3,8 +3,6 @@ import { type ThreeEvent, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { audio } from "../audio/AudioManager";
-import { isDebug } from "../debug";
-import { EditLevelButton } from "../editor/EditLevelButton";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { type LevelConfig, levelHasMode } from "../levels";
 import {
@@ -15,51 +13,26 @@ import {
   isModeUnlocked,
   LEVEL_MODE_LABEL,
   type LevelMode,
-  type Stars,
 } from "../progress";
 import { useGame } from "../store";
-import { IconBreach, IconLock, IconLockdown, IconStar, IconUnlock } from "../ui/MenuIcons";
+import { IconBreach, IconLockdown } from "../ui/MenuIcons";
+import { StarDisplay } from "../ui/StarDisplay";
+import { mapLevelPosition } from "./worldMapLayout";
 
 type Props = { level: LevelConfig };
-
-const STAR_SHAPE = (() => {
-  const shape = new THREE.Shape();
-  const outer = 0.46;
-  const inner = 0.2;
-  for (let i = 0; i < 10; i++) {
-    const r = i % 2 === 0 ? outer : inner;
-    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
-    const x = Math.cos(a) * r;
-    const y = Math.sin(a) * r;
-    if (i === 0) shape.moveTo(x, y);
-    else shape.lineTo(x, y);
-  }
-  shape.closePath();
-  return shape;
-})();
-
-const STAR_GEOM = new THREE.ShapeGeometry(STAR_SHAPE);
-const STAR_SLOTS = ["slot-left", "slot-center", "slot-right"] as const;
 
 // World-map challenge-mode badge styling. Icon carries the mode's visual
 // identity (no letter — the letters overlapped the level-number plaque
 // and were illegible against the terrain). Three render states
 // (locked / unlocked / cleared) are chosen at the call site.
-const MODE_BADGE: Record<
-  "breach" | "containment",
-  { Icon: typeof IconBreach; text: string; border: string; bg: string }
-> = {
+const MODE_BADGE: Record<"breach" | "containment", { Icon: typeof IconBreach; text: string }> = {
   breach: {
     Icon: IconBreach,
     text: "text-orange",
-    border: "border-orange",
-    bg: "bg-[rgba(60,30,5,0.92)]",
   },
   containment: {
     Icon: IconLockdown,
     text: "text-red",
-    border: "border-red",
-    bg: "bg-[rgba(50,10,18,0.92)]",
   },
 };
 
@@ -150,15 +123,10 @@ export const LevelNode = ({ level }: Props) => {
     document.body.style.cursor = "default";
   };
 
-  // Stars sit high above the dome; the number / lock label sits just
-  // south of the ground ring (radius 1.5) so it reads as a plaque
-  // directly under the icon at our tilted ortho angle. Positive z =
-  // "south" on screen.
-  const starY = 3.15;
-  const labelZ = 1.85;
+  const labelZ = 2.1;
 
-  const x = level.nodePos.x;
-  const z = -level.nodePos.y;
+  const x = mapLevelPosition(level.id).x;
+  const z = -mapLevelPosition(level.id).y;
 
   return (
     <group position={[x, 0, z]}>
@@ -227,146 +195,46 @@ export const LevelNode = ({ level }: Props) => {
       )}
 
       <Html center position={[0, 0.05, labelZ]} zIndexRange={[0, 10]} wrapperClass="map-label-wrap">
-        <div className={`map-label ${unlocked ? "" : "locked"}`}>
-          {unlocked ? level.id : "\u{1F512}"}
-        </div>
-      </Html>
-
-      {completed && (
-        <group position={[0, starY, 0]}>
-          {STAR_SLOTS.map((slot, i) => {
-            const filled = i < stars;
-            const offset = (i - 1) * 1.1;
-            return (
-              <mesh
-                key={slot}
-                geometry={STAR_GEOM}
-                position={[offset, 0, 0]}
-                rotation={[-Math.PI / 2.4, 0, 0]}
-              >
-                <meshStandardMaterial
-                  color={filled ? "#ffd66a" : "#2a3240"}
-                  emissive={filled ? "#a66a14" : "#000000"}
-                  emissiveIntensity={filled ? 1.2 : 0}
-                  side={THREE.DoubleSide}
-                />
-              </mesh>
-            );
-          })}
-        </group>
-      )}
-
-      {!editorActive && challengeBadges.length > 0 && (
-        <Html
-          center
-          position={[0, 0.05, labelZ + 1.5]}
-          zIndexRange={[0, 10]}
-          wrapperClass="map-badges-wrap"
-        >
-          <div className="flex gap-1 select-none">
-            {challengeBadges.map(({ mode, cleared, open }) => {
-              const b = MODE_BADGE[mode];
-              const state = cleared ? "cleared" : open ? "unlocked" : "locked";
-              const cls = cleared
-                ? `${b.border} ${b.text} ${b.bg}`
-                : open
-                  ? `${b.border} ${b.text} bg-[rgba(10,16,24,0.92)]`
-                  : "border-border-faint text-fg-dim bg-[rgba(10,16,24,0.92)] opacity-70";
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!unlocked) return;
-                    audio.ensureResumed();
-                    audio.play("level-select", "ui", 0.7, 80);
-                    openModePicker(level.id);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className={`relative flex items-center justify-center w-7 h-7 rounded border ${cls} transition-all hover:brightness-125 cursor-pointer`}
-                  title={`${LEVEL_MODE_LABEL[mode]} — ${state}`}
-                  aria-label={`${LEVEL_MODE_LABEL[mode]} — ${state}`}
-                >
-                  <b.Icon size={16} />
-                  {cleared && (
-                    <span
-                      className={`absolute -top-1 -right-1 text-[9px] font-bold ${b.text} bg-[rgba(10,16,24,0.95)] rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none`}
-                    >
-                      ✓
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </Html>
-      )}
-
-      {isDebug && !editorActive && <DebugLevelControl levelId={level.id} levelName={level.name} />}
-      {import.meta.env.DEV && unlocked && !editorActive && <EditLevelButton levelId={level.id} />}
-    </group>
-  );
-};
-
-const DebugLevelControl = ({ levelId, levelName }: { levelId: number; levelName: string }) => {
-  const progress = useGame((s) => s.progress);
-  const debugSetLevelStars = useGame((s) => s.debugSetLevelStars);
-  const debugUnlockThroughLevel = useGame((s) => s.debugUnlockThroughLevel);
-  const debugLockFromLevel = useGame((s) => s.debugLockFromLevel);
-  const unlocked = isLevelUnlocked(levelId, progress);
-  const stars = getStars(progress, levelId);
-  const unlockLabel = unlocked
-    ? levelId === 1
-      ? "Clear all stars and reset the tech tree"
-      : `Lock ${levelName} and later, clear earned stars, reset the tech tree`
-    : `Unlock through ${levelName} with 3 stars`;
-  const starValues = [1, 2, 3] as const satisfies readonly Stars[];
-
-  return (
-    <Html
-      center
-      position={[0, 4.05, -0.1]}
-      zIndexRange={[9, 9]}
-      wrapperClass="debug-level-control-wrap"
-    >
-      <div
-        className={`debug-level-control ${unlocked ? "is-complete" : "is-locked"}`}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <fieldset className="debug-level-stars" aria-label={`${levelName} stars`}>
-          {starValues.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={`debug-level-star-button ${value <= stars ? "is-filled" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                debugSetLevelStars(levelId, value);
-              }}
-              title={`Set ${levelName} to ${value} star${value === 1 ? "" : "s"}`}
-              aria-label={`Set ${levelName} to ${value} star${value === 1 ? "" : "s"}`}
-              aria-pressed={stars === value}
-            >
-              <IconStar size={10} className="debug-level-star-icon" />
-            </button>
-          ))}
-        </fieldset>
         <button
           type="button"
-          className="debug-level-unlock"
+          className={`map-label ${unlocked ? "" : "locked"}`}
+          disabled={!unlocked || editorActive}
+          aria-label={`${level.id}. ${level.name}, ${stars} stars`}
+          title={level.name}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            if (unlocked) debugLockFromLevel(levelId);
-            else debugUnlockThroughLevel(levelId);
+            audio.ensureResumed();
+            audio.play("level-select", "ui", 0.7, 80);
+            if (modePickerAvailable) openModePicker(level.id);
+            else startLevel(level.id);
           }}
-          title={unlockLabel}
-          aria-label={unlockLabel}
-          aria-pressed={unlocked}
+          onFocus={() => setHoveredLevel(level.id)}
+          onBlur={() => setHoveredLevel(null)}
         >
-          {unlocked ? <IconUnlock size={12} /> : <IconLock size={12} />}
+          <span className="map-label-main">
+            <span className="map-label-number">{level.id}</span>
+            {completed && <StarDisplay count={stars} size={10} />}
+          </span>
+          {!editorActive && challengeBadges.length > 0 && (
+            <span className="map-label-modes">
+              {challengeBadges.map(({ mode, cleared, open }) => {
+                const badge = MODE_BADGE[mode];
+                return (
+                  <span
+                    key={mode}
+                    className={cleared || open ? badge.text : "text-fg-dim"}
+                    title={`${LEVEL_MODE_LABEL[mode]} — ${cleared ? "cleared" : open ? "unlocked" : "locked"}`}
+                  >
+                    <badge.Icon size={11} />
+                    {cleared && <span aria-hidden>✓</span>}
+                  </span>
+                );
+              })}
+            </span>
+          )}
         </button>
-      </div>
-    </Html>
+      </Html>
+    </group>
   );
 };

@@ -25,6 +25,7 @@ import { EndlessUnlockedModal } from "./EndlessUnlockedModal";
 import { prewarmEnemyIcons } from "./EnemyIcon.specs";
 import { FullscreenToggle } from "./FullscreenToggle";
 import { LanguageControls } from "./LanguageControls";
+import { MapDeveloperTools } from "./MapDeveloperTools";
 import {
   IconBolt,
   IconBook,
@@ -163,7 +164,7 @@ export const WorldMapUI = () => {
 
   return (
     <div className="hud">
-      <div className="world-map-stats absolute top-6 left-6 flex flex-col gap-2 pointer-events-none">
+      <div className="world-map-stats absolute top-6 left-6 flex gap-2 pointer-events-none">
         <MetaChip label={t("worldMap.totalStars")} value={total} max={maxTotal} />
         <MetaChip label={t("worldMap.outposts")} value={completed} max={outpostCount} />
       </div>
@@ -181,116 +182,89 @@ export const WorldMapUI = () => {
         </button>
       </div>
 
-      <div className="world-map-difficulty absolute bottom-6 left-6 pointer-events-none">
-        <DifficultyButton
-          className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3 py-1.5 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-border-strong hover:text-white"
-          title={t("difficulty.change")}
-        />
-      </div>
+      <div className="world-map-footer">
+        <div className="world-map-difficulty pointer-events-none">
+          <DifficultyButton
+            className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3 py-1.5 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-border-strong hover:text-white"
+            title={t("difficulty.change")}
+          />
+        </div>
 
-      <div className="world-map-rd absolute bottom-6 right-6 pointer-events-none flex flex-col items-end gap-2">
-        {endlessUnlocked &&
-          (desktopShell ? (
-            <button
-              type="button"
-              className="world-map-utility-btn bg-surface-1 border border-blue/50 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
-              onClick={() => setEndlessPickerOpen(true)}
-              aria-label="Open endless mode"
-              title="Endless — survive infinite escalating waves"
-            >
-              <span className="text-base leading-none font-bold text-cyan shrink-0" aria-hidden>
-                ∞
-              </span>
-              <span className="text-sm font-bold tracking-wide uppercase">Endless</span>
-            </button>
-          ) : (
-            // Web build: Endless is a Steam-version extra. Non-interactive
-            // teaser in place of the button — no dead onClick, nothing blocks.
-            <div
-              className="world-map-utility-btn bg-surface-1 border border-border/60 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-default select-none opacity-80"
-              title={t("worldMap.endlessSteamNote")}
-            >
-              <span className="text-base leading-none font-bold text-cyan/50 shrink-0" aria-hidden>
-                ∞
-              </span>
-              <span className="text-sm font-bold tracking-wide uppercase text-fg-muted">
-                Endless
-              </span>
-              <span className="text-[11px] font-medium normal-case text-fg-faint">
-                {t("worldMap.endlessSteamNote")}
-              </span>
-            </div>
-          ))}
-        <button
-          type="button"
-          className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
-          onClick={() => setCompendiumOpen(true, "lore")}
-          aria-label={t("worldMap.loreAria")}
-          title={t("worldMap.loreTitle")}
-        >
-          <IconScroll size={16} className="shrink-0" />
-          <span className="text-sm font-bold tracking-wide uppercase">{t("worldMap.lore")}</span>
-        </button>
-        <button
-          type="button"
-          className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
-          onClick={() => setCompendiumOpen(true)}
-          aria-label={t("worldMap.compendiumAria")}
-          title={t("worldMap.compendium")}
-        >
-          <IconBook size={16} className="shrink-0" />
-          <span className="text-sm font-bold tracking-wide uppercase">
-            {t("worldMap.compendium")}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
-          onClick={() => setAchievementsOpen(true)}
-          aria-label={t("worldMap.achievementsAria")}
-          title={t("worldMap.achievements")}
-        >
-          <IconTrophy size={16} className="shrink-0" />
-          <span className="text-sm font-bold tracking-wide uppercase">
-            {t("worldMap.achievements")}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="world-map-utility-btn bg-surface-1 border border-blue/40 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
-          onClick={() => setRobotShopOpen(true)}
-          aria-label={t("worldMap.robotsAria")}
-          title={t("worldMap.robotsTitle", { count: bolts })}
-        >
-          <IconSquad size={16} className="shrink-0" />
-          <span className="text-sm font-bold tracking-wide uppercase">{t("worldMap.robots")}</span>
-          <span
-            className={`ml-1 inline-flex items-center gap-1.5 text-[13px] font-bold tabular-nums ${bolts > 0 ? "text-[#d7bf82]" : "text-fg-muted"}`}
+        <div className="world-map-rd pointer-events-none flex items-center gap-2">
+          {endlessUnlocked &&
+            (desktopShell ? (
+              <button
+                type="button"
+                className="world-map-utility-btn bg-surface-1 border border-blue/50 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
+                onClick={() => setEndlessPickerOpen(true)}
+                aria-label="Open endless mode"
+                title="Endless — survive infinite escalating waves"
+              >
+                <span className="text-base leading-none font-bold text-cyan shrink-0" aria-hidden>
+                  ∞
+                </span>
+                <span className="text-sm font-bold tracking-wide uppercase">Endless</span>
+              </button>
+            ) : (
+              // Web build: Endless is a Steam-version extra. Non-interactive
+              // teaser in place of the button — no dead onClick, nothing blocks.
+              <div
+                className="world-map-utility-btn bg-surface-1 border border-border/60 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-default select-none opacity-80"
+                title={t("worldMap.endlessSteamNote")}
+              >
+                <span
+                  className="text-base leading-none font-bold text-cyan/50 shrink-0"
+                  aria-hidden
+                >
+                  ∞
+                </span>
+                <span className="text-sm font-bold tracking-wide uppercase text-fg-muted">
+                  Endless
+                </span>
+                <span className="text-[11px] font-medium normal-case text-fg-faint">
+                  {t("worldMap.endlessSteamNote")}
+                </span>
+              </div>
+            ))}
+          <button
+            type="button"
+            className="world-map-utility-btn bg-surface-1 border border-blue/40 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
+            onClick={() => setRobotShopOpen(true)}
+            aria-label={t("worldMap.robotsAria")}
+            title={t("worldMap.robotsTitle", { count: bolts })}
           >
-            <IconBolt size={15} className="shrink-0" />
-            {bolts}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="world-map-utility-btn bg-surface-1 border border-gold/40 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-gold hover:text-white"
-          onClick={() => setSkillTreeOpen(true)}
-          aria-label={t("worldMap.labAria")}
-          title={
-            availableStars > 0
-              ? t("worldMap.labTitleUnspent", { count: availableStars })
-              : t("worldMap.labTitle")
-          }
-        >
-          <IconLab size={16} className="shrink-0" />
-          <span className="text-sm font-bold tracking-wide uppercase">{t("worldMap.lab")}</span>
-          <span
-            className={`ml-1 inline-flex items-center justify-center gap-0.5 min-w-[28px] h-5 px-1.5 rounded-full ${availableStars > 0 ? "bg-gold text-black" : "bg-surface-2 text-fg-muted border border-border"} text-[11px] font-bold tabular-nums`}
+            <IconSquad size={16} className="shrink-0" />
+            <span className="text-sm font-bold tracking-wide uppercase">
+              {t("worldMap.robots")}
+            </span>
+            <span
+              className={`ml-1 inline-flex items-center gap-1.5 text-[13px] font-bold tabular-nums ${bolts > 0 ? "text-[#d7bf82]" : "text-fg-muted"}`}
+            >
+              <IconBolt size={15} className="shrink-0" />
+              {bolts}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="world-map-utility-btn bg-surface-1 border border-gold/40 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-gold hover:text-white"
+            onClick={() => setSkillTreeOpen(true)}
+            aria-label={t("worldMap.labAria")}
+            title={
+              availableStars > 0
+                ? t("worldMap.labTitleUnspent", { count: availableStars })
+                : t("worldMap.labTitle")
+            }
           >
-            <IconStar size={10} className="shrink-0" />
-            {availableStars}
-          </span>
-        </button>
+            <IconLab size={16} className="shrink-0" />
+            <span className="text-sm font-bold tracking-wide uppercase">{t("worldMap.lab")}</span>
+            <span
+              className={`ml-1 inline-flex items-center justify-center gap-0.5 min-w-[28px] h-5 px-1.5 rounded-full ${availableStars > 0 ? "bg-gold text-black" : "bg-surface-2 text-fg-muted border border-border"} text-[11px] font-bold tabular-nums`}
+            >
+              <IconStar size={10} className="shrink-0" />
+              {availableStars}
+            </span>
+          </button>
+        </div>
       </div>
 
       {menuOpen && (
@@ -300,7 +274,56 @@ export const WorldMapUI = () => {
             <FullscreenToggle />
             <LanguageControls />
             {isDebug && <DebugProgressSettings />}
+            {(isDebug || import.meta.env.DEV) && (
+              <MapDeveloperTools onClose={() => setMenuOpen(false)} />
+            )}
             <div className="menu-panel-actions">
+              <button
+                type="button"
+                className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setCompendiumOpen(true, "lore");
+                }}
+                aria-label={t("worldMap.loreAria")}
+                title={t("worldMap.loreTitle")}
+              >
+                <IconScroll size={16} className="shrink-0" />
+                <span className="text-sm font-bold tracking-wide uppercase">
+                  {t("worldMap.lore")}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setCompendiumOpen(true);
+                }}
+                aria-label={t("worldMap.compendiumAria")}
+                title={t("worldMap.compendium")}
+              >
+                <IconBook size={16} className="shrink-0" />
+                <span className="text-sm font-bold tracking-wide uppercase">
+                  {t("worldMap.compendium")}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setAchievementsOpen(true);
+                }}
+                aria-label={t("worldMap.achievementsAria")}
+                title={t("worldMap.achievements")}
+              >
+                <IconTrophy size={16} className="shrink-0" />
+                <span className="text-sm font-bold tracking-wide uppercase">
+                  {t("worldMap.achievements")}
+                </span>
+              </button>
+
               <DifficultyButton
                 className="btn btn-ghost w-full flex items-center justify-center gap-2"
                 label={t("difficulty.label")}

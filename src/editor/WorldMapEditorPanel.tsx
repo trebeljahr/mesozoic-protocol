@@ -7,6 +7,8 @@ import { useWorldMapEditor } from "./worldMapEditorStore";
 // (copy / download / clear all / restore generated). Mounted in App.tsx
 // behind import.meta.env.DEV && screen === "worldMap".
 export const WorldMapEditorPanel = () => {
+  const active = useWorldMapEditor((s) => s.active);
+  if (!active) return null;
   const onDownload = () => {
     downloadJson("mz-worldmap.json", useWorldMapEditor.getState().exportJson());
   };

@@ -4,25 +4,24 @@ import { LEVELS } from "../levels";
 import { mulberry32 } from "../sim/random";
 import type { AuthoredLake, Vec2 } from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
+import { mapLevelPosition } from "./worldMapLayout";
 
 // One route definition for rendering, terrain shoulders and scenery exclusion.
 export const MAP_ROUTES = LEVELS.slice(0, -1).map((level, index) => {
-  const a = level.nodePos;
-  const b = LEVELS[index + 1].nodePos;
-  const dx = b.x - a.x,
-    dy = b.y - a.y;
-  const length = Math.hypot(dx, dy);
-  const bend = Math.min(1.1, length * 0.1) * (index % 2 ? 1 : -1);
-  const c = {
-    x: (a.x + b.x) / 2 + (dy / length) * bend,
-    y: (a.y + b.y) / 2 - (dx / length) * bend,
-  };
+  const a = mapLevelPosition(level.id);
+  const b = mapLevelPosition(LEVELS[index + 1].id);
+  const previous = mapLevelPosition(LEVELS[Math.max(0, index - 1)].id);
+  const next = mapLevelPosition(LEVELS[Math.min(LEVELS.length - 1, index + 2)].id);
+  // Matching tangents through outposts round the switchbacks without moving
+  // route endpoints or creating sharp corners at region connections.
+  const c = { x: a.x + (b.x - previous.x) * 0.17, y: a.y + (b.y - previous.y) * 0.17 };
+  const d = { x: b.x - (next.x - a.x) * 0.17, y: b.y - (next.y - a.y) * 0.17 };
   return Array.from({ length: 25 }, (_, i) => {
     const t = i / 24,
       s = 1 - t;
     return {
-      x: s * s * a.x + 2 * s * t * c.x + t * t * b.x,
-      y: s * s * a.y + 2 * s * t * c.y + t * t * b.y,
+      x: s ** 3 * a.x + 3 * s * s * t * c.x + 3 * s * t * t * d.x + t ** 3 * b.x,
+      y: s ** 3 * a.y + 3 * s * s * t * c.y + 3 * s * t * t * d.y + t ** 3 * b.y,
     };
   });
 });
@@ -57,7 +56,9 @@ export function mapRouteDistance(x: number, y: number, includeService = true) {
   return Math.sqrt(best);
 }
 export const mapNodeDistance = (x: number, y: number) =>
-  Math.min(...LEVELS.map((l) => Math.hypot(l.nodePos.x - x, l.nodePos.y - y)));
+  Math.min(
+    ...LEVELS.map((l) => Math.hypot(mapLevelPosition(l.id).x - x, mapLevelPosition(l.id).y - y)),
+  );
 export const smoothMap = (a: number, b: number, value: number) => {
   const t = Math.max(0, Math.min(1, (value - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -75,11 +76,30 @@ export const mapNoise = (x: number, y: number): number => {
   const b = mapHash(ix, iy + 1) * (1 - sx) + mapHash(ix + 1, iy + 1) * sx;
   return a * (1 - sy) + b * sy;
 };
-// Boundaries meander in empty ground and settle near the canonical level biomes.
-export function mapHabitatY(x: number, y: number) {
-  return y + (mapNoise(x * 0.12, y * 0.1) - 0.5) * 5 * smoothMap(1.5, 6, mapNodeDistance(x, y));
+// Each outpost owns a patch of its canonical habitat. Warped distance fields
+// join those patches into ridges, bays and peninsulas rather than latitude bands.
+export const MAP_BIOMES: Biome[] = ["forest", "snow", "desert", "wasteland", "lava", "alien"];
+const REGION_ANCHORS = MAP_BIOMES.map((biome) =>
+  LEVELS.filter((level) => biomeForPos(level.nodePos) === biome).map((level) =>
+    mapLevelPosition(level.id),
+  ),
+);
+export function mapBiomeWeights(x: number, y: number): number[] {
+  const warp = smoothMap(1.5, 5, mapNodeDistance(x, y));
+  const wx = x + (mapNoise(x * 0.075 + 17, y * 0.075) - 0.5) * 7 * warp;
+  const wy = y + (mapNoise(x * 0.085, y * 0.085 + 31) - 0.5) * 6 * warp;
+  const distances = REGION_ANCHORS.map((anchors) =>
+    Math.min(...anchors.map((p) => Math.hypot((wx - p.x) * 0.85, wy - p.y))),
+  );
+  const nearest = Math.min(...distances);
+  const weights = distances.map((d) => Math.exp(-(d - nearest) * 1.15));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  return weights.map((w) => w / sum);
 }
-export const mapBiome = (x: number, y: number) => biomeForPos({ x, y: mapHabitatY(x, y) });
+export const mapBiome = (x: number, y: number): Biome => {
+  const weights = mapBiomeWeights(x, y);
+  return MAP_BIOMES[weights.indexOf(Math.max(...weights))];
+};
 
 export type MapFacility = {
   pos: Vec2;
@@ -88,37 +108,38 @@ export type MapFacility = {
   yaw: number;
   research: boolean;
 };
-// Six regional stations, facing inward toward their campaign band. No duplicate
+// Six regional stations, facing inward toward their campaign region. No duplicate
 // building ring around every node; these reservations also govern natural props.
 export const MAP_FACILITIES: MapFacility[] = [
-  { pos: { x: -33, y: -14 }, biome: "forest", yaw: -0.45, research: true },
-  { pos: { x: 32, y: -5.5 }, biome: "snow", yaw: 0.35, research: false },
-  { pos: { x: -33, y: 2 }, biome: "desert", yaw: -0.3, research: false },
-  { pos: { x: 33, y: 9 }, biome: "wasteland", yaw: 0.25, research: false },
-  { pos: { x: -33, y: 16 }, biome: "lava", yaw: -0.4, research: false },
-  { pos: { x: 33, y: 26 }, biome: "alien", yaw: 0.3, research: true },
+  { pos: { x: -37, y: -15 }, biome: "forest", yaw: -0.45, research: true },
+  { pos: { x: -36, y: 12 }, biome: "snow", yaw: 0.35, research: false },
+  { pos: { x: 1, y: 33 }, biome: "desert", yaw: -0.3, research: false },
+  { pos: { x: 7, y: -30 }, biome: "wasteland", yaw: 0.25, research: false },
+  { pos: { x: 36, y: -23 }, biome: "lava", yaw: -0.4, research: false },
+  { pos: { x: 36, y: 31 }, biome: "alien", yaw: 0.3, research: true },
 ].map((f) => ({ ...f, biome: f.biome as Biome, radius: 3 }));
 
 // Dirt access spurs tie the research stations into the campaign route.
 export const MAP_SERVICE_ROUTES = MAP_FACILITIES.map((f) => {
   const node = LEVELS.filter((l) => biomeForPos(l.nodePos) === f.biome).sort(
     (a, b) =>
-      Math.hypot(a.nodePos.x - f.pos.x, a.nodePos.y - f.pos.y) -
-      Math.hypot(b.nodePos.x - f.pos.x, b.nodePos.y - f.pos.y),
+      Math.hypot(mapLevelPosition(a.id).x - f.pos.x, mapLevelPosition(a.id).y - f.pos.y) -
+      Math.hypot(mapLevelPosition(b.id).x - f.pos.x, mapLevelPosition(b.id).y - f.pos.y),
   )[0];
-  return [f.pos, { x: (f.pos.x + node.nodePos.x) / 2, y: f.pos.y }, node.nodePos];
+  const pos = mapLevelPosition(node.id);
+  return [f.pos, { x: (f.pos.x + pos.x) / 2, y: f.pos.y }, pos];
 });
 export const MAP_LAKES: AuthoredLake[] = [
   {
     id: "atlas-forest-pool",
-    pos: { x: -11, y: -22 },
-    rx: 4.5,
+    pos: { x: -24, y: -31 },
+    rx: 3.2,
     ry: 2.6,
     rot: -0.3,
     material: "water",
   },
-  { id: "atlas-lava-pool", pos: { x: 33, y: 17 }, rx: 2.8, ry: 1.9, rot: 0.5, material: "lava" },
-  { id: "atlas-alien-pool", pos: { x: 4, y: 32 }, rx: 3.8, ry: 2.1, rot: -0.2, material: "toxic" },
+  { id: "atlas-lava-pool", pos: { x: 36, y: -7 }, rx: 2.3, ry: 1.9, rot: 0.5, material: "lava" },
+  { id: "atlas-alien-pool", pos: { x: 23, y: 34 }, rx: 2.4, ry: 2.1, rot: -0.2, material: "toxic" },
 ];
 export const mapShoreDistance = (x: number, y: number) =>
   Math.min(
@@ -138,8 +159,8 @@ export type MapHabitat = {
 function composeMapHabitats(): MapHabitat[] {
   const rand = mulberry32(60173);
   const candidates: { pos: Vec2; score: number }[] = [];
-  for (let y = -23; y <= 33; y += 3)
-    for (let x = -36; x <= 34; x += 3) {
+  for (let y = -34; y <= 37; y += 3)
+    for (let x = -40; x <= 40; x += 3) {
       const pos = { x: x + (rand() - 0.5) * 2, y: y + (rand() - 0.5) * 2 };
       const clear = Math.min(
         mapNodeDistance(pos.x, pos.y) - 3.2,

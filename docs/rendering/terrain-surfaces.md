@@ -55,7 +55,9 @@ those same curves. Grove species, understory and stones share deterministic
 anchors; progress only appends remains after the permanent layout is complete.
 
 `BiomeGround` keeps the editor's flat ground plane and concentrates vertices
-around the visible atlas. Its mineral/cover weights blend by habitat, with
+around the visible atlas. `worldMapLayout` places the campaign in six distinct
+regions without changing gameplay biome identities or save IDs. Warped distances
+to those outposts blend mineral/cover weights into irregular habitat contours, with
 leaf litter under forest groves, compacted access tracks and damp shores.
 `WorldMapSoilMaterial` uses the battlefield's bundled soil textures with
 stochastic sampling and rotated tangent normals; low quality omits normals.
@@ -65,7 +67,8 @@ Procedural prop and facility erasure keys remain position-derived.
 
 World-map discovery is derived from standard campaign stars, with no additional
 save fields. Unlocked outposts reveal a local clearing; cleared outposts widen
-it. Only discovered node labels and outgoing route segments mount. `WorldMapFog`
+it. Only discovered node labels mount. All route segments remain continuous beneath
+the fog so the feather, rather than a missing segment, controls visibility. `WorldMapFog`
 projects a single screen-covering quad onto the ground, so unseen scenery cannot
 protrude through the fog. Reveal history is transient and isolated per save slot;
 returning after a win eases newly earned radii outward, while resets clamp at once.

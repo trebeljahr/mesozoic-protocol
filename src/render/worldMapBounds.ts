@@ -9,8 +9,8 @@
 // click plane is sized to ±PAN_LIMIT plus a small pad — props placed
 // further out could never be revealed by any valid pan/zoom combination.
 
-export const CONTENT_W = 80;
-export const CONTENT_H = 64;
+export const CONTENT_W = 92;
+export const CONTENT_H = 78;
 
 export const PAN_LIMIT_X = CONTENT_W / 2 - 14;
 export const PAN_LIMIT_Z = CONTENT_H / 2 - 8;

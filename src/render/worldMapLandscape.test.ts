@@ -9,10 +9,12 @@ import {
   MAP_LAKES,
   MAP_ROUTES,
   mapBiome,
+  mapBiomeWeights,
   mapNodeDistance,
   mapRouteDistance,
   mapShoreDistance,
 } from "./worldMapLandscape";
+import { mapLevelPosition } from "./worldMapLayout";
 
 vi.mock("@react-three/drei", () => ({ useGLTF: { preload: () => {} } }));
 
@@ -36,15 +38,36 @@ describe("world map landscape", () => {
   });
   it("keeps every route attached to its level and preserves level habitat identity", () => {
     for (let i = 0; i < MAP_ROUTES.length; i++) {
-      expect(MAP_ROUTES[i][0]).toEqual(LEVELS[i].nodePos);
-      expect(MAP_ROUTES[i].at(-1)).toEqual(LEVELS[i + 1].nodePos);
+      expect(MAP_ROUTES[i][0]).toEqual(mapLevelPosition(LEVELS[i].id));
+      expect(MAP_ROUTES[i].at(-1)).toEqual(mapLevelPosition(LEVELS[i + 1].id));
     }
     for (const level of LEVELS)
-      expect(mapBiome(level.nodePos.x, level.nodePos.y)).toBe(biomeForPos(level.nodePos));
+      expect(mapBiome(mapLevelPosition(level.id).x, mapLevelPosition(level.id).y)).toBe(
+        biomeForPos(level.nodePos),
+      );
+  });
+  it("forms distinct regions across longitude and keeps blending normalized", () => {
+    expect(new Set([-30, -15, 0, 15, 30].map((x) => mapBiome(x, 10))).size).toBeGreaterThanOrEqual(
+      3,
+    );
+    for (let y = -32; y <= 36; y += 4)
+      for (let x = -40; x <= 40; x += 4) {
+        const weights = mapBiomeWeights(x, y);
+        expect(weights.every((w) => Number.isFinite(w) && w >= 0 && w <= 1)).toBe(true);
+        expect(weights.reduce((a, b) => a + b, 0)).toBeCloseTo(1);
+      }
+    for (const a of LEVELS)
+      for (const b of LEVELS) {
+        if (a.id === b.id) continue;
+        const p = mapLevelPosition(a.id),
+          q = mapLevelPosition(b.id);
+        expect(Math.hypot(p.x - q.x, p.y - q.y)).toBeGreaterThan(6);
+      }
   });
   it("gives every region natural formations and one clear facility reservation", () => {
     expect(MAP_FACILITIES).toHaveLength(6);
     for (const f of MAP_FACILITIES) {
+      expect(mapBiome(f.pos.x, f.pos.y)).toBe(f.biome);
       expect(mapNodeDistance(f.pos.x, f.pos.y)).toBeGreaterThan(f.radius + 3.1);
       expect(mapRouteDistance(f.pos.x, f.pos.y, false)).toBeGreaterThan(f.radius + 0.8);
       expect(MAP_HABITATS.some((h) => h.biome === f.biome)).toBe(true);

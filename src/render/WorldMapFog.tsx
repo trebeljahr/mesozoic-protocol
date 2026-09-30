@@ -7,6 +7,7 @@ import type { SlotId } from "../progress";
 import { useGame } from "../store";
 import { useMediaQuery } from "../ui/useMediaQuery";
 import { initialDiscovery, type MapDiscovery, mapDiscovery } from "./worldMapDiscovery";
+import { mapLevelPosition } from "./worldMapLayout";
 
 // Only animation history; actual discovery is always derived from this save's
 // stars. Slot separation and downward clamps prevent resets leaking old land.
@@ -34,7 +35,12 @@ export const WorldMapFog = () => {
         uCameraWorld: { value: new THREE.Matrix4() },
         uReveal: {
           value: LEVELS.map(
-            (level, i) => new THREE.Vector3(level.nodePos.x, level.nodePos.y, initial.radii[i]),
+            (level, i) =>
+              new THREE.Vector3(
+                mapLevelPosition(level.id).x,
+                mapLevelPosition(level.id).y,
+                initial.radii[i],
+              ),
           ),
         },
         uTime: { value: 0 },
@@ -73,10 +79,14 @@ export const WorldMapFog = () => {
           float distanceToClear=10000.0;
           for(int i=0;i<${LEVELS.length};i++) {
             if(uReveal[i].z>0.01) {
-              distanceToClear=min(distanceToClear,length(vGround-uReveal[i].xy)-uReveal[i].z);
+              float d=length(vGround-uReveal[i].xy)-uReveal[i].z;
+              float h=max(3.0-abs(distanceToClear-d),0.0)/3.0;
+              distanceToClear=min(distanceToClear,d)-h*h*0.75;
             }
           }
-          float opacity=smoothstep(-1.4,2.8,distanceToClear+(cloud-0.5)*2.0)*(1.0-uCleared);
+          // Wide atmospheric falloff; a smooth union avoids scalloped seams
+          // where neighboring discoveries meet.
+          float opacity=smoothstep(-3.0,7.0,distanceToClear+(cloud-0.5)*3.0)*(1.0-uCleared);
           gl_FragColor=vec4(mix(uDark,uLight,cloud*0.72),opacity);
           #include <colorspace_fragment>
         }`,

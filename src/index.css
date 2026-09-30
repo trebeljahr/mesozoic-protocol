@@ -2034,44 +2034,38 @@
     color: color-mix(in srgb, var(--color-orange), white 30%);
   }
 
-  /* Level node labels rendered via <Html>.
-   The drei <Html> wrapper div sits on top of the canvas — if it catches
-   pointer events, the 3D node underneath becomes unhoverable. Wrapping
-   with .map-label-wrap kills pointer events on the whole subtree. */
-  .map-label-wrap,
-  .map-label-wrap > * {
-    pointer-events: none;
-  }
+  /* One DOM anchor per outpost keeps number, stars and mode status aligned. */
+  .map-label-wrap, .map-label-wrap > * { pointer-events: none; }
   .map-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
     font-family: inherit;
-    font-size: var(--fs-lg);
+    font-size: 12px;
     font-weight: 700;
-    color: #ffffff;
-    background: rgba(10, 16, 24, 0.7);
-    border: 1px solid rgba(255, 214, 106, 0.35);
-    border-radius: 999px;
-    padding: 2px 8px;
-    text-align: center;
-    min-width: 22px;
-    pointer-events: none;
+    line-height: 1.2;
+    color: #fff;
+    background: rgba(10, 16, 24, 0.88);
+    border: 1px solid rgba(255, 214, 106, 0.3);
+    border-radius: 8px;
+    padding: 4px 7px;
+    min-width: 28px;
+    pointer-events: auto;
+    cursor: pointer;
     user-select: none;
     white-space: nowrap;
   }
-  .map-label.locked {
-    border-color: rgba(120, 160, 200, 0.25);
-    color: #8a98aa;
+  .map-label:focus-visible { outline: 2px solid #9aebff; outline-offset: 3px; }
+  .map-label.locked { color: #8a98aa; border-color: rgba(120,160,200,.25); }
+  .map-label-main, .map-label-modes, .map-label-modes > span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
   }
-
-  /* Challenge-mode badges. The wrapper itself stays click-through so the
-   level dome behind it remains hoverable; individual buttons re-enable
-   pointer events so they can open the mode picker. */
-  .map-badges-wrap,
-  .map-badges-wrap > * {
-    pointer-events: none;
-  }
-  .map-badges-wrap button {
-    pointer-events: auto;
-  }
+  .map-label-number { min-width: 14px; font-size: 12px; }
+  .map-label-modes { gap: 10px; }
+  .map-label-modes > span { gap: 2px; font-size: 9px; }
 
   .stars-row {
     display: inline-flex;
@@ -6456,3 +6450,39 @@
     100% { transform: translateX(280%); }
   }
 }
+
+/* The map owns the center; navigation shares one edge and one flow layout. */
+.world-map-footer {
+  position: absolute;
+  bottom: calc(16px + var(--safe-bottom, 0px));
+  left: calc(16px + var(--safe-left, 0px));
+  right: calc(16px + var(--safe-right, 0px));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+  z-index: 12;
+}
+.world-map-rd { flex-wrap: wrap; justify-content: flex-end; }
+.world-map-footer .world-map-utility-btn { min-height: 40px; flex: 0 0 auto; }
+.map-developer-tools { margin: 16px 0; border-top: 1px solid #35404b; padding-top: 12px; }
+.map-developer-tools summary { cursor: pointer; color: #9aa9b9; margin-bottom: 12px; }
+.map-developer-tools label { display: block; font-size: 12px; margin-bottom: 6px; }
+.map-developer-tools select { width: 100%; padding: 10px; margin-bottom: 10px; background: #151e29; color: #fff; }
+.map-developer-tools > div { margin-top: 10px; }
+.map-developer-tools [aria-pressed="true"] { border-color: #ffd66a; color: #ffd66a; }
+@media (max-width: 700px) {
+  .world-map-stats { top: calc(8px + var(--safe-top, 0px)); left: 8px; gap: 4px; }
+  .world-map-stats .world-map-meta { padding: 5px 7px; min-width: 70px; }
+  .world-map-footer { gap: 6px; align-items: flex-end; bottom: calc(8px + var(--safe-bottom, 0px)); left: 8px; right: 8px; }
+  .world-map-difficulty { align-self: flex-start; }
+  .world-map-rd { gap: 4px; }
+  .world-map-footer .world-map-utility-btn { font-size: 11px; padding: 6px 8px; min-height: 38px; }
+  .world-map-footer .world-map-utility-btn .text-sm { font-size: 10px; }
+}
+@media (hover: none) { .world-map-hover-card { display: none; } }
+.world-map-meta { white-space: nowrap; }
+.map-label:disabled { pointer-events: none; }
+
+@media (max-width: 560px) { .mode-picker-grid { grid-template-columns: 1fr; } }

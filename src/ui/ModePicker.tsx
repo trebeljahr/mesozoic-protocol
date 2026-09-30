@@ -99,7 +99,7 @@ export const ModePicker = () => {
           </button>
         </header>
 
-        <div className="grid grid-cols-3 gap-2 p-3 sm:gap-3 sm:p-5 overflow-y-auto">
+        <div className="mode-picker-grid grid grid-cols-3 gap-2 p-3 sm:gap-3 sm:p-5 overflow-y-auto">
           {LEVEL_MODES.map((mode) => {
             const defined = levelHasMode(level, mode);
             const unlocked = isModeUnlocked(progress, level.id, mode);
@@ -143,7 +143,7 @@ export const ModePicker = () => {
               >
                 {status && (
                   <span
-                    className={`absolute top-1 right-1 sm:top-2 sm:right-2 text-[9px] font-bold tracking-wide uppercase ${
+                    className={`self-start text-[9px] font-bold tracking-wide uppercase ${
                       status === "locked" ? "text-fg-dim" : accent.text
                     }`}
                   >
@@ -186,7 +186,7 @@ export const ModePicker = () => {
 };
 
 const Row = ({ label, value }: { label: string; value: string }) => (
-  <li className="flex justify-between">
+  <li className="flex justify-between gap-3">
     <span className="text-fg-muted">{label}</span>
     <span className="text-fg font-semibold">{value}</span>
   </li>
