@@ -1,4 +1,3 @@
-import { TERRAIN_EDGE } from "./terrainPalette";
 import { useGLTF } from "@react-three/drei";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useRef } from "react";
@@ -42,6 +41,7 @@ import { sampleStratifiedFeatures } from "../sim/worley";
 import { useGame } from "../store";
 import { setGroundedTransform } from "./groundedTransform";
 import { TerrainSurface } from "./TerrainSurface";
+import { TERRAIN_EDGE } from "./terrainPalette";
 
 const nearAnyPath = (paths: Vec2[][], x: number, y: number, clearance: number) => {
   const r2 = clearance * clearance;

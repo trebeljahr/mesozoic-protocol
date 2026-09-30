@@ -1,14 +1,13 @@
 import { Suspense, useEffect, useMemo } from "react";
 import { BIOME_STYLE } from "../biomes";
 import { useGame } from "../store";
-import { TERRAIN_EDGE } from "./terrainPalette";
 import { TerrainSoilMaterial } from "./TerrainSoilMaterial";
+import { TERRAIN_EDGE } from "./terrainPalette";
 import { buildTerrainSurface } from "./terrainSurfaceGeometry";
 
 export const TerrainSurface = () => {
   const paths = useGame((s) => s.world.paths);
   const flow = useGame((s) => s.world.flowFeatures);
-  const level = useGame((s) => s.world.levelId);
   const biome = useGame((s) => s.world.biome);
   const override = useGame((s) => s.world.overrideActive);
   const geometry = useMemo(() => {
@@ -27,7 +26,7 @@ export const TerrainSurface = () => {
           ? { wet: "#2a3039", gravel: "#51535b" }
           : undefined,
     );
-  }, [paths, flow, level, biome, override]);
+  }, [paths, flow, biome, override]);
   useEffect(() => () => geometry?.dispose(), [geometry]);
   if (!geometry) return null;
   return (

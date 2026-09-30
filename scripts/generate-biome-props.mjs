@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 globalThis.FileReader = class {
@@ -12,7 +13,8 @@ globalThis.FileReader = class {
 };
 const root = "public/models/natural";
 await fs.mkdir(root, { recursive: true });
-function rng(seed) {
+function rng(initialSeed) {
+  let seed = initialSeed;
   return () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
@@ -87,7 +89,15 @@ function rock(seed, color) {
     p.setXYZ(i, x * n, Math.max(0, (y * n + 0.87) * 0.65), z * n * (0.65 + (seed % 3) * 0.08));
   }
   g.computeVertexNormals();
-  return new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: 0.97 }));
+  const colors = [];
+  for (let i = 0; i < p.count; i++) {
+    const shade = new THREE.Color(color).multiplyScalar(
+      0.85 + Math.sin(p.getX(i) * 9 + p.getY(i) * 12 + phase) * 0.07,
+    );
+    colors.push(shade.r, shade.g, shade.b);
+  }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  return new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }));
 }
 async function save(name, model) {
   await fs.writeFile(
@@ -101,5 +111,23 @@ for (const [biome, color] of [
   ["Snow", "#89969e"],
   ["Waste", "#7d756b"],
 ])
-  for (let i = 1; i <= 5; i++) await save(`${biome}Rock${i}`, rock(i * 43, color));
+  for (let i = 1; i <= 5; i++) {
+    const sourceBiome = { Desert: "desert", Snow: "snow", Waste: "wasteland" }[biome];
+    const sourcePath = `public/models/biomes/${sourceBiome}/Rock${i}.glb`;
+    let source;
+    try {
+      source = await fs.readFile(sourcePath);
+    } catch {
+      source = await fs.readFile(`public/models/biomes/${sourceBiome}/Rock1.glb`);
+    }
+    const original = await new GLTFLoader().parseAsync(
+      source.buffer.slice(source.byteOffset, source.byteOffset + source.byteLength),
+      "",
+    );
+    const size = new THREE.Box3().setFromObject(original.scene).getSize(new THREE.Vector3());
+    const model = rock(i * 43, color);
+    const actual = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    model.geometry.scale(size.x / actual.x, size.y / actual.y, size.z / actual.z);
+    await save(`${biome}Rock${i}`, model);
+  }
 console.log("Generated four snow pines and fifteen weathered stones.");

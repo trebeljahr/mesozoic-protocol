@@ -63,6 +63,19 @@ try {
     },
     Number(process.env.REVIEW_LEVEL || 4),
   );
+  await page.waitForFunction(
+    async () => {
+      const resource = performance
+        .getEntriesByType("resource")
+        .find((e) => e.name.includes("/@react-three_fiber.js?"));
+      if (!resource) return false;
+      const fiber = await import(resource.name);
+      const root = fiber._roots.get(document.querySelector("canvas"))?.store.getState();
+      return root?.camera.isOrthographicCamera && !window.__game.getState().levelLoadPending;
+    },
+    null,
+    { timeout: 60000 },
+  );
   await page.waitForTimeout(5000);
   await page.evaluate(async () => {
     const f = await import(
@@ -85,6 +98,7 @@ try {
     position: window.__reviewRoot.camera.position.toArray(),
     zoom: window.__reviewRoot.camera.zoom,
     quality: navigator.hardwareConcurrency,
+    biome: window.__game.getState().world.biome,
   }));
   await page.screenshot({ path: out + "-start.png" });
   if (mode === "props") {
@@ -119,7 +133,7 @@ try {
     if (
       !log.treeRemoval.removed ||
       log.treeRemoval.selected !== target.id ||
-      log.treeRemoval.stoneCount !== 0
+      (log.camera.biome === "forest" && log.treeRemoval.stoneCount !== 0)
     )
       throw new Error("Prop selection/removal failed: " + JSON.stringify(log.treeRemoval));
   }

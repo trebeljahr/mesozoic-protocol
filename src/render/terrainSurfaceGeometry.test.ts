@@ -20,6 +20,31 @@ const paths = [
 ];
 
 describe("campaign terrain safety", () => {
+  it("covers dry biomes with finite material weights and a readable flat lane", () => {
+    const geometry = buildTerrainSurface(paths, [], [], "#cbd6dd", true);
+    const pos = geometry.getAttribute("position");
+    const weights = geometry.getAttribute("terrainSurface");
+    let laneVertices = 0;
+    let groundVertices = 0;
+    for (let i = 0; i < pos.count; i++) {
+      expect(pos.getY(i)).toBeCloseTo(0.003, 5);
+      expect(weights.getY(i)).toBe(0);
+      expect(weights.getX(i)).toBeGreaterThanOrEqual(0);
+      expect(weights.getX(i)).toBeLessThanOrEqual(1);
+      const distance = pathDistance(pos.getX(i), -pos.getZ(i), paths);
+      if (distance < PATH_WIDTH * 0.4) {
+        expect(weights.getX(i)).toBe(1);
+        laneVertices++;
+      }
+      if (distance > PATH_WIDTH * 2) {
+        expect(weights.getX(i)).toBe(0);
+        groundVertices++;
+      }
+    }
+    expect(laneVertices).toBeGreaterThan(100);
+    expect(groundVertices).toBeGreaterThan(1000);
+    geometry.dispose();
+  });
   it("treats connected river and pool as a union, without internal shores", () => {
     expect(fluidDistance(0, 0, rivers, lakes)).toBeLessThan(-1.5);
     expect(fluidDistance(2, 0, rivers, lakes)).toBeLessThanOrEqual(-1);

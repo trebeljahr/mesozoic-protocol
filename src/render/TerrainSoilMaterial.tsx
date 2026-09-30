@@ -2,8 +2,8 @@ import { useLoader, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { Biome } from "../biomes";
-import { TERRAIN_PALETTE } from "./terrainPalette";
 import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { TERRAIN_PALETTE } from "./terrainPalette";
 
 const LOW = GRAPHICS_QUALITY === "low";
 const ROOT = "/textures/terrain/";

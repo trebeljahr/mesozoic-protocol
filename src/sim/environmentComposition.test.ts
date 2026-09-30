@@ -8,7 +8,7 @@ import { levelLandscape } from "./levelLandscape";
 import { distPointToSegSq } from "./vec2";
 import { createWorld, TREE_CLEARANCE_MARGIN, TREE_FOOTPRINT, TREE_MIN_SPACING } from "./world";
 
-const levels = [1, 4, 5, 8, 10, 11, 13, 15, 18, 20, 23, 25, 28, 30];
+const levels = Array.from({ length: 30 }, (_, i) => i + 1);
 
 describe("composed playable scenery", () => {
   it("does not leave an obstacle from a disabled forest stone layer", () => {
