@@ -10,7 +10,7 @@ We used the existing Google Flow project and its game model ingredients for A/B/
 
 ## 2. Select a direction before making every size
 
-Review a small contact sheet, including a thumbnail-sized title test. Record both the selected version and rejected choices. Keep a separate visual target for game rendering if it differs from marketing artwork. Here B remains a game-art reference, while A5 is the approved marketing package.
+Review a small contact sheet, including a thumbnail-sized title test. Record both the selected version and rejected choices. Keep a separate visual target for game rendering if it differs from marketing artwork. Here the user subsequently clarified that the uploaded A5 package is also the primary in-game target; the earlier B preference is historical. Assess an integrated playable scene against the actual A5 capsules and hero before calling the visual pass complete.
 
 Use separate landscape, portrait and text-free panoramic masters. A portrait cropped from a wide scene often loses the character or title space. For palette corrections, pass the actual approved color reference as an image and distinguish color instructions from composition instructions. Our successful A5 prompts preserve A4 geometry while restoring original A colors.
 
