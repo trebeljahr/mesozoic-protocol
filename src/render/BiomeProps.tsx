@@ -1,12 +1,12 @@
 import { useGLTF } from "@react-three/drei";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import * as THREE from "three";
-import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { useGame } from "../store";
 import { DeadDinoInstancer, isDeadDinoUrl } from "./DeadDinos";
 import { collectMeshSource } from "./meshSource";
-import { type PropInstance, propPlan } from "./worldMapPropPlan";
+import { SceneryBatches } from "./SceneryBatches";
+import { mapPropTargetSize, type PropInstance, propPlan } from "./worldMapPropPlan";
 
 // Renders the world map's generated set-dressing. The layout itself lives
 // in worldMapPropPlan.ts; this module instances it, and in DEV applies the
@@ -31,7 +31,7 @@ const PropInstancer = ({ url, items }: { url: string; items: PropInstance[] }) =
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-    const target = TARGET_SIZE_BY_ROLE[classifyPropUrl(url)];
+    const target = mapPropTargetSize(url);
     return {
       normalizedScale: target / maxDim,
       centerX: center.x,
@@ -40,58 +40,29 @@ const PropInstancer = ({ url, items }: { url: string; items: PropInstance[] }) =
     };
   }, [scene, url]);
 
-  const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
-
-  // Initialize before the first frame: identity matrices expose the raw asset scale.
-  useLayoutEffect(() => {
-    if (!source) return;
-    const dummy = new THREE.Object3D();
-    // Pre-translation that recenters the geometry on its visible center
-    // before scale/rotate. Composing M = T(pos) · R(rotY) · S(s) · T(-center)
-    // reproduces the old wrapper-group + offset-child transform exactly.
+  const transform = useMemo(() => {
     const recenter = new THREE.Matrix4().makeTranslation(-centerX, 0, -centerZ);
-    for (const im of partRefs.current) {
-      if (!im) continue;
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const s = normalizedScale * it.scale;
-        dummy.position.set(it.pos.x, -minY * s, it.pos.z);
-        dummy.rotation.set(0, it.rotY, it.tiltZ ?? 0);
-        dummy.scale.setScalar(s);
-        dummy.updateMatrix();
-        dummy.matrix.multiply(recenter);
-        im.setMatrixAt(i, dummy.matrix);
-      }
-      im.count = items.length;
-      im.instanceMatrix.needsUpdate = true;
-    }
-  }, [items, source, normalizedScale, centerX, centerZ, minY]);
-
-  if (!source || items.length === 0) return null;
-
+    return (dummy: THREE.Object3D, it: PropInstance) => {
+      const scale = normalizedScale * it.scale;
+      dummy.position.set(it.pos.x, -minY * scale, it.pos.z);
+      dummy.rotation.set(0, it.rotY, it.tiltZ ?? 0);
+      dummy.scale.setScalar(scale);
+      dummy.updateMatrix();
+      dummy.matrix.multiply(recenter);
+    };
+  }, [normalizedScale, centerX, centerZ, minY]);
+  if (!source || !items.length) return null;
   return (
-    <group>
-      {source.parts.map((part, pi) => (
-        <instancedMesh
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts array is stable per scene
-          key={pi}
-          ref={(el: THREE.InstancedMesh | null) => {
-            partRefs.current[pi] = el;
-          }}
-          args={[part.geom, part.material, items.length]}
-          castShadow
-          receiveShadow
-          raycast={noRaycast}
-          // Per-instance matrices bake in world positions, so the default
-          // origin-centered bounding sphere frustum-culls the whole batch
-          // once the camera pans away from origin. Disable per-batch culling
-          // (matches OutpostClusters / InstancedGroup).
-          frustumCulled={false}
-        />
-      ))}
-    </group>
+    <SceneryBatches
+      parts={source.parts}
+      items={items}
+      position={mapPosition}
+      transform={transform}
+      raycast={noRaycast}
+    />
   );
 };
+const mapPosition = (item: PropInstance) => ({ x: item.pos.x, y: -item.pos.z });
 
 const NO_ERASED: ReadonlySet<string> = new Set();
 

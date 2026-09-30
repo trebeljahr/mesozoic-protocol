@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import type { AuthoredLake, River } from "../sim/types";
 import { Rivers } from "./Rivers";
+import { MAP_LAKES } from "./worldMapLandscape";
 
 // World-map rivers wrapper. The world map renders rivers in both dev and
 // prod, but the source differs:
@@ -23,18 +24,19 @@ const STORAGE_KEY = "mz:worldmapedit:v1";
 // One-shot read of the authored world-map water (rivers + lakes) from
 // localStorage. No subscribe — players don't edit the world map, so a
 // snapshot at mount is correct.
-const readStoredWater = (): { rivers: River[]; lakes: AuthoredLake[] } => {
-  if (typeof window === "undefined") return { rivers: [], lakes: [] };
+const readStoredWater = (): { rivers: River[]; lakes: AuthoredLake[]; override: boolean } => {
+  if (typeof window === "undefined") return { rivers: [], lakes: [], override: false };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { rivers: [], lakes: [] };
-    const parsed = JSON.parse(raw) as { rivers?: unknown; lakes?: unknown };
+    if (!raw) return { rivers: [], lakes: [], override: false };
+    const parsed = JSON.parse(raw) as { rivers?: unknown; lakes?: unknown; override?: unknown };
     return {
+      override: parsed.override === true,
       rivers: Array.isArray(parsed?.rivers) ? (parsed.rivers as River[]) : [],
       lakes: Array.isArray(parsed?.lakes) ? (parsed.lakes as AuthoredLake[]) : [],
     };
   } catch {
-    return { rivers: [], lakes: [] };
+    return { rivers: [], lakes: [], override: false };
   }
 };
 
@@ -53,8 +55,12 @@ export const WorldMapRivers = () => {
 const DevWorldMapRivers = () => {
   const version = useWorldMapEditor((s) => s.version);
   void version;
-  const { rivers, lakes } = useWorldMapEditor.getState().getCurrent();
-  return <Rivers rivers={rivers} lakes={lakes} />;
+  const { rivers, lakes, override } = useWorldMapEditor.getState().getCurrent();
+  const renderedLakes = useMemo(
+    () => (override ? lakes : [...MAP_LAKES, ...lakes]),
+    [override, lakes],
+  );
+  return <Rivers rivers={rivers} lakes={renderedLakes} />;
 };
 
 // Prod path: snapshot localStorage once on mount. Re-reads on window focus
@@ -67,5 +73,9 @@ const ProdWorldMapRivers = () => {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   }, []);
-  return <Rivers rivers={water.rivers} lakes={water.lakes} />;
+  const renderedLakes = useMemo(
+    () => (water.override ? water.lakes : [...MAP_LAKES, ...water.lakes]),
+    [water],
+  );
+  return <Rivers rivers={water.rivers} lakes={renderedLakes} />;
 };

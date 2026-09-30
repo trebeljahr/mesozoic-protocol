@@ -46,3 +46,19 @@ These captures are development evidence, not approved store media.
 Water foam uses the union shore distance and two animated noise scales. Broken
 patches gather near banks; lake/river joins have no interior foam outlines. Lava
 retains its crust treatment.
+
+## World map
+
+`worldMapLandscape.ts` owns campaign curves, facility access spurs, habitat
+masses and the three default pools. Ground shoulders and prop clearances sample
+those same curves. Grove species, understory and stones share deterministic
+anchors; progress only appends remains after the permanent layout is complete.
+
+`BiomeGround` keeps the editor's flat ground plane and concentrates vertices
+around the visible atlas. Its mineral/cover weights blend by habitat, with
+leaf litter under forest groves, compacted access tracks and damp shores.
+`WorldMapSoilMaterial` uses the battlefield's bundled soil textures with
+stochastic sampling and rotated tangent normals; low quality omits normals.
+The map uses `SceneryBatches` for bounded instancing and shares campaign
+`ResearchDeck`/`ServiceAnnex` architecture at six reserved regional sites.
+Procedural prop and facility erasure keys remain position-derived.

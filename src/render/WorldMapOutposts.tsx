@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
-import { OutpostClusters } from "./OutpostClusters";
+import { ResearchDeck, ServiceAnnex } from "./ContainmentCompound";
+import { MAP_FACILITIES, type MapFacility } from "./worldMapLandscape";
 import { outpostKey, worldMapOutposts } from "./worldMapOutpostPlan";
 
 // Renders the world map's generated colonies. Layout lives in
@@ -10,7 +11,7 @@ import { outpostKey, worldMapOutposts } from "./worldMapOutpostPlan";
 
 export const WorldMapOutposts = () => {
   if (import.meta.env.DEV) return <DevWorldMapOutposts />;
-  return <OutpostClusters clusters={worldMapOutposts()} />;
+  return <MapFacilities clusters={worldMapOutposts()} />;
 };
 
 const DevWorldMapOutposts = () => {
@@ -23,5 +24,38 @@ const DevWorldMapOutposts = () => {
     if (erased.size === 0) return worldMapOutposts();
     return worldMapOutposts().filter((o) => !erased.has(outpostKey(o.pos)));
   }, [version]);
-  return <OutpostClusters clusters={clusters} />;
+  return <MapFacilities clusters={clusters} />;
 };
+
+const MapFacilities = ({ clusters }: { clusters: MapFacility[] }) => (
+  <>
+    {clusters.map((cluster) => {
+      const index = MAP_FACILITIES.findIndex((f) => f.pos === cluster.pos);
+      const facility = MAP_FACILITIES[index];
+      if (!facility) return null;
+      const outpost = {
+        id: index + 1,
+        templateId: facility.research ? "map-research" : "map-annex",
+        pos: { x: 0, y: 0 },
+        yaw: 0,
+        scale: 1,
+        radius: 4.12,
+        interior: facility.research,
+      };
+      return (
+        <group
+          key={outpostKey(cluster.pos)}
+          position={[cluster.pos.x, 0, -cluster.pos.y]}
+          rotation={[0, cluster.yaw, 0]}
+          scale={0.55}
+        >
+          {facility.research ? (
+            <ResearchDeck outpost={outpost} biome={facility.biome} />
+          ) : (
+            <ServiceAnnex outpost={outpost} biome={facility.biome} />
+          )}
+        </group>
+      );
+    })}
+  </>
+);

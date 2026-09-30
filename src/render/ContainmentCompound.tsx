@@ -223,7 +223,13 @@ export const ResearchDeck = ({
 // The same restrained service architecture fits the two existing outer
 // colony reservations. Roofs sit outside the pilot rectangle; doors face the
 // compound, with tanks and crates grouped on an attached apron.
-const ServiceAnnex = ({ outpost, biome = "forest" }: { outpost: Outpost; biome?: Biome }) => {
+export const ServiceAnnex = ({
+  outpost,
+  biome = "forest",
+}: {
+  outpost: Outpost;
+  biome?: Biome;
+}) => {
   const west = outpost.pos.x < 0;
   return (
     <group

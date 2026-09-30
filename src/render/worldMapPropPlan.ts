@@ -1,12 +1,8 @@
-import { useGLTF } from "@react-three/drei";
-import { nanoid } from "nanoid";
 import * as THREE from "three";
 import {
   BIOME_LAYERS,
-  BIOME_STORY_PROPS,
   BIOME_TREE_URLS,
   type Biome,
-  biomeForPos,
   classifyPropUrl,
   TARGET_SIZE_BY_ROLE,
 } from "../biomes";
@@ -14,19 +10,14 @@ import { LEVELS } from "../levels";
 import { getStars, type ProgressData } from "../progress";
 import { mulberry32 } from "../sim/random";
 import { DEAD_DINO_FOOTPRINT, DEAD_DINO_URLS, deadDinoCollisionRadius } from "./DeadDinos";
-
-// Layout for the world map's generated set-dressing. Split out of
-// BiomeProps.tsx (which renders the plan) so the dev-only world-map editor
-// can read the same plan without importing the render layer — the editor
-// store needs it to know what generated decor a click / brush / placement
-// overlaps, and BiomeProps in turn reads the editor's erase mask, which
-// would otherwise be an import cycle.
-
-// World-map decoration. Keep it SPARSE so each level cluster reads as a
-// recognizable little vignette rather than a noisy pile: one robot landmark
-// where the biome supports it, a small trace prop, then trees/rocks, plus a
-// touch of biome foliage so the planet doesn't read as pure tech. Cleared
-// levels get a small bones trail — the player's "march of death".
+import {
+  MAP_FACILITIES,
+  MAP_HABITATS,
+  mapBiome,
+  mapNodeDistance,
+  mapRouteDistance,
+  mapShoreDistance,
+} from "./worldMapLandscape";
 
 export type PropInstance = {
   id: string;
@@ -35,352 +26,173 @@ export type PropInstance = {
   rotY: number;
   scale: number;
   tiltZ?: number;
-  // Stable position-derived id, the same shape the level editor uses for
-  // its seeded decor (see proceduralPosKey). `id` is a fresh nanoid on
-  // every plan rebuild, so it can't address an item across reloads — this
-  // can, which is what the editor's erased-procedural mask stores.
   key: string;
 };
+const treeModels = new Set(Object.values(BIOME_TREE_URLS).flat());
+// SnowPine assets do not contain "tree" in their filename. Use the biome
+// catalog as authority so their crowns do not shrink to cosmetic scale.
+export const mapPropTargetSize = (url: string) =>
+  treeModels.has(url) ? TARGET_SIZE_BY_ROLE.tree : TARGET_SIZE_BY_ROLE[classifyPropUrl(url)];
+export const mapPropRadius = (url: string, scale: number) =>
+  DEAD_DINO_FOOTPRINT[url] !== undefined
+    ? deadDinoCollisionRadius(url, scale)
+    : mapPropTargetSize(url) * scale * 0.5;
 
-type PropRoleBucket = {
-  urls: string[];
-  count: number;
-  minScale: number;
-  maxScale: number;
-  minRadius: number;
-  maxRadius: number;
-  // Extra spacing slack on top of the visible-silhouette radius. Larger
-  // buckets read better with more breathing room.
-  pad?: number;
-  // Optional Z-axis tilt range so dead-dino bones can lie flat instead of
-  // standing upright like the rest of the deco.
-  tiltMin?: number;
-  tiltMax?: number;
-};
+const family = (biome: Biome, pattern: RegExp) => [
+  ...new Set(BIOME_LAYERS[biome].flatMap((l) => l.urls).filter((u) => pattern.test(u))),
+];
+type Reservation = { x: number; y: number; radius: number };
+const baseReservations: Reservation[] = [];
+const basePlan: Record<string, PropInstance[]> = {};
 
-// Robot structure per biome — modular sci-fi research outposts. Every level
-// node anchors on a substantial building (hangar / structure / rocket) so
-// the world map reads as a network of high-tech bases on a hostile planet,
-// not a string of pirate camps. Wooden landmarks (Tent / House / Cabin /
-// Sawmill) are intentionally excluded across all biomes; they still appear
-// inside levels as set-dressing, but at the world map's tilt + zoom they
-// fought the sci-fi theme.
-const BIOME_LANDMARKS: Record<Biome, string[]> = {
-  forest: ["/models/scifi/structure_detailed.glb", "/models/scifi/hangar_smallA.glb"],
-  desert: ["/models/scifi/hangar_smallA.glb", "/models/scifi/hangar_largeA.glb"],
-  snow: ["/models/scifi/hangar_smallA.glb", "/models/scifi/hangar_largeA.glb"],
-  wasteland: ["/models/scifi/structure_diagonal.glb", "/models/scifi/structure_closed.glb"],
-  lava: ["/models/scifi/structure_detailed.glb", "/models/scifi/rocket_baseA.glb"],
-  alien: ["/models/scifi/hangar_roundA.glb", "/models/scifi/hangar_smallB.glb"],
-};
-
-// Modular accent — a smaller secondary sci-fi piece dropped next to each
-// landmark so each node reads as a small base (anchor + outbuilding) rather
-// than a single isolated building. Picked so the silhouette differs from
-// the anchor at a glance — closed structures, large dishes, chimneys, or
-// crashed craft. Models picked from the building-role set so they
-// normalize to the same robot scale as the anchor.
-const BIOME_MODULES: Record<Biome, string[]> = {
-  forest: ["/models/scifi/structure_closed.glb", "/models/scifi/satelliteDish_large.glb"],
-  desert: ["/models/scifi/craft_speederA.glb", "/models/scifi/satelliteDish_detailed.glb"],
-  snow: ["/models/scifi/satelliteDish_large.glb", "/models/scifi/chimney_detailed.glb"],
-  wasteland: ["/models/scifi/craft_speederA.glb", "/models/scifi/structure_closed.glb"],
-  lava: ["/models/scifi/chimney_detailed.glb", "/models/scifi/satelliteDish_large.glb"],
-  alien: ["/models/scifi/satelliteDish_large.glb", "/models/scifi/structure_closed.glb"],
-};
-
-const rockUrls = (biome: Biome): string[] =>
-  BIOME_LAYERS[biome]
-    .flatMap((l) => l.urls)
-    .filter((u) => /rock/i.test(u) || /crystal_(?:large|medium)/i.test(u));
-
-const WOODEN_RX = /tent|house|cabin|sawmill|barrel\.glb|chest|torch/i;
-const storyUrls = (biome: Biome): string[] =>
-  BIOME_STORY_PROPS[biome].filter((u) => !WOODEN_RX.test(u));
-
-// Biome-specific foliage / ground deco — bushes, plants, flowers,
-// mushrooms drawn from each biome's BIOME_LAYERS. Pulled separately from
-// rocks so the world-map clusters read as more than "tech + bare ground".
-const FOLIAGE_RX = /bush|bushflowers|mushroom|plant|grass/i;
-const foliageUrls = (biome: Biome): string[] => {
-  const seen = new Set<string>();
-  for (const l of BIOME_LAYERS[biome]) {
-    for (const u of l.urls) {
-      if (FOLIAGE_RX.test(u)) seen.add(u);
-    }
-  }
-  return Array.from(seen);
-};
-
-// Per-level cluster geometry. Props land on composition slots outside
-// the clean node bubble.
-const CLUSTER_R = 7.6;
-// Visible node footprint — hit cylinder (1.95) + outer hover ring (1.95) +
-// south-side label/stars slack. Was 2.4; bumped to 3.1 because the HTML
-// label and star row extend ~1.85 + label height south of the bubble, so
-// any prop landing on that side could visually overlap the label even with
-// the bbox-circle check clearing the hit cylinder.
-const NODE_VISIBLE_R = 3.1;
-// Center-to-center spacing slack between props on top of summed radii.
-const MIN_GAP = 1.45;
-// Extra gap between a prop's edge and the node's visible footprint.
-const NODE_PROP_GAP = 0.55;
-const MAX_RETRIES = 32;
-// Six evenly-ish-spaced angular slots so each role gets a clean home and
-// the cluster reads as a deliberate composition. Anchor at slot 0, module
-// on the opposite side, foliage / bones tucked between trees and rocks.
-const COMPOSITION_SLOTS = [0, Math.PI, 1.95, -1.95, Math.PI * 0.5, -Math.PI * 0.5];
-
-const NODE_POSITIONS: { x: number; z: number }[] = LEVELS.map((l) => ({
-  x: l.nodePos.x,
-  z: -l.nodePos.y,
-}));
-
-// Visible half-radius of a prop URL at a given placement scale. Derived
-// from `TARGET_SIZE_BY_ROLE` (the same target the renderer normalizes
-// each GLB's max-dim to) so the overlap check matches the rendered
-// silhouette instead of the per-bucket clearance heuristic — that was
-// the source of node↔prop overlaps when a role's clearance underestimated
-// the visible mesh (e.g. story buckets containing a tent-classified-as-
-// building that rendered ~2x the claimed radius).
-const visibleRadius = (url: string, scale: number): number => {
-  // Dead-dino carcasses have their own per-URL footprint because the
-  // DeadDinoInstancer normalizes them to that size rather than to a
-  // TARGET_SIZE_BY_ROLE bucket (skinned mesh + custom death pose).
-  const dino = DEAD_DINO_FOOTPRINT[url];
-  if (dino !== undefined) return deadDinoCollisionRadius(url, scale);
-  const role = classifyPropUrl(url);
-  return (TARGET_SIZE_BY_ROLE[role] * scale) / 2;
-};
-
-const buildPropPlan = (progress: ProgressData) => {
-  const perUrl: Record<string, PropInstance[]> = {};
-  const placed: { x: number; z: number; r: number }[] = [];
-
-  const tryPlace = (
-    center: { x: number; z: number },
-    bucket: PropRoleBucket,
-    rand: () => number,
-    baseAngle: number,
-    slotIndex: number,
-  ): PropInstance | null => {
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      const slot = COMPOSITION_SLOTS[slotIndex % COMPOSITION_SLOTS.length];
-      const a = baseAngle + slot + (rand() - 0.5) * 0.55 + attempt * 0.17;
-      const r = bucket.minRadius + rand() * (bucket.maxRadius - bucket.minRadius);
-      const x = center.x + Math.cos(a) * r;
-      const z = center.z + Math.sin(a) * r;
-      const scale = bucket.minScale + rand() * (bucket.maxScale - bucket.minScale);
-      // Pick the URL up front so the visible-silhouette radius matches
-      // the prop that will actually render at this position.
-      const url = bucket.urls[Math.floor(rand() * bucket.urls.length)];
-      const pad = bucket.pad ?? 0;
-      const radius = visibleRadius(url, scale) + pad;
-
-      let bad = false;
-      // Edge-of-prop → edge-of-node check. Uses the rendered silhouette
-      // radius so the bubble + label/stars footprint can never overlap
-      // ANY node, not just this one.
-      const minNodeDist = radius + NODE_VISIBLE_R + NODE_PROP_GAP;
-      const minNodeDistSq = minNodeDist * minNodeDist;
-      for (const n of NODE_POSITIONS) {
-        const dx = x - n.x;
-        const dz = z - n.z;
-        if (dx * dx + dz * dz < minNodeDistSq) {
-          bad = true;
-          break;
-        }
-      }
-      if (bad) continue;
-
-      for (const p of placed) {
-        const dx = x - p.x;
-        const dz = z - p.z;
-        const minDist = radius + p.r + MIN_GAP;
-        if (dx * dx + dz * dz < minDist * minDist) {
-          bad = true;
-          break;
-        }
-      }
-      if (bad) continue;
-
-      placed.push({ x, z, r: radius });
-      const tilt =
-        bucket.tiltMin !== undefined && bucket.tiltMax !== undefined
-          ? bucket.tiltMin + rand() * (bucket.tiltMax - bucket.tiltMin)
-          : undefined;
-      return {
-        id: nanoid(),
-        url,
-        pos: new THREE.Vector3(x, 0, z),
-        rotY: rand() * Math.PI * 2,
-        scale,
-        tiltZ: tilt,
-        key: `${x},${z}`,
-      };
-    }
-    return null;
+// Clear rendered silhouettes, not just trunks. Small undergrowth can tuck into
+// a canopy, while crowns retain separate silhouettes and routes remain open.
+function place(
+  plan: Record<string, PropInstance[]>,
+  placed: Reservation[],
+  url: string,
+  x: number,
+  y: number,
+  scale: number,
+  yaw: number,
+  understory = false,
+) {
+  const radius = mapPropRadius(url, scale);
+  if (mapShoreDistance(x, y) < radius + 0.4) return false;
+  if (mapNodeDistance(x, y) < 3.15 + radius || mapRouteDistance(x, y) < 0.8 + radius) return false;
+  if (MAP_FACILITIES.some((f) => Math.hypot(f.pos.x - x, f.pos.y - y) < f.radius + radius + 0.3))
+    return false;
+  const footprint = radius * (understory ? 0.42 : 0.8);
+  if (placed.some((p) => Math.hypot(p.x - x, p.y - y) < p.radius + footprint + 0.1)) return false;
+  placed.push({ x, y, radius: footprint });
+  const key = `${x},${-y}`;
+  const item: PropInstance = {
+    id: key,
+    key,
+    url,
+    pos: new THREE.Vector3(x, 0, -y),
+    scale,
+    rotY: yaw,
   };
-
-  for (const lvl of LEVELS) {
-    const biome: Biome = biomeForPos(lvl.nodePos);
-    const rand = mulberry32(lvl.id * 9973 + 17);
-    const center = { x: lvl.nodePos.x, z: -lvl.nodePos.y };
-    const landmarkUrls = BIOME_LANDMARKS[biome] ?? [];
-    const moduleUrls = BIOME_MODULES[biome] ?? [];
-    const traceUrls = storyUrls(biome);
-    const foliage = foliageUrls(biome);
-    const baseAngle = rand() * Math.PI * 2;
-    const hasLandmark = landmarkUrls.length > 0;
-    const cleared = getStars(progress, lvl.id) > 0;
-
-    const landmarkBucket: PropRoleBucket = {
-      urls: landmarkUrls,
-      count: 1,
-      minScale: 0.95,
-      maxScale: 1.1,
-      // Inner edge accounts for landmark half-radius (~1.55) + node
-      // visible (3.1) + gap (0.55) = ~5.2 minimum. 5.4 gives slack so
-      // retries usually land cleanly.
-      minRadius: 5.4,
-      maxRadius: 6.1,
-      pad: 0.15,
-    };
-    const moduleBucket: PropRoleBucket = {
-      urls: moduleUrls,
-      count: hasLandmark ? 1 : 0,
-      minScale: 0.85,
-      maxScale: 1.0,
-      minRadius: 5.2,
-      maxRadius: 5.9,
-      pad: 0.1,
-    };
-    const treeBucket: PropRoleBucket = {
-      urls: BIOME_TREE_URLS[biome],
-      count: hasLandmark ? 1 : 2,
-      minScale: 0.95,
-      maxScale: 1.1,
-      minRadius: 5.3,
-      maxRadius: CLUSTER_R,
-      pad: 0.2,
-    };
-    const storyBucket: PropRoleBucket = {
-      urls: traceUrls,
-      count: 1,
-      minScale: 0.85,
-      maxScale: 1.1,
-      minRadius: 5.1,
-      maxRadius: 6.0,
-      pad: 0.1,
-    };
-    const rockBucket: PropRoleBucket = {
-      urls: rockUrls(biome),
-      count: 1,
-      minScale: 0.95,
-      maxScale: 1.1,
-      minRadius: 5.0,
-      maxRadius: CLUSTER_R,
-      pad: 0.1,
-    };
-    // Foliage tucks in close to the cluster ring — small bushes/flowers/
-    // mushrooms/plants drawn from the biome's own scatter layers so each
-    // node reads as planted in a biome, not just on a tech pad. Slightly
-    // larger than the in-level scatter (which authors at 0.18–0.55) so
-    // the silhouettes register at the world map's tilted ortho.
-    const foliageBucket: PropRoleBucket = {
-      urls: foliage,
-      count: foliage.length > 0 ? 2 : 0,
-      minScale: 0.6,
-      maxScale: 1.0,
-      minRadius: 5.0,
-      maxRadius: CLUSTER_R,
-      pad: 0.05,
-    };
-    // Dead dinos — only near cleared levels. The player's march of
-    // death leaves 1–2 frozen carcasses per conquered node so the trail
-    // reads as a few fallen along the way, not a graveyard.
-    // Count is drawn from a SEPARATE stream so toggling cleared state
-    // (e.g. debug lock/unlock) never advances the shared `rand` and so
-    // never reshuffles the surrounding trees/rocks/foliage placement.
-    const deadRand = mulberry32(lvl.id * 6151 + 53);
-    const deadCount = cleared ? (deadRand() < 0.5 ? 2 : 1) : 0;
-    const deadDinoBucket: PropRoleBucket = {
-      urls: DEAD_DINO_URLS,
-      count: deadCount,
-      minScale: 0.9,
-      maxScale: 1.1,
-      minRadius: 5.3,
-      maxRadius: CLUSTER_R,
-      pad: 0.15,
-    };
-
-    let slotIndex = 0;
-    for (const bucket of [
-      landmarkBucket,
-      moduleBucket,
-      storyBucket,
-      treeBucket,
-      foliageBucket,
-      rockBucket,
-      deadDinoBucket,
-    ]) {
-      if (bucket.urls.length === 0 || bucket.count === 0) continue;
-      for (let i = 0; i < bucket.count; i++) {
-        const inst = tryPlace(center, bucket, rand, baseAngle, slotIndex++);
-        if (!inst) continue;
-        const existing = perUrl[inst.url] ?? [];
-        existing.push(inst);
-        perUrl[inst.url] = existing;
-      }
-    }
-  }
-  return perUrl;
-};
-// Memoised plan, keyed on the progress object's identity. The world-map
-// editor asks for the plan on every placement / brush step to know what
-// generated decor a new prop overlaps, and rebuilding 50 level clusters
-// (each with retry loops) per step was the one hot path here.
-let planCacheKey: ProgressData | null = null;
-let planCache: Record<string, PropInstance[]> = {};
-
-export const propPlan = (progress: ProgressData): Record<string, PropInstance[]> => {
-  if (planCacheKey !== progress) {
-    planCache = buildPropPlan(progress);
-    planCacheKey = progress;
-  }
-  return planCache;
-};
-
-// Flattened view of the world map's generated decor for the dev editor:
-// footprint + the stable key the erased-procedural mask addresses items by.
-// Coordinates are editor-space (y = -z), matching PlacedProp.pos.
-export const worldMapProceduralItems = (
-  progress: ProgressData,
-): { x: number; y: number; r: number; key: string }[] => {
-  const items: { x: number; y: number; r: number; key: string }[] = [];
-  for (const list of Object.values(propPlan(progress))) {
-    for (const it of list) {
-      items.push({
-        x: it.pos.x,
-        y: -it.pos.z,
-        r: visibleRadius(it.url, it.scale),
-        key: it.key,
-      });
-    }
-  }
-  return items;
-};
-
-// Preload URLs actually used by the world map.
-const allUrls = new Set<string>();
-for (const lvl of LEVELS) {
-  const biome: Biome = biomeForPos(lvl.nodePos);
-  for (const u of rockUrls(biome)) allUrls.add(u);
-  for (const u of storyUrls(biome)) allUrls.add(u);
-  for (const u of foliageUrls(biome)) allUrls.add(u);
-  for (const u of BIOME_TREE_URLS[biome]) allUrls.add(u);
-  for (const u of BIOME_LANDMARKS[biome] ?? []) allUrls.add(u);
-  for (const u of BIOME_MODULES[biome] ?? []) allUrls.add(u);
+  const bucket = plan[url] ?? [];
+  bucket.push(item);
+  plan[url] = bucket;
+  return true;
 }
-for (const u of DEAD_DINO_URLS) allUrls.add(u);
-for (const u of allUrls) useGLTF.preload(u);
+
+// Whole habitats share species, direction and scale hierarchy. The natural
+// layer gets first claim on the land; facilities have explicit reservations.
+for (const mass of MAP_HABITATS) {
+  const rand = mulberry32(mass.seed);
+  const trees = BIOME_TREE_URLS[mass.biome];
+  const rocks = family(
+    mass.biome,
+    mass.biome === "alien" ? /rock|crystal_(?:large|medium)|meteor/i : /rock|meteor/i,
+  );
+  const bushes = family(mass.biome, /bush|plant|mushroom/i);
+  const grass = family(mass.biome, /grass/i);
+  const main = mass.kind === "grove" ? trees : rocks;
+  const species = Math.floor(rand() * Math.max(1, main.length));
+  const c = Math.cos(mass.yaw),
+    s = Math.sin(mass.yaw);
+  const scatter = (
+    urls: string[],
+    count: number,
+    lo: number,
+    hi: number,
+    spread: number,
+    under = false,
+  ) => {
+    if (!urls.length) return;
+    let accepted = 0;
+    for (let attempt = 0; attempt < count * 18 && accepted < count; attempt++) {
+      const a = rand() * Math.PI * 2;
+      const r = Math.sqrt(rand()) * mass.radius * spread;
+      const u = Math.cos(a) * r,
+        v = Math.sin(a) * r * 0.7;
+      const x = mass.pos.x + u * c - v * s,
+        y = mass.pos.y + u * s + v * c;
+      if (mapBiome(x, y) !== mass.biome) continue;
+      const scale = lo + rand() * (hi - lo);
+      const url = urls[(species + (accepted % Math.min(2, urls.length))) % urls.length];
+      if (
+        place(
+          basePlan,
+          baseReservations,
+          url,
+          x,
+          y,
+          scale,
+          mass.yaw + (rand() - 0.5) * (mass.kind === "formation" ? 0.45 : 4),
+          under,
+        )
+      )
+        accepted++;
+    }
+  };
+  // Tall elder + smaller companions; boulders are formations, not tiny gravel.
+  scatter(
+    main,
+    mass.kind === "grove" ? (mass.biome === "alien" ? 4 : 7) : 5,
+    mass.kind === "grove" ? 0.85 : 1.7,
+    mass.kind === "grove"
+      ? mass.biome === "alien"
+        ? 1.15
+        : 1.65
+      : mass.biome === "alien"
+        ? 2.5
+        : 3.8,
+    1,
+  );
+  scatter(bushes, mass.kind === "grove" ? 8 : 2, 0.65, 1.4, 1.2, true);
+  scatter(rocks, 5, 0.5, 1.1, 1.25, true);
+  scatter(grass, mass.kind === "grove" ? 18 : 5, 0.8, 1.5, 1.25, true);
+}
+
+// Progress only appends remains after the immutable landscape is complete.
+// Clearing an early level can never reshuffle scenery beside a later level.
+const buildPropPlan = (progress: ProgressData) => {
+  const plan = Object.fromEntries(
+    Object.entries(basePlan).map(([url, items]) => [url, [...items]]),
+  );
+  const placed = [...baseReservations];
+  for (const level of LEVELS) {
+    if (!getStars(progress, level.id)) continue;
+    const rand = mulberry32(level.id * 6151 + 53);
+    for (let i = 0; i < 24; i++) {
+      const a = rand() * Math.PI * 2,
+        r = 4.8 + rand() * 2;
+      if (
+        place(
+          plan,
+          placed,
+          DEAD_DINO_URLS[level.id % DEAD_DINO_URLS.length],
+          level.nodePos.x + Math.cos(a) * r,
+          level.nodePos.y + Math.sin(a) * r,
+          0.65,
+          rand() * Math.PI * 2,
+        )
+      )
+        break;
+    }
+  }
+  return plan;
+};
+let cacheKey: ProgressData | null = null;
+let cache: Record<string, PropInstance[]> = {};
+export const propPlan = (progress: ProgressData) => {
+  if (cacheKey !== progress) {
+    cache = buildPropPlan(progress);
+    cacheKey = progress;
+  }
+  return cache;
+};
+export const worldMapProceduralItems = (progress: ProgressData) =>
+  Object.values(propPlan(progress)).flatMap((items) =>
+    items.map((it) => ({
+      x: it.pos.x,
+      y: -it.pos.z,
+      r: mapPropRadius(it.url, it.scale),
+      key: it.key,
+    })),
+  );

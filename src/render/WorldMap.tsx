@@ -12,6 +12,7 @@ import { useGame } from "../store";
 import { useIsMobile } from "../ui/useMediaQuery";
 import { BiomeGround } from "./BiomeGround";
 import { BiomeProps } from "./BiomeProps";
+import { GRAPHICS_QUALITY } from "./effectsTunables";
 import { LevelNode } from "./LevelNode";
 import { MapRoute } from "./MapRoute";
 import { MapOrbitControls } from "./useMapGestures";
@@ -33,10 +34,9 @@ import {
 // CONTENT_*/GROUND_*/PAN_LIMIT_* live in worldMapBounds.ts so the dev-only
 // world-map editor can re-use them without importing this whole module.
 
-// Camera tilt: forward = (0, -0.935, -0.354) → the screen-up axis
-// projects onto the ground plane stretched by 1/0.935. So the visible
-// Z extent on the ground at zoom Z is (height/Z) / 0.935.
-const TILT_GROUND_FACTOR = 1 / 0.935;
+// A shallower atlas view shows tree crowns and facility faces. Keep the
+// ground projection factor paired with the 30-high / 18-back camera offset.
+const TILT_GROUND_FACTOR = Math.hypot(30, 18) / 30;
 
 // Hard ceiling on zoom-in. Past this, single nodes overflow the viewport
 // and the labels become unreadable from oversampling.
@@ -61,10 +61,12 @@ const MIN_FOCUS_HALF_Z = 6;
 // screen center. Positive = node sits below midline.
 const MOBILE_Y_OFFSET_FRAC = 0.18;
 // Camera-to-target Z offset baked into the OrthographicCamera position
-// (0, 30, 11.36). Preserved when shifting target so the look angle stays
+// (0, 30, 18). Preserved when shifting target so the look angle stays
 // fixed.
-const CAMERA_Z_OFFSET = 11.36;
+const CAMERA_Z_OFFSET = 18;
 const CAMERA_Y = 30;
+// Centre the complete campaign span, including the northern alien region.
+const ATLAS_TARGET_Z = -5;
 
 const computeFitZoom = (width: number, height: number): number => {
   const halfX = CONTENT_W / 2;
@@ -147,7 +149,7 @@ const MapCamera = ({ fitZoom, focus }: { fitZoom: number; focus: CameraFocus | n
     const cam = cameraRef.current;
     if (!cam) return;
     const targetX = focus?.targetX ?? 0;
-    const targetZ = focus?.targetZ ?? 0;
+    const targetZ = focus?.targetZ ?? ATLAS_TARGET_Z;
     cam.position.set(targetX, CAMERA_Y, targetZ + CAMERA_Z_OFFSET);
     cam.zoom = focus?.zoom ?? fitZoom;
     cam.updateProjectionMatrix();
@@ -156,7 +158,11 @@ const MapCamera = ({ fitZoom, focus }: { fitZoom: number; focus: CameraFocus | n
     <OrthographicCamera
       ref={cameraRef}
       makeDefault
-      position={[focus?.targetX ?? 0, CAMERA_Y, (focus?.targetZ ?? 0) + CAMERA_Z_OFFSET]}
+      position={[
+        focus?.targetX ?? 0,
+        CAMERA_Y,
+        (focus?.targetZ ?? ATLAS_TARGET_Z) + CAMERA_Z_OFFSET,
+      ]}
       zoom={focus?.zoom ?? fitZoom}
       near={0.1}
       far={200}
@@ -172,7 +178,7 @@ const MapFocusTarget = ({ focus }: { focus: CameraFocus | null }) => {
   useEffect(() => {
     if (!controls) return;
     const targetX = focus?.targetX ?? 0;
-    const targetZ = focus?.targetZ ?? 0;
+    const targetZ = focus?.targetZ ?? ATLAS_TARGET_Z;
     controls.target.set(targetX, 0, targetZ);
     controls.update();
   }, [controls, focus]);
@@ -216,22 +222,6 @@ export const WorldMapScene = () => {
       <color attach="background" args={[BG]} />
       <fog attach="fog" args={[FOG, 80, 160]} />
 
-      {/*
-      Camera position determines the look angle once OrbitControls takes
-      over (OrbitControls always re-orients the camera toward its target,
-      which overrides the `rotation` prop). The target sits at (0,0,0) and
-      the camera offset (0, 30, 11.36) gives forward = (0, -0.935, -0.354)
-      — i.e. ~21° below vertical. A shallower angle (the previous z=22)
-      caused the screen-space "up" vector to align too closely with world
-      +Y, so the bottom rays of tall (portrait-ish) canvases started below
-      the ground plane and revealed BG along the south horizon.
-
-      Initial zoom is computed from the viewport so phones don't open
-      half-cropped. Used as both the camera's starting zoom and the
-      OrbitControls minZoom (zooming out further would expose BG). On
-      mobile the camera additionally offsets to center on the player's
-      current level — see computeMobileFocus.
-    */}
       <MapCamera fitZoom={fitZoom} focus={focus} />
 
       <MapOrbitControls
@@ -260,13 +250,14 @@ export const WorldMapScene = () => {
         intensity={2.8}
         color="#ffe8cf"
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
+        shadow-mapSize-height={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
         shadow-camera-left={-CONTENT_H}
         shadow-camera-right={CONTENT_H}
         shadow-camera-top={CONTENT_H}
         shadow-camera-bottom={-CONTENT_H}
-        shadow-bias={-0.0005}
+        shadow-bias={-0.00015}
+        shadow-normalBias={0.025}
       />
       <hemisphereLight args={[HEMI_TOP, HEMI_BOTTOM, 0.5]} />
 

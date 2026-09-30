@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { LEVELS } from "../levels";
 import { isLevelUnlocked } from "../progress";
 import { useGame } from "../store";
+import { MAP_ROUTES } from "./worldMapLandscape";
 
 export const MapRoute = () => {
   const progress = useGame((s) => s.progress);
@@ -19,19 +20,8 @@ export const MapRoute = () => {
       const bothUnlocked = isLevelUnlocked(a.id, progress) && isLevelUnlocked(b.id, progress);
       const yOutline = 0.02;
       const yFill = 0.025;
-      const from = new THREE.Vector3(a.nodePos.x, 0, -a.nodePos.y);
-      const to = new THREE.Vector3(b.nodePos.x, 0, -b.nodePos.y);
-      const delta = to.clone().sub(from);
-      const bend = new THREE.Vector3(-delta.z, 0, delta.x)
-        .normalize()
-        .multiplyScalar(Math.min(1.1, delta.length() * 0.1) * (i % 2 ? 1 : -1));
-      const curve = new THREE.QuadraticBezierCurve3(
-        from,
-        from.clone().lerp(to, 0.5).add(bend),
-        to,
-      ).getPoints(24);
-      const outline = curve.map((p) => new THREE.Vector3(p.x, yOutline, p.z));
-      const fill = curve.map((p) => new THREE.Vector3(p.x, yFill, p.z));
+      const outline = MAP_ROUTES[i].map((p) => new THREE.Vector3(p.x, yOutline, -p.y));
+      const fill = MAP_ROUTES[i].map((p) => new THREE.Vector3(p.x, yFill, -p.y));
       if (bothUnlocked) {
         reached.push({ id: a.id, outline, fill });
       } else {
