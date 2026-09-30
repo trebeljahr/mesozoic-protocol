@@ -16,6 +16,7 @@ import { EasterEggs } from "./EasterEggs";
 import { EditorEasterEggMarkers } from "./EditorEasterEggMarkers";
 import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
+import { GRAPHICS_QUALITY } from "./effectsTunables";
 import { FlowFeatures } from "./FlowFeatures";
 import { Ground } from "./Ground";
 import { HealAuras } from "./HealAuras";
@@ -59,27 +60,31 @@ export const PlayScene = () => {
 
       <CameraRig />
 
+      {/* Modest image-based fill keeps metal readable without flattening the key. */}
       <Environment
         files="/hdri/rooitou_park_1k.hdr"
         background={false}
-        environmentIntensity={0.6}
+        environmentIntensity={0.32}
       />
 
-      <ambientLight intensity={0.55} color="#eaf2ff" />
+      <ambientLight intensity={0.24} color="#dce9ee" />
       <directionalLight
         position={[14, 26, 10]}
-        intensity={2.2}
-        color="#fff4dc"
+        intensity={2.65}
+        color="#ffe6c6"
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
+        shadow-mapSize-height={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
         shadow-camera-left={-MAP_HEIGHT}
         shadow-camera-right={MAP_HEIGHT}
         shadow-camera-top={MAP_HEIGHT}
         shadow-camera-bottom={-MAP_HEIGHT}
-        shadow-bias={-0.0005}
+        shadow-camera-near={1}
+        shadow-camera-far={90}
+        shadow-bias={-0.00015}
+        shadow-normalBias={0.025}
       />
-      <hemisphereLight args={[style.hemiTop, style.hemiBottom, 0.85]} />
+      <hemisphereLight args={[style.hemiTop, style.hemiBottom, 0.6]} />
 
       <SimTicker />
       <ShaderPrewarm />

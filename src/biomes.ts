@@ -86,8 +86,8 @@ export type BiomeStyle = {
 // reads ember-warm and an alien run reads cool / glowing.
 export type BiomePainted = {
   // Multiplied into shadow tones during the color grade (≤1 darkens). Tuned
-  // cool teal for forest/snow/alien, warm for desert/wasteland, deep red for
-  // lava — pushes the split-tone away from grey toward the biome's mood.
+  // cool for forest/snow/alien, nearly neutral for desert/wasteland, and
+  // gently warm for lava. Keep material midtones and shadow detail intact.
   shadowTint: [number, number, number];
   // Multiplied into highlight tones (≥1 brightens). Warm orange/ember for
   // lava/wasteland; soft cyan-white for snow/alien; warm peach for forest.
@@ -113,48 +113,48 @@ export type BiomePainted = {
 
 export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
   forest: {
-    shadowTint: [0.82, 0.92, 1.0],
-    highlightTint: [1.04, 0.98, 0.88],
+    shadowTint: [0.91, 0.97, 1.0],
+    highlightTint: [1.025, 1.0, 0.96],
     dustColor: "#cae7b5",
     dustDensity: 0.22,
     bloomBias: 0.85,
     godRaysColor: "#ffe2a8",
   },
   desert: {
-    shadowTint: [0.92, 0.86, 0.78],
-    highlightTint: [1.08, 0.98, 0.82],
+    shadowTint: [0.96, 0.97, 1.0],
+    highlightTint: [1.035, 1.0, 0.95],
     dustColor: "#e8c890",
     dustDensity: 0.3,
     bloomBias: 0.9,
     godRaysColor: "#ffd87a",
   },
   snow: {
-    shadowTint: [0.78, 0.9, 1.04],
-    highlightTint: [1.0, 1.0, 1.06],
+    shadowTint: [0.9, 0.96, 1.02],
+    highlightTint: [1.02, 1.01, 1.0],
     dustColor: "#dceaff",
     dustDensity: 0.25,
     bloomBias: 0.8,
     godRaysColor: "#cfe6ff",
   },
   wasteland: {
-    shadowTint: [0.88, 0.82, 0.8],
-    highlightTint: [1.12, 0.96, 0.78],
+    shadowTint: [0.96, 0.95, 0.94],
+    highlightTint: [1.04, 1.0, 0.94],
     dustColor: "#caa078",
     dustDensity: 0.32,
     bloomBias: 1.0,
     godRaysColor: "#ffb070",
   },
   lava: {
-    shadowTint: [0.7, 0.55, 0.55],
-    highlightTint: [1.2, 0.85, 0.6],
+    shadowTint: [0.96, 0.91, 0.9],
+    highlightTint: [1.05, 0.98, 0.92],
     dustColor: "#ff8a32",
     dustDensity: 0.35,
     bloomBias: 1.35,
     godRaysColor: "#ff9050",
   },
   alien: {
-    shadowTint: [0.78, 0.78, 1.0],
-    highlightTint: [1.02, 0.95, 1.1],
+    shadowTint: [0.92, 0.94, 1.02],
+    highlightTint: [1.0, 1.01, 1.035],
     dustColor: "#7effe0",
     dustDensity: 0.3,
     bloomBias: 1.2,
@@ -164,11 +164,11 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
 
 export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
   forest: {
-    groundColor: "#5c7848",
+    groundColor: "#526957",
     pathColor: "#c9a876",
-    sceneBg: "#a7cbe3",
-    fogColor: "#c4dcec",
-    fogNear: 48,
+    sceneBg: "#8aa6ad",
+    fogColor: "#a3b7bb",
+    fogNear: 34,
     fogFar: 110,
     hemiTop: "#bcd8ff",
     hemiBottom: "#5a4a2a",
@@ -180,9 +180,9 @@ export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
     pathColor: "#8a6434",
     sceneBg: "#d9c194",
     fogColor: "#e6d0a2",
-    fogNear: 48,
+    fogNear: 34,
     fogFar: 110,
-    hemiTop: "#ffe4b0",
+    hemiTop: "#d9dce5",
     hemiBottom: "#7a5028",
     startRing: "#ffe08a",
     endRing: "#ff5a3a",
@@ -192,7 +192,7 @@ export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
     pathColor: "#6a7a88",
     sceneBg: "#8eaac0",
     fogColor: "#98b0c2",
-    fogNear: 38,
+    fogNear: 30,
     fogFar: 88,
     hemiTop: "#c0d0e0",
     hemiBottom: "#506070",
@@ -204,9 +204,9 @@ export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
     pathColor: "#6b4f36",
     sceneBg: "#caa688",
     fogColor: "#d8bc9a",
-    fogNear: 44,
+    fogNear: 34,
     fogFar: 96,
-    hemiTop: "#e8c8a8",
+    hemiTop: "#c9d2da",
     hemiBottom: "#5a4030",
     startRing: "#ffcf6a",
     endRing: "#ff5252",
@@ -219,9 +219,9 @@ export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
     pathColor: "#5a3a24",
     sceneBg: "#4a1a18",
     fogColor: "#9a3420",
-    fogNear: 36,
+    fogNear: 30,
     fogFar: 82,
-    hemiTop: "#ffb060",
+    hemiTop: "#c7bac4",
     hemiBottom: "#5a1a10",
     startRing: "#ff9050",
     endRing: "#ffe060",
@@ -237,7 +237,7 @@ export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
     pathColor: "#5a4880",
     sceneBg: "#2a1545",
     fogColor: "#5a3a90",
-    fogNear: 40,
+    fogNear: 32,
     fogFar: 90,
     hemiTop: "#b0a0ff",
     hemiBottom: "#2a1550",

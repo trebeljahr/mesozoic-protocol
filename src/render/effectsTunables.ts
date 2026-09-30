@@ -32,38 +32,36 @@ const detectGraphicsQuality = (): GraphicsQuality => {
 export const GRAPHICS_QUALITY: GraphicsQuality = detectGraphicsQuality();
 
 // Selective bloom — only meshes on BLOOM_LAYER pass through. Threshold stays
-// moderate because the selection pass already filters to opt-in geometry;
-// it gates non-emissive body parts of opt-in models so only canopies,
-// muzzle flashes, and authored VFX actually glow.
-export const BLOOM_THRESHOLD = 0.55;
-export const BLOOM_SMOOTHING = 0.2;
-export const BLOOM_INTENSITY = 1.25;
+// at HDR white: selection alone also includes non-emissive model bodies.
+// Bright emissive canopies, muzzle flashes and authored VFX supply the glow.
+export const BLOOM_THRESHOLD = 1.0;
+export const BLOOM_SMOOTHING = 0.25;
+export const BLOOM_INTENSITY = 0.85;
 export const BLOOM_KERNEL: Record<GraphicsQuality, KernelSize> = {
   low: KernelSize.SMALL,
   medium: KernelSize.MEDIUM,
   high: KernelSize.LARGE,
 };
 
-// Color grade. Hue shifted slightly cool, saturation pumped a touch, then a
-// small contrast bump to deepen shadows. Split-tone (cool shadows / warm
-// highlights) comes from the per-biome BIOME_PAINTED.shadowTint /
+// Color grade. Neutral midtones with a restrained saturation and contrast
+// adjustment; directional lighting supplies most of the shape. Split-tone
+// (cool shadows / warm highlights) comes from BIOME_PAINTED.shadowTint /
 // highlightTint multiplied in by the PaintedPostFx pipeline.
 export const GRADE_HUE = 0.0;
-export const GRADE_SATURATION = 0.12;
-export const GRADE_BRIGHTNESS = -0.02;
-export const GRADE_CONTRAST = 0.12;
+export const GRADE_SATURATION = -0.025;
+export const GRADE_BRIGHTNESS = 0.0;
+export const GRADE_CONTRAST = 0.045;
 
-// Dark vignette closes the frame. Capsule art has heavy edge falloff so the
-// eye reads the center as "the action."
+// Gentle edge falloff preserves build slots and enemies near the map boundary.
 export const VIGNETTE_OFFSET = 0.3;
-export const VIGNETTE_DARKNESS = 0.55;
+export const VIGNETTE_DARKNESS = 0.3;
 
 // God-rays — high quality only. Anchored to a sun proxy in the scene.
 // Kernel deliberately small; the radial blur dominates the cost.
 export const GODRAYS_DENSITY = 0.97;
 export const GODRAYS_DECAY = 0.94;
 export const GODRAYS_WEIGHT = 0.35;
-export const GODRAYS_EXPOSURE = 0.5;
+export const GODRAYS_EXPOSURE = 0.24;
 export const GODRAYS_SAMPLES = 36;
 export const GODRAYS_KERNEL = KernelSize.SMALL;
 export const GODRAYS_RESOLUTION_SCALE = 0.35;

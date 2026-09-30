@@ -5,9 +5,10 @@ import {
   HueSaturation,
   Outline,
   SelectiveBloom,
+  ToneMapping,
   Vignette,
 } from "@react-three/postprocessing";
-import { BlendFunction, Effect } from "postprocessing";
+import { BlendFunction, Effect, ToneMappingMode } from "postprocessing";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { BIOME_PAINTED, type Biome } from "../biomes";
@@ -78,8 +79,8 @@ uniform vec3 uHighlightTint;
 
 void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
   float l = dot(inputColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  float shadowK = smoothstep(0.5, 0.05, l);
-  float highK = smoothstep(0.55, 1.0, l);
+  float shadowK = 1.0 - smoothstep(0.04, 0.42, l);
+  float highK = smoothstep(0.65, 1.0, l);
   vec3 shadowMul = mix(vec3(1.0), uShadowTint, shadowK);
   vec3 highMul = mix(vec3(1.0), uHighlightTint, highK);
   outputColor = vec4(inputColor.rgb * shadowMul * highMul, inputColor.a);
@@ -142,18 +143,9 @@ type Props = {
   enabled?: boolean;
 };
 
-// Ordered post-processing chain that pushes the renderer toward the capsule
-// key-art look:
-//   1. Split-tone color grade  (cool shadows / warm highlights, biome-biased)
-//   2. HueSaturation           (subtle saturation lift)
-//   3. BrightnessContrast      (deepen shadows)
-//   4. Selective bloom         (only meshes on BLOOM_LAYER)
-//   5. God-rays                (high quality only — anchored to SunProxy)
-//   6. Outline                 (medium+ quality — enemies + robot only)
-//   7. Vignette                (frame falloff)
-// Quality tier (effectsTunables.ts) decides which optional passes are wired.
-// Hot-path math is pushed into the GPU shaders; the only React work per
-// frame is the biome-change effect that updates the SplitToneEffect uniforms.
+// Extract selected HDR energy before neutral tone mapping, then apply a mild
+// biome grade. Outlines and vignette operate on the display-range result.
+// DOM HUD and separate preview canvases never enter this composer.
 export const PaintedPostFx = ({ enabled = true }: Props) => {
   const biome = useGame((s) => s.world.biome);
   const palette = BIOME_PAINTED[biome];
@@ -200,11 +192,9 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
 
   return (
     <>
-      <primitive object={splitTone} />
-      <HueSaturation hue={GRADE_HUE} saturation={GRADE_SATURATION} />
-      <BrightnessContrast brightness={GRADE_BRIGHTNESS} contrast={GRADE_CONTRAST} />
       <SelectiveBloom
         lights={lightPlaceholders}
+        ignoreBackground
         selectionLayer={BLOOM_LAYER}
         luminanceThreshold={BLOOM_THRESHOLD}
         luminanceSmoothing={BLOOM_SMOOTHING}
@@ -225,6 +215,12 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
           blur
         />
       )}
+      {/* Composer disables renderer tone mapping. Compress HDR only after bloom
+          extraction, then grade display-range colors so midtones stay neutral. */}
+      <ToneMapping mode={ToneMappingMode.NEUTRAL} />
+      <primitive object={splitTone} />
+      <HueSaturation hue={GRADE_HUE} saturation={GRADE_SATURATION} />
+      <BrightnessContrast brightness={GRADE_BRIGHTNESS} contrast={GRADE_CONTRAST} />
       {includeOutline && (
         <Outline
           selectionLayer={OUTLINE_LAYER}
