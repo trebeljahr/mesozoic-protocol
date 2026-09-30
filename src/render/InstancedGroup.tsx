@@ -1,9 +1,10 @@
 import { useGLTF } from "@react-three/drei";
-import { useLayoutEffect, useMemo, useRef } from "react";
-import * as THREE from "three";
+import { useMemo } from "react";
+import type * as THREE from "three";
 import type { Vec2 } from "../sim/types";
 import { setGroundedTransform } from "./groundedTransform";
 import { collectMeshSource, type MeshSource } from "./meshSource";
+import { SceneryBatches } from "./SceneryBatches";
 
 // Shared renderer for the two outdoor cosmetic layers (BiomeCosmetics in
 // the playable rectangle, OuterScenery in the band outside it). Both
@@ -36,47 +37,20 @@ export const InstancedGroup = <T extends GroupItem>({
   const { scene } = useGLTF(url);
   const source = useMemo(() => collectMeshSource(scene), [scene]);
   const baseScale = source && baseScaleFor ? baseScaleFor(source, url) : 1;
-  const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
-
-  // Initialize before the first frame: identity matrices expose the raw asset scale.
-  useLayoutEffect(() => {
-    if (!source) return;
-    const dummy = new THREE.Object3D();
-    for (const im of partRefs.current) {
-      if (!im) continue;
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        const s = baseScale * it.scale;
-        setGroundedTransform(dummy, source, it.pos, it.rotY, s);
-        im.setMatrixAt(i, dummy.matrix);
-      }
-      im.count = items.length;
-      im.instanceMatrix.needsUpdate = true;
-    }
-  }, [items, source, baseScale]);
-
   if (!source || items.length === 0) return null;
-
   return (
-    <group>
-      {source.parts.map((part, pi) => (
-        <instancedMesh
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts array is stable per scene
-          key={pi}
-          ref={(el: THREE.InstancedMesh | null) => {
-            partRefs.current[pi] = el;
-          }}
-          args={[part.geom, part.material, items.length]}
-          castShadow={castShadow}
-          receiveShadow={receiveShadow}
-          raycast={raycast}
-          // Positions are baked into per-instance matrices, so the default
-          // origin-centered bounding sphere fails the frustum test once the
-          // player zooms in and pans away from origin — culling the whole
-          // batch and making every prop vanish. Disable per-batch culling.
-          frustumCulled={false}
-        />
-      ))}
-    </group>
+    <SceneryBatches
+      parts={source.parts}
+      items={items}
+      position={itemPosition}
+      transform={(dummy, it) =>
+        setGroundedTransform(dummy, source, it.pos, it.rotY, baseScale * it.scale)
+      }
+      castShadow={castShadow}
+      receiveShadow={receiveShadow}
+      raycast={raycast}
+    />
   );
 };
+
+const itemPosition = (item: GroupItem) => item.pos;

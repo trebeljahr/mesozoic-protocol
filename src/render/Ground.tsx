@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import { nanoid } from "nanoid";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import {
   ALL_BIOME_URLS,
@@ -40,6 +40,7 @@ import { ROCK_FOOTPRINT, TOWER_CLEAR_RADIUS, TREE_FOOTPRINT } from "../sim/world
 import { sampleStratifiedFeatures } from "../sim/worley";
 import { useGame } from "../store";
 import { setGroundedTransform } from "./groundedTransform";
+import { SceneryBatches } from "./SceneryBatches";
 import { TerrainSurface } from "./TerrainSurface";
 import { TERRAIN_EDGE } from "./terrainPalette";
 
@@ -212,7 +213,6 @@ const NatureInstances = ({
   normalizeTo?: number;
 }) => {
   const { scene } = useGLTF(url);
-  const instRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
   // Quaternius/KayKit models are authored as several primitives — one mesh per
   // colour region (trunk / foliage / snow cap). The loader exposes each as its
@@ -285,46 +285,18 @@ const NatureInstances = ({
   // before the per-instance scale band is applied. Otherwise raw GLTF scale.
   const baseScale = source && normalizeTo ? normalizeTo / source.maxDim : 1;
 
-  useEffect(() => {
-    if (!source) return;
-    const dummy = new THREE.Object3D();
-    source.parts.forEach((_, idx) => {
-      const im = instRefs.current[idx];
-      if (!im) return;
-      for (let i = 0; i < placements.length; i++) {
-        const p = placements[i];
-        const s = baseScale * p.scale;
-        setGroundedTransform(dummy, source, { x: p.x, y: p.y }, p.rot, s);
-        im.setMatrixAt(i, dummy.matrix);
-      }
-      im.count = placements.length;
-      im.instanceMatrix.needsUpdate = true;
-    });
-  }, [placements, source, baseScale]);
-
   if (!source || placements.length === 0) return null;
-
   return (
-    <>
-      {source.parts.map((part, idx) => (
-        <instancedMesh
-          key={part.geom.uuid}
-          ref={(el) => {
-            instRefs.current[idx] = el;
-          }}
-          args={[part.geom, part.material, placements.length]}
-          castShadow={castShadow}
-          receiveShadow
-          // Positions are baked into per-instance matrices, so the default
-          // origin-centered bounding sphere fails the frustum test once the
-          // player zooms in and pans away from origin — culling the whole
-          // batch and making the ground decor vanish. Disable per-batch culling.
-          frustumCulled={false}
-        />
-      ))}
-    </>
+    <SceneryBatches
+      parts={source.parts}
+      items={placements}
+      position={placementPosition}
+      transform={(dummy, p) => setGroundedTransform(dummy, source, p, p.rot, baseScale * p.scale)}
+      castShadow={castShadow}
+    />
   );
 };
+const placementPosition = (placement: Placement) => placement;
 
 const buildBlockers = (trees: Tree[], rocks: Rock[]): { x: number; y: number; r: number }[] => {
   const out: { x: number; y: number; r: number }[] = [];

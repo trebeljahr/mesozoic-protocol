@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_LAYERS, type Biome } from "../biomes";
 import { useEditor } from "../editor/editorStore";
@@ -9,6 +9,7 @@ import { meshXZRadii, ROCK_REMOVE_COST } from "../sim/world";
 import { useGame } from "../store";
 import { setGroundedTransform } from "./groundedTransform";
 import { collectMeshSource } from "./meshSource";
+import { SceneryBatches } from "./SceneryBatches";
 
 const rockUrl = (biome: Biome, rock: Rock): string | undefined =>
   BIOME_LAYERS[biome][rock.layerIndex]?.urls[rock.variant];
@@ -45,52 +46,20 @@ const RockGroup = ({
     if (source) meshXZRadii.set(url, xzRadius);
   }, [source, url, xzRadius]);
 
-  const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
-
-  // Initialize before the first frame: identity matrices expose the raw asset scale.
-  useLayoutEffect(() => {
-    if (!source) return;
-    const dummy = new THREE.Object3D();
-    for (const im of partRefs.current) {
-      if (!im) continue;
-      for (let i = 0; i < rocks.length; i++) {
-        const r = rocks[i];
-        const s = baseScale * r.scale;
-        setGroundedTransform(dummy, source, r.pos, r.rot, s);
-        im.setMatrixAt(i, dummy.matrix);
-      }
-      im.count = rocks.length;
-      im.instanceMatrix.needsUpdate = true;
-      // Instance bounds must follow the populated matrices for raycasting.
-      im.computeBoundingSphere();
-    }
-  }, [rocks, source, baseScale]);
-
   if (!source || rocks.length === 0) return null;
-
   return (
-    <group>
-      {source.parts.map((part, pi) => (
-        <instancedMesh
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts array is stable per scene
-          key={pi}
-          ref={(el: THREE.InstancedMesh | null) => {
-            partRefs.current[pi] = el;
-          }}
-          args={[part.geom, part.material, rocks.length]}
-          castShadow
-          receiveShadow
-          raycast={neverRaycast}
-          // Positions are baked into per-instance matrices, so the default
-          // origin-centered bounding sphere fails the frustum test once the
-          // player zooms in and pans away from origin — culling the whole
-          // batch and making every rock vanish. Disable per-batch culling.
-          frustumCulled={false}
-        />
-      ))}
-    </group>
+    <SceneryBatches
+      parts={source.parts}
+      items={rocks}
+      position={rockPosition}
+      transform={(dummy, r) =>
+        setGroundedTransform(dummy, source, r.pos, r.rot, baseScale * r.scale)
+      }
+      raycast={neverRaycast}
+    />
   );
 };
+const rockPosition = (rock: Rock) => rock.pos;
 
 export const Rocks = () => {
   const biome = useGame((s) => s.world.biome);

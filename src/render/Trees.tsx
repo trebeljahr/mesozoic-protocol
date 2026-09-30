@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_TREE_URLS } from "../biomes";
 import { useEditor } from "../editor/editorStore";
@@ -8,6 +8,7 @@ import type { Tree } from "../sim/types";
 import { meshXZRadii, TREE_REMOVE_COST, TREE_TARGET_HEIGHT, TREE_VARIANTS } from "../sim/world";
 import { useGame } from "../store";
 import { collectMeshSource, type MeshPart } from "./meshSource";
+import { SceneryBatches } from "./SceneryBatches";
 
 type VariantSource = {
   parts: MeshPart[];
@@ -231,54 +232,23 @@ export const Trees = () => {
 };
 
 const VariantGroup = ({ bucket, source }: { bucket: Tree[]; source: VariantSource }) => {
-  const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
-
-  // Initialize before the first frame: identity matrices expose the raw asset scale.
-  useLayoutEffect(() => {
-    const dummy = new THREE.Object3D();
-    for (const im of partRefs.current) {
-      if (!im) continue;
-      for (let i = 0; i < bucket.length; i++) {
-        const t = bucket[i];
-        // Height-normalised scale: the per-instance variety rides on top of the
-        // variant's native→TREE_TARGET_HEIGHT factor so trees sit in one band.
+  return (
+    <SceneryBatches
+      parts={source.parts}
+      items={bucket}
+      position={treePosition}
+      transform={(dummy, t) => {
         const eff = t.scale * source.heightScale;
         dummy.position.set(t.pos.x, -source.minY * eff, -t.pos.y);
         dummy.rotation.set(0, t.rot, 0);
         dummy.scale.setScalar(eff);
         dummy.updateMatrix();
-        im.setMatrixAt(i, dummy.matrix);
-      }
-      im.count = bucket.length;
-      im.instanceMatrix.needsUpdate = true;
-      // Instance bounds must follow the populated matrices for raycasting.
-      im.computeBoundingSphere();
-    }
-  }, [bucket, source]);
-
-  return (
-    <group>
-      {source.parts.map((part, pi) => (
-        <instancedMesh
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts array is stable per scene
-          key={pi}
-          ref={(el: THREE.InstancedMesh | null) => {
-            partRefs.current[pi] = el;
-          }}
-          args={[part.geom, part.material, Math.max(1, bucket.length)]}
-          castShadow
-          receiveShadow
-          raycast={neverRaycast}
-          // Positions are baked into per-instance matrices, so the default
-          // origin-centered bounding sphere fails the frustum test once the
-          // player zooms in and pans away from origin — culling the whole
-          // batch and making every tree vanish. Disable per-batch culling.
-          frustumCulled={false}
-        />
-      ))}
-    </group>
+      }}
+      raycast={neverRaycast}
+    />
   );
 };
+const treePosition = (tree: Tree) => tree.pos;
 
 // Pointer events go to the hit discs, not the model silhouette.
 const neverRaycast: THREE.Mesh["raycast"] = () => {};
