@@ -115,10 +115,10 @@ export const ChainArcsFx = () => {
   }, []);
 
   useEffect(() => {
-    for (const ref of [coreRef, haloRef, flashRef]) {
-      const obj = ref.current;
-      if (obj) obj.layers.enable(BLOOM_LAYER);
-    }
+    // SelectiveBloom compares the scene depth with its selected-object depth.
+    // Only the depth-writing core belongs in that mask. Transparent sheath and
+    // hit sprites would mask it with a different depth and erase its bloom.
+    coreRef.current?.layers.enable(BLOOM_LAYER);
   }, []);
 
   useFrame((state) => {
@@ -167,8 +167,8 @@ export const ChainArcsFx = () => {
         bx,
         by,
         bz,
-        (sheath ? 0.095 : 0.042) * width,
-        (sheath ? 0.075 : 0.03) * width,
+        (sheath ? 0.04 : 0.023) * width,
+        (sheath ? 0.03 : 0.017) * width,
         r,
         g,
         b,
@@ -185,13 +185,13 @@ export const ChainArcsFx = () => {
       if (life <= 0) continue;
       const lifeNorm = Math.min(1, life * 10);
       const fadeIn = lightningEnvelope(life);
-      const alpha = fadeIn * 3.8;
+      const alpha = fadeIn * 6;
       const coreR = CORE_TINT.r * alpha;
       const coreG = CORE_TINT.g * alpha;
       const coreB = CORE_TINT.b * alpha;
-      const haloR = HALO_TINT.r * alpha * 0.28;
-      const haloG = HALO_TINT.g * alpha * 0.28;
-      const haloB = HALO_TINT.b * alpha * 0.34;
+      const haloR = HALO_TINT.r * alpha * 0.1;
+      const haloG = HALO_TINT.g * alpha * 0.1;
+      const haloB = HALO_TINT.b * alpha * 0.14;
 
       const rng = seeded((beam.id * 1597 + tBucket * 9176) ^ 0x9e3779b9);
 
@@ -375,14 +375,9 @@ export const ChainArcsFx = () => {
         />
       </mesh>
       <mesh ref={coreRef} args={[coreGeom]} renderOrder={3} frustumCulled={false}>
-        <meshBasicMaterial
-          vertexColors
-          transparent
-          opacity={1}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
+        {/* Opaque HDR core supplies identical depth to both selective-bloom
+            inputs. Glow and fade energy live in vertex RGB, not opacity. */}
+        <meshBasicMaterial vertexColors depthWrite toneMapped={false} />
       </mesh>
       <instancedMesh
         ref={flashRef}
