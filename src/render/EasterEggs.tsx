@@ -305,7 +305,7 @@ const chimneyLocal = (
 //   - smoke rides a separate alpha-blended whitepuff mesh above the flame.
 //     Additive smoke is invisible against the bright snow ground, so this
 //     one carries real per-instance opacity via the same onBeforeCompile
-//     `aOpacity` hook SmokePuffs uses.
+//     `aOpacity` material hook.
 // Offsets live in the egg's outer-group local space (like the chimney
 // column), so the flame rotates with egg.rotY; billboards are counter-
 // rotated by the group's world rotation so they still face the camera.
@@ -400,7 +400,7 @@ const TorchFlame = ({
   const parentQuat = useMemo(() => new THREE.Quaternion(), []);
 
   // Per-instance opacity for the alpha-blended smoke, injected the same way
-  // SmokePuffs does (MeshBasicMaterial has no per-instance alpha otherwise).
+  // the torch needs (MeshBasicMaterial has no per-instance alpha otherwise).
   const smokeOpacity = useMemo(
     () => new THREE.InstancedBufferAttribute(new Float32Array(SMOKE_COUNT), 1),
     [],

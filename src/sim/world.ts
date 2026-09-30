@@ -2586,8 +2586,8 @@ export const spawnParticles = (
   }
 };
 
-// Soft smoke puffs spawned at an explosion impact — Kenney whitepuff
-// sprite billboards rendered separately from the existing additive
+// Animated smoke billows spawned at an explosion impact, rendered
+// separately from the existing additive
 // spark particles. Tinted darker for diesel/industrial reads, with
 // outward drift, slow upward rise, and rotation jitter.
 export const spawnExplosionSmoke = (world: World, pos: Vec2, radius: number, count = 6) => {

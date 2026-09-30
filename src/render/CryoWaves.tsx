@@ -5,11 +5,12 @@ import { useGame } from "../store";
 
 const MAX_WAVES = 16;
 const vertexShader = /* glsl */ `
+  attribute vec3 waveState;
   varying vec2 ground;
   varying vec3 wave;
   void main() {
-    // Instance color carries progress, range and opacity, not RGB.
-    wave = instanceColor;
+    // Explicit data stays valid even before the first wave is emitted.
+    wave = waveState;
     ground = position.xy * wave.y;
     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
   }
@@ -50,7 +51,12 @@ const fragmentShader = /* glsl */ `
     float crystal = 1.0 - smoothstep(0.004, 0.004 + aa, d);
     float frost = (1.0 - smoothstep(0.01, 0.065, d)) * 0.10;
     float alpha = (crystal * 0.42 + frost) * band * wave.z;
-    gl_FragColor = vec4(mix(vec3(0.48, 0.72, 0.80), vec3(0.83, 0.94, 0.97), crystal), alpha);
+    // Sparse specular catches travel through the growing branches, leaving
+    // the quiet ground-frost footprint intact rather than a glowing ring.
+    float glint = pow(max(0.0, sin(behind * 9.0 + seed * 31.0)), 18.0)
+      * step(0.72, seed) * crystal;
+    gl_FragColor = vec4(mix(vec3(0.48, 0.72, 0.80), vec3(0.83, 0.94, 0.97), crystal)
+      + glint * vec3(0.15, 0.20, 0.22), alpha + glint * band * wave.z * 0.2);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -59,7 +65,10 @@ const fragmentShader = /* glsl */ `
 export const CryoWaves = () => {
   const ref = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const data = useMemo(() => new THREE.Color(), []);
+  const data = useMemo(
+    () => new THREE.InstancedBufferAttribute(new Float32Array(MAX_WAVES * 3), 3),
+    [],
+  );
   useFrame(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -77,17 +86,18 @@ export const CryoWaves = () => {
       dummy.scale.set(wave.maxRadius, wave.maxRadius, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(count, dummy.matrix);
-      data.setRGB(
+      data.setXYZ(
+        count,
         progress,
         wave.maxRadius,
         (1 - THREE.MathUtils.smoothstep(progress, 0.65, 1)) *
           THREE.MathUtils.smoothstep(progress, 0, 0.12),
       );
-      mesh.setColorAt(count++, data);
+      count++;
     }
     mesh.count = count;
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    data.needsUpdate = true;
   });
   return (
     <instancedMesh
@@ -96,7 +106,9 @@ export const CryoWaves = () => {
       frustumCulled={false}
       renderOrder={2}
     >
-      <planeGeometry args={[2, 2]} />
+      <planeGeometry args={[2, 2]}>
+        <primitive object={data} attach="attributes-waveState" />
+      </planeGeometry>
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}

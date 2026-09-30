@@ -44,7 +44,6 @@ import { SelectionRing } from "./SelectionRing";
 import { ShaderPrewarm } from "./ShaderPrewarm";
 import { ShieldBubbles } from "./ShieldBubbles";
 import { SimTicker } from "./SimTicker";
-import { SmokePuffs } from "./SmokePuffs";
 import { SpotTargetMarker } from "./SpotTargetMarker";
 import { TowerVfx } from "./TowerVfx";
 import { Trees } from "./Trees";
@@ -220,7 +219,6 @@ export const PlayScene = () => {
         <PulseTracerFx />
         <ChainArcsFx />
         <Effects />
-        <SmokePuffs />
         <BiomeAmbientVfx />
         <AmbientHaze />
       </Defer>

@@ -705,8 +705,8 @@ export type Particle = {
 };
 
 // Sprite-billboard smoke puff. Drifts outward + upward, fades + grows.
-// Rendered with a Kenney smoke texture, NormalBlending (occludes scene
-// like real smoke, unlike the additive spark Particles above).
+// Rendered with an animated smoke atlas and alpha blending; shared by
+// explosion plumes and the soot trail left by cooling flame particles.
 export type Puff = {
   id: EntityId;
   pos: Vec2; // ground-plane drift

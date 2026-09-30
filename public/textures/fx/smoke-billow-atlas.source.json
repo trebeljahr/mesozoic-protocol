@@ -1,0 +1,17 @@
+{
+  "asset": "smoke-billow-atlas.png",
+  "origin": "Original generated VFX artwork",
+  "generator": "Built-in image_gen tool",
+  "created": "2026-10-01",
+  "layout": {
+    "columns": 4,
+    "rows": 4,
+    "frames": 16,
+    "frameWidth": 256,
+    "frameHeight": 256,
+    "order": "left-to-right, top-to-bottom"
+  },
+  "processing": "Resized transparent source to 1024x1024 RGBA. Runtime mipmaps, half-texel cell insets, border fade.",
+  "prompt": "Production game VFX sprite atlas, square transparent RGBA, EXACTLY 4 columns and 4 rows of 16 equal cells, no text or grid lines. Each cell has one centered isolated compact rounded billow of smoke with at least 15 percent completely transparent margin on every side. A sequential animation of the SAME softly rolling smoke puff across frames left-to-right then top-to-bottom, roughly constant size, changing internal curls. Original realistic prerendered volumetric smoke, neutral light gray silver lobes with darker gray crevices, soft translucent edges and holes, lit gently from above-left, varied medium-scale rolling detail readable at small game sizes. NO fire, NO orange, NO sparks, NO outlines, NO background, NO floor, NO shadows, NO glow, no triangle, no pointed cone. Compact billowy puff appropriate for tinting as charcoal soot or pale cold vapor in a strategy game. NOT a dense solid cotton ball, not a single radial gradient. Smooth partial alpha on wispy fringe, all wisps dissolve completely within each cell. Perfectly regular 4x4 cell alignment, no overlaps between cells.",
+  "runtime": "Smoke and cold vapor share one sorted instanced batch, capped at 320 sprites (160 on low quality). Two atlas samples and one shared scene-depth lookup per pixel. Explosions reuse the fire atlas."
+}

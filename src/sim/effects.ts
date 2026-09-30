@@ -35,7 +35,36 @@ export const updateParticles = (world: World, dt: number) => {
     p.vel.y *= decay;
   }
   const t = world.time;
-  retainInPlace(world.particles, (p) => p.expiresAt > t);
+  retainInPlace(world.particles, (p) => {
+    if (p.expiresAt > t) return true;
+    // A sparse fraction of cooling flame billows leaves rising soot. This
+    // lives in the normal puff lifecycle, so it lingers after firing stops.
+    if (
+      p.kind === "flame" &&
+      p.maxLife >= 0.45 &&
+      (p.id * 0.61803398875) % 1 < 0.16 &&
+      world.puffs.length < 384
+    ) {
+      const seed = (p.id * 0.38196601125) % 1;
+      const life = 1.1 + seed * 0.5;
+      world.puffs.push({
+        id: world.nextEntityId++,
+        pos: { ...p.pos },
+        vel: { x: p.vel.x * 0.1, y: p.vel.y * 0.1 },
+        h: 0.85,
+        vh: 0.45 + seed * 0.3,
+        expiresAt: t + life,
+        maxLife: life,
+        size0: 0.5,
+        size1: 1.35,
+        rot: seed * Math.PI * 2,
+        rotVel: (seed - 0.5) * 0.6,
+        tint: "#a79b8e",
+        alpha0: 0.32,
+      });
+    }
+    return false;
+  });
 };
 
 export const updatePuffs = (world: World, dt: number) => {

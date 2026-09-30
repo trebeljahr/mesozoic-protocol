@@ -1,11 +1,11 @@
 import { useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Particle } from "../sim/types";
 import { useGame } from "../store";
 import { BLOOM_LAYER, GRAPHICS_QUALITY } from "./effectsTunables";
-import { FlameSceneDepth } from "./FlameSceneDepth";
+import { softParticleShader, useSoftParticles } from "./SoftParticles";
 
 const CAPACITY = GRAPHICS_QUALITY === "low" ? 384 : 768;
 const ATLAS_URL = "/textures/fx/flame-billow-atlas.png";
@@ -21,17 +21,7 @@ void main() {
 
 const fragmentShader = `
 uniform sampler2D atlas;
-uniform sampler2D sceneDepth;
-uniform vec2 viewportSize;
-uniform vec2 cameraRange;
-uniform float orthographic;
-uniform float depthReady;
-#include <packing>
-float viewDistance(float depth) {
-  return orthographic > 0.5
-    ? -orthographicDepthToViewZ(depth, cameraRange.x, cameraRange.y)
-    : -perspectiveDepthToViewZ(depth, cameraRange.x, cameraRange.y);
-}
+${softParticleShader}
 varying vec2 vUv;
 varying vec3 vFlame;
 vec4 frame(float index) {
@@ -48,13 +38,7 @@ void main() {
   // Blend premultiplied frames: transparent edges cannot make black halos.
   vec4 fire = mix(frame(index), frame(mod(index + 1.0, 16.0)), fract(vFlame.y));
   float fade = smoothstep(0.0, 0.09, age) * (1.0 - smoothstep(0.5, 1.0, age));
-  if (depthReady > 0.5) {
-    float surface = viewDistance(texture2D(sceneDepth, gl_FragCoord.xy / viewportSize).r);
-    float particle = viewDistance(gl_FragCoord.z);
-    // Fade both emitted light and opacity before the billboard cuts into a
-    // solid surface. Also occludes fire in the selective-bloom-only pass.
-    fade *= smoothstep(0.0, 0.42, surface - particle);
-  }
+  fade *= softParticleFade(0.42);
   vec3 cooling = mix(vec3(1.0), vec3(0.85, 0.36, 0.12), age * age * 0.7 + vFlame.z);
   // Hybrid premultiplied alpha/additive blend, as used for sprite fire:
   // retain amber folds while overlapping hot pockets still emit light.
@@ -72,35 +56,10 @@ export const FlameParticles = () => {
   const atlas = useTexture(ATLAS_URL);
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const data = useMemo(() => new Float32Array(CAPACITY * 3), []);
-  const depth = useMemo(() => new FlameSceneDepth(), []);
+  const soft = useSoftParticles();
   const uniforms = useMemo(
-    () => ({
-      atlas: { value: atlas },
-      sceneDepth: { value: null as THREE.Texture | null },
-      viewportSize: { value: new THREE.Vector2(1, 1) },
-      cameraRange: { value: new THREE.Vector2(0.1, 1000) },
-      orthographic: { value: 1 },
-      depthReady: { value: 0 },
-    }),
-    [atlas],
-  );
-  useEffect(() => () => depth.dispose(), [depth]);
-  const beforeRender = useCallback<THREE.Object3D["onBeforeRender"]>(
-    (renderer, scene, camera) => {
-      if (scene.overrideMaterial || !meshRef.current?.count) return;
-      // The main pass has all solid occluders. Reuse that snapshot for bloom,
-      // whose layer-filtered scene omits most turrets, units, and scenery.
-      if (camera.layers.isEnabled(0)) depth.capture(renderer);
-      uniforms.sceneDepth.value = depth.target?.depthTexture ?? null;
-      uniforms.depthReady.value = depth.ready ? 1 : 0;
-      const target = renderer.getRenderTarget();
-      if (target) uniforms.viewportSize.value.set(target.width, target.height);
-      else renderer.getDrawingBufferSize(uniforms.viewportSize.value);
-      const projectionCamera = camera as THREE.PerspectiveCamera | THREE.OrthographicCamera;
-      uniforms.cameraRange.value.set(projectionCamera.near, projectionCamera.far);
-      uniforms.orthographic.value = "isOrthographicCamera" in camera ? 1 : 0;
-    },
-    [depth, uniforms],
+    () => ({ ...soft.uniforms, atlas: { value: atlas } }),
+    [atlas, soft.uniforms],
   );
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const direction = useMemo(() => new THREE.Vector3(), []);
@@ -122,7 +81,6 @@ export const FlameParticles = () => {
   }, [atlas]);
 
   useFrame(({ camera }) => {
-    depth.ready = false;
     const mesh = meshRef.current;
     if (!mesh) return;
     const { world } = useGame.getState();
@@ -196,7 +154,7 @@ export const FlameParticles = () => {
       args={[undefined, undefined, CAPACITY]}
       frustumCulled={false}
       renderOrder={2}
-      onBeforeRender={beforeRender}
+      onBeforeRender={soft.beforeRender}
     >
       <planeGeometry args={[2, 2]}>
         <instancedBufferAttribute

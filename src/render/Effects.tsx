@@ -12,15 +12,16 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
+import { CombatBillows } from "./CombatBillows";
 import { CryoWaves } from "./CryoWaves";
 import { FlameParticles } from "./FlameParticles";
 import { isLightningBeam } from "./lightningGeometry";
 import { BLOOM_LAYER } from "./PaintedPostFx";
+import { SoftParticles } from "./SoftParticles";
 
 export { CHAIN_BEAM_COLOR } from "./lightningGeometry";
 
 const MAX_PARTICLES = 1024;
-const MAX_EXPLOSIONS = 32;
 const MAX_BEAMS = 64;
 const MAX_BEAM_POINTS = 16;
 const BEAM_SUBDIVISIONS = 6; // interior noise points per source segment
@@ -60,10 +61,6 @@ export const Effects = () => {
   const particleTex = useTexture("/textures/fx/whitepuff15.png");
   const particleRef = useRef<THREE.InstancedMesh>(null);
   const particleMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const explosionRef = useRef<THREE.InstancedMesh>(null);
-  const explosionMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const flashRef = useRef<THREE.InstancedMesh>(null);
-  const flashMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const beamsGroupRef = useRef<THREE.Group>(null);
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -104,7 +101,7 @@ export const Effects = () => {
   // sphere on geometry change.
   useEffect(() => {
     const big = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e4);
-    const meshes = [particleRef.current, explosionRef.current, flashRef.current];
+    const meshes = [particleRef.current];
     for (const m of meshes) {
       if (!m) continue;
       m.boundingSphere = big.clone();
@@ -157,53 +154,6 @@ export const Effects = () => {
       pMesh.count = i;
       pMesh.instanceMatrix.needsUpdate = true;
       if (pMesh.instanceColor) pMesh.instanceColor.needsUpdate = true;
-    }
-
-    // --- Explosions: white shockwave + warm flash ---
-    const eMesh = explosionRef.current;
-    const fMesh = flashRef.current;
-    if (eMesh && fMesh) {
-      let i = 0;
-      for (const e of world.explosions) {
-        if (i >= MAX_EXPLOSIONS) break;
-        const life = Math.max(0, (e.expiresAt - now) / e.maxLife);
-        const growth = 1 - life;
-        // Outer shockwave — expanding translucent dome
-        dummy.position.set(e.pos.x, 0.35, -e.pos.y);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.setScalar(e.radius * (0.35 + growth * 1.0));
-        dummy.updateMatrix();
-        eMesh.setMatrixAt(i, dummy.matrix);
-        // Cool slightly-blue cast so it reads as a shock front, not a headlight.
-        color.setRGB(0.82, 0.88, 1.0);
-        eMesh.setColorAt(i, color);
-
-        // Inner flash — warm hot core that shrinks slightly
-        dummy.position.set(e.pos.x, 0.35, -e.pos.y);
-        dummy.scale.setScalar(e.radius * (0.55 + life * 0.35));
-        dummy.updateMatrix();
-        fMesh.setMatrixAt(i, dummy.matrix);
-        color.setRGB(1.0, 0.82, 0.5).multiplyScalar(0.35 + life * 0.6);
-        fMesh.setColorAt(i, color);
-        i++;
-      }
-      eMesh.count = i;
-      fMesh.count = i;
-      eMesh.instanceMatrix.needsUpdate = true;
-      fMesh.instanceMatrix.needsUpdate = true;
-      if (eMesh.instanceColor) eMesh.instanceColor.needsUpdate = true;
-      if (fMesh.instanceColor) fMesh.instanceColor.needsUpdate = true;
-      // Fade shockwave opacity with the longest-lived explosion so a single
-      // material still reads as "translucent and fading".
-      const eMat = explosionMatRef.current;
-      if (eMat && world.explosions.length > 0) {
-        let maxLife = 0;
-        for (const e of world.explosions) {
-          const l = Math.max(0, (e.expiresAt - now) / e.maxLife);
-          if (l > maxLife) maxLife = l;
-        }
-        eMat.opacity = 0.12 + maxLife * 0.28;
-      }
     }
 
     // --- Beams: jagged lightning, core + halo ---
@@ -305,64 +255,35 @@ export const Effects = () => {
   });
 
   return (
-    <group>
-      <FlameParticles />
-      <instancedMesh
-        ref={particleRef}
-        args={[undefined, undefined, MAX_PARTICLES]}
-        renderOrder={2}
-        frustumCulled={false}
-      >
-        <planeGeometry args={[2, 2]} />
-        <meshBasicMaterial
-          ref={particleMatRef}
-          map={particleTex}
-          toneMapped={false}
-          transparent
-          opacity={0.55}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </instancedMesh>
+    <SoftParticles>
+      <group>
+        <FlameParticles />
+        <instancedMesh
+          ref={particleRef}
+          args={[undefined, undefined, MAX_PARTICLES]}
+          renderOrder={2}
+          frustumCulled={false}
+        >
+          <planeGeometry args={[2, 2]} />
+          <meshBasicMaterial
+            ref={particleMatRef}
+            map={particleTex}
+            toneMapped={false}
+            transparent
+            opacity={0.55}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </instancedMesh>
 
-      <instancedMesh
-        ref={explosionRef}
-        args={[undefined, undefined, MAX_EXPLOSIONS]}
-        renderOrder={2}
-        frustumCulled={false}
-      >
-        <sphereGeometry args={[1, 20, 20]} />
-        <meshBasicMaterial
-          ref={explosionMatRef}
-          toneMapped={false}
-          transparent
-          opacity={0.3}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-        />
-      </instancedMesh>
+        <CombatBillows kind="blast" />
+        <CombatBillows kind="vapor" />
 
-      <instancedMesh
-        ref={flashRef}
-        args={[undefined, undefined, MAX_EXPLOSIONS]}
-        renderOrder={2}
-        frustumCulled={false}
-      >
-        <sphereGeometry args={[1, 16, 16]} />
-        <meshBasicMaterial
-          ref={flashMatRef}
-          toneMapped={false}
-          transparent
-          opacity={0.85}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </instancedMesh>
+        <CryoWaves />
 
-      <CryoWaves />
-
-      <group ref={beamsGroupRef} renderOrder={2} />
-    </group>
+        <group ref={beamsGroupRef} renderOrder={2} />
+      </group>
+    </SoftParticles>
   );
 };
