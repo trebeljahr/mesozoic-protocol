@@ -32,6 +32,7 @@ import type { Vec2 } from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
 import { sampleStratifiedFeatures } from "../sim/worley";
 import { useGame } from "../store";
+import { containmentSceneryBlockers } from "./containmentLayout";
 import { InstancedGroup } from "./InstancedGroup";
 import type { MeshSource } from "./meshSource";
 
@@ -357,6 +358,7 @@ export const OuterScenery = () => {
     const key = levelId + proceduralSeed;
     const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, key, biome) : null;
     const blockers = [
+      ...containmentSceneryBlockers({ levelId, proceduralSeed, overrideActive, outposts, paths }),
       ...outposts.map((o) => ({ pos: o.pos, radius: o.radius })),
       ...trees.map((t) => ({ pos: t.pos, radius: 0.85 * t.scale })),
       ...rocks.map((r) => ({ pos: r.pos, radius: 0.7 * r.scale })),
