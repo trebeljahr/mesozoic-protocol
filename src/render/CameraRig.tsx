@@ -4,90 +4,19 @@ import { useEffect, useMemo, useRef } from "react";
 import type { OrthographicCamera as OrthographicCameraImpl } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useEditor } from "../editor/editorStore";
-import { MAP_HEIGHT, MAP_WIDTH, PATH_ENTRY_MARGIN_X, PATH_ENTRY_MARGIN_Y } from "../level";
 import { useGame } from "../store";
+import {
+  ABS_MAX_ZOOM,
+  BATTLE_MAX_POLAR,
+  BATTLE_MIN_POLAR,
+  CAMERA_BASE_POSITION,
+  computeFitZoom,
+  computeMaxPathExtents,
+  MAX_ZOOM_MULT,
+  START_ZOOM_MULT,
+  TILT_HALF_FACTOR,
+} from "./cameraFraming";
 import { MapOrbitControls } from "./useMapGestures";
-
-const CAMERA_BASE_POSITION: [number, number, number] = [0, 24, 14];
-
-// Battle camera orbit clamps. Base position sits at polar ≈ 0.528 rad
-// (≈30° from world +Y). Allow a small tilt window so the player can hint
-// the scene is 3D without flipping to top-down or dipping under the
-// ground plane and exposing background.
-const BATTLE_MIN_POLAR = 0.35;
-const BATTLE_MAX_POLAR = 0.75;
-
-// Pan limits are computed dynamically from current zoom — see
-// `panLimitFor` below. At fit zoom the range collapses to 0 so the whole
-// map stays centred; the player can only pan once they've zoomed in.
-
-// Camera tilt is rotation.x ≈ -π/3 (60° pitch). One pixel along the
-// camera's screen-up axis at zoom Z corresponds to ~0.577/Z world units
-// on the ground plane in the Z (north/south) direction. The camera at
-// (0, 24, 14) looks toward the origin with look = (0, -0.838, -0.489),
-// and the ortho viewport is a parallelepiped, so visible Z extent on
-// ground is symmetric around z=0 with half-extent ≈ 0.577*height/Z.
-const TILT_HALF_FACTOR = 0.577;
-
-// Decoration margin past the play area at the most-zoomed-out zoom. X
-// matches the sim's side-entry bounds; Z keeps baseline decor visible,
-// while the path extents below pull top/bottom entries into the fit.
-const DECOR_MARGIN_X = PATH_ENTRY_MARGIN_X;
-const DECOR_MARGIN_Z = 4.5;
-
-// Mobile gets a larger Z margin so the HUD bands (top wave banner,
-// bottom tower picker) don't crop the playable area. Without this the
-// fit zoom on landscape phones cuts off path endpoints behind the HUD.
-const MOBILE_VIEWPORT_PX = 720;
-const MOBILE_DECOR_MARGIN_Z = PATH_ENTRY_MARGIN_Y + 1.5;
-
-// Start a little zoomed in from the maximum zoom-out so the first run
-// still has useful pan range while the player can pull back farther.
-const START_ZOOM_MULT = 1.12;
-
-// How far the player can manually zoom in past the fit-to-edge zoom.
-// 2.5× covers reading tower upgrade details up close. Zooming out
-// past the fit zoom is disallowed — that would re-expose background.
-const MAX_ZOOM_MULT = 2.5;
-
-// Hard ceiling on zoom-in regardless of fit zoom. Values past this
-// turn each world unit into ~80+ CSS px, which makes tower models
-// blocky and the placement reticle feel sluggish. Capping here keeps
-// readability sensible on huge viewports where fit zoom alone would
-// already be high.
-const ABS_MAX_ZOOM = 80;
-
-const computeMaxPathExtents = (paths: { x: number; y: number }[][]): { x: number; z: number } => {
-  let x = 0;
-  let z = 0;
-  for (const p of paths) {
-    for (const point of p) {
-      x = Math.max(x, Math.abs(point.x));
-      z = Math.max(z, Math.abs(point.y));
-    }
-  }
-  return { x, z };
-};
-
-// Most-zoomed-out zoom — guarantees the playable area + decor margin
-// fits on screen on both axes. Uses min() so the binding constraint
-// wins: on narrow viewports the X edges hit first, on ultrawide the
-// Z edges hit first. The half-extent is max(playArea, pathExtent)
-// because some levels have paths that meander outside the play
-// rectangle's vertical band; pulling them in too is friendlier.
-const computeFitZoom = (
-  width: number,
-  height: number,
-  pathHalfExtents: { x: number; z: number },
-): number => {
-  const mobile = width <= MOBILE_VIEWPORT_PX || height <= 500;
-  const marginZ = mobile ? MOBILE_DECOR_MARGIN_Z : DECOR_MARGIN_Z;
-  const halfX = Math.max(MAP_WIDTH / 2 + DECOR_MARGIN_X, pathHalfExtents.x);
-  const halfZ = Math.max(MAP_HEIGHT / 2 + marginZ, pathHalfExtents.z);
-  const fitZoomX = width / (2 * halfX);
-  const fitZoomZ = (TILT_HALF_FACTOR * height) / halfZ;
-  return Math.min(fitZoomX, fitZoomZ);
-};
 
 export const CameraRig = () => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -236,7 +165,7 @@ export const CameraRig = () => {
         ref={cameraRef}
         makeDefault
         position={CAMERA_BASE_POSITION}
-        rotation={[-Math.PI / 3, 0, 0]}
+        rotation={[-Math.atan2(CAMERA_BASE_POSITION[1], CAMERA_BASE_POSITION[2]), 0, 0]}
         zoom={startZoom}
         near={0.1}
         far={200}

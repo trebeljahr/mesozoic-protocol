@@ -64,14 +64,14 @@ export const PlayScene = () => {
       <Environment
         files="/hdri/rooitou_park_1k.hdr"
         background={false}
-        environmentIntensity={0.32}
+        environmentIntensity={0.22}
       />
 
-      <ambientLight intensity={0.24} color="#dce9ee" />
+      <ambientLight intensity={0.16} color="#c3d9df" />
       <directionalLight
         position={[14, 26, 10]}
-        intensity={2.65}
-        color="#ffe6c6"
+        intensity={3.0}
+        color="#ffe0b8"
         castShadow
         shadow-mapSize-width={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
         shadow-mapSize-height={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
@@ -84,7 +84,7 @@ export const PlayScene = () => {
         shadow-bias={-0.00015}
         shadow-normalBias={0.025}
       />
-      <hemisphereLight args={[style.hemiTop, style.hemiBottom, 0.6]} />
+      <hemisphereLight args={[style.hemiTop, style.hemiBottom, 0.48]} />
 
       <SimTicker />
       <ShaderPrewarm />
