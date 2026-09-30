@@ -3,8 +3,7 @@ import type { TowerKind, TowerUpgrades } from "../sim/types";
 // Visual feedback for the in-game upgrade tree. Each path picks 1–2
 // material "roles" and drifts their colour per tier so the player can
 // read a tower's investment from across the board. Stays inside the
-// existing brand palette and respects tower type (fire stays
-// warm, electric stays cool).
+// existing brand palette, with warm energy accents against cool housings.
 //
 // Two GLB flavours, each with its own tint variant:
 //
@@ -148,19 +147,19 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
       // investment stays readable even when the orb is dim or obscured.
       // Voltage (B) owns the coils independently. Deliberate hue steps
       // keep adjacent tiers distinct instead of blending similar blues.
-      // A stays teal/cyan while B stays magenta/indigo/blue, including
+      // A stays teal/cyan while B moves from magenta to scarlet, including
       // mixed upgrades. The dark foot anchors both against the terrain.
       const coilPurple: [number, number, number] = [
         [0.486, 0.071, 0.863],
-        [0.9, 0.025, 0.42],
-        [0.24, 0.035, 0.95],
-        [0.025, 0.38, 1.0],
+        [0.82, 0.025, 0.68],
+        [0.94, 0.025, 0.4],
+        [1.0, 0.055, 0.22],
       ][b] as [number, number, number];
       const coilPurpleDark: [number, number, number] = [
         [0.2, 0.031, 0.373],
-        [0.46, 0.012, 0.16],
-        [0.1, 0.015, 0.5],
-        [0.012, 0.17, 0.62],
+        [0.34, 0.012, 0.25],
+        [0.4, 0.012, 0.14],
+        [0.46, 0.018, 0.07],
       ][b] as [number, number, number];
       const navyShroud: [number, number, number] = [
         [0.137, 0.169, 0.224],
@@ -368,14 +367,14 @@ export function computeTowerTints(kind: TowerKind, upgrades: TowerUpgrades): Tin
   }
 }
 
-// Per-instance chain orb colour drift along Path A (Arc Reach).
-export function chainOrbBase(tierA: number): [number, number, number] {
-  const t = Math.min(3, Math.max(0, tierA | 0));
+// Path B (Voltage) warms the orb against the pale cyan arcs and cool housing.
+export function chainOrbBase(tierB: number): [number, number, number] {
+  const t = Math.min(3, Math.max(0, tierB | 0));
   return [
     [0.62, 0.86, 1.0],
-    [0.46, 0.74, 1.0],
-    [0.34, 0.62, 1.0],
-    [0.26, 0.52, 1.0],
+    [0.9, 0.12, 0.72],
+    [1.0, 0.08, 0.42],
+    [1.0, 0.065, 0.2],
   ][t] as [number, number, number];
 }
 

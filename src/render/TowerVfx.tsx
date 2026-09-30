@@ -16,7 +16,7 @@ import { chainOrbBase } from "./towerTints";
 const MAX_PER_KIND = 64;
 
 // Crossed arcs hold a fixed pale cool-blue tint — upgrades drift only the
-// orb (Path A) and the body mesh (Path B), never the arcs. Live `intensity`
+// orb/coils (Path B) and the housing (Path A), never the arcs. Live `intensity`
 // still flickers these with charge.
 const CHAIN_ARC_A_TINT: [number, number, number] = [0.7, 0.85, 1.0];
 const CHAIN_ARC_B_TINT: [number, number, number] = [0.66, 0.92, 1.0];
@@ -63,10 +63,9 @@ export const TowerVfx = () => {
       const intensity = baseGlow + (1 - baseGlow) * charge * flicker;
       const orbY = 1.35;
 
-      // Path A (Arc Reach) drifts the orb toward a cool steel blue; the
-      // arcs hold a fixed tint. Path B is reflected on the body mesh in
-      // ModelTowerMesh.
-      const orbBase = chainOrbBase(t.upgrades.a);
+      // Voltage warms the orb toward scarlet while the arcs stay cool,
+      // matching the coil progression applied by ModelTowerMesh.
+      const orbBase = chainOrbBase(t.upgrades.b);
 
       // Core orb
       dummy.position.set(t.pos.x, orbY, -t.pos.y);
