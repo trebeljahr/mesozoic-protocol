@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { classifyPropUrl, TARGET_SIZE_BY_ROLE } from "../biomes";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
@@ -42,7 +42,8 @@ const PropInstancer = ({ url, items }: { url: string; items: PropInstance[] }) =
 
   const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
-  useEffect(() => {
+  // Initialize before the first frame: identity matrices expose the raw asset scale.
+  useLayoutEffect(() => {
     if (!source) return;
     const dummy = new THREE.Object3D();
     // Pre-translation that recenters the geometry on its visible center

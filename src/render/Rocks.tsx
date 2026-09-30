@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_LAYERS, type Biome } from "../biomes";
 import { useEditor } from "../editor/editorStore";
@@ -47,7 +47,8 @@ const RockGroup = ({
 
   const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
-  useEffect(() => {
+  // Initialize before the first frame: identity matrices expose the raw asset scale.
+  useLayoutEffect(() => {
     if (!source) return;
     const dummy = new THREE.Object3D();
     for (const im of partRefs.current) {

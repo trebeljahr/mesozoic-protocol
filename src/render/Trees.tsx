@@ -1,6 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_TREE_URLS } from "../biomes";
 import { useEditor } from "../editor/editorStore";
@@ -233,7 +233,8 @@ export const Trees = () => {
 const VariantGroup = ({ bucket, source }: { bucket: Tree[]; source: VariantSource }) => {
   const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
-  useEffect(() => {
+  // Initialize before the first frame: identity matrices expose the raw asset scale.
+  useLayoutEffect(() => {
     const dummy = new THREE.Object3D();
     for (const im of partRefs.current) {
       if (!im) continue;

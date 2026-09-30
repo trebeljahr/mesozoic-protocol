@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Vec2 } from "../sim/types";
 import { setGroundedTransform } from "./groundedTransform";
@@ -38,7 +38,8 @@ export const InstancedGroup = <T extends GroupItem>({
   const baseScale = source && baseScaleFor ? baseScaleFor(source, url) : 1;
   const partRefs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
-  useEffect(() => {
+  // Initialize before the first frame: identity matrices expose the raw asset scale.
+  useLayoutEffect(() => {
     if (!source) return;
     const dummy = new THREE.Object3D();
     for (const im of partRefs.current) {

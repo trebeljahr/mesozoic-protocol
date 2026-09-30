@@ -1,5 +1,5 @@
 import { useGLTF } from "@react-three/drei";
-import { useEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { collectMeshSource } from "./meshSource";
 import { ALL_OUTPOST_URLS, KIT_SCALE, outpostUrl, type PlacedOutpost } from "./outpostKit";
@@ -63,7 +63,8 @@ const ModelInstances = ({
   }, [scene, url]);
   const refs = useRef<(THREE.InstancedMesh | null)[]>([]);
 
-  useEffect(() => {
+  // Initialize before the first frame: identity matrices expose the raw asset scale.
+  useLayoutEffect(() => {
     if (!source) return;
     const dummy = new THREE.Object3D();
     for (const im of refs.current) {
