@@ -12,22 +12,27 @@ export const COMMAND_PALETTES: Record<Biome, [string, string, string, string]> =
   lava: ["#737b7e", "#a6aba8", "#353c43", "#d7ad88"],
   alien: ["#8c8a9d", "#c1bfd3", "#424758", "#a8e0d6"],
 };
-export function commandBuildingPlan(biome: Biome, variant: number): BaseBlock[] {
+export function commandBuildingPlan(biome: Biome, variant: number, linked = false): BaseBlock[] {
   const palette = COMMAND_PALETTES[biome];
   const [wall, trim, steel, lamp] = palette;
   const blocks: BaseBlock[] = [];
   const add = (at: BaseBlock["at"], size: BaseBlock["size"], color: string) =>
     blocks.push({ at, size, color });
   // Stable forward battery deck: turret origins, aim, and destruction effects do not move.
-  add([0, 0.1, -0.4], [5.8, 0.2, 4.6], steel);
+  if (!linked) add([0, 0.1, -0.4], [5.8, 0.2, 4.6], steel);
   add([0, (HQ_GUN_DECK_HEIGHT - 0.12) / 2, 0], [2.2, HQ_GUN_DECK_HEIGHT - 0.12, 2.15], wall);
   add([0, HQ_GUN_DECK_HEIGHT - 0.06, 0], [2.5, 0.12, 2.45], trim);
-  // Armoured access hatch and service vents give the battery pedestal a human scale.
-  add([0, 0.95, 1.09], [0.85, 1.4, 0.04], steel);
-  add([0, 1.72, 1.13], [1.1, 0.1, 0.16], trim);
-  add([0, 1.48, 1.12], [0.5, 0.08, 0.03], lamp);
+  // Armoured battery face with cooling slits; no domestic doorway silhouette.
+  add([0, 1.25, 1.09], [1.6, 0.58, 0.05], steel);
+  for (const x of [-0.5, 0, 0.5]) add([x, 1.25, 1.13], [0.3, 0.08, 0.025], trim);
   for (const x of [-1.12, 1.12])
     for (let i = 0; i < 3; i++) add([x, 0.85 + i * 0.18, 0.2], [0.04, 0.065, 0.65], steel);
+  if (linked) {
+    // Rear battery housing joins the broad research wings on the shared apron.
+    add([0, 0.98, -1.7], [1.8, 1.5, 1.7], wall);
+    add([0, 1.81, -1.7], [1.95, 0.16, 1.85], trim);
+    return blocks;
+  }
   const module = (kind: BaseStructure, x: number, z: number, scale: number) => {
     for (const block of baseStructurePlan(kind, palette, "intact"))
       add(

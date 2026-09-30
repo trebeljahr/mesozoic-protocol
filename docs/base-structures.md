@@ -31,9 +31,16 @@ relay, hangar, and logistics. All keep the functional turret at the original
 path endpoint and `HQ_GUN_DECK_HEIGHT`. The campaign selects them by level
 and endpoint index with biome materials.
 
-`commandComplexPlan` connects eligible rear docks with a minimal gallery
-network. Every gallery edge must clear all gameplay paths and stay inside
-the union of the existing HQ reservation circles. Unsafe or distant pairs
-remain separate. Coincident endpoints share one architectural shell; this
-does not alter the simulation's endpoints or guns. The HQ scenery layer
-removes internal fences and keeps corpses off the galleries.
+`commandComplexPlan` groups eligible rear docks. `sharedCommandGeometry`
+replaces those groups' individual slabs and rear buildings with one apron,
+central research halls, broad connecting wings, animated specimen tanks,
+and an exterior perimeter. Research halls alternate in height; communications
+and storage equipment occupy the rear flanks. Batteries use armored panels
+and cooling vents instead of door-like hatches.
+
+Shared structures must clear all gameplay paths and remain inside the union
+of existing HQ reservation circles. Perimeter openings follow the actual
+approach lanes. Unsafe or distant pairs remain separate. Coincident endpoints
+share one architectural shell without changing simulation endpoints or guns.
+The HQ scenery layer removes internal fences and keeps corpses outside the
+shared facility. Geometry tests cover pairs, triples, and all campaign paths.

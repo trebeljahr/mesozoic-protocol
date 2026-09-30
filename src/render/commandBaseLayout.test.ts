@@ -57,11 +57,13 @@ describe("connected command outposts", () => {
                 (p) => Math.hypot(p.end.x - point.x, p.end.y - point.y) <= HQ_PAD_BLOCKER_RADIUS,
               ),
             ).toBe(true);
-            for (const path of paths)
-              for (let j = 1; j < path.length; j++)
-                expect(distToSegmentSq(point, path[j - 1], path[j])).toBeGreaterThanOrEqual(
-                  (PATH_WIDTH / 2) ** 2,
-                );
+            expect(
+              paths.every((path) =>
+                path
+                  .slice(1)
+                  .every((end, j) => distToSegmentSq(point, path[j], end) >= (PATH_WIDTH / 2) ** 2),
+              ),
+            ).toBe(true);
           }
       }
     }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { PATH_WIDTH } from "../level";
+import { HQ_PAD_BLOCKER_RADIUS, PATH_WIDTH } from "../level";
 import { mulberry32 } from "../sim/random";
 import type { Vec2 } from "../sim/types";
 import { distToSegmentSq } from "../sim/vec2";
@@ -322,6 +322,7 @@ export const HQBase = () => {
     const primitiveList: PrimitiveInstance[] = [];
 
     for (const pose of complex.poses) {
+      if (complex.poses.some((other) => other !== pose && other.group === pose.group)) continue;
       const path = paths[pose.index];
       const last = path[path.length - 1];
       const prev = path[path.length - 2];
@@ -479,7 +480,13 @@ export const HQBase = () => {
         for (const c of hqCenters) {
           const ix = c.x - wx;
           const iy = c.y - wy;
-          const lim = corpseR + HQ_CLUSTER_RADIUS;
+          const connected = complex.poses.some(
+            (p) =>
+              p.end.x === c.x &&
+              p.end.y === c.y &&
+              complex.poses.some((other) => other !== p && other.group === p.group),
+          );
+          const lim = corpseR + (connected ? HQ_PAD_BLOCKER_RADIUS : HQ_CLUSTER_RADIUS);
           if (ix * ix + iy * iy < lim * lim) {
             blocked = true;
             break;
