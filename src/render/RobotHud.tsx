@@ -12,7 +12,7 @@ const ROBOT_DEATH_DURATION = 0.85;
 const ROBOT_DEATH_EXPLOSION_DURATION = 0.7;
 const ROBOT_DEATH_CORE_DURATION = 0.22;
 const STORM_RING_Y = 0.18;
-const STORM_SPARK_COUNT = 24;
+const PHASE_VEIL_SPARK_COUNT = 24;
 
 // Arrow geometry lives in the local XZ plane with +Z as "forward"
 // (the dash direction). The aim group's yaw rotation maps local +Z
@@ -40,7 +40,7 @@ export const RobotHud = () => {
   const ringRef = useRef<THREE.Mesh>(null);
   const footRef = useRef<THREE.Mesh>(null);
   const moveRef = useRef<THREE.Mesh>(null);
-  const stormSparksRef = useRef<THREE.InstancedMesh>(null);
+  const phaseVeilSparksRef = useRef<THREE.InstancedMesh>(null);
   const sparkTransform = useMemo(() => new THREE.Object3D(), []);
   const stormFillRef = useRef<THREE.Mesh>(null);
   const stormRingRef = useRef<THREE.Mesh>(null);
@@ -150,9 +150,9 @@ export const RobotHud = () => {
     const stormRing = stormRingRef.current;
     const stormPulse = stormPulseRef.current;
     if (stormFill && stormRing && stormPulse) {
-      stormFill.visible = stormActive && robot.selected;
-      stormRing.visible = stormActive && robot.selected;
-      stormPulse.visible = stormActive && robot.selected;
+      stormFill.visible = stormActive;
+      stormRing.visible = stormActive;
+      stormPulse.visible = stormActive;
       if (stormActive) {
         const radius = storm.radius;
         const fade = Math.min(1, Math.max(0, (storm.endAt - world.time) / 0.35));
@@ -171,16 +171,19 @@ export const RobotHud = () => {
         (stormPulse.material as THREE.MeshBasicMaterial).opacity = 0.48 * fade;
       }
     }
-    // Small charged streaks rise off the chassis even when deselected.
+    // Phase Veil (E) sends charged streaks off Leela, even when deselected.
     // Simulation time keeps the emission frozen while the game is paused.
-    const sparks = stormSparksRef.current;
+    const buff = robot.selfBuff;
+    const phaseVeilActive =
+      robot.alive && robot.variant === "leela" && !!buff && world.time < buff.endAt;
+    const sparks = phaseVeilSparksRef.current;
     if (sparks) {
-      sparks.visible = stormActive;
-      if (stormActive) {
+      sparks.visible = phaseVeilActive;
+      if (phaseVeilActive) {
         sparks.position.set(robot.pos.x, 0, -robot.pos.y);
-        const fade = Math.min(1, (storm.endAt - world.time) / 0.35);
-        for (let i = 0; i < STORM_SPARK_COUNT; i++) {
-          const phase = (world.time * (0.85 + (i % 4) * 0.12) + i / STORM_SPARK_COUNT) % 1;
+        const fade = Math.min(1, (buff.endAt - world.time) / 0.35);
+        for (let i = 0; i < PHASE_VEIL_SPARK_COUNT; i++) {
+          const phase = (world.time * (0.85 + (i % 4) * 0.12) + i / PHASE_VEIL_SPARK_COUNT) % 1;
           const angle = i * 2.39996;
           const radius = 0.35 + (i % 5) * 0.12 + phase * 0.15;
           const jitter = Math.sin(Math.floor(world.time * 18) + i * 7) * 0.09;
@@ -346,8 +349,8 @@ export const RobotHud = () => {
         />
       </mesh>
       <instancedMesh
-        ref={stormSparksRef}
-        args={[undefined, undefined, STORM_SPARK_COUNT]}
+        ref={phaseVeilSparksRef}
+        args={[undefined, undefined, PHASE_VEIL_SPARK_COUNT]}
         visible={false}
         frustumCulled={false}
       >

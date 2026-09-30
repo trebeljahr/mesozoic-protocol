@@ -12,7 +12,8 @@ const ORBIT_RADIUS = 1.15;
 // tower SelectionRing (same geometry/material) so a selected robot reads
 // the same way a selected tower does. While the E self-buff is live the
 // ring turns the variant tint, grows to the buffed reach, and a pulsing
-// halo with orbiting glow points hugs the robot.
+// halo with orbiting glow points hugs the robot. Leela uses Phase Veil
+// sparks in RobotHud instead of the E range ring and halo.
 export const RobotSelectionVfx = () => {
   const ringRef = useRef<THREE.Mesh>(null);
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
@@ -35,11 +36,12 @@ export const RobotSelectionVfx = () => {
 
     const buff = robot.selfBuff;
     const eActive = robot.alive && buff !== null && world.time < buff.endAt;
+    const phaseVeilActive = eActive && robot.variant === "leela";
     const rangeMul = eActive ? (spec.abilities[2].rangeMul ?? 1) : 1;
 
     // Range ring — on selection, and while E is active so the player can
     // see the Spotter Drone's boosted reach even without re-selecting.
-    const showRing = robot.alive && (robot.selected || eActive);
+    const showRing = robot.alive && !phaseVeilActive && (robot.selected || eActive);
     ring.visible = showRing;
     if (showRing) {
       ring.position.set(robot.pos.x, 0.04, -robot.pos.y);
@@ -58,8 +60,8 @@ export const RobotSelectionVfx = () => {
 
     // E halo — pulsing disc + ring + orbiting glow points around the
     // robot, only while the slot-2 self-buff window is live.
-    halo.visible = eActive;
-    if (eActive) {
+    halo.visible = eActive && !phaseVeilActive;
+    if (halo.visible) {
       const t = state.clock.elapsedTime;
       halo.position.set(robot.pos.x, 0, -robot.pos.y);
       const pulse = 0.5 + 0.5 * Math.sin(t * 4);
