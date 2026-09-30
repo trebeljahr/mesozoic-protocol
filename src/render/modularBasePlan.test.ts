@@ -17,6 +17,19 @@ describe("modular base reservations", () => {
           }
         }
   });
+  it("bounds the courtyard buildings and leaves the central tank well clear", () => {
+    for (const biome of biomes) {
+      const blocks = modularBasePlan(biome, 2, 4, true);
+      for (const { at, size } of blocks) {
+        expect(
+          Math.hypot(Math.abs(at[0]) + size[0] / 2, Math.abs(at[2]) + size[2] / 2),
+        ).toBeLessThanOrEqual(4);
+        // No tall solid architecture inside the central specimen tank.
+        if (size[1] > 0.6) expect(Math.hypot(at[0], at[2])).toBeGreaterThan(1);
+      }
+      expect(blocks).not.toEqual(modularBasePlan(biome, 2, 4));
+    }
+  });
   it("produces stable layouts and distinct climate treatments", () => {
     const plans = biomes.map((biome) => modularBasePlan(biome, 2, 5));
     expect(new Set(plans.map((plan) => JSON.stringify(plan))).size).toBe(6);

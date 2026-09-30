@@ -27,14 +27,27 @@ const ORDERS: Record<Biome, readonly BaseModule[]> = {
 };
 
 /** Build connected two-, three-, or five-module compounds, bounded by the reserved circle. */
-export function modularBasePlan(biome: Biome, seed: number, radius: number): BaseBlock[] {
+export const courtyardBaseScale = (radius: number): number => Math.min(1, (radius * 0.94) / 6.4);
+
+export function modularBasePlan(
+  biome: Biome,
+  seed: number,
+  radius: number,
+  courtyard = false,
+): BaseBlock[] {
   const [wall, trim, steel, light] = PALETTES[biome];
   const blocks: BaseBlock[] = [];
   const add = (at: BaseBlock["at"], size: BaseBlock["size"], color: string) =>
     blocks.push({ at, size, color });
   const variant = Math.abs(Math.floor(seed)) % 3;
-  const slots =
-    variant === 0
+  const slots = courtyard
+    ? [
+        [-3.6, 0],
+        [3.6, 0],
+        [-1.8, -3.6],
+        [1.8, -3.6],
+      ]
+    : variant === 0
       ? [
           [0, -1.8],
           [0, 1.8],
@@ -55,8 +68,17 @@ export function modularBasePlan(biome: Biome, seed: number, radius: number): Bas
   const order = ORDERS[biome];
   for (const [index, [x, z]] of slots.entries()) {
     const kind = order[(index + Math.abs(Math.floor(seed))) % order.length];
+    const yaw = courtyard ? (x < -3 ? Math.PI / 2 : x > 3 ? -Math.PI / 2 : 0) : 0;
     const box = (at: BaseBlock["at"], size: BaseBlock["size"], color: string) =>
-      add([x + at[0], at[1], z + at[2]], size, color);
+      add(
+        [
+          x + at[0] * Math.cos(yaw) + at[2] * Math.sin(yaw),
+          at[1],
+          z - at[0] * Math.sin(yaw) + at[2] * Math.cos(yaw),
+        ],
+        yaw === 0 ? size : [size[2], size[1], size[0]],
+        color,
+      );
     const h = kind === "cargo" ? 1.35 : kind === "comms" ? 1.9 : 1.65;
     box([0, 0.12, 0], [3.4, 0.24, 3.3], steel);
     box([0, 0.27, 0], [3.15, 0.12, 3.05], trim);
@@ -114,17 +136,32 @@ export function modularBasePlan(biome: Biome, seed: number, radius: number): Bas
     if (biome === "alien") box([1.13, roof + 0.36, -1], [0.16, 0.72, 0.16], light);
     if (biome === "wasteland") box([0.8, h + 0.55, 0.45], [0.85, 0.07, 0.48], "#835a43");
   }
+  if (courtyard) {
+    // Open U-shaped research court, with a broad entry and tank service plinth.
+    add([0, 0.12, -0.3], [6.9, 0.24, 6.6], steel);
+    add([0, 0.26, -0.3], [6.6, 0.04, 6.3], trim);
+    add([0, 0.35, 0], [3.5, 0.16, 3.5], steel);
+    for (const x of [-2.2, 2.2]) {
+      add([x, 0.3, 0.3], [0.12, 0.05, 4.8], light);
+      add([x, 0.68, 2.6], [0.5, 0.8, 0.5], steel);
+      add([x, 1.1, 2.6], [0.55, 0.08, 0.55], light);
+    }
+    // Feed pipes run back to the labs; console faces the open entry.
+    for (const x of [-0.7, 0.7]) add([x, 0.48, -2], [0.16, 0.16, 2], steel);
+    add([1.7, 0.75, 1.7], [0.65, 0.9, 0.6], wall);
+    add([1.7, 1.23, 1.7], [0.56, 0.08, 0.5], light);
+  }
   // A central service spine joins every module's apron, with inset edge markings.
   const minX = Math.min(...slots.map(([x]) => x)) - 1.6;
   const maxX = Math.max(...slots.map(([x]) => x)) + 1.6;
-  add([(minX + maxX) / 2, 0.18, 0], [maxX - minX, 0.2, 0.8], steel);
-  add([(minX + maxX) / 2, 0.29, 0], [maxX - minX - 0.2, 0.03, 0.12], trim);
+  if (!courtyard) add([(minX + maxX) / 2, 0.18, 0], [maxX - minX, 0.2, 0.8], steel);
+  if (!courtyard) add([(minX + maxX) / 2, 0.29, 0], [maxX - minX - 0.2, 0.03, 0.12], trim);
   const extent = Math.max(
     ...blocks.map(({ at, size }) =>
       Math.hypot(Math.abs(at[0]) + size[0] / 2, Math.abs(at[2]) + size[2] / 2),
     ),
   );
-  const scale = Math.min(1, (radius * 0.94) / extent);
+  const scale = courtyard ? courtyardBaseScale(radius) : Math.min(1, (radius * 0.94) / extent);
   return blocks.map(({ at, size, color }) => ({
     at: at.map((v) => v * scale) as BaseBlock["at"],
     size: size.map((v) => v * scale) as BaseBlock["size"],
