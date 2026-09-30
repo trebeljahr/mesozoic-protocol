@@ -9,6 +9,7 @@ import { OUTPOST_BY_ID, type PlacedOutpost } from "./outpostKit";
 // hero colonies in the outer scenery band plus any interior blocker colony.
 export const WorldOutposts = () => {
   const campaign = useGame((s) => !s.world.overrideActive);
+  const levelId = useGame((s) => s.world.levelId);
   const biome = useGame((s) => s.world.biome);
   const showcase = useGame((s) => hasMarshContainment(s.world));
   const paths = useGame((s) => s.world.paths);
@@ -29,7 +30,13 @@ export const WorldOutposts = () => {
     <>
       <OutpostClusters clusters={clusters} />
       {campaign && (
-        <ContainmentCompound outposts={outposts} paths={paths} biome={biome} perimeter={showcase} />
+        <ContainmentCompound
+          seed={levelId}
+          outposts={outposts}
+          paths={paths}
+          biome={biome}
+          perimeter={showcase}
+        />
       )}
     </>
   );

@@ -53,8 +53,8 @@ export function modularBasePlan(
   const blocks: BaseBlock[] = [];
   const add = (at: BaseBlock["at"], size: BaseBlock["size"], color: string) =>
     blocks.push({ at, size, color });
-  const variant = Math.abs(Math.floor(seed)) % 6;
-  const slots = courtyard
+  const variant = Math.abs(Math.floor(seed)) % 9;
+  let slots = courtyard
     ? layout === "twin"
       ? [
           [-3.6, -1.8],
@@ -74,43 +74,79 @@ export function modularBasePlan(
             [-1.8, -3.6],
             [1.8, -3.6],
           ]
-    : variant === 3
+    : variant === 6
       ? [
-          [-2.8, 0],
-          [0.8, 0],
-          [4.4, 1.8],
+          [-3.6, -1.8],
+          [-3.6, 1.8],
+          [0, -1.8],
+          [3.6, -1.8],
         ]
-      : variant === 4
+      : variant === 7
         ? [
-            [-1.8, -3.6],
-            [-1.8, 0],
-            [1.8, 1.8],
+            [-3.6, 0],
+            [0, 0],
+            [3.6, 0],
           ]
-        : variant === 5
+        : variant === 8
           ? [
-              [0, 0],
+              [-1.8, -3.6],
+              [1.8, -3.6],
               [-3.6, 0],
               [3.6, 0],
-              [0, -3.6],
             ]
-          : variant === 0
+          : variant === 3
             ? [
-                [0, -1.8],
-                [0, 1.8],
+                [-2.8, 0],
+                [0.8, 0],
+                [4.4, 1.8],
               ]
-            : variant === 1
+            : variant === 4
               ? [
-                  [-1.8, -1.8],
-                  [1.8, -1.8],
-                  [-1.8, 1.8],
-                ]
-              : [
-                  [-3.6, -1.8],
-                  [0, -1.8],
-                  [3.6, -1.8],
-                  [-1.8, 1.8],
+                  [-1.8, -3.6],
+                  [-1.8, 0],
                   [1.8, 1.8],
-                ];
+                ]
+              : variant === 5
+                ? [
+                    [0, 0],
+                    [-3.6, 0],
+                    [3.6, 0],
+                    [0, -3.6],
+                  ]
+                : variant === 0
+                  ? [
+                      [0, -1.8],
+                      [0, 1.8],
+                    ]
+                  : variant === 1
+                    ? [
+                        [-1.8, -1.8],
+                        [1.8, -1.8],
+                        [-1.8, 1.8],
+                      ]
+                    : [
+                        [-3.6, -1.8],
+                        [0, -1.8],
+                        [3.6, -1.8],
+                        [-1.8, 1.8],
+                        [1.8, 1.8],
+                      ];
+  // Offset lab wings create asymmetrical courts independently of tank/damage choices.
+  if (courtyard) {
+    const wingLayout = Math.abs(Math.floor(seed / 9)) % 3;
+    if (wingLayout === 1)
+      slots = [
+        [-3.6, -1.8],
+        [-3.6, 1.8],
+        [3.6, 0],
+      ];
+    if (wingLayout === 2)
+      slots = [
+        [-3.6, 0],
+        [3.6, -1.8],
+        [3.6, 1.8],
+      ];
+  }
   for (const [index, [x, z]] of slots.entries()) {
     const kind =
       BASE_STRUCTURES[(index * 5 + Math.abs(Math.floor(seed / 9))) % BASE_STRUCTURES.length].id;
@@ -125,8 +161,40 @@ export function modularBasePlan(
         yaw === 0 ? size : [size[2], size[1], size[0]],
         color,
       );
+    const heightScale = [1, 0.85, 1.12][Math.abs(Math.floor(seed / 6) + index) % 3];
     for (const block of baseStructurePlan(kind, PALETTES[biome], condition))
-      box(block.at, block.size, block.color);
+      box(
+        [block.at[0], block.at[1] * heightScale, block.at[2]],
+        [block.size[0], block.size[1] * heightScale, block.size[2]],
+        block.color,
+      );
+    // Armoured observation strip and rooftop utility cluster, away from the central court.
+    if (kind === "lab" || kind === "bunker" || kind === "hangar") {
+      box([0, 1.05 * heightScale, 1.31], [1.7, 0.2, 0.05], light);
+      for (const u of [-0.9, 0.9]) box([u, 0.7, 1.35], [0.15, 1.4, 0.14], steel);
+    }
+    if (!courtyard) {
+      // Segmented protective walls follow exposed module edges, leaving a wide service opening.
+      for (const [dx, dz] of [
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+      ]) {
+        if (
+          slots.some(([sx, sz]) =>
+            sx !== x || sz !== z ? Math.hypot(sx - x - dx * 3.6, sz - z - dz * 3.6) < 2.8 : false,
+          )
+        )
+          continue;
+        if (condition === "breached" && (index + dx + variant) % 3 === 0) continue;
+        add([x + dx * 1.65, 0.5, z + dz * 1.65], [dx ? 0.15 : 3.3, 0.65, dz ? 0.15 : 3.3], wall);
+        add([x + dx * 1.65, 0.86, z + dz * 1.65], [dx ? 0.18 : 3.3, 0.07, dz ? 0.18 : 3.3], trim);
+      }
+      // Watch mast at the exposed front corner; some sites use a low floodlight instead.
+      const mastHeight = (variant + index) % 2 ? 2.8 : 1.6;
+      add([x + 1.5, mastHeight / 2, z + 1.5], [0.12, mastHeight, 0.12], steel);
+      add([x + 1.5, mastHeight, z + 1.5], [0.45, 0.12, 0.24], light);
+    }
   }
   if (courtyard) {
     // Open U-shaped research court, with a broad entry and tank service plinth.
@@ -144,6 +212,12 @@ export function modularBasePlan(
       add([0, 3.62, -1.6], [3.5, 0.23, 0.26], trim);
       add([0, 3.2, -1.6], [0.09, 0.7, 0.09], steel);
     }
+    for (const side of [-1, 1]) {
+      add([side * 3.1, 0.65, 1.75], [0.18, 0.8, 2.5], wall);
+      add([side * 3.1, 1.1, 1.75], [0.24, 0.1, 2.5], trim);
+      add([side * 3.1, 1.75, 2.8], [0.12, 2.9, 0.12], steel);
+      add([side * 3.1, 3.2, 2.8], [0.6, 0.14, 0.3], light);
+    }
     // Feed pipes run back to the labs; console faces the open entry.
     for (const x of [-0.7, 0.7]) add([x, 0.48, -2], [0.16, 0.16, 2], steel);
     add([1.7, 0.75, 1.7], [0.65, 0.9, 0.6], wall);
@@ -152,11 +226,11 @@ export function modularBasePlan(
   // A central service spine joins every module's apron, with inset edge markings.
   const minX = Math.min(...slots.map(([x]) => x)) - 1.6;
   const maxX = Math.max(...slots.map(([x]) => x)) + 1.6;
-  if (!courtyard) add([(minX + maxX) / 2, 0.18, 0], [maxX - minX, 0.2, 0.8], steel);
+  if (!courtyard) add([(minX + maxX) / 2, 0.18, 0], [maxX - minX, 0.2, 1.6], steel);
   if (!courtyard) add([(minX + maxX) / 2, 0.29, 0], [maxX - minX - 0.2, 0.03, 0.12], trim);
   if (!courtyard)
     for (const [x, z] of slots) {
-      if (z !== 0) add([x, 0.18, z / 2], [0.75, 0.2, Math.abs(z) + 0.5], steel);
+      if (z !== 0) add([x, 0.18, z / 2], [1.4, 0.2, Math.abs(z) + 0.5], steel);
     }
   const extent = Math.max(
     ...blocks.map(({ at, size }) =>

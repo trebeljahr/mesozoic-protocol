@@ -8,7 +8,15 @@ import { baseSeed, courtyardBaseScale, modularBasePlan } from "./modularBasePlan
 const noRaycast: THREE.Mesh["raycast"] = () => {};
 
 /** One instanced draw for all compound panels, equipment, and connecting decks. */
-export function ModularBases({ outposts, biome }: { outposts: Outpost[]; biome: Biome }) {
+export function ModularBases({
+  outposts,
+  biome,
+  seed: levelSeed = 0,
+}: {
+  outposts: Outpost[];
+  biome: Biome;
+  seed?: number;
+}) {
   const ref = useRef<THREE.InstancedMesh>(null);
   // At most one landmark per map, using the largest existing reservation.
   const courtyard = useMemo(() => {
@@ -20,13 +28,13 @@ export function ModularBases({ outposts, biome }: { outposts: Outpost[]; biome: 
       outposts
         .filter((o) => !o.interior)
         .flatMap((o) => {
-          const seed = baseSeed(o);
+          const seed = baseSeed(o) + levelSeed * 17;
           return modularBasePlan(biome, seed, o.radius, o.id === courtyard?.id).map((block) => ({
             ...block,
             outpost: o,
           }));
         }),
-    [outposts, biome, courtyard],
+    [outposts, biome, courtyard, levelSeed],
   );
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -71,7 +79,7 @@ export function ModularBases({ outposts, biome }: { outposts: Outpost[]; biome: 
           rotation={[0, courtyard.yaw, 0]}
           scale={courtyardBaseScale(courtyard.radius)}
         >
-          <CourtyardEquipment biome={biome} seed={baseSeed(courtyard)} />
+          <CourtyardEquipment biome={biome} seed={baseSeed(courtyard) + levelSeed * 17} />
         </group>
       )}
     </>

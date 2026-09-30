@@ -69,9 +69,9 @@ describe("connected command outposts", () => {
     }
     expect(linkedLevels).toBeGreaterThanOrEqual(3);
   });
-  it("keeps all four main-base designs inside the existing reservation and preserves the gun deck", () => {
+  it("keeps all six main-base designs inside the existing reservation and preserves the gun deck", () => {
     const shapes = new Set<string>();
-    for (let variant = 0; variant < 4; variant++) {
+    for (let variant = 0; variant < 6; variant++) {
       const blocks = commandBuildingPlan("forest", variant);
       shapes.add(JSON.stringify(blocks));
       for (const b of blocks)
@@ -83,6 +83,6 @@ describe("connected command outposts", () => {
       expect(deck.at[2]).toBe(0);
       expect(deck.at[1] + deck.size[1] / 2).toBeCloseTo(HQ_GUN_DECK_HEIGHT);
     }
-    expect(shapes.size).toBe(4);
+    expect(shapes.size).toBe(6);
   });
 });

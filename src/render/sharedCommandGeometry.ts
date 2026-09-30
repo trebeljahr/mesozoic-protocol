@@ -75,6 +75,7 @@ export function sharedCommandGeometry(
   complex: CommandComplex,
   paths: Vec2[][],
   biome: Biome,
+  seed = 0,
 ): { panels: CommandPanel[]; tanks: CommandTank[] } {
   const [wall, trim, steel, lamp] = COMMAND_PALETTES[biome];
   const panels: CommandPanel[] = [],
@@ -199,14 +200,23 @@ export function sharedCommandGeometry(
     if (depth === undefined) continue;
     const hall = world(0, 0.9);
     add(hall, 0.13, [width + 0.14, 0.26, depth + 0.14], steel, yaw, "floor");
-    const height = index % 2 === 0 ? 2.4 : 1.75;
+    const style = Math.abs(Math.floor(seed + index)) % 6;
+    const height = [2.4, 1.75, 2.8, 2.05, 2.55, 1.9][style];
     const roof = 0.24 + height;
     add(hall, 0.24 + height / 2, [width, height, depth], wall, yaw);
     panels[panels.length - 1].feature = "hall";
     add(hall, roof + 0.08, [width + 0.14, 0.16, depth + 0.14], trim, yaw);
     add(hall, roof + 0.22, [width * 0.74, 0.12, depth * 0.72], steel, yaw);
-    for (const t of [-width * 0.24, width * 0.24])
+    for (const t of style % 2 ? [0] : [-width * 0.24, width * 0.24])
       add(world(t, 0.9), roof + 0.32, [width * 0.32, 0.09, depth * 0.54], lamp, yaw);
+    if (style >= 2) {
+      // Raised ventilation spine or communications array changes the roof silhouette.
+      add(hall, roof + 0.5, [width * 0.35, 0.4, depth * 0.45], steel, yaw);
+      if (style >= 4) {
+        add(hall, roof + 1.1, [0.08, 1, 0.08], trim, yaw);
+        add(hall, roof + 1.5, [width * 0.55, 0.1, 0.15], lamp, yaw);
+      }
+    }
     // Observation band faces a specimen court, not a domestic entrance.
     add(
       world(0, 0.9 - depth / 2 - 0.025),
@@ -249,6 +259,22 @@ export function sharedCommandGeometry(
       if (!rectClear(pos, 0, 1.3, 1.3, complex.poses, paths)) continue;
       tanks.push({ pos, scale, seed: index * 17 + t });
       add(pos, 0.32, [1.22, 0.16, 1.22], steel, yaw);
+    }
+  }
+  // Standalone batteries also have specimen service bays, beside the gun apron.
+  for (const pose of complex.poses) {
+    if (complex.poses.some((p) => p !== pose && p.group === pose.group)) continue;
+    const sides = (seed + pose.index) % 3 === 0 ? [-1, 1] : [(seed + pose.index) % 2 ? -1 : 1];
+    for (const side of sides) {
+      const x = side * 2.12,
+        z = 0.2;
+      const pos = {
+        x: pose.end.x + x * Math.cos(pose.yaw) + z * Math.sin(pose.yaw),
+        y: pose.end.y + x * Math.sin(pose.yaw) - z * Math.cos(pose.yaw),
+      };
+      if (!rectClear(pos, pose.yaw, 0.95, 0.95, complex.poses, paths)) continue;
+      tanks.push({ pos, scale: 1, seed: seed + pose.index * 7 + side });
+      add(pos, 0.3, [0.95, 0.2, 0.95], steel, pose.yaw, "floor");
     }
   }
   const structures = panels.filter((panel) => panel.role === "structure" && panel.size[1] > 0.4);

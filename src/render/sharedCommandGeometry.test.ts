@@ -30,14 +30,42 @@ describe("unified research command complexes", () => {
         expect(cap.at[1] + cap.size[1] / 2).toBeCloseTo(HQ_GUN_DECK_HEIGHT);
       }
   });
+  it("varies roof silhouettes and standalone specimen bays by level seed", () => {
+    const paths = [
+      [
+        { x: 0, y: -12 },
+        { x: 0, y: 0 },
+      ],
+      [
+        { x: 6, y: -12 },
+        { x: 6, y: 0 },
+      ],
+    ];
+    const complex = commandComplexPlan(paths);
+    const designs = Array.from({ length: 6 }, (_, seed) =>
+      sharedCommandGeometry(complex, paths, "forest", seed),
+    );
+    expect(new Set(designs.map((d) => JSON.stringify(d))).size).toBe(6);
+    const single = commandComplexPlan(paths.slice(0, 1));
+    for (let seed = 0; seed < 6; seed++) {
+      const geometry = sharedCommandGeometry(single, paths.slice(0, 1), "forest", seed);
+      expect(geometry.tanks.length).toBeGreaterThan(0);
+      for (const tank of geometry.tanks)
+        for (const block of commandBuildingPlan("forest", seed)) {
+          if (block.at[1] + block.size[1] / 2 <= 0.4) continue;
+          const dx = Math.max(0, Math.abs(tank.pos.x - block.at[0]) - block.size[0] / 2);
+          const dz = Math.max(0, Math.abs(-tank.pos.y - block.at[2]) - block.size[2] / 2);
+          expect(Math.hypot(dx, dz)).toBeGreaterThan(0.42);
+        }
+    }
+  });
   it("keeps shared structures, specimen pads and outer walls inside reserved ground and off gameplay lanes", () => {
     let checked = 0;
     for (const level of LEVELS) {
       const world = createWorld(level),
         complex = commandComplexPlan(world.paths);
-      if (!complex.links.length) continue;
-      checked++;
-      const geometry = sharedCommandGeometry(complex, world.paths, world.biome);
+      if (complex.links.length) checked++;
+      const geometry = sharedCommandGeometry(complex, world.paths, world.biome, level.id);
       expect(geometry.panels.filter((p) => p.feature === "hall")).toHaveLength(
         complex.links.length,
       );

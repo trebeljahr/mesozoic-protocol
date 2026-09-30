@@ -63,7 +63,7 @@ describe("modular base reservations", () => {
       const outposts = createWorld(getLevel(i + 1))
         .outposts.filter((o) => !o.interior && o.radius >= 3.2)
         .sort((a, b) => b.radius - a.radius || a.id - b.id);
-      return outposts[0] ? baseAppearance(baseSeed(outposts[0])) : null;
+      return outposts[0] ? baseAppearance(baseSeed(outposts[0]) + (i + 1) * 17) : null;
     }).filter((a) => a !== null);
     expect(new Set(appearances.map((a) => a.layout)).size).toBe(3);
     expect(new Set(appearances.map((a) => a.condition)).size).toBe(3);

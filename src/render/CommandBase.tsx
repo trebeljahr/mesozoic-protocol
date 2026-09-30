@@ -44,7 +44,7 @@ export const CommandBase = ({
           yaw: pose.yaw,
         });
     }
-    const shared = sharedCommandGeometry(complex, paths, biome);
+    const shared = sharedCommandGeometry(complex, paths, biome, seed);
     return { panels: [...result, ...shared.panels], tanks: shared.tanks };
   }, [paths, biome, seed]);
   useLayoutEffect(() => {

@@ -318,9 +318,11 @@ export const ContainmentCompound = ({
   paths,
   biome = "forest",
   perimeter = true,
+  seed = 0,
 }: {
   biome?: Biome;
   perimeter?: boolean;
+  seed?: number;
   outposts: Outpost[];
   paths: Vec2[][];
 }) => {
@@ -342,7 +344,7 @@ export const ContainmentCompound = ({
           <BattleDamage position={[-20.5, 0.02, 4.8]} seed={23} />
         </>
       )}
-      <ModularBases outposts={outposts} biome={biome} />
+      <ModularBases outposts={outposts} biome={biome} seed={seed} />
       {outposts
         .filter((o) => o.interior)
         .map((o) => (
