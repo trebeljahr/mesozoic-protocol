@@ -24,23 +24,29 @@ describe("campaign terrain safety", () => {
     const geometry = buildTerrainSurface(paths, [], [], "#cbd6dd", true);
     const pos = geometry.getAttribute("position");
     const weights = geometry.getAttribute("terrainSurface");
+    const invalidVertices: number[] = [];
     let laneVertices = 0;
     let groundVertices = 0;
     for (let i = 0; i < pos.count; i++) {
-      expect(pos.getY(i)).toBeCloseTo(0.003, 5);
-      expect(weights.getY(i)).toBe(0);
-      expect(weights.getX(i)).toBeGreaterThanOrEqual(0);
-      expect(weights.getX(i)).toBeLessThanOrEqual(1);
+      const weight = weights.getX(i);
+      // Check every vertex without allocating hundreds of thousands of matchers.
+      if (
+        !(Math.abs(pos.getY(i) - 0.003) < 0.000005) ||
+        weights.getY(i) !== 0 ||
+        !(weight >= 0 && weight <= 1)
+      )
+        invalidVertices.push(i);
       const distance = pathDistance(pos.getX(i), -pos.getZ(i), paths);
       if (distance < PATH_WIDTH * 0.4) {
-        expect(weights.getX(i)).toBe(1);
+        if (weight !== 1) invalidVertices.push(i);
         laneVertices++;
       }
       if (distance > PATH_WIDTH * 2) {
-        expect(weights.getX(i)).toBe(0);
+        if (weight !== 0) invalidVertices.push(i);
         groundVertices++;
       }
     }
+    expect(invalidVertices).toEqual([]);
     expect(laneVertices).toBeGreaterThan(100);
     expect(groundVertices).toBeGreaterThan(1000);
     geometry.dispose();
@@ -57,6 +63,7 @@ describe("campaign terrain safety", () => {
     const uv = geometry.getAttribute("uv");
     const weights = geometry.getAttribute("terrainSurface");
     const seen = new Map<string, number[]>();
+    const discontinuities: { vertex: number; component: number }[] = [];
     for (let i = 0; i < pos.count; i++) {
       const key = `${pos.getX(i).toFixed(5)}:${pos.getZ(i).toFixed(5)}`;
       const values = [
@@ -71,10 +78,13 @@ describe("campaign terrain safety", () => {
       const previous = seen.get(key);
       if (previous)
         values.forEach((v, j) => {
-          expect(v).toBeCloseTo(previous[j], 4);
+          if (!(Math.abs(v - previous[j]) < 0.00005)) {
+            discontinuities.push({ vertex: i, component: j });
+          }
         });
       else seen.set(key, values);
     }
+    expect(discontinuities).toEqual([]);
     expect(seen.size).toBeLessThan(pos.count / 2);
     geometry.dispose();
   });
@@ -82,21 +92,22 @@ describe("campaign terrain safety", () => {
     const geometry = buildTerrainSurface(paths, rivers, lakes, "#456252", true);
     const pos = geometry.getAttribute("position");
     expect(pos.count).toBeLessThan(180000);
+    const invalidVertices: number[] = [];
     let raised = 0;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i),
         y = -pos.getZ(i),
         h = pos.getY(i);
-      expect(Number.isFinite(h)).toBe(true);
-      expect(h).toBeLessThanOrEqual(0.03);
+      if (!Number.isFinite(h) || h > 0.03) invalidVertices.push(i);
       if (
         fluidDistance(x, y, rivers, lakes) >= 0 ||
         pathDistance(x, y, paths) <= PATH_WIDTH / 2 + 0.3
       ) {
-        expect(h).toBeCloseTo(0.003, 5);
+        if (!(Math.abs(h - 0.003) < 0.000005)) invalidVertices.push(i);
       }
       if (h > 0.004) raised++;
     }
+    expect(invalidVertices).toEqual([]);
     expect(raised).toBeGreaterThan(0);
     geometry.dispose();
   });
