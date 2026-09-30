@@ -1,0 +1,50 @@
+import { describe, expect, it } from "vitest";
+import { PATH_WIDTH } from "../level";
+import { buildTerrainSurface, fluidDistance, pathDistance } from "./terrainSurfaceGeometry";
+
+const rivers = [
+  {
+    points: [
+      { x: -12, y: 0 },
+      { x: 12, y: 0 },
+    ],
+    width: 2,
+  },
+];
+const lakes = [{ x: 0, y: 0, rx: 3, ry: 2, rot: 0 }];
+const paths = [
+  [
+    { x: 6, y: -12 },
+    { x: 6, y: 12 },
+  ],
+];
+
+describe("campaign terrain safety", () => {
+  it("treats connected river and pool as a union, without internal shores", () => {
+    expect(fluidDistance(0, 0, rivers, lakes)).toBeLessThan(-1.5);
+    expect(fluidDistance(2, 0, rivers, lakes)).toBeLessThanOrEqual(-1);
+    expect(fluidDistance(0, 3, rivers, lakes)).toBeGreaterThan(0);
+  });
+  it("keeps every dry build surface and bridge approach flat with bounded geometry", () => {
+    const geometry = buildTerrainSurface(paths, rivers, lakes, "#456252", true);
+    const pos = geometry.getAttribute("position");
+    expect(pos.count).toBeLessThan(180000);
+    let raised = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i),
+        y = -pos.getZ(i),
+        h = pos.getY(i);
+      expect(Number.isFinite(h)).toBe(true);
+      expect(h).toBeLessThanOrEqual(0.03);
+      if (
+        fluidDistance(x, y, rivers, lakes) >= 0 ||
+        pathDistance(x, y, paths) <= PATH_WIDTH / 2 + 0.3
+      ) {
+        expect(h).toBeCloseTo(0.003, 5);
+      }
+      if (h > 0.004) raised++;
+    }
+    expect(raised).toBeGreaterThan(0);
+    geometry.dispose();
+  });
+});

@@ -40,6 +40,7 @@ import { ROCK_FOOTPRINT, TOWER_CLEAR_RADIUS, TREE_FOOTPRINT } from "../sim/world
 import { sampleStratifiedFeatures } from "../sim/worley";
 import { useGame } from "../store";
 import { setGroundedTransform } from "./groundedTransform";
+import { TerrainSurface } from "./TerrainSurface";
 
 const nearAnyPath = (paths: Vec2[][], x: number, y: number, clearance: number) => {
   const r2 = clearance * clearance;
@@ -437,6 +438,8 @@ export const Ground = () => {
         <planeGeometry args={[MAP_WIDTH * 6, MAP_HEIGHT * 8]} />
         <meshStandardMaterial color={style.groundColor} roughness={0.98} metalness={0} />
       </mesh>
+
+      <TerrainSurface />
 
       {culledLayers.flatMap(({ spec, buckets }) =>
         buckets.map(({ id, placements }, vi) => (

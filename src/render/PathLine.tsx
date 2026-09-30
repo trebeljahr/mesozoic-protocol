@@ -10,6 +10,7 @@ export const PathLine = () => {
   const paths = useGame((s) => s.world.paths);
   const biome = useGame((s) => s.world.biome);
   const pathDebug = useGame((s) => s.pathDebug);
+  const terrainPath = useGame((s) => s.world.levelId === 4 && !s.world.overrideActive);
   const style = BIOME_STYLE[biome];
   const pathsWithIds = useMemo(
     () =>
@@ -38,9 +39,10 @@ export const PathLine = () => {
   return (
     <group>
       <group>
-        {pathsWithIds.map(({ id, renderPath }) => (
-          <PathOutline key={`out-${id}`} path={renderPath} color={outlineColor} />
-        ))}
+        {!terrainPath &&
+          pathsWithIds.map(({ id, renderPath }) => (
+            <PathOutline key={`out-${id}`} path={renderPath} color={outlineColor} />
+          ))}
       </group>
       <group>
         {pathsWithIds.map(({ id, path, renderPath }) => (
@@ -48,6 +50,7 @@ export const PathLine = () => {
             key={`in-${id}`}
             path={renderPath}
             ringPos={path[0]}
+            terrainPath={terrainPath}
             pathColor={style.pathColor}
             startColor={style.startRing}
           />
@@ -270,20 +273,24 @@ const PathInner = ({
   ringPos,
   pathColor,
   startColor,
+  terrainPath,
 }: {
   path: Vec2[];
   ringPos: Vec2;
   pathColor: string;
   startColor: string;
+  terrainPath: boolean;
 }) => {
   const geometry = useMemo(() => buildRibbonGeometry(path, PATH_WIDTH, PATH_Y_INNER), [path]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   if (path.length < 2) return null;
   return (
     <group>
-      <mesh geometry={geometry} receiveShadow>
-        <meshStandardMaterial color={pathColor} roughness={1} />
-      </mesh>
+      {!terrainPath && (
+        <mesh geometry={geometry} receiveShadow>
+          <meshStandardMaterial color={pathColor} roughness={1} />
+        </mesh>
+      )}
       <mesh position={[ringPos.x, 0.04, -ringPos.y]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[0.6, 1.0, 24]} />
         <meshBasicMaterial color={startColor} transparent opacity={0.6} side={THREE.DoubleSide} />
