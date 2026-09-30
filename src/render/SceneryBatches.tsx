@@ -1,5 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { disposeSceneryMesh } from "./disposeSceneryMesh";
 import { partitionScenery, updateSceneryBounds } from "./sceneryBounds";
 
 type Part = { geom: THREE.BufferGeometry; material: THREE.Material | THREE.Material[] };
@@ -52,7 +53,7 @@ function SceneryCell<T>({
   useLayoutEffect(() => {
     const meshes = refs.current.slice();
     return () => {
-      for (const mesh of meshes) mesh?.dispose();
+      for (const mesh of meshes) if (mesh) disposeSceneryMesh(mesh);
     };
   }, [parts, items.length]);
   return (
