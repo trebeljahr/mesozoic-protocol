@@ -12,6 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
+import { CryoWaves } from "./CryoWaves";
 import { FlameParticles } from "./FlameParticles";
 import { isLightningBeam } from "./lightningGeometry";
 import { BLOOM_LAYER } from "./PaintedPostFx";
@@ -20,7 +21,6 @@ export { CHAIN_BEAM_COLOR } from "./lightningGeometry";
 
 const MAX_PARTICLES = 1024;
 const MAX_EXPLOSIONS = 32;
-const MAX_CRYO_WAVES = 16;
 const MAX_BEAMS = 64;
 const MAX_BEAM_POINTS = 16;
 const BEAM_SUBDIVISIONS = 6; // interior noise points per source segment
@@ -64,8 +64,6 @@ export const Effects = () => {
   const explosionMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const flashRef = useRef<THREE.InstancedMesh>(null);
   const flashMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const cryoWaveRef = useRef<THREE.InstancedMesh>(null);
-  const cryoHaloRef = useRef<THREE.InstancedMesh>(null);
   const beamsGroupRef = useRef<THREE.Group>(null);
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -106,19 +104,13 @@ export const Effects = () => {
   // sphere on geometry change.
   useEffect(() => {
     const big = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e4);
-    const meshes = [
-      particleRef.current,
-      explosionRef.current,
-      flashRef.current,
-      cryoWaveRef.current,
-      cryoHaloRef.current,
-    ];
+    const meshes = [particleRef.current, explosionRef.current, flashRef.current];
     for (const m of meshes) {
       if (!m) continue;
       m.boundingSphere = big.clone();
       m.geometry.boundingSphere = big.clone();
       // Combat VFX are HDR (toneMapped=false additive); opt into the
-      // selective bloom pass so explosions / muzzle flashes / cryo rings
+      // selective bloom pass so explosions / muzzle flashes
       // carry a soft halo instead of reading as flat sprites.
       m.layers.enable(BLOOM_LAYER);
     }
@@ -218,51 +210,6 @@ export const Effects = () => {
     for (let k = 0; k < beamPairs.length; k++) {
       beamPairs[k].core.line.visible = false;
       beamPairs[k].halo.line.visible = false;
-    }
-
-    // Cryo waves: two co-located instanced meshes per wave — a crisp
-    // leading edge (cryoWaveRef) and a softer trailing halo (cryoHaloRef)
-    // — so the ring reads as a frost band with depth instead of a single
-    // pencil line. Expansion is linear in radius (constant front speed),
-    // which is what "emanating outward evenly" looks like.
-    const wMesh = cryoWaveRef.current;
-    const hMesh = cryoHaloRef.current;
-    if (wMesh && hMesh) {
-      let i = 0;
-      for (const w of world.cryoWaves) {
-        if (i >= MAX_CRYO_WAVES) break;
-        const life = Math.max(0, (w.expiresAt - now) / w.maxLife);
-        const progress = 1 - life;
-        const radius = w.maxRadius * progress;
-        // Fade in fast (first ~8% of life) so the ring doesn't pop at the
-        // degenerate r=0 origin, then linearly bleed energy as it expands —
-        // the front is brightest near the tower and fades to nothing as it
-        // reaches the aura edge.
-        const fadeIn = Math.min(1, progress / 0.08);
-        const alpha = fadeIn * life;
-
-        dummy.position.set(w.pos.x, 0.06, -w.pos.y);
-        dummy.rotation.set(-Math.PI / 2, 0, 0);
-        dummy.scale.set(radius, radius, 1);
-        dummy.updateMatrix();
-        wMesh.setMatrixAt(i, dummy.matrix);
-        color.setRGB(0.85, 0.97, 1.0).multiplyScalar(alpha);
-        wMesh.setColorAt(i, color);
-
-        // Halo trails the front slightly (95% radius) and is dimmer + wider.
-        dummy.scale.set(radius * 0.95, radius * 0.95, 1);
-        dummy.updateMatrix();
-        hMesh.setMatrixAt(i, dummy.matrix);
-        color.setRGB(0.55, 0.82, 1.0).multiplyScalar(alpha * 0.6);
-        hMesh.setColorAt(i, color);
-        i++;
-      }
-      wMesh.count = i;
-      hMesh.count = i;
-      wMesh.instanceMatrix.needsUpdate = true;
-      hMesh.instanceMatrix.needsUpdate = true;
-      if (wMesh.instanceColor) wMesh.instanceColor.needsUpdate = true;
-      if (hMesh.instanceColor) hMesh.instanceColor.needsUpdate = true;
     }
 
     let idx = 0;
@@ -413,39 +360,7 @@ export const Effects = () => {
         />
       </instancedMesh>
 
-      <instancedMesh
-        ref={cryoHaloRef}
-        args={[undefined, undefined, MAX_CRYO_WAVES]}
-        renderOrder={2}
-        frustumCulled={false}
-      >
-        <ringGeometry args={[0.78, 1.0, 64]} />
-        <meshBasicMaterial
-          toneMapped={false}
-          transparent
-          opacity={1}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </instancedMesh>
-
-      <instancedMesh
-        ref={cryoWaveRef}
-        args={[undefined, undefined, MAX_CRYO_WAVES]}
-        renderOrder={2}
-        frustumCulled={false}
-      >
-        <ringGeometry args={[0.94, 1.0, 64]} />
-        <meshBasicMaterial
-          toneMapped={false}
-          transparent
-          opacity={1}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </instancedMesh>
+      <CryoWaves />
 
       <group ref={beamsGroupRef} renderOrder={2} />
     </group>
