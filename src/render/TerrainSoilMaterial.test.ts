@@ -48,6 +48,8 @@ describe("terrain biome shader specialization", () => {
     expect(forest.customProgramCacheKey()).not.toBe(desert.customProgramCacheKey());
     expect(desert.customProgramCacheKey()).toBe(snow.customProgramCacheKey());
     expect(forest.defines.TERRAIN_FOREST).toBe(1);
+    expect(snow.vertexColors).toBe(false);
+    expect(desert.vertexColors).toBe(true);
     expect(desert.defines.TERRAIN_FOREST).toBeUndefined();
   });
 

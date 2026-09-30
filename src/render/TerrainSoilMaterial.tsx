@@ -49,11 +49,12 @@ export const TerrainSoilMaterial = ({
       return texture;
     });
     const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
+      // Snow keeps the texture grain without the geometry's beige soil underpainting.
+      vertexColors: biome !== "snow",
       map: textures[0],
       roughnessMap: textures[1],
       normalMap: textures[5] ?? null,
-      normalScale: new THREE.Vector2(0.32, 0.32),
+      normalScale: new THREE.Vector2().setScalar(biome === "snow" ? 0.2 : 0.32),
       roughness: 1,
     });
     const palette = TERRAIN_PALETTE[biome];

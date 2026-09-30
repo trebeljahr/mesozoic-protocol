@@ -130,7 +130,7 @@ export const BIOME_PAINTED: Record<Biome, BiomePainted> = {
   },
   snow: {
     shadowTint: [0.9, 0.96, 1.02],
-    highlightTint: [1.02, 1.01, 1.0],
+    highlightTint: [1.0, 1.01, 1.025],
     dustColor: "#dceaff",
     dustDensity: 0.25,
     bloomBias: 0.8,
@@ -188,10 +188,10 @@ export const BIOME_STYLE: Record<Biome, BiomeStyle> = {
     endRing: "#ff5a3a",
   },
   snow: {
-    groundColor: "#a0b2c2",
-    pathColor: "#6a7a88",
-    sceneBg: "#8eaac0",
-    fogColor: "#98b0c2",
+    groundColor: "#c8dcf2",
+    pathColor: "#8aabc9",
+    sceneBg: "#b4cce4",
+    fogColor: "#c0d5eb",
     fogNear: 30,
     fogFar: 88,
     hemiTop: "#c0d0e0",
@@ -551,7 +551,7 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // ground-cover.
     seed: 3131,
     urls: ["/models/biomes/snow/Bush1.glb", "/models/biomes/snow/Bush2.glb"],
-    count: 55,
+    count: 85,
     clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.18,
     maxScale: 0.28,
@@ -565,7 +565,7 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // material reads as a family; size differential keeps the role clear.
     seed: 5959,
     urls: ["/models/natural/SnowRock1.glb"],
-    count: 30,
+    count: 55,
     clearance: GROUND_COVER_CLEARANCE,
     minScale: 0.13,
     maxScale: 0.22,
@@ -578,15 +578,20 @@ const SNOW_LAYERS: BiomeLayerSpec = [
     // blue colour multiply (see BiomeLayer.tint) so the snowfield keeps the
     // soft sprinkle of the forest floor, tinted for the climate.
     seed: 1717,
-    urls: ["/models/nature/Grass1.glb", "/models/nature/Grass2.glb", "/models/nature/Grass3.glb"],
-    count: 70,
+    urls: [
+      "/models/natural/Grass1.glb",
+      "/models/natural/Grass2.glb",
+      "/models/natural/Grass3.glb",
+    ],
+    count: 320,
     clearance: GROUND_COVER_CLEARANCE,
-    minScale: 0.5,
-    maxScale: 0.9,
+    normalizeTo: 0.42,
+    minScale: 0.65,
+    maxScale: 1.15,
     castShadow: false,
-    footprint: 0.26,
+    footprint: 0.18,
     groundCover: true,
-    tint: [0.7, 0.85, 1.0],
+    tint: [0.95, 0.85, 1.6],
   },
 ];
 

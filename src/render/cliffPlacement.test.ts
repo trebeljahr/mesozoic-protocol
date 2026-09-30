@@ -8,7 +8,7 @@ import { buildCliffs } from "./cliffPlacement";
 
 describe("biome escarpments", () => {
   it.each([
-    11, 13, 15, 16, 18, 20, 26, 28, 30,
+    6, 7, 8, 9, 10, 11, 13, 15, 16, 18, 20, 26, 28, 30,
   ])("keeps level %i cliffs outside play, roads and water", (id) => {
     const world = createWorld(getLevel(id));
     const { biome, paths } = world;
@@ -50,7 +50,6 @@ describe("biome escarpments", () => {
   });
   it("does not add cliffs to other biomes", () => {
     expect(buildCliffs("forest", 1, [])).toEqual([]);
-    expect(buildCliffs("snow", 6, [])).toEqual([]);
     expect(buildCliffs("lava", 21, [])).toEqual([]);
   });
 });

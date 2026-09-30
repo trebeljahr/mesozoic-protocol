@@ -6,6 +6,8 @@ import type { Vec2 } from "../sim/types";
 import { distPointToSegSq } from "../sim/vec2";
 
 export const CLIFF_ROCKS: Partial<Record<Biome, string[]>> = {
+  // Only the closed, solid snow rock; the other natural variants have open backs.
+  snow: ["/models/natural/SnowRock1.glb"],
   desert: [
     "/models/natural/DesertRock1.glb",
     "/models/natural/DesertRock2.glb",
