@@ -15,14 +15,21 @@ import {
   hasFlowFeatures,
   isOnFlowSurface,
 } from "../flowGeometry";
-import { MAP_HEIGHT, MAP_WIDTH } from "../level";
+import { HQ_PAD_BLOCKER_RADIUS, MAP_HEIGHT, MAP_WIDTH } from "../level";
+import {
+  composeEnvironment,
+  compositionDensity,
+  compositionMask,
+  compositionSeeds,
+  type EnvironmentMass,
+  nearestMass,
+} from "../sim/environmentComposition";
 import {
   type LandscapeField,
   landscapeMaskForUrls,
   passesDensityCut,
   scaleTFromDensity,
   spacingForDensity,
-  variantForStand,
 } from "../sim/landscape";
 import { levelLandscape } from "../sim/levelLandscape";
 import { evenSpreadSpacing, poissonDiskSample } from "../sim/poisson";
@@ -32,6 +39,7 @@ import { distPointToSegSq } from "../sim/vec2";
 import { ROCK_FOOTPRINT, TOWER_CLEAR_RADIUS, TREE_FOOTPRINT } from "../sim/world";
 import { sampleStratifiedFeatures } from "../sim/worley";
 import { useGame } from "../store";
+import { setGroundedTransform } from "./groundedTransform";
 
 const nearAnyPath = (paths: Vec2[][], x: number, y: number, clearance: number) => {
   const r2 = clearance * clearance;
@@ -80,12 +88,9 @@ const SPARSE_SPACING_MUL = 2.4;
 // disappear, or the map stops reading as "alive and full".
 const GROUND_COVER_SPARSE_MUL = 1.5;
 
-// Build placements for one non-blocking layer with landscape-driven Poisson
-// disk sampling. Spacing, the accept/reject cut, model choice and scale all
-// read the shared per-level landscape field, so undergrowth follows the same
-// fertile hollows and dry ridges the trees and rocks do instead of speckling
-// the rect uniformly. External constraints (paths, flow, blockers, earlier
-// decor) plug into `isValid`.
+// Fill shared landscape masses with small detail. Hard mass boundaries leave
+// the gaps empty; Poisson spacing and the seeded cut soften each group within
+// those boundaries. External clearance checks remain authoritative.
 const buildLayer = (
   paths: Vec2[][],
   spec: BiomeLayer,
@@ -95,6 +100,7 @@ const buildLayer = (
   levelId: number,
   layerIndex: number,
   field: LandscapeField,
+  masses: EnvironmentMass[],
 ): Placement[][] => {
   const buckets: Placement[][] = spec.urls.map(() => []);
   const footprint = layerFootprint(spec);
@@ -105,26 +111,17 @@ const buildLayer = (
 
   const seedBase = spec.seed + levelId * 1103 + layerIndex * 149;
 
-  // Layer min-spacing — derived from footprint × avg scale × 2 (two
-  // halves touching) plus slack. This only guarantees meshes don't overlap;
-  // for a count well below the rect's capacity it leaves the radius far
-  // under the count-implied spacing, so Bridson clumps points near the seed
-  // frontiers and stops at maxCount with bare gaps between (the patchy look).
-  // The even-spread spacing is the reference the landscape modulation
-  // brackets: tighter in the stands, looser in the clearings, so the layer
-  // still lands near its authored count overall.
+  // Footprint spacing is the lower bound; count-implied spacing controls
+  // detail within a mass without trying to cover the entire playable map.
   const avgScale = (spec.minScale + spec.maxScale) / 2;
   const collisionRMin = 2 * footprint * avgScale + PROP_SPACING_SLACK;
   const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
   const even = evenSpreadSpacing(area, spec.count);
-  // Pack tighter than even spread inside a stand and open out well past it
-  // in the clearings; the two bracket `even` so the layer still lands near
-  // its authored count.
-  const dense = Math.max(collisionRMin, even * 0.7);
+  const dense = Math.max(collisionRMin, even * 0.38);
   const sparseMul = isGroundCover ? GROUND_COVER_SPARSE_MUL : SPARSE_SPACING_MUL;
   const sparse = Math.max(dense, even * sparseMul);
-  const mask = landscapeMaskForUrls(spec.urls, isGroundCover);
-  const densityAt = (x: number, y: number): number => field.density(mask, x, y);
+  const mask = compositionMask(spec.urls, landscapeMaskForUrls(spec.urls, isGroundCover));
+  const densityAt = (x: number, y: number): number => compositionDensity(masses, mask, x, y);
   const radiusAt = (x: number, y: number): number =>
     spacingForDensity(densityAt(x, y), dense, sparse);
   // Ground cover keeps a high floor so clearings stay grassy; sparser
@@ -139,6 +136,7 @@ const buildLayer = (
 
   const isValid = (x: number, y: number): boolean => {
     if (nearAnyPath(paths, x, y, spec.clearance)) return false;
+    if (densityAt(x, y) <= 0) return false;
     if (!passesDensityCut(field, densityAt(x, y), x, y, cutFloor)) return false;
     if (isOnFlowSurface(flow, x, y, flowFootprint)) return false;
     for (const b of blockers) {
@@ -162,11 +160,8 @@ const buildLayer = (
     return true;
   };
 
-  // Stratified initial frontiers — Bridson with a single seed fills a
-  // disc outward from that seed and stops at maxCount, leaving the rest
-  // of the rect bare. Seeding ~one start per √count points gives the
-  // algorithm many parallel fronts so the Poisson scatter covers the
-  // whole playable rect uniformly.
+  // Group silhouettes get first choice. Additional candidates let detail
+  // find valid pockets around blockers, but cannot escape the shared masses.
   const initialPoints = sampleStratifiedFeatures(
     seedBase * 17 + 5,
     bounds,
@@ -179,16 +174,14 @@ const buildLayer = (
     isValid,
     maxCount: spec.count,
     seed: seedBase * 31 + 23,
-    initialPoints,
+    initialPoints: [...compositionSeeds(masses, mask), ...initialPoints],
   });
 
   const detailRng = mulberry32(seedBase * 53 + 91);
   for (const p of points) {
-    // Model choice follows a slow stand field rather than a per-prop coin
-    // flip, so a thicket is mostly one species with the odd stray — the
-    // single biggest tell that a scatter was generated is neighbouring
-    // props cycling through every variant at random.
-    const variant = variantForStand(field, p.x, p.y, spec.urls.length, detailRng());
+    // One species per mass keeps neighbouring detail in the same family.
+    const mass = nearestMass(masses, mask, p.x, p.y).mass;
+    const variant = (mass?.species ?? 0) % spec.urls.length;
     const scaleT = scaleTFromDensity(densityAt(p.x, p.y), detailRng());
     const scale = spec.minScale + scaleT * (spec.maxScale - spec.minScale);
     const r = footprint * scale;
@@ -261,7 +254,13 @@ const NatureInstances = ({
     const size = unionSet ? union.getSize(new THREE.Vector3()) : new THREE.Vector3();
     const maxDim = Math.max(size.x, size.y, size.z, 0.001);
     const minY = unionSet ? union.min.y : 0;
-    return { parts, minY: Number.isFinite(minY) ? minY : 0, maxDim };
+    return {
+      parts,
+      minY: Number.isFinite(minY) ? minY : 0,
+      maxDim,
+      centerX: unionSet ? (union.min.x + union.max.x) / 2 : 0,
+      centerZ: unionSet ? (union.min.z + union.max.z) / 2 : 0,
+    };
   }, [scene, tint]);
 
   // When the layer opts into size normalization, divide the target world size
@@ -278,10 +277,7 @@ const NatureInstances = ({
       for (let i = 0; i < placements.length; i++) {
         const p = placements[i];
         const s = baseScale * p.scale;
-        dummy.position.set(p.x, -source.minY * s, -p.y);
-        dummy.rotation.set(0, p.rot, 0);
-        dummy.scale.setScalar(s);
-        dummy.updateMatrix();
+        setGroundedTransform(dummy, source, { x: p.x, y: p.y }, p.rot, s);
         im.setMatrixAt(i, dummy.matrix);
       }
       im.count = placements.length;
@@ -328,6 +324,7 @@ export const Ground = () => {
   const overrideActive = useGame((s) => s.world.overrideActive);
   const trees = useGame((s) => s.world.trees);
   const rocks = useGame((s) => s.world.rocks);
+  const outposts = useGame((s) => s.world.outposts);
   // world.towers is mutated in place on placement (push), so subscribing to
   // the array reference wouldn't notify React. towerVersion bumps on every
   // place/sell — that's the trigger; the array is read via getState.
@@ -347,23 +344,38 @@ export const Ground = () => {
   // so we don't sprinkle grass into the river.
   const layers = useMemo(() => {
     if (overrideActive) return [];
-    const blockers = buildBlockers(trees, rocks);
+    const blockers = [
+      ...buildBlockers(trees, rocks),
+      ...outposts.map((o) => ({ x: o.pos.x, y: o.pos.y, r: o.radius })),
+      ...paths
+        .filter((p) => p.length > 1)
+        .map((p) => ({ x: p[p.length - 1].x, y: p[p.length - 1].y, r: HQ_PAD_BLOCKER_RADIUS })),
+    ];
     const decor: DecorEntry[] = [];
     const proceduralKey = levelId + proceduralSeed;
     const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, proceduralKey, biome) : null;
     // Same field the sim used for trees/rocks — decor has to agree with the
     // terrain those were placed on, not invent its own.
     const field = levelLandscape(proceduralKey, biome, flow);
+    const masses = composeEnvironment(paths, biome, field);
     return specs.map((spec, layerIndex) => ({
       spec,
-      buckets: buildLayer(paths, spec, decor, blockers, flow, proceduralKey, layerIndex, field).map(
-        (placements) => ({
-          id: nanoid(),
-          placements,
-        }),
-      ),
+      buckets: buildLayer(
+        paths,
+        spec,
+        decor,
+        blockers,
+        flow,
+        proceduralKey,
+        layerIndex,
+        field,
+        masses,
+      ).map((placements) => ({
+        id: nanoid(),
+        placements,
+      })),
     }));
-  }, [paths, specs, biome, levelId, proceduralSeed, overrideActive, trees, rocks]);
+  }, [paths, specs, biome, levelId, proceduralSeed, overrideActive, trees, rocks, outposts]);
 
   // Cull any decor instance the player has built a tower on top of, or that
   // an authored prop stands on, so the base sits on clean ground instead of

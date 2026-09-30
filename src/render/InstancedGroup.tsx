@@ -2,6 +2,7 @@ import { useGLTF } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Vec2 } from "../sim/types";
+import { setGroundedTransform } from "./groundedTransform";
 import { collectMeshSource, type MeshSource } from "./meshSource";
 
 // Shared renderer for the two outdoor cosmetic layers (BiomeCosmetics in
@@ -45,14 +46,7 @@ export const InstancedGroup = <T extends GroupItem>({
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
         const s = baseScale * it.scale;
-        const cos = Math.cos(it.rotY);
-        const sin = Math.sin(it.rotY);
-        const centerX = (source.centerX * cos - source.centerZ * sin) * s;
-        const centerZ = (source.centerX * sin + source.centerZ * cos) * s;
-        dummy.position.set(it.pos.x - centerX, -source.minY * s, -it.pos.y - centerZ);
-        dummy.rotation.set(0, it.rotY, 0);
-        dummy.scale.setScalar(s);
-        dummy.updateMatrix();
+        setGroundedTransform(dummy, source, it.pos, it.rotY, s);
         im.setMatrixAt(i, dummy.matrix);
       }
       im.count = items.length;

@@ -31,16 +31,14 @@ import {
   outpostRadius,
   outpostScaleBand,
 } from "../render/outpostKit";
-import { availableDamageTypes, ensureImmunityCoverage } from "./immunityCoverage";
 import {
-  clamp01,
-  type LandscapeField,
-  landscapeMaskForUrls,
-  passesDensityCut,
-  scaleTFromDensity,
-  spacingForDensity,
-  variantForStand,
-} from "./landscape";
+  composeEnvironment,
+  compositionDensity,
+  compositionSeeds,
+  nearestMass,
+} from "./environmentComposition";
+import { availableDamageTypes, ensureImmunityCoverage } from "./immunityCoverage";
+import { type LandscapeField, landscapeMaskForUrls, scaleTFromDensity } from "./landscape";
 import { levelLandscape } from "./levelLandscape";
 import { prependLeadInToBounds, samplePath, smoothPath } from "./path";
 import { poissonDiskSample } from "./poisson";
@@ -87,7 +85,6 @@ import type {
   World,
 } from "./types";
 import { distPointToSegSq } from "./vec2";
-import { createWorleyField } from "./worley";
 
 export const STARTING_LIVES = 20;
 
@@ -189,13 +186,6 @@ const robotDefaults = (variant: RobotVariant, pos: Vec2, id: EntityId, xp: numbe
 };
 
 export const TREE_COUNT = 22;
-// Trees clump into a handful of groves rather than evenly speckling the
-// map. The Worley field plants this many "grove centres"; Poisson then
-// fills around them at variable spacing.
-const TREE_GROVE_COUNT = 5;
-const TREE_GROVE_RADIUS = 3.8;
-// Looser-than-min spacing in low-density (between-grove) regions.
-const TREE_MAX_SPACING = 7.0;
 export const TREE_VARIANTS = 4;
 export const TREE_CLEARANCE_MARGIN = 2.3;
 // Wider range with a slight central bias gives a more natural mix —
@@ -262,24 +252,9 @@ const buildTrees = (
   const halfH = MAP_HEIGHT / 2 + 9;
   const bounds = { minX: -halfW, maxX: halfW, minY: -halfH, maxY: halfH };
 
-  // Worley field: scatter TREE_GROVE_COUNT "grove centres" — density is
-  // 1 at a centre, smoothly decaying to 0 at TREE_GROVE_RADIUS. Poisson
-  // packs tight inside groves (TREE_MIN_SPACING), loose between them
-  // (TREE_MAX_SPACING) — natural-looking woodland rather than even mat.
-  const worley = createWorleyField(seed, bounds, TREE_GROVE_COUNT, TREE_GROVE_RADIUS);
-  // Grove centres alone give round blobs in arbitrary places. Multiplying
-  // them into the landscape's fertility (moist, flat, off-ridge ground,
-  // banked up along any river) makes the woodland follow terrain: it
-  // spills along a valley, thins on the dry rise, and stops at the scree.
-  const densityAt = (x: number, y: number): number => {
-    const grove = worley.density(x, y);
-    const fert = field.density("canopy", x, y);
-    // Keep a floor under the grove term so a fertile hollow with no grove
-    // centre still grows the odd tree instead of being a hard cut-out.
-    return clamp01(fert * (0.35 + 0.65 * grove));
-  };
-  const radiusAt = (x: number, y: number): number =>
-    spacingForDensity(densityAt(x, y), TREE_MIN_SPACING, TREE_MAX_SPACING);
+  const masses = composeEnvironment(paths, biome, field);
+  const densityAt = (x: number, y: number) => compositionDensity(masses, "canopy", x, y);
+  const radiusAt = () => TREE_MIN_SPACING;
 
   // Pre-compute HQ blocker centres so trees never spawn inside (or just
   // outside) the home-base fence — HQBase.tsx renders its own authored
@@ -292,7 +267,7 @@ const buildTrees = (
     // Real clearings: without a cut, Bridson eventually backfills the
     // meadows once the fertile ground is full and the woodland reads as
     // even scatter again.
-    if (!passesDensityCut(field, densityAt(x, y), x, y, 0.08)) return false;
+    if (densityAt(x, y) <= 0) return false;
     for (const path of paths) {
       for (let i = 0; i < path.length - 1; i++) {
         if (distPointToSegSq(x, y, path[i].x, path[i].y, path[i + 1].x, path[i + 1].y) < pathR2) {
@@ -320,10 +295,8 @@ const buildTrees = (
     isValid,
     maxCount: TREE_COUNT,
     seed: seed * 31 + 17,
-    // Seed Bridson with each grove centre so the placement spreads
-    // across all groves rather than packing TREE_COUNT trees around
-    // the first one the algorithm walks into.
-    initialPoints: worley.features,
+    // Plant the authored group silhouettes before filling their fringes.
+    initialPoints: compositionSeeds(masses, "canopy"),
   });
 
   // Variant/scale/rot stream is independent so changes to count/spacing
@@ -338,25 +311,18 @@ const buildTrees = (
     // fringe rather than shuffling sizes at random. Biomes with a tight
     // BIOME_TREE_SCALE_RANGE (alien) collapse this to a uniform big size.
     const jitter = (rng() + rng()) / 2;
-    const t = scaleTFromDensity(densityAt(p.x, p.y), jitter, 0.45);
+    const t = scaleTFromDensity(densityAt(p.x, p.y), jitter, 0.8);
     trees.push({
       id: nextId++,
       pos: { x: p.x, y: p.y },
-      // Species follows the stand field so a grove is mostly one kind of
-      // tree with a few strays — random per-tree variants are the loudest
-      // "this was generated" signal on a wooded map.
-      variant: variantForStand(field, p.x, p.y, TREE_VARIANTS, rng()),
+      // A grove has one species; silhouette and scale provide variation.
+      variant: (nearestMass(masses, "canopy", p.x, p.y).mass?.species ?? 0) % TREE_VARIANTS,
       scale: (treeMinScale + t * (treeMaxScale - treeMinScale)) * biomeScale,
       rot: rng() * Math.PI * 2,
     });
   }
   return { trees, nextId };
 };
-
-// Per-layer rock-to-rock spacing multiplier — sparse-region Poisson
-// radius is ROCK_MIN_SPACING × this. Tuned so the variation between
-// "rock pile centre" and "loose stones" reads naturally.
-const ROCK_MAX_SPACING_MUL = 3.0;
 
 const buildRocks = (
   biome: Biome,
@@ -377,35 +343,21 @@ const buildRocks = (
   const hqCenters = paths.filter((p) => p.length >= 2).map((p) => p[p.length - 1]);
 
   const layers = BIOME_LAYERS[biome];
+  const masses = composeEnvironment(paths, biome, field);
   for (let layerIndex = 0; layerIndex < layers.length; layerIndex++) {
     const spec = layers[layerIndex];
     if (!spec.blocks) continue;
     const seedBase = spec.seed + levelId * 1013 + layerIndex * 97;
 
-    // Each blocking layer gets its own Worley field — different layers
-    // in the same biome have independent feature positions so a rock-
-    // pile centre and a crystal-cluster centre don't always line up.
-    const sigma = spec.cluster?.sigma ?? 2.5;
-    const featureRadius = sigma * 2.0;
-    const featureCount = spec.cluster?.seeds ?? 5;
-    const worley = createWorleyField(seedBase, bounds, featureCount, featureRadius);
     const baseFootprint = blockingFootprint(spec);
     const avgScale = (spec.minScale + spec.maxScale) / 2;
     const candidateR = baseFootprint * spec.maxScale;
     const treeSpacing = candidateR + TREE_FOOTPRINT * 0.8;
     const treeSpacingSq = treeSpacing * treeSpacing;
     const rMin = Math.max(ROCK_MIN_SPACING, 2 * baseFootprint * avgScale + 0.4);
-    const rMax = rMin * ROCK_MAX_SPACING_MUL;
-    // Same idea as the groves: the Worley pile centres say "a cluster
-    // belongs somewhere around here", the landscape mask says which ground
-    // can hold it — steep, dry, high, and away from the fertile hollows the
-    // trees took. Debris/bone/crystal layers classify onto the rock mask
-    // too; anything plant-shaped in a blocking layer follows vegetation.
     const mask = landscapeMaskForUrls(spec.urls);
-    const densityAt = (x: number, y: number): number =>
-      clamp01(field.density(mask, x, y) * (0.35 + 0.65 * worley.density(x, y)));
-    const radiusAt = (x: number, y: number): number =>
-      spacingForDensity(densityAt(x, y), rMin, rMax);
+    const densityAt = (x: number, y: number) => compositionDensity(masses, mask, x, y);
+    const radiusAt = () => rMin;
 
     const pathR2 = spec.clearance * spec.clearance;
     // Snapshot rocks from earlier layers so this layer's Poisson treats
@@ -420,7 +372,7 @@ const buildRocks = (
 
     const isValid = (x: number, y: number): boolean => {
       if (isOnFlowSurface(flow, x, y, flowFootprint)) return false;
-      if (!passesDensityCut(field, densityAt(x, y), x, y, 0.1)) return false;
+      if (densityAt(x, y) <= 0) return false;
       for (const path of paths) {
         for (let i = 0; i < path.length - 1; i++) {
           if (distPointToSegSq(x, y, path[i].x, path[i].y, path[i + 1].x, path[i + 1].y) < pathR2) {
@@ -461,19 +413,18 @@ const buildRocks = (
       isValid,
       maxCount: spec.count,
       seed: seedBase * 31 + 17,
-      // Seed Bridson with each Worley feature so every rock pile gets
-      // its own frontier instead of all `spec.count` rocks stacking
-      // around the first feature the algorithm reaches.
-      initialPoints: worley.features,
+      // The same formation anchors drive boulders and surface fragments.
+      initialPoints: compositionSeeds(masses, mask),
     });
 
     const detailRng = mulberry32(seedBase * 53 + 91);
     for (const p of points) {
-      const variant = variantForStand(field, p.x, p.y, spec.urls.length, detailRng());
+      const mass = nearestMass(masses, mask, p.x, p.y).mass;
+      const variant = (mass?.species ?? 0) % spec.urls.length;
       const jitter = (detailRng() + detailRng()) / 2;
-      const t = scaleTFromDensity(densityAt(p.x, p.y), jitter, 0.45);
+      const t = scaleTFromDensity(densityAt(p.x, p.y), jitter, 0.8);
       const scale = spec.minScale + t * (spec.maxScale - spec.minScale);
-      const rot = detailRng() * Math.PI * 2;
+      const rot = -(mass?.yaw ?? 0) + (detailRng() - 0.5) * 0.35;
       rocks.push({
         id: nextId++,
         pos: { x: p.x, y: p.y },

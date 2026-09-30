@@ -44,7 +44,6 @@ const PATH_CLEARANCE = PATH_WIDTH / 2 + 1.2;
 // the stratified-seed grid pitch so the even anchor points don't reject
 // each other.
 const PROP_SPACING = 2.4;
-const STORY_SIDE = PATH_WIDTH / 2 + 0.25;
 
 const STORY_TARGET_HEIGHT = new Map<string, number>([
   ["/models/landmarks/desert/Tent.glb", 0.62],
@@ -202,6 +201,15 @@ const buildStoryDetails = (
 
   const blockedByWorld = (x: number, y: number, radius: number): boolean => {
     if (!inBounds(x, y)) return true;
+    for (const path of paths) {
+      for (let i = 1; i < path.length; i++) {
+        if (
+          distPointToSegSq(x, y, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y) <
+          (PATH_WIDTH / 2 + radius + 0.8) ** 2
+        )
+          return true;
+      }
+    }
     if (isOnFlowSurface(flow, x, y, radius)) return true;
     for (const c of hqCenters) {
       const dx = c.x - x;
@@ -254,39 +262,54 @@ const buildStoryDetails = (
         opacity: style.traceOpacity,
       });
     }
+  }
 
-    const primaryIndex = levelId % 2 === 0 ? 0 : (levelId + pathIndex) % urls.length;
-    const secondaryIndex = (levelId * 3 + pathIndex + 1) % urls.length;
-    const picks = [urls[primaryIndex], urls[secondaryIndex]].filter(
-      (url, i, arr) => arr.indexOf(url) === i,
-    );
-
-    for (let i = 0; i < Math.min(2, picks.length); i++) {
-      const url = picks[i];
-      const radius = storyRadiusFor(url);
-      // Start ≥4.6 along the approach so 3D props sit beyond the HQ
-      // compound (fence corner ≈ 4.1 from the tower) instead of crowding
-      // right in front of the turret.
-      const p = at(clampFwd(4.6 + i * 1.25 + rng() * 0.4), sideSign * (STORY_SIDE - i * 0.1));
-      if (blockedByWorld(p.x, p.y, radius)) continue;
-      instances.push({
-        url,
-        pos: p,
-        scale: 0.9 + rng() * 0.25,
-        rotY: yaw + Math.PI + (rng() - 0.5) * 0.65,
-        clearRadius: radius,
-      });
-    }
-
-    const markerPos = at(clampFwd(4.9 + rng() * 0.55), sideSign * (STORY_SIDE + 0.02));
-    if (!blockedByWorld(markerPos.x, markerPos.y, 0.28)) {
-      markers.push({
-        pos: markerPos,
-        rotY: yaw + Math.PI,
-        clearRadius: 0.28,
-        color: style.marker,
-        accent: style.markerAccent,
-      });
+  // Two small field stations with a shared facing and fixed role hierarchy.
+  // Accept complete groups only: dropping whichever piece happens to fit
+  // turns a station back into isolated roadside debris.
+  let sites = 0;
+  for (const path of paths) {
+    if (path.length < 3 || sites >= 2) continue;
+    for (const fraction of [0.35, 0.65, 0.5, 0.2, 0.8]) {
+      if (sites >= 2) break;
+      const i = Math.min(path.length - 2, Math.floor(path.length * fraction));
+      const a = path[i],
+        b = path[i + 1];
+      const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const fx = (b.x - a.x) / length,
+        fy = (b.y - a.y) / length;
+      for (const side of [1, -1]) {
+        const center = { x: a.x - fy * side * 4.5, y: a.y + fx * side * 4.5 };
+        if (instances.some((p) => Math.hypot(p.pos.x - center.x, p.pos.y - center.y) < 7)) continue;
+        const offsets = [
+          [0, 0, 1.1],
+          [1.25, 0.35, 0.85],
+          [0.7, -0.9, 0.72],
+        ];
+        const group = offsets.map(([along, depth, scale], index): Instance => {
+          const url = urls[index % urls.length];
+          return {
+            url,
+            scale,
+            rotY: Math.atan2(fx, -fy) + (side > 0 ? Math.PI / 2 : -Math.PI / 2),
+            pos: { x: center.x + fx * along - fy * depth, y: center.y + fy * along + fx * depth },
+            clearRadius: storyRadiusFor(url) * scale,
+          };
+        });
+        if (group.some((p) => blockedByWorld(p.pos.x, p.pos.y, p.clearRadius ?? 0.5))) continue;
+        instances.push(...group);
+        const markerPos = { x: center.x - fx * 0.9, y: center.y - fy * 0.9 };
+        if (!blockedByWorld(markerPos.x, markerPos.y, 0.28))
+          markers.push({
+            pos: markerPos,
+            rotY: group[0].rotY,
+            clearRadius: 0.28,
+            color: style.marker,
+            accent: style.markerAccent,
+          });
+        sites++;
+        break;
+      }
     }
   }
 
@@ -480,6 +503,7 @@ export const BiomeCosmetics = () => {
   const proceduralSeed = useGame((s) => s.world.proceduralSeed);
   const trees = useGame((s) => s.world.trees);
   const rocks = useGame((s) => s.world.rocks);
+  const outposts = useGame((s) => s.world.outposts);
   // world.towers is mutated in place on placement (push), so subscribing to
   // the array reference wouldn't notify React. towerVersion bumps on every
   // place/sell — that's the trigger; the array is read via getState.
@@ -489,6 +513,7 @@ export const BiomeCosmetics = () => {
   const details = useMemo(() => {
     // Block cosmetics from spawning on top of trees/rocks that already exist.
     const blockers: { pos: Vec2; radius: number }[] = [
+      ...outposts.map((o) => ({ pos: o.pos, radius: o.radius })),
       ...trees.map((t) => ({ pos: t.pos, radius: 0.9 * t.scale })),
       ...rocks.map((r) => ({ pos: r.pos, radius: 0.7 * r.scale })),
     ];
@@ -507,7 +532,7 @@ export const BiomeCosmetics = () => {
       byUrl.set(inst.url, list);
     }
     return { groups: Array.from(byUrl.entries()), traces: story.traces, markers: story.markers };
-  }, [biome, paths, levelId, proceduralSeed, trees, rocks]);
+  }, [biome, paths, levelId, proceduralSeed, trees, rocks, outposts]);
 
   // Cull cosmetics that overlap a tower so the base sits on clean ground.
   // Filtered at render-time to keep placement stable as towers come/go.

@@ -7,6 +7,7 @@ import { useEditor } from "../editor/editorStore";
 import type { Rock } from "../sim/types";
 import { meshXZRadii, ROCK_REMOVE_COST } from "../sim/world";
 import { useGame } from "../store";
+import { setGroundedTransform } from "./groundedTransform";
 import { collectMeshSource } from "./meshSource";
 
 const rockUrl = (biome: Biome, rock: Rock): string | undefined =>
@@ -54,10 +55,7 @@ const RockGroup = ({
       for (let i = 0; i < rocks.length; i++) {
         const r = rocks[i];
         const s = baseScale * r.scale;
-        dummy.position.set(r.pos.x, -source.minY * s, -r.pos.y);
-        dummy.rotation.set(0, r.rot, 0);
-        dummy.scale.setScalar(s);
-        dummy.updateMatrix();
+        setGroundedTransform(dummy, source, r.pos, r.rot, s);
         im.setMatrixAt(i, dummy.matrix);
       }
       im.count = rocks.length;

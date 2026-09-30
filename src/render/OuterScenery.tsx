@@ -15,10 +15,21 @@ import {
   hasFlowFeatures,
   isOnFlowSurface,
 } from "../flowGeometry";
-import { MAP_HEIGHT, MAP_WIDTH } from "../level";
+import { HQ_PAD_BLOCKER_RADIUS, MAP_HEIGHT, MAP_WIDTH } from "../level";
+import {
+  composeEnvironment,
+  compositionDensity,
+  compositionMask,
+  compositionSeeds,
+  type EnvironmentMass,
+  nearestMass,
+} from "../sim/environmentComposition";
+import { landscapeMaskForUrls } from "../sim/landscape";
+import { levelLandscape } from "../sim/levelLandscape";
 import { evenSpreadSpacing, poissonDiskSample } from "../sim/poisson";
 import { mulberry32 } from "../sim/random";
 import type { Vec2 } from "../sim/types";
+import { distPointToSegSq } from "../sim/vec2";
 import { sampleStratifiedFeatures } from "../sim/worley";
 import { useGame } from "../store";
 import { InstancedGroup } from "./InstancedGroup";
@@ -74,7 +85,7 @@ const BAND_AREA = OUTER_HALF_W * 2 * OUTER_HALF_H * 2 - INNER_HALF_W * 2 * INNER
 const INNER_AREA = MAP_WIDTH * MAP_HEIGHT;
 const BAND_RATIO = BAND_AREA / INNER_AREA;
 
-type Instance = { url: string; pos: Vec2; scale: number; rotY: number };
+type Instance = { url: string; pos: Vec2; scale: number; rotY: number; radius: number };
 
 const cosmeticScale = (rng: () => number): number => 0.7 + ((rng() + rng()) / 2) * 0.7;
 
@@ -132,17 +143,17 @@ const OUTER_BOUNDS = {
   maxY: OUTER_HALF_H,
 };
 
-// Mirror one BIOME_LAYER on the band at proportional count using uniform
-// Poisson sampling — non-removable outer decor should spread evenly
-// across the band rather than clump into Worley features. Spacing is
-// derived from the layer's footprint × max scale. Spacing-checks against
-// the running `out` list so previously-placed layers don't collide.
+// Continue the playable composition across the rim using the same anchors,
+// families and clearance checks. Empty gaps extend through the boundary.
 const placeLayerInBand = (
   out: Instance[],
   layer: BiomeLayer,
   levelId: number,
   layerIndex: number,
   flow: FlowFeatures | null,
+  masses: EnvironmentMass[],
+  paths: Vec2[][],
+  blockers: { pos: Vec2; radius: number }[],
 ): void => {
   // Buildings are robot focal points; don't sprinkle them in the corners.
   if (layer.urls.every((u) => classifyPropUrl(u) === "building")) return;
@@ -151,9 +162,9 @@ const placeLayerInBand = (
   if (targetCount === 0) return;
 
   const seedBase = layer.seed * 17 + levelId * 4451 + layerIndex * 991;
-  // Floor footprint spacing at the count-implied even spread (band area) so
-  // the rim layers cover the band evenly instead of clumping near seeds.
-  const rMin = Math.max(layerMinSpacing(layer), evenSpreadSpacing(BAND_AREA, targetCount));
+  // Concentrate the count within the shared masses instead of filling gaps.
+  const rMin = Math.max(layerMinSpacing(layer), evenSpreadSpacing(BAND_AREA, targetCount) * 0.45);
+  const mask = compositionMask(layer.urls, landscapeMaskForUrls(layer.urls, layer.groundCover));
 
   // Conservative footprint for the cross-layer check — use this layer's
   // max-scale instance so a worst-case sibling at the candidate position
@@ -162,13 +173,25 @@ const placeLayerInBand = (
 
   const isValid = (x: number, y: number): boolean => {
     if (insideInner(x, y)) return false;
+    if (compositionDensity(masses, mask, x, y) <= 0) return false;
+    for (const path of paths) {
+      for (let i = 1; i < path.length; i++) {
+        if (
+          distPointToSegSq(x, y, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y) <
+          layer.clearance ** 2
+        )
+          return false;
+      }
+    }
+    if (blockers.some((b) => Math.hypot(b.pos.x - x, b.pos.y - y) < b.radius + candidateR + 0.2))
+      return false;
     // Rivers/lakes run off the play rect into the band; keep band decor off
     // the water tails just like the inner placement does.
     if (isOnFlowSurface(flow, x, y, candidateR + 0.2)) return false;
     for (const o of out) {
       const dx = o.pos.x - x;
       const dy = o.pos.y - y;
-      const min = candidateR + PROP_SPACING_SLACK;
+      const min = candidateR + o.radius + PROP_SPACING_SLACK;
       if (dx * dx + dy * dy < min * min) return false;
     }
     return true;
@@ -185,16 +208,19 @@ const placeLayerInBand = (
     isValid,
     maxCount: targetCount,
     seed: seedBase + 7,
-    initialPoints,
+    initialPoints: [...compositionSeeds(masses, mask), ...initialPoints],
   });
 
   const detailRng = mulberry32(seedBase + 13);
   for (const p of points) {
-    const url = layer.urls[Math.floor(detailRng() * layer.urls.length)];
+    const mass = nearestMass(masses, mask, p.x, p.y).mass;
+    const url = layer.urls[(mass?.species ?? 0) % layer.urls.length];
+    const scale = layerScale(detailRng, layer);
     out.push({
       url,
       pos: { x: p.x, y: p.y },
-      scale: layerScale(detailRng, layer),
+      scale,
+      radius: layerFootprint(layer) * scale,
       rotY: detailRng() * Math.PI * 2,
     });
   }
@@ -250,13 +276,21 @@ const placeUniformInBand = (
       url,
       pos: { x: p.x, y: p.y },
       scale: scaleFn(detailRng),
+      radius: flowFootprint,
       rotY: detailRng() * Math.PI * 2,
     });
   }
 };
 
-const buildInstances = (biome: Biome, levelId: number, flow: FlowFeatures | null): Instance[] => {
+const buildInstances = (
+  biome: Biome,
+  levelId: number,
+  flow: FlowFeatures | null,
+  paths: Vec2[][],
+  blockers: { pos: Vec2; radius: number }[],
+): Instance[] => {
   const out: Instance[] = [];
+  const masses = composeEnvironment(paths, biome, levelLandscape(levelId, biome, flow));
 
   // Non-blocking ground layers (grass, etc.) in the outer band. Blocking
   // layers (rocks) and trees are now spawned by buildRocks/buildTrees in
@@ -265,7 +299,7 @@ const buildInstances = (biome: Biome, levelId: number, flow: FlowFeatures | null
   const layers = BIOME_LAYERS[biome];
   for (let li = 0; li < layers.length; li++) {
     if (layers[li].blocks) continue;
-    placeLayerInBand(out, layers[li], levelId, li, flow);
+    placeLayerInBand(out, layers[li], levelId, li, flow, masses, paths, blockers);
   }
 
   // Cosmetics (forest BushFlowers etc.) rendered separately on the
@@ -312,10 +346,25 @@ export const OuterScenery = () => {
   const biome = useGame((s) => s.world.biome);
   const levelId = useGame((s) => s.world.levelId);
   const paths = useGame((s) => s.world.paths);
+  const proceduralSeed = useGame((s) => s.world.proceduralSeed);
+  const overrideActive = useGame((s) => s.world.overrideActive);
+  const outposts = useGame((s) => s.world.outposts);
+  const trees = useGame((s) => s.world.trees);
+  const rocks = useGame((s) => s.world.rocks);
 
   const groups = useMemo(() => {
-    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, levelId, biome) : null;
-    const instances = buildInstances(biome, levelId, flow);
+    if (overrideActive) return [];
+    const key = levelId + proceduralSeed;
+    const flow = hasFlowFeatures(biome) ? buildFlowFeatures(paths, key, biome) : null;
+    const blockers = [
+      ...outposts.map((o) => ({ pos: o.pos, radius: o.radius })),
+      ...trees.map((t) => ({ pos: t.pos, radius: 0.85 * t.scale })),
+      ...rocks.map((r) => ({ pos: r.pos, radius: 0.7 * r.scale })),
+      ...paths
+        .filter((p) => p.length > 1)
+        .map((p) => ({ pos: p[p.length - 1], radius: HQ_PAD_BLOCKER_RADIUS })),
+    ];
+    const instances = buildInstances(biome, key, flow, paths, blockers);
     const byUrl = new Map<string, Instance[]>();
     for (const inst of instances) {
       const list = byUrl.get(inst.url) ?? [];
@@ -323,7 +372,7 @@ export const OuterScenery = () => {
       byUrl.set(inst.url, list);
     }
     return Array.from(byUrl.entries());
-  }, [biome, levelId, paths]);
+  }, [biome, levelId, proceduralSeed, overrideActive, paths, outposts, trees, rocks]);
 
   // Per-biome URL→normalizeTo from the non-blocking layers (blocking layers
   // render via Rocks.tsx, not here). Only this biome's layers are consulted so

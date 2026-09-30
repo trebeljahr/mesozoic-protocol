@@ -449,25 +449,19 @@ const SNOW_LAYERS: BiomeLayerSpec = [
   // hidden easter egg (EASTER_EGG_DEFS "snowman" in easterEggs.ts) so it
   // reads as a rare find rather than set-dressing.
   {
-    // Snow conifers — birch + pine snow variants. These read as tree-sized
+    // Snow conifers. These read as tree-sized
     // silhouettes, so they're a *blocking* obstacle layer (clearable via the
     // remove flow) rather than untouchable decor that sits in build slots
-    // permanently — same treatment as DEAD_TREE_LAYER. Authored max-dims span
-    // 2.7–5.1 units across the 10 variants, so normalizeTo pins every one to a
+    // permanently — same treatment as DEAD_TREE_LAYER. normalizeTo pins each to a
     // consistent ~2.2-unit young-tree size; the relative band adds variation.
     // Kept a touch smaller than the clearable obstacle trees (BIOME_TREE_URLS).
     seed: 8181,
+    // A single conifer family keeps the young-tree layer coherent with the
+    // mature grove silhouettes; archived source models remain on disk.
     urls: [
       "/models/biomes/snow/PineTreeSnow1.glb",
       "/models/biomes/snow/PineTreeSnow2.glb",
-      "/models/biomes/snow/PineTreeSnow3.glb",
       "/models/biomes/snow/PineTreeSnow4.glb",
-      "/models/biomes/snow/PineTreeSnow5.glb",
-      "/models/biomes/snow/BirchTreeSnow1.glb",
-      "/models/biomes/snow/BirchTreeSnow2.glb",
-      "/models/biomes/snow/BirchTreeSnow3.glb",
-      "/models/biomes/snow/BirchTreeSnow4.glb",
-      "/models/biomes/snow/BirchTreeSnow5.glb",
     ],
     count: 12,
     clearance: PATH_WIDTH / 2 + 1.0,
@@ -886,7 +880,7 @@ export const BIOME_TREE_URLS: Record<Biome, string[]> = {
     // Tree3 was the 'shiny cluster of polyhedra' variant that reads as
     // broken — swapped for another Tree1 so the slot still has 4 entries.
     "/models/nature/Tree1.glb",
-    "/models/nature/Tree4.glb",
+    "/models/nature/Tree2.glb",
   ],
   desert: [
     "/models/biomes/desert/Tree1.glb",
@@ -895,13 +889,10 @@ export const BIOME_TREE_URLS: Record<Biome, string[]> = {
     "/models/biomes/desert/Tree4.glb",
   ],
   snow: [
-    "/models/biomes/snow/Tree1.glb",
-    "/models/biomes/snow/Tree2.glb",
-    // Tree3 pulled — it renders with a shiny material and holes punched
-    // through the trunk; swapped the slot for Tree5 which is a clean
-    // snow-capped pine.
-    "/models/biomes/snow/Tree5.glb",
-    "/models/biomes/snow/Tree4.glb",
+    "/models/biomes/snow/PineTreeSnow1.glb",
+    "/models/biomes/snow/PineTreeSnow2.glb",
+    "/models/biomes/snow/PineTreeSnow4.glb",
+    "/models/biomes/snow/PineTreeSnow1.glb",
   ],
   wasteland: [
     "/models/biomes/wasteland/Tree1.glb",
@@ -973,10 +964,9 @@ export const BIOME_COSMETICS: Record<Biome, string[]> = {
 // build-slot blockers.
 export const BIOME_STORY_PROPS: Record<Biome, string[]> = {
   forest: [
-    "/models/landmarks/desert/Tent.glb",
-    "/models/landmarks/forest/Barrel.glb",
+    "/models/scifi/machine_generator.glb",
     "/models/scifi/machine_barrel.glb",
-    "/models/scifi/rover.glb",
+    "/models/scifi/barrels.glb",
   ],
   desert: [
     "/models/landmarks/desert/Tent.glb",
@@ -986,7 +976,7 @@ export const BIOME_STORY_PROPS: Record<Biome, string[]> = {
   ],
   snow: [
     "/models/landmarks/snow/Tent.glb",
-    "/models/landmarks/snow/Torch.glb",
+    "/models/scifi/barrels.glb",
     "/models/scifi/machine_generator.glb",
     "/models/scifi/satelliteDish.glb",
   ],
