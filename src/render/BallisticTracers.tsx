@@ -75,10 +75,14 @@ export const BallisticTracers = () => {
         fragmentShader={`${softParticleShader}
         varying vec2 vUv;
         void main() {
-          float width = mix(0.08, 0.48, pow(vUv.x, 0.7));
+          // MSAA edge fragments can extrapolate UVs outside the quad. A
+          // fractional power of negative X produces NaN, which bloom spreads
+          // across the frame. Keep both power inputs in their valid domain.
+          float along = clamp(vUv.x, 0.0, 1.0);
+          float width = mix(0.08, 0.48, pow(along, 0.7));
           float body = 1.0 - smoothstep(width * 0.4, width, abs(vUv.y - 0.5));
           float tip = 1.0 - smoothstep(0.88, 1.0, vUv.x);
-          float alpha = body * tip * pow(vUv.x, 0.65) * softParticleFade(0.12);
+          float alpha = body * tip * pow(along, 0.65) * softParticleFade(0.12);
           vec3 color = mix(vec3(0.85, 0.25, 0.035), vec3(1.7, 1.35, 0.8), smoothstep(0.5, 0.87, vUv.x));
           gl_FragColor = vec4(color, alpha);
           #include <colorspace_fragment>
