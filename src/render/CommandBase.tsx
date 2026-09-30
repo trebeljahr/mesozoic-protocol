@@ -3,6 +3,9 @@ import type { Vec2 } from "../sim/types";
 import { BattleDamage, ScorchMark } from "./BattleDamage";
 import { HQ_GUN_DECK_HEIGHT } from "./commandBaseLayout";
 
+const GUN_DECK_CAP_THICKNESS = 0.12;
+const GUN_DECK_SUPPORT_HEIGHT = HQ_GUN_DECK_HEIGHT - GUN_DECK_CAP_THICKNESS;
+
 // Command building with a forward roof deck for the functional defence turret.
 // Local +Z faces the route. Footprint remains within the existing HQ reservation.
 const Block = ({
@@ -43,12 +46,18 @@ export const CommandBase = ({ paths }: { paths: Vec2[][] }) => {
           <Block p={[0, 1.1, -1.45]} size={[4.55, 1.6, 2.1]} color="#8c9185" />
           <Block p={[0, 1.96, -1.45]} size={[4.85, 0.19, 2.4]} color="#444f4c" />
           {/* Forward gun deck keeps the functional turret above the roofline. */}
+          {/* Stop the support at the cap underside: coplanar top faces flicker
+              through the turret shadow as the camera moves. */}
           <Block
-            p={[0, HQ_GUN_DECK_HEIGHT / 2, 0]}
-            size={[2.2, HQ_GUN_DECK_HEIGHT, 2.15]}
+            p={[0, GUN_DECK_SUPPORT_HEIGHT / 2, 0]}
+            size={[2.2, GUN_DECK_SUPPORT_HEIGHT, 2.15]}
             color="#68736d"
           />
-          <Block p={[0, HQ_GUN_DECK_HEIGHT - 0.06, 0]} size={[2.5, 0.12, 2.45]} color="#a3a795" />
+          <Block
+            p={[0, HQ_GUN_DECK_HEIGHT - GUN_DECK_CAP_THICKNESS / 2, 0]}
+            size={[2.5, GUN_DECK_CAP_THICKNESS, 2.45]}
+            color="#a3a795"
+          />
           <BattleDamage position={[2.5, 0.22, -1.2]} seed={7} />
           <ScorchMark
             position={[2.281, 1.05, -1.2]}
