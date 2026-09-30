@@ -11,6 +11,7 @@ import {
   MARSH_WALLS,
   wallClearsRoutes,
 } from "./containmentLayout";
+import { ModularBases } from "./ModularBases";
 import { OutpostClusters } from "./OutpostClusters";
 import { type PlacedOutpost, SPACEKIT_MODEL_DIR } from "./outpostKit";
 
@@ -341,11 +342,7 @@ export const ContainmentCompound = ({
           <BattleDamage position={[-20.5, 0.02, 4.8]} seed={23} />
         </>
       )}
-      {outposts
-        .filter((o) => !o.interior && o.pos.x < 0)
-        .map((o) => (
-          <ServiceAnnex key={o.id} outpost={o} biome={biome} />
-        ))}
+      <ModularBases outposts={outposts} biome={biome} />
       {outposts
         .filter((o) => o.interior)
         .map((o) => (
