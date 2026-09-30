@@ -2,20 +2,21 @@
   "project": "Mesozoic Protocol",
   "date": "2026-09-30",
   "timezone": "Australia/Sydney",
-  "status": "A_and_B_preferred_A2_landscape_pending_review",
+  "status": "A3_action_refinement_pending_review",
   "flowProject": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29",
   "flowHistory": "https://flow.google.com/u/1/project/4ef14fb9-079f-46e8-977e-2008ad3a1e29/edit/5db7c0a7-e206-4fcc-ac37-9f27a3087e44",
-  "newGenerationRequests": 3,
+  "newGenerationRequests": 4,
   "sequence": [
     "B Tactical Outpost completed before C submitted",
     "C Mech versus Dinosaur completed",
-    "A2 clean landscape completed after user preferred A and B and requested cleaner landscape A"
+    "A2 clean landscape completed after user preferred A and B and requested cleaner landscape A",
+    "A3 breach action completed after user said A2 was better but too calm"
   ],
   "displayedCostPerRequest": 0,
   "modelForNewRequests": "Nano Banana 2",
   "references": "Ten pre-existing game model ingredients from original prompt, plus selected existing key art; reused in Flow. No new external uploads.",
-  "preservation": "All four originals exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
-  "selection": "User prefers A and B; C least. B is desired actual-game visual target. A2 refines A for landscape; final artwork treatment remains under review.",
+  "preservation": "All five originals exported separately; earlier alternatives retained in Flow history. No project assets deleted.",
+  "selection": "A and B preferred; C least. A2 improved A but user found it too calm. A3 restores action and light contrast; awaiting review. B remains game visual target.",
   "files": [
     {
       "file": "originals/a-containment-breach.jpg",
@@ -45,6 +46,13 @@
       "origin": "Google Flow Nano Banana 2, generated 2026-09-30; zero-credit setting; existing original A and game model ingredients reused",
       "usage": "Marketing refinement and landscape composition study; not gameplay or final store art",
       "review": "Cleaner faceted shapes, calm title area, whole mech visible. Loses some original A drama. Generated three turrets despite prompt requesting two; not pixel-exact game geometry."
+    },
+    {
+      "file": "originals/a3-breach-action.jpg",
+      "dimensions": "1376x768",
+      "sha256": "f6acf20dac505c462359c8978c12b4c1ad235ae20bc12b0398f2d4dd3aad476f",
+      "origin": "Google Flow Nano Banana 2; zero-credit 16:9 setting; refinement of selected A2 with existing game model ingredients, 2026-09-30",
+      "usage": "Marketing artwork refinement, not gameplay or final store export"
     }
   ],
   "previews": [
@@ -54,7 +62,8 @@
     "flow-result-a2.jpg",
     "a2-landscape-studies.jpg",
     "previews/a2-main-crop-study.jpg",
-    "previews/a2-header-crop-study.jpg"
+    "previews/a2-header-crop-study.jpg",
+    "flow-result-a3.jpg"
   ],
   "previewMethod": "ImageMagick resize, crop and sheet layout; originals unchanged. Temporary Arial Bold title demonstrates small-scale legibility, not final approved logo.",
   "gameplay": "Existing public/screenshots desktop captures remain unchanged. Mobile captures still needed.",
@@ -97,7 +106,7 @@
       "Opaque flat PNG for asset catalog handoff; changing compiled app assets is separate rollout work"
     ]
   ],
-  "validation": "Four originals visually reviewed. A2 main/header crop studies produced for review; final title and full size matrix remain pending.",
+  "validation": "A3 original visually reviewed in Flow. Earlier wide A2 crops remain studies; final size matrix pending approved composition.",
   "gameVisualTarget": {
     "direction": "B Tactical Outpost",
     "status": "Renderer inspected read-only. Playable prototype scope question pending; no game code changed.",
