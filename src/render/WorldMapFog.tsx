@@ -80,13 +80,16 @@ export const WorldMapFog = () => {
           for(int i=0;i<${LEVELS.length};i++) {
             if(uReveal[i].z>0.01) {
               float d=length(vGround-uReveal[i].xy)-uReveal[i].z;
-              float h=max(3.0-abs(distanceToClear-d),0.0)/3.0;
-              distanceToClear=min(distanceToClear,d)-h*h*0.75;
+              float h=max(5.0-abs(distanceToClear-d),0.0)/5.0;
+              distanceToClear=min(distanceToClear,d)-h*h*1.25;
             }
           }
-          // Wide atmospheric falloff; a smooth union avoids scalloped seams
-          // where neighboring discoveries meet.
-          float opacity=smoothstep(-3.0,7.0,distanceToClear+(cloud-0.5)*3.0)*(1.0-uCleared);
+          // A long atmospheric tail avoids the visible rim of a bounded
+          // smoothstep. Keep the outpost clear, then accumulate haze slowly
+          // across roughly three times the former transition width.
+          float hazeDistance=max(0.0,distanceToClear+5.0+(cloud-0.5)*0.8);
+          float opticalDepth=hazeDistance/14.0;
+          float opacity=(1.0-exp(-opticalDepth*opticalDepth))*(1.0-uCleared);
           gl_FragColor=vec4(mix(uDark,uLight,cloud*0.72),opacity);
           #include <colorspace_fragment>
         }`,
