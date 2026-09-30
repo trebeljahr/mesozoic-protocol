@@ -31,6 +31,13 @@ describe("battle camera framing", () => {
       }
     }
   });
+  it("leaves headroom for the showcase perimeter without removing zoom access", () => {
+    const extents = { x: 26.5, z: 12 };
+    const zoom = computeFitZoom(1440, 900, extents, true);
+    expect(zoom).toBeLessThan(computeFitZoom(1440, 900, extents));
+    expect(1440 / (2 * zoom)).toBeGreaterThanOrEqual(29);
+    expect((TILT_HALF_FACTOR * 900) / zoom).toBeGreaterThanOrEqual(20);
+  });
   it("starts inside the orbit limits and derives projection from the actual elevation", () => {
     const angle = Math.atan2(CAMERA_BASE_POSITION[2], CAMERA_BASE_POSITION[1]);
     expect(angle).toBeGreaterThan(BATTLE_MIN_POLAR);

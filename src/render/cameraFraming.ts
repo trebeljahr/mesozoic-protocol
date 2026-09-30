@@ -68,10 +68,11 @@ export const computeFitZoom = (
   width: number,
   height: number,
   pathHalfExtents: { x: number; z: number },
+  compound = false,
 ): number => {
   const mobile = width <= MOBILE_VIEWPORT_PX || height <= 500;
-  const marginZ = mobile ? MOBILE_DECOR_MARGIN_Z : DECOR_MARGIN_Z;
-  const halfX = Math.max(MAP_WIDTH / 2 + DECOR_MARGIN_X, pathHalfExtents.x);
+  const marginZ = mobile ? MOBILE_DECOR_MARGIN_Z : compound ? 8 : DECOR_MARGIN_Z;
+  const halfX = Math.max(MAP_WIDTH / 2 + (compound ? 9 : DECOR_MARGIN_X), pathHalfExtents.x);
   const halfZ = Math.max(MAP_HEIGHT / 2 + marginZ, pathHalfExtents.z);
   const fitZoomX = width / (2 * halfX);
   const fitZoomZ = (TILT_HALF_FACTOR * height) / halfZ;

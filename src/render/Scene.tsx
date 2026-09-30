@@ -71,7 +71,7 @@ export const PlayScene = () => {
       <directionalLight
         position={[14, 26, 10]}
         intensity={3.0}
-        color="#ffe0b8"
+        color="#ffe8cf"
         castShadow
         shadow-mapSize-width={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
         shadow-mapSize-height={GRAPHICS_QUALITY === "low" ? 1024 : 2048}

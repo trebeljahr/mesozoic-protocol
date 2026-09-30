@@ -24,6 +24,9 @@ export const CameraRig = () => {
 
   const paths = useGame((s) => s.world.paths);
   const levelId = useGame((s) => s.world.levelId);
+  const compound = useGame(
+    (s) => s.world.levelId === 4 && !s.world.overrideActive && s.world.proceduralSeed === 0,
+  );
   const selectedKind = useGame((s) => s.selectedKind);
   const status = useGame((s) => s.world.status);
   // While a robot dash aim is armed, single-finger touch is reserved for
@@ -70,11 +73,11 @@ export const CameraRig = () => {
 
   const pathHalfExtents = useMemo(() => computeMaxPathExtents(paths), [paths]);
   const fitZoom = useMemo(
-    () => computeFitZoom(size.width, size.height, pathHalfExtents),
-    [size.width, size.height, pathHalfExtents],
+    () => computeFitZoom(size.width, size.height, pathHalfExtents, compound),
+    [size.width, size.height, pathHalfExtents, compound],
   );
   const maxZoom = Math.min(fitZoom * MAX_ZOOM_MULT, ABS_MAX_ZOOM);
-  const startZoom = Math.min(fitZoom * START_ZOOM_MULT, maxZoom);
+  const startZoom = Math.min(fitZoom * (compound ? 1 : START_ZOOM_MULT), maxZoom);
   // At zoom z the visible half-extent is viewport / (2z) on X and
   // TILT * viewport / z on Z. Pan range is what was visible at fit zoom
   // minus what's visible now — zero at fit zoom, growing as the player

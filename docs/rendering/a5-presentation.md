@@ -32,7 +32,8 @@ establish visual acceptance for all biomes.
 `[0,24,20]`, about 40 degrees from vertical; orbit limits remain .35–.75 radians.
 The Z half-extent factor is `hypot(y,z)/(2*y)`, derived from the actual pose.
 Fit uses both map bounds and route extrema, with larger margins on phones.
-Start zoom is 1.08 times fit; users can pull back to fit or zoom in to 2.5 times
+Marsh Breach uses 9 units of side margin and 8 units of vertical margin for its
+perimeter, starting at fit zoom. Other levels start at 1.08 times fit; users can pull back to fit or zoom in to 2.5 times
 fit (absolute maximum 80). Starting slightly inside fit leaves a small pan range.
 
 Preserve level/viewport recentering, loss-shake reset, build/aim gesture
@@ -53,3 +54,20 @@ screenshots, and a build passing is not visual acceptance.
 Terrain and architecture contracts live alongside this document. Preserve editor
 overrides, flat build surfaces, route clearance and save compatibility when
 extending the showcase to other levels.
+
+The combined review driver uses an isolated browser context and always closes it:
+
+```sh
+BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs static /tmp/a5
+BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs combat /tmp/a5-combat
+BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs low /tmp/a5-low
+BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs mobile /tmp/a5-phone
+BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs transitions /tmp/a5-menu
+```
+
+It records camera state and browser errors alongside images. Combat funds tower
+placement through the debug API, but starts the real wave with Space; it checks
+pointer selection, orders real hero movement and waits for a real chain beam.
+Mobile mode opens the build drawer and chooses Pulse Rifle by touch. These
+browser checks supplement native device testing; they do not establish native
+performance or store-media approval.
