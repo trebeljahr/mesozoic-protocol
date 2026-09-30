@@ -12,6 +12,7 @@ const ROBOT_DEATH_DURATION = 0.85;
 const ROBOT_DEATH_EXPLOSION_DURATION = 0.7;
 const ROBOT_DEATH_CORE_DURATION = 0.22;
 const STORM_RING_Y = 0.18;
+const STORM_SPARK_COUNT = 24;
 
 // Arrow geometry lives in the local XZ plane with +Z as "forward"
 // (the dash direction). The aim group's yaw rotation maps local +Z
@@ -39,6 +40,8 @@ export const RobotHud = () => {
   const ringRef = useRef<THREE.Mesh>(null);
   const footRef = useRef<THREE.Mesh>(null);
   const moveRef = useRef<THREE.Mesh>(null);
+  const stormSparksRef = useRef<THREE.InstancedMesh>(null);
+  const sparkTransform = useMemo(() => new THREE.Object3D(), []);
   const stormFillRef = useRef<THREE.Mesh>(null);
   const stormRingRef = useRef<THREE.Mesh>(null);
   const stormPulseRef = useRef<THREE.Mesh>(null);
@@ -147,9 +150,9 @@ export const RobotHud = () => {
     const stormRing = stormRingRef.current;
     const stormPulse = stormPulseRef.current;
     if (stormFill && stormRing && stormPulse) {
-      stormFill.visible = stormActive;
-      stormRing.visible = stormActive;
-      stormPulse.visible = stormActive;
+      stormFill.visible = stormActive && robot.selected;
+      stormRing.visible = stormActive && robot.selected;
+      stormPulse.visible = stormActive && robot.selected;
       if (stormActive) {
         const radius = storm.radius;
         const fade = Math.min(1, Math.max(0, (storm.endAt - world.time) / 0.35));
@@ -166,6 +169,37 @@ export const RobotHud = () => {
         stormPulse.rotation.set(-Math.PI / 2, 0, -world.time * 0.75);
         stormPulse.scale.setScalar(radius * (0.9 + Math.sin(world.time * 5.4) * 0.07));
         (stormPulse.material as THREE.MeshBasicMaterial).opacity = 0.48 * fade;
+      }
+    }
+    // Small charged streaks rise off the chassis even when deselected.
+    // Simulation time keeps the emission frozen while the game is paused.
+    const sparks = stormSparksRef.current;
+    if (sparks) {
+      sparks.visible = stormActive;
+      if (stormActive) {
+        sparks.position.set(robot.pos.x, 0, -robot.pos.y);
+        const fade = Math.min(1, (storm.endAt - world.time) / 0.35);
+        for (let i = 0; i < STORM_SPARK_COUNT; i++) {
+          const phase = (world.time * (0.85 + (i % 4) * 0.12) + i / STORM_SPARK_COUNT) % 1;
+          const angle = i * 2.39996;
+          const radius = 0.35 + (i % 5) * 0.12 + phase * 0.15;
+          const jitter = Math.sin(Math.floor(world.time * 18) + i * 7) * 0.09;
+          sparkTransform.position.set(
+            Math.cos(angle) * radius + jitter,
+            0.8 + phase * 2.6,
+            Math.sin(angle) * radius - jitter,
+          );
+          const envelope = Math.min(1, phase * 8, (1 - phase) * 4) * fade;
+          sparkTransform.scale.set(
+            0.035 * envelope,
+            (0.12 + (i % 3) * 0.045) * envelope,
+            0.035 * envelope,
+          );
+          sparkTransform.rotation.set(jitter * 3, angle, jitter * 4);
+          sparkTransform.updateMatrix();
+          sparks.setMatrixAt(i, sparkTransform.matrix);
+        }
+        sparks.instanceMatrix.needsUpdate = true;
       }
     }
     // Dash aim arrow (armed dash, any variant). Shaft + arrowhead +
@@ -311,6 +345,22 @@ export const RobotHud = () => {
           depthTest={false}
         />
       </mesh>
+      <instancedMesh
+        ref={stormSparksRef}
+        args={[undefined, undefined, STORM_SPARK_COUNT]}
+        visible={false}
+        frustumCulled={false}
+      >
+        <octahedronGeometry args={[1, 0]} />
+        <meshBasicMaterial
+          color="#9beaff"
+          transparent
+          opacity={0.95}
+          toneMapped={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </instancedMesh>
       <mesh ref={stormFillRef} geometry={stormFillGeom} visible={false} renderOrder={3}>
         <meshBasicMaterial
           color="#5ad6ff"
