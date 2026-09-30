@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { dampFactor, shortAngleDelta } from "../sim/angle";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
+import { HQ_GUN_DECK_HEIGHT } from "./commandBaseLayout";
 import { disposeModelInstance } from "./disposeModelInstance";
 import {
   bakeObjectToGeometry,
@@ -120,7 +121,7 @@ const HQOne = ({ pose }: { pose: Pose }) => {
   const firedTargetIdRef = useRef<number | null>(null);
 
   // Bind-pose-accurate baseline: same `measureVisibleBox` we use for every
-  // other model so the HQ's feet sit on y=0 instead of floating where the
+  // other model so the HQ's feet sit on the gun deck instead of floating where the
   // raw geometry bbox extends.
   const { scaledClone, baseY, chunkMaterial } = useMemo(() => {
     const s =
@@ -143,7 +144,7 @@ const HQOne = ({ pose }: { pose: Pose }) => {
       }
     });
     const groundedBox = measureVisibleBox(c);
-    const baseYLocal = -groundedBox.min.y;
+    const baseYLocal = HQ_GUN_DECK_HEIGHT - groundedBox.min.y;
 
     // Pick a representative material from the source meshes; falls back to
     // a neutral metallic if the GLB has nothing readable.
@@ -382,7 +383,7 @@ const HQOne = ({ pose }: { pose: Pose }) => {
       const wz = -pose.position[1] + -localX * s + localZ * c;
       const wy = baseY + BARREL_HEIGHT;
       const tx = laserTarget.pos.x;
-      const ty = baseY + 0.55; // approximate enemy hit height
+      const ty = 0.55; // approximate enemy hit height
       const tz = -laserTarget.pos.y;
       const dx = tx - wx;
       const dy = ty - wy;
@@ -456,7 +457,7 @@ const HQOne = ({ pose }: { pose: Pose }) => {
 
   return (
     <>
-      <group ref={outerRef}>
+      <group ref={outerRef} name={`hq-turret-${pose.pathIndex}`}>
         {(!shouldExplode || !fracture || !chunksLive) && <primitive object={scaledClone} />}
         {/* Death explosion: warm outer fireball + white-hot inner core.
             Hidden during regular play; ref-driven scaling/opacity during the
@@ -488,7 +489,7 @@ const HQOne = ({ pose }: { pose: Pose }) => {
         <mesh
           ref={shockwaveRef}
           visible={false}
-          position={[0, 0.05, 0]}
+          position={[0, 0.05 - HQ_GUN_DECK_HEIGHT, 0]}
           rotation={[-Math.PI / 2, 0, 0]}
         >
           <ringGeometry args={[0.45, 0.6, 48]} />
@@ -522,7 +523,7 @@ const HQOne = ({ pose }: { pose: Pose }) => {
           the rotating outer group, so the per-frame placeLaser() math
           can position them directly in world coordinates without
           fighting the turret yaw transform. */}
-      <mesh ref={leftLaserRef} visible={false} renderOrder={3}>
+      <mesh ref={leftLaserRef} name={`hq-laser-${pose.pathIndex}`} visible={false} renderOrder={3}>
         <cylinderGeometry args={[LASER_RADIUS, LASER_RADIUS, 1, 8, 1]} />
         <meshBasicMaterial
           color="#ff3a2a"

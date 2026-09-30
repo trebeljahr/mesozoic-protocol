@@ -8,10 +8,10 @@ const out = process.argv[3];
 if (
   !process.env.BASE_URL ||
   !out ||
-  !["static", "detail", "props", "combat", "low", "mobile", "transitions"].includes(mode)
+  !["static", "detail", "props", "hq", "combat", "low", "mobile", "transitions"].includes(mode)
 )
   throw new Error(
-    "Usage: BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs [static|detail|props|combat|low|mobile|transitions] OUTPUT_PREFIX",
+    "Usage: BASE_URL=http://127.0.0.1:PORT node scripts/capture-a5-review.mjs [static|detail|props|hq|combat|low|mobile|transitions] OUTPUT_PREFIX",
   );
 const browser = await chromium.launch({
   headless: true,
@@ -169,6 +169,54 @@ try {
       );
       throw new Error("Base selection failed: " + JSON.stringify({ base, ...log.baseDebug }));
     }
+  }
+  if (mode === "hq") {
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => window.__game.getState().world.enemies.length > 0);
+    await page.evaluate(() => {
+      const g = window.__game,
+        w = g.getState().world,
+        e = w.enemies[0],
+        path = w.paths[0],
+        end = path[path.length - 1];
+      let segment = path.length - 2;
+      while (segment > 0 && Math.hypot(path[segment].x - end.x, path[segment].y - end.y) < 3.5)
+        segment--;
+      e.segment = segment;
+      e.segmentT = 0;
+      e.pos = { ...path[segment] };
+      e.speed = 0;
+      e.hp = 1000;
+      e.maxHp = 1000;
+      g.setState({ newEnemyQueue: [], deferredNewEnemyQueue: [], autoPausedForNewEnemy: false });
+      if (w.status === "paused") g.getState().togglePause();
+    });
+    await page.waitForFunction(
+      () => window.__reviewRoot.scene.getObjectByName("hq-laser-0")?.visible,
+      {},
+      { polling: "raf" },
+    );
+    log.hqShot = await page.evaluate(() => {
+      const root = window.__reviewRoot,
+        beam = root.scene.getObjectByName("hq-laser-0");
+      beam.updateMatrixWorld(true);
+      const ends = [-0.5, 0.5].map((y) =>
+        beam.position.clone().set(0, y, 0).applyMatrix4(beam.matrixWorld).toArray(),
+      );
+      return {
+        ends,
+        damage: window.__game.getState().world.base.damageDealt,
+        mount: root.scene.getObjectByName("hq-turret-0").position.toArray(),
+      };
+    });
+    const heights = log.hqShot.ends.map((p) => p[1]);
+    if (
+      Math.max(...heights) < 2.9 ||
+      Math.abs(Math.min(...heights) - 0.55) > 0.02 ||
+      log.hqShot.damage <= 0
+    )
+      throw new Error("Raised HQ shot origin/target failed");
+    await page.screenshot({ path: out + "-shot.png" });
   }
   if (mode === "combat") {
     log.placement = await page.evaluate(() => {

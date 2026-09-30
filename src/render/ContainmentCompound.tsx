@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import * as THREE from "three";
 import type { Outpost, Vec2 } from "../sim/types";
+import { BattleDamage, ScorchMark } from "./BattleDamage";
 import { CANISTER_PALETTE } from "./biomeColors";
 import { CloningCanister } from "./CloningCanister";
 import {
@@ -203,6 +204,8 @@ export const ResearchDeck = ({ outpost }: { outpost: Outpost }) => {
           seed={47}
         />
       </group>
+      <BattleDamage position={[2.15, 0.25, 1.05]} seed={13} />
+      <ScorchMark position={[1.7, 0.9, -0.689]} rotation={[0, 0, 0]} size={[1.1, 0.9]} />
       <group position={[0, 0.23, 0]}>
         <OutpostClusters clusters={service} />
       </group>
@@ -309,7 +312,12 @@ export const ContainmentCompound = ({
       {walls.map((wall) => (
         <ContainmentWallRun key={wall.id} wall={wall} />
       ))}
-      {walls.length > 0 && <BreachDebris />}
+      {walls.length > 0 && (
+        <>
+          <BreachDebris />
+          <BattleDamage position={[-20.5, 0.02, 4.8]} seed={23} />
+        </>
+      )}
       {outposts
         .filter((o) => !o.interior && o.pos.x < 0)
         .map((o) => (

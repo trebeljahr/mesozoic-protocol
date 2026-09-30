@@ -77,16 +77,38 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
             return mix(mix(surfaceHash(i).x,surfaceHash(i+vec2(1,0)).x,f.x),
                        mix(surfaceHash(i+vec2(0,1)).x,surfaceHash(i+1.0).x,f.x),f.y);
           }
-          // Overlapping world cells sample independent offsets; no identical tile grid.
-          vec4 untiled(sampler2D tex, vec2 uv) {
-            vec2 cell=floor(uv*0.45), f=fract(uv*0.45);
-            vec2 dx=dFdx(uv), dy=dFdy(uv);
-            f=f*f*(3.0-2.0*f);
-            return mix(mix(texture2DGradEXT(tex,uv+surfaceHash(cell)*7.0,dx,dy),
-                           texture2DGradEXT(tex,uv+surfaceHash(cell+vec2(1,0))*7.0,dx,dy),f.x),
-                       mix(texture2DGradEXT(tex,uv+surfaceHash(cell+vec2(0,1))*7.0,dx,dy),
-                           texture2DGradEXT(tex,uv+surfaceHash(cell+1.0)*7.0,dx,dy),f.x),f.y);
+          // Triangular stochastic patches: random rotation, scale and offset.
+          // Explicit derivatives prevent mip seams; normal XY follows the rotation.
+          vec4 patchSample(sampler2D tex, vec2 uv, vec2 cell, bool normalData) {
+            vec2 h=surfaceHash(cell);
+            float angle=h.x*6.2831853;
+            mat2 turn=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
+            float scale=0.75+h.y*0.65;
+            vec4 sampleValue=texture2DGradEXT(tex,turn*uv*scale+h*11.0,
+              turn*dFdx(uv)*scale,turn*dFdy(uv)*scale);
+            if(normalData) {
+              vec2 n=sampleValue.xy*2.0-1.0;
+              sampleValue.xy=vec2(dot(turn[0],n),dot(turn[1],n))*0.5+0.5;
+            }
+            return sampleValue;
           }
+          vec4 stochastic(sampler2D tex, vec2 uv, bool normalData) {
+            vec2 q=uv*0.72, cell=floor(q), f=fract(q);
+            vec2 a=cell, b=cell+vec2(1,0), c=cell+vec2(0,1);
+            vec3 weights=vec3(1.0-f.x-f.y,f.x,f.y);
+            if(f.x+f.y>1.0) {
+              a=cell+1.0;
+              weights=vec3(f.x+f.y-1.0,1.0-f.y,1.0-f.x);
+            }
+            weights=pow(max(weights,vec3(0.0)),vec3(1.5));
+            weights/=dot(weights,vec3(1.0));
+            return patchSample(tex,uv,a,normalData)*weights.x
+                 + patchSample(tex,uv,b,normalData)*weights.y
+                 + patchSample(tex,uv,c,normalData)*weights.z;
+          }
+          vec4 untiled(sampler2D tex, vec2 uv) { return stochastic(tex,uv,false); }
+          vec4 untiledNormal(sampler2D tex, vec2 uv) { return stochastic(tex,uv,true); }
+
         `,
         )
         .replace(
@@ -94,12 +116,13 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
           `
           vec2 world = vMapUv * 3.0;
           float habitat = habitatNoise(world*0.085) * 0.72 + habitatNoise(world*0.23+17.0)*0.28;
-          float grassWeight = smoothstep(0.36,0.64,habitat) * (1.0-vTerrainSurface.y);
-          float leafWeight = (1.0-grassWeight) * (1.0-vTerrainSurface.y) * 0.85;
+          float grassWeight = smoothstep(0.12,0.88,habitat) * (1.0-vTerrainSurface.y) * 0.65;
+          float leafWeight = (1.0-grassWeight) * (1.0-vTerrainSurface.y) * 0.58;
           vec3 soil = untiled(map,vMapUv).rgb * 1.7;
-          vec3 leaves = untiled(uLeafMap,vMapUv*0.85).rgb * 1.65;
-          vec3 grass = untiled(uGrassMap,vMapUv*1.15).rgb * 1.35;
-          vec3 road = untiled(uRoadMap,vMapUv).rgb * 2.25;
+          vec3 leaves = untiled(uLeafMap,vMapUv*1.3).rgb * 1.2;
+          vec3 grass = untiled(uGrassMap,vMapUv*1.55).rgb * vec3(1.12,1.28,1.1);
+          vec3 roadTex = untiled(uRoadMap,vMapUv*1.2).rgb;
+          vec3 road = mix(roadTex*3.4,vec3(0.38,0.285,0.17),0.38);
           vec3 surface = mix(soil,leaves,leafWeight);
           surface = mix(surface,grass,grassWeight);
           surface = mix(surface,road,vTerrainSurface.x);
@@ -128,13 +151,13 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
           THREE.ShaderChunk.normal_fragment_maps
             .replaceAll(
               "texture2D( normalMap, vNormalMapUv )",
-              "untiled( normalMap, vNormalMapUv )",
+              "untiledNormal( normalMap, vNormalMapUv )",
             )
             .replace(
               "mapN.xy *= normalScale;",
-              `vec3 roadNormal = untiled(uRoadNormal, vNormalMapUv).xyz * 2.0 - 1.0;
-             vec3 leafNormal = untiled(uLeafNormal, vNormalMapUv*0.85).xyz*2.0-1.0;
-             vec3 grassNormal = untiled(uGrassNormal, vNormalMapUv*1.15).xyz*2.0-1.0;
+              `vec3 roadNormal = untiledNormal(uRoadNormal, vNormalMapUv*1.2).xyz * 2.0 - 1.0;
+             vec3 leafNormal = untiledNormal(uLeafNormal, vNormalMapUv*1.3).xyz*2.0-1.0;
+             vec3 grassNormal = untiledNormal(uGrassNormal, vNormalMapUv*1.55).xyz*2.0-1.0;
              mapN = mix(mapN,leafNormal,leafWeight);
              mapN = mix(mapN,grassNormal,grassWeight);
              mapN = normalize(mix(mapN, roadNormal, vTerrainSurface.x));
@@ -142,7 +165,7 @@ export const TerrainSoilMaterial = ({ groundColor }: { groundColor: string }) =>
             ),
         );
     };
-    mat.customProgramCacheKey = () => "terrain-habitat-soil-v2";
+    mat.customProgramCacheKey = () => "terrain-stochastic-soil-v3";
     return { mat, textures };
   }, [sources, gl, groundColor]);
   useEffect(

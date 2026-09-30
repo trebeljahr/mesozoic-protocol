@@ -58,11 +58,20 @@ reservations or saved layouts.
 `CommandBase` replaces the assorted HQ kit cluster with one command block,
 recessed doorway, shaded observation windows, roof ventilation, solar array and
 communications mast. Local +Z faces the route endpoint. The 5.8×4.6 apron stays
-inside the 4.5-unit HQ reservation. The defence turret, aiming, loss animation
-and base upgrades remain driven by `HQTurret`; the command building is scenery.
+inside the 4.5-unit HQ reservation. The forward gun deck is 2.12 units high. `commandBaseLayout.ts` shares this
+height with `HQTurret`, including muzzle flashes and fracture origins. Laser
+target height stays at ground level. Aiming, damage and upgrades retain their
+simulation contracts; the command building is scenery.
 
 Natural forest trees and shrubs use the generated meshes documented in
 `public/models/natural/README.md`. The instanced renderers refresh bounding
 spheres after matrix changes, including invisible hit discs, so selection tracks
 loaded and removed props. Forest stone generation is disabled, with no hidden
 obstacle left by the sampling fallback. Other biomes retain their prop sets.
+
+`BattleDamage` places bounded cosmetic fire/smoke sources at the HQ, research
+deck and west breach. Scorch marks and broken panels stay within scenery areas.
+Smoke reuses the bundled Kenney puff; flames are animated shader billboards.
+There are no dynamic lights or simulation-particle allocations. Low quality
+uses four smoke slots per source; high uses seven. These describe prior battle
+damage rather than the current HQ health value.

@@ -113,7 +113,7 @@ export function buildTerrainSurface(
         // Full legal lane stays readable; broad, irregular shoulders break
         // the visual road border without narrowing its gameplay footprint.
         const shoulder = 0.8 + 0.4 * Math.sin(x * 1.8 + y * 1.1) + 0.3 * patch;
-        lane = 1 - smooth(PATH_WIDTH * 0.38, PATH_WIDTH * 0.5 + shoulder, pd);
+        lane = 1 - smooth(PATH_WIDTH * 0.44, PATH_WIDTH * 0.5 + shoulder * 0.7, pd);
         color.lerp(road, lane * 0.8);
       }
       const bankBand = 1 - smooth(0.15, 1.1 + patch * 0.3, fd);

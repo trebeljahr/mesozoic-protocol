@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import type { Vec2 } from "../sim/types";
+import { BattleDamage, ScorchMark } from "./BattleDamage";
+import { HQ_GUN_DECK_HEIGHT } from "./commandBaseLayout";
 
-// One legible command building behind the existing functional defence turret.
+// Command building with a forward roof deck for the functional defence turret.
 // Local +Z faces the route. Footprint remains within the existing HQ reservation.
 const Block = ({
   p,
@@ -40,6 +42,22 @@ export const CommandBase = ({ paths }: { paths: Vec2[][] }) => {
           <Block p={[0, 0.24, -1.35]} size={[4.9, 0.28, 2.55]} color="#999d91" />
           <Block p={[0, 1.1, -1.45]} size={[4.55, 1.6, 2.1]} color="#8c9185" />
           <Block p={[0, 1.96, -1.45]} size={[4.85, 0.19, 2.4]} color="#444f4c" />
+          {/* Forward gun deck keeps the functional turret above the roofline. */}
+          <Block
+            p={[0, HQ_GUN_DECK_HEIGHT / 2, 0]}
+            size={[2.2, HQ_GUN_DECK_HEIGHT, 2.15]}
+            color="#68736d"
+          />
+          <Block p={[0, HQ_GUN_DECK_HEIGHT - 0.06, 0]} size={[2.5, 0.12, 2.45]} color="#a3a795" />
+          <BattleDamage position={[2.5, 0.22, -1.2]} seed={7} />
+          <ScorchMark
+            position={[2.281, 1.05, -1.2]}
+            rotation={[0, Math.PI / 2, 0]}
+            size={[1.8, 1.7]}
+          />
+          <group position={[-2.25, 1.8, -1.9]} rotation={[0.15, 0.1, -0.3]}>
+            <Block p={[0, 0, 0]} size={[0.7, 0.14, 0.7]} color="#434b45" />
+          </group>
           {/* Recessed entrance and a continuous shaded observation band. */}
           <Block p={[0, 0.88, -0.375]} size={[0.85, 1.25, 0.06]} color="#263b3a" />
           <Block p={[0, 1.62, -0.15]} size={[1.35, 0.12, 0.65]} color="#454f4a" />

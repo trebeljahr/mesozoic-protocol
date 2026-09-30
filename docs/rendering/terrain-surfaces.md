@@ -19,9 +19,11 @@ only shoreline strips. `BiomeGround` is the separate world-map renderer.
   level-4-only and is not an all-biome art-direction switch.
 - The mesh is non-interactive, receives shadows, uses no post-processing passes, and disposes on
   replacement/unmount. Level 4 blends locally bundled photographic mud, compacted dirt, grass and leaf litter with world-scaled UVs, wet-bank roughness and tangent normals.
-  World cells blend independent texture offsets with explicit UV gradients to avoid
-  mip seams. Broad habitat noise separates grassy areas from leaf-covered soil;
-  lane and union-shore weights preserve tracks and wet banks.
+  Triangular stochastic patches vary texture rotation, scale and offset, with explicit
+  UV gradients to avoid mip seams. Normal XY rotates back into the shared tangent
+  frame. Broad, overlapping habitat weights soften grassy/leaf-covered transitions;
+  the compacted route keeps a consistent lighter core for tactical readability.
+  Lane and union-shore weights preserve tracks and wet banks.
   Low quality retains colour/roughness but skips all four terrain normal maps. Source images
   are CC0 from Poly Haven; per-asset `source.json` files under
   `public/textures/terrain/` record URLs and SHA-256 hashes.
