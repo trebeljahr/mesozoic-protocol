@@ -441,10 +441,8 @@ const spawnFlameStream = (world: World, t: Tower, target: Enemy) => {
   const orangeLife = 0.45;
   const redLife = 0.7;
 
-  // Hot inner jet — narrowish, fast, short-lived; reaches ~70% down the cone.
-  // One particle per tick is enough — the per-particle brightness boost
-  // (Effects.tsx) ramps newly-spawned particles to ~2.2× and overlapping
-  // tick spawns already pile a visible hot core on the centerline.
+  // Separate lifetimes keep the jet hot near the nozzle and let its outer
+  // tongues cool and rise. Rendering is separate from impact sparks.
   spawnParticles(
     world,
     nozzle,
@@ -454,9 +452,8 @@ const spawnFlameStream = (world: World, t: Tower, target: Enemy) => {
     yellowLife,
     dir,
     Math.PI / 10,
+    "flame",
   );
-  // Mid orange flames — main flame body, fills most of the cone. Cone kept
-  // just inside the damage cone so the body stays visibly contained.
   spawnParticles(
     world,
     nozzle,
@@ -466,14 +463,19 @@ const spawnFlameStream = (world: World, t: Tower, target: Enemy) => {
     orangeLife,
     dir,
     Math.PI / 7,
+    "flame",
   );
-  // Outer red wash + trailing embers — sized so axial embers land right at
-  // the damage-cone edge (range), so the visible wall matches what burns.
-  // Counts intentionally thin: the particle material is additive +
-  // toneMapped:false, so each layer adds linearly to the framebuffer and
-  // a dense stream paints the cone white over bright biome surfaces (lit
-  // snow albedo already runs ~1.7-1.9 in linear and blooms on its own).
-  spawnParticles(world, nozzle, 2, "#e8492a", speedRange(redLife, 1.0), redLife, dir, Math.PI / 6);
+  spawnParticles(
+    world,
+    nozzle,
+    2,
+    "#e8492a",
+    speedRange(redLife, 1.0),
+    redLife,
+    dir,
+    Math.PI / 6,
+    "flame",
+  );
 };
 
 const fireMortarAtSpot = (world: World, t: Tower, pos: Vec2) => {

@@ -2564,6 +2564,7 @@ export const spawnParticles = (
   lifeSec = 0.35,
   baseDir?: Vec2,
   halfConeRadians?: number,
+  kind?: "flame",
 ) => {
   const hasDir = baseDir && (baseDir.x !== 0 || baseDir.y !== 0);
   const baseAngle = hasDir ? Math.atan2(baseDir!.y, baseDir!.x) : 0;
@@ -2579,6 +2580,7 @@ export const spawnParticles = (
       vel: { x: Math.cos(angle) * spd, y: Math.sin(angle) * spd },
       expiresAt: world.time + lifeSec,
       maxLife: lifeSec,
+      kind,
       color,
     });
   }

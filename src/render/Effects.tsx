@@ -12,6 +12,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
+import { FlameParticles } from "./FlameParticles";
 import { isLightningBeam } from "./lightningGeometry";
 import { BLOOM_LAYER } from "./PaintedPostFx";
 
@@ -54,7 +55,7 @@ const makeBeamPair = (): { core: BeamPass; halo: BeamPass } => {
 
 export const Effects = () => {
   // Kenney soft-puff sprite — same asset the smoke billboards use, here on
-  // the additive spark particles so flame/impact bursts read as soft glows
+  // the additive spark particles so impact bursts read as soft glows
   // instead of hard-edged polygon discs.
   const particleTex = useTexture("/textures/fx/whitepuff15.png");
   const particleRef = useRef<THREE.InstancedMesh>(null);
@@ -132,6 +133,7 @@ export const Effects = () => {
     if (pMesh) {
       let i = 0;
       for (const p of world.particles) {
+        if (p.kind === "flame") continue;
         if (i >= MAX_PARTICLES) break;
         const life = Math.max(0, (p.expiresAt - now) / p.maxLife);
         dummy.position.set(p.pos.x, 0.55, -p.pos.y);
@@ -357,6 +359,7 @@ export const Effects = () => {
 
   return (
     <group>
+      <FlameParticles />
       <instancedMesh
         ref={particleRef}
         args={[undefined, undefined, MAX_PARTICLES]}

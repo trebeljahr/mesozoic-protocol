@@ -695,6 +695,7 @@ export type CryoWave = {
 };
 
 export type Particle = {
+  kind?: "flame";
   id: EntityId;
   pos: Vec2;
   vel: Vec2;
