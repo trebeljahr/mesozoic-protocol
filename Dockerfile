@@ -2,7 +2,7 @@
 #
 # Static-site image for mesozoic-protocol.
 # Built by .github/workflows/deploy.yml, pushed to GHCR, pulled by
-# Coolify via docker-compose.yml. nginx serves the built bundle —
+# Coolify's Docker Image application. nginx serves the built bundle —
 # no runtime Node, so dotenvx encryption isn't relevant here
 # (anything sensitive should never reach the browser bundle anyway).
 ARG NODE_VERSION=24
@@ -21,6 +21,11 @@ COPY . .
 RUN pnpm build
 
 FROM nginx:alpine AS runner
+RUN apk add --no-cache curl
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY scripts/nginx-drain.sh /usr/local/bin/nginx-drain.sh
+HEALTHCHECK --interval=2s --timeout=5s --start-period=15s --retries=5 \
+  CMD curl --fail --silent --show-error http://127.0.0.1/healthz >/dev/null || exit 1
+CMD ["/usr/local/bin/nginx-drain.sh"]
 EXPOSE 80

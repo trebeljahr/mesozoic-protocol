@@ -1,7 +1,5 @@
-# Coolify reads this file (build pack: dockercompose) to deploy
-# mesozoic-protocol. The image is built by .github/workflows/deploy.yml and
-# pushed to GHCR; Coolify pulls it and (re)starts the service when
-# the workflow's deploy webhook fires.
+# Legacy Compose definition, retained for rollback. The active Coolify
+# resource is a Docker Image application; this file does not drive it.
 #
 # `pull_policy: always` is load-bearing: without it Docker treats the
 # moving `:latest` tag as already-present locally and restarts the stale
