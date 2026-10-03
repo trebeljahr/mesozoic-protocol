@@ -16,7 +16,7 @@ import type { RobotVariant } from "./sim/types";
 // exists only for web portals (CrazyGames) and Steam Next Fest: a
 // try-before-you-buy slice that plays the five forest outposts and then
 // points at the Steam wishlist.
-export const IS_DEMO: boolean = import.meta.env.VITE_DEMO === "1";
+export const IS_DEMO: boolean = import.meta.env?.VITE_DEMO === "1";
 
 // Highest campaign level playable in the demo. Level 6 opens the snow biome
 // (see src/biomes.ts band comments); the demo stops at the five forest
@@ -36,7 +36,7 @@ export const DEMO_TEASER_ROBOT_BOLTS = 250;
 // Assigned app. Keep demo links disabled until its Coming Soon page is public.
 // Release builds opt in only after checking the destination in Steam.
 export const STEAM_STORE_URL = "https://store.steampowered.com/app/4798230/Mesozoic_Protocol/";
-export const STEAM_STORE_READY: boolean = import.meta.env.VITE_STEAM_STORE_READY === "1";
+export const STEAM_STORE_READY: boolean = import.meta.env?.VITE_STEAM_STORE_READY === "1";
 
 // A campaign level is out of the demo's reach once it climbs past the forest
 // outposts. Returns false in the full build (IS_DEMO folds to false), so
