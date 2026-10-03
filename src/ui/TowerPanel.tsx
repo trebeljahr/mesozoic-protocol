@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { canUseBattlefield } from "../sim/playControl";
 import { effectiveFireRate } from "../sim/towers";
 import type { DamageType, EnemyKind, TargetingMode, Tower } from "../sim/types";
 import {
@@ -53,7 +54,7 @@ export const TowerPanel = () => {
   const selectedId = useGame((s) => s.ui.selectedTowerId);
   useGame((s) => s.ui.towerVersion);
   const gold = useGame((s) => s.ui.gold);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
   const isMobile = useIsMobile();
   const [infoOpen, setInfoOpen] = useState(false);
   // Containment mode disables selling; we still render the panel so upgrades
@@ -61,7 +62,7 @@ export const TowerPanel = () => {
   // sellDisabled is true.
   const sellDisabled = useGame((s) => s.world.sellingDisabled);
 
-  if (selectedId === null || status !== "running") return null;
+  if (selectedId === null || !battlefieldUsable) return null;
   const tower = useGame.getState().world.towerById.get(selectedId);
   if (!tower) return null;
 

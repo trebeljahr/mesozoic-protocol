@@ -131,6 +131,7 @@ export const App = () => {
   const worldMapEditorChromeHidden = useWorldMapEditor((s) => s.chromeHidden);
   const selectedKind = useGame((s) => s.selectedKind);
   const paused = useGame((s) => s.ui.status === "paused");
+  const planningPaused = useGame((s) => s.planningPaused);
   const newEnemyAlertVisible = useGame((s) => s.newEnemyQueue.length > 0);
   const modalOpen =
     compendiumOpen ||
@@ -165,7 +166,7 @@ export const App = () => {
   useGamepadMenuNavigation(
     (screen !== "playing" && screen !== "worldMap") ||
       modalOpen ||
-      (screen === "playing" && paused) ||
+      (screen === "playing" && paused && !planningPaused) ||
       levelIntroVisible ||
       newEnemyAlertVisible,
     { confirmAsKeyboard: levelIntroVisible || newEnemyAlertVisible },

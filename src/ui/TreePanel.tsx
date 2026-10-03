@@ -4,6 +4,7 @@ import { Suspense, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { BIOME_LAYERS, BIOME_STYLE, BIOME_TREE_URLS } from "../biomes";
 import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
+import { canUseBattlefield } from "../sim/playControl";
 import { ROCK_REMOVE_COST, TREE_REMOVE_COST } from "../sim/world";
 import { useGame } from "../store";
 import { RightOverlay } from "./RightOverlay";
@@ -43,10 +44,10 @@ export const TreePanel = () => {
   const rocks = useGame((s) => s.world.rocks);
   const biome = useGame((s) => s.world.biome);
   const gold = useGame((s) => s.ui.gold);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
   const { t } = useTranslation();
 
-  if (status !== "running") return null;
+  if (!battlefieldUsable) return null;
 
   let selection: Selection | null = null;
   if (selectedTreeId !== null) {

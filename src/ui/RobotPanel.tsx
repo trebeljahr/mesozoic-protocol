@@ -35,6 +35,7 @@ export const RobotPanel = () => {
   const dps = useGame((s) => s.ui.robotDps);
   const damageDealt = useGame((s) => s.ui.robotDamageDealt);
   const trigger = useGame((s) => s.triggerRobotAbility);
+  const running = useGame((s) => s.ui.status === "running");
   const panelOpen = useGame((s) => s.robotPanelOpen);
   const setRobotPanelOpen = useGame((s) => s.setRobotPanelOpen);
   const selectRobotUnit = useGame((s) => s.selectRobotUnit);
@@ -106,17 +107,19 @@ export const RobotPanel = () => {
           const cd = cooldowns[slot];
           const active = activeRemaining[slot] > 0;
           const max = maxCooldowns[slot];
-          const ready = cd === 0 && alive;
+          const ready = cd === 0 && alive && running;
           const fillPct = max > 0 ? clamp01(1 - cd / max) : 1;
           const hint = showKeyboardHints ? ` [${key}]` : "";
           const abilityLabel = t(`robots:variants.${variant}.abilityLabel.${slot}`);
-          const title = active
-            ? t("robotShop.abilityActiveTitle", {
-                label: abilityLabel,
-                hint,
-                seconds: activeRemaining[slot].toFixed(1),
-              })
-            : `${abilityLabel}${hint}`;
+          const title = !running
+            ? t("planning.abilitiesPaused")
+            : active
+              ? t("robotShop.abilityActiveTitle", {
+                  label: abilityLabel,
+                  hint,
+                  seconds: activeRemaining[slot].toFixed(1),
+                })
+              : `${abilityLabel}${hint}`;
           return (
             <button
               key={slot}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_TREE_URLS } from "../biomes";
 import { useEditor } from "../editor/editorStore";
+import { canUseBattlefield } from "../sim/playControl";
 import type { Tree } from "../sim/types";
 import { meshXZRadii, TREE_REMOVE_COST, TREE_TARGET_HEIGHT, TREE_VARIANTS } from "../sim/world";
 import { useGame } from "../store";
@@ -109,7 +110,7 @@ export const Trees = () => {
   const trees = useGame.getState().world.trees;
   const biome = useGame((s) => s.world.biome);
   const gold = useGame((s) => s.ui.gold);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
   const selectedTreeId = useGame((s) => s.selectedTreeId);
   const selectedRockId = useGame((s) => s.selectedRockId);
   const selectedKind = useGame((s) => s.selectedKind);
@@ -156,7 +157,7 @@ export const Trees = () => {
   ]);
 
   const canAfford = gold >= TREE_REMOVE_COST;
-  const running = status === "running";
+  const running = battlefieldUsable;
   const hovered = hoveredId !== null ? (trees.find((t) => t.id === hoveredId) ?? null) : null;
   const selected =
     selectedTreeId !== null ? (trees.find((t) => t.id === selectedTreeId) ?? null) : null;

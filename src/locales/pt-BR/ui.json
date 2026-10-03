@@ -828,5 +828,40 @@
     "challengesComplete": "Every Breach and Containment challenge is complete. Try a different robot for your next defense.",
     "revisit": "Replay this ending from the world-map menu.",
     "replay": "Campaign epilogue"
+  },
+  "planning": {
+    "controls": "Battle controls",
+    "pause": "Plan",
+    "resume": "Resume defense",
+    "active": "Planning paused · build, upgrade, sell and assign drones. Resume when ready.",
+    "shortcut": "Planning pause (T / controller Select). Menu pause: P / Start.",
+    "speedLabel": "Simulation speed: {{speed}}×. Change speed.",
+    "speedHint": "Switch between 1× and 2× simulation time. Paused time stays frozen.",
+    "training": "Training controls its own pace and available actions.",
+    "abilitiesPaused": "Resume defense to use abilities."
+  },
+  "wavePreview": {
+    "button": "Incoming {{wave}}",
+    "heading": "Wave {{wave}} · {{count}} scheduled",
+    "none": "All waves have been called.",
+    "empty": "No scheduled enemies in this wave.",
+    "bossWarning": "Boss incoming",
+    "boss": "Matriarch",
+    "new": "NEW",
+    "hp": "{{hp}} HP",
+    "shield": "{{hp}} shield",
+    "shielded": "Shielded",
+    "healer": "Healing aura",
+    "regen": "Regenerates",
+    "defenses": "Damage taken: {{values}}",
+    "counter": "Best available damage: {{types}}",
+    "noCounter": "No effective tower damage in this loadout.",
+    "reinforcements": "Can summon reinforcements; total count varies.",
+    "lane": "Lane {{lane}} · {{count}} scheduled",
+    "marker": "Lane {{lane}} · {{count}}",
+    "laneHint": "Select a lane to highlight its entry on the field.",
+    "stream": "Extra {{kinds}} every {{min}}–{{max}}s while the boss is active.",
+    "adaptive": "Some enemies may adapt further to your recent damage types.",
+    "countHint": "Counts cover scheduled spawns. Summons and continuing boss escorts are additional."
   }
 }

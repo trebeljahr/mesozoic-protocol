@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { BIOME_LAYERS, type Biome } from "../biomes";
 import { useEditor } from "../editor/editorStore";
+import { canUseBattlefield } from "../sim/playControl";
 import type { Rock } from "../sim/types";
 import { meshXZRadii, ROCK_REMOVE_COST } from "../sim/world";
 import { useGame } from "../store";
@@ -64,7 +65,7 @@ const rockPosition = (rock: Rock) => rock.pos;
 export const Rocks = () => {
   const biome = useGame((s) => s.world.biome);
   const rocks = useGame((s) => s.world.rocks);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
   const gold = useGame((s) => s.ui.gold);
   const selectedRockId = useGame((s) => s.selectedRockId);
   const selectedTreeId = useGame((s) => s.selectedTreeId);
@@ -101,7 +102,7 @@ export const Rocks = () => {
     robotSelected,
   ]);
 
-  const running = status === "running";
+  const running = battlefieldUsable;
   const hovered = hoveredId !== null ? (rocks.find((r) => r.id === hoveredId) ?? null) : null;
   const selected =
     selectedRockId !== null ? (rocks.find((r) => r.id === selectedRockId) ?? null) : null;

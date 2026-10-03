@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { baseDps } from "../sim/base";
+import { canUseBattlefield } from "../sim/playControl";
 import {
   BASE_STAT_LABEL,
   BASE_UPGRADES,
@@ -18,9 +19,9 @@ export const BasePanel = () => {
   const selectedBase = useGame((s) => s.ui.selectedBase);
   useGame((s) => s.ui.towerVersion);
   const gold = useGame((s) => s.ui.gold);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
 
-  if (!selectedBase || status !== "running") return null;
+  if (!selectedBase || !battlefieldUsable) return null;
   const state = useGame.getState();
   const base = state.world.base;
   const hqCount = state.world.paths.length;

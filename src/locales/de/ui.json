@@ -828,5 +828,40 @@
     "challengesComplete": "Alle Herausforderungen in Durchbruch und Eindämmung sind abgeschlossen. Probiere für die nächste Verteidigung einen anderen Roboter.",
     "revisit": "Öffne diesen Abschluss erneut über das Weltkartenmenü.",
     "replay": "Kampagnenabschluss"
+  },
+  "planning": {
+    "controls": "Kampfsteuerung",
+    "pause": "Planen",
+    "resume": "Verteidigung fortsetzen",
+    "active": "Planungspause · Bauen, aufrüsten, verkaufen und Drohnen zuweisen. Danach bewusst fortsetzen.",
+    "shortcut": "Planungspause (T / Controller Select). Menüpause: P / Start.",
+    "speedLabel": "Simulationsgeschwindigkeit: {{speed}}×. Geschwindigkeit ändern.",
+    "speedHint": "Zwischen 1× und 2× Simulationszeit wechseln. In der Pause bleibt die Zeit stehen.",
+    "training": "Das Training bestimmt Tempo und verfügbare Aktionen.",
+    "abilitiesPaused": "Verteidigung fortsetzen, um Fähigkeiten zu nutzen."
+  },
+  "wavePreview": {
+    "button": "Ankommend {{wave}}",
+    "heading": "Welle {{wave}} · {{count}} geplant",
+    "none": "Alle Wellen wurden gerufen.",
+    "empty": "In dieser Welle sind keine Gegner geplant.",
+    "bossWarning": "Boss im Anmarsch",
+    "boss": "Matriarchin",
+    "new": "NEU",
+    "hp": "{{hp}} LP",
+    "shield": "{{hp}} Schild",
+    "shielded": "Geschützt",
+    "healer": "Heilaura",
+    "regen": "Regeneriert",
+    "defenses": "Erlittener Schaden: {{values}}",
+    "counter": "Bester verfügbarer Schaden: {{types}}",
+    "noCounter": "Keine wirksame Turmschadensart in dieser Ausrüstung.",
+    "reinforcements": "Kann Verstärkung rufen; Gesamtzahl variiert.",
+    "lane": "Route {{lane}} · {{count}} geplant",
+    "marker": "Route {{lane}} · {{count}}",
+    "laneHint": "Route wählen, um ihren Eingang auf dem Feld zu markieren.",
+    "stream": "Zusätzliche {{kinds}} alle {{min}}–{{max}} s, solange der Boss aktiv ist.",
+    "adaptive": "Einige Gegner können sich zusätzlich an deine bisherigen Schadensarten anpassen.",
+    "countHint": "Die Zahlen umfassen geplante Gegner. Beschworene Gegner und laufende Bosseskorten kommen hinzu."
   }
 }

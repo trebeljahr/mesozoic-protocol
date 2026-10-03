@@ -26,6 +26,7 @@ import { HealthBars } from "./HealthBars";
 import { HiveDrones } from "./HiveDrones";
 import { HQBase } from "./HQBase";
 import { HQTurrets } from "./HQTurret";
+import { IncomingLaneMarkers } from "./IncomingLaneMarkers";
 import { ModelEnemyMesh } from "./ModelEnemyMesh";
 import { ModelRobotMesh } from "./ModelRobotMesh";
 import { ModelTowerMesh } from "./ModelTowerMesh";
@@ -95,6 +96,7 @@ export const PlayScene = () => {
       <HQTurrets />
       <HQBase />
       <PathLine />
+      <IncomingLaneMarkers />
       <Placement />
       <TutorialMarker />
       {/* Frame 1 — bulk of the static decor (trees, rocks, biome cosmetics

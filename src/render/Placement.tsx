@@ -7,6 +7,7 @@ import { GAMEPAD_STICK_DEADZONE, scaleGamepadAxis, useGamepadInput } from "../in
 import { isMenuFrameHandled } from "../input/useGamepadMenuNavigation";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { effectiveTowerCost } from "../sim/metaSkills";
+import { canUseBattlefield } from "../sim/playControl";
 import type { TowerKind } from "../sim/types";
 import { TOWER_CLEAR_RADIUS, TOWER_STATS, towerKindAtBuildLimit } from "../sim/world";
 import { useGame } from "../store";
@@ -49,7 +50,7 @@ export const Placement = () => {
   const invalidPulseTimerRef = useRef<number | null>(null);
   const [invalidPulse, setInvalidPulse] = useState<{ pos: Vec2; key: number } | null>(null);
   const gold = useGame((s) => s.ui.gold);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
   const selectedKind = useGame((s) => s.selectedKind);
   // Subscribed so the placement plane re-renders (and re-runs the
   // towerAtPos / canPlace getState() reads below) when towers or trees
@@ -151,7 +152,7 @@ export const Placement = () => {
       state.skillTreeOpen ||
       state.robotShopOpen ||
       state.screen !== "playing" ||
-      state.ui.status !== "running" ||
+      !canUseBattlefield(state) ||
       state.compendiumOpen ||
       state.achievementsOpen ||
       state.creditsOpen ||
@@ -169,7 +170,14 @@ export const Placement = () => {
     // are deliberate and not subject to the same conflict.
     const touchLocked = Date.now() - lastTouchInputAtRef.current < GAMEPAD_TOUCH_LOCKOUT_MS;
 
-    if (frame.buttonPressed("start")) state.togglePause();
+    if (frame.buttonPressed("start")) {
+      state.togglePause();
+      return;
+    }
+    if (frame.buttonPressed("select")) {
+      state.togglePlanningPause();
+      return;
+    }
     if (frame.buttonPressed("y")) state.callWaveEarly();
 
     const cycleTower = (direction: -1 | 1) => {
@@ -197,7 +205,7 @@ export const Placement = () => {
         state.selectedRockId
       ) {
         state.clearSelection();
-      } else if (state.ui.status === "running" || state.ui.status === "paused") {
+      } else if (canUseBattlefield(state) || state.ui.status === "paused") {
         state.togglePause();
       }
     }
@@ -474,7 +482,7 @@ export const Placement = () => {
   const hoveredTower = activeHover !== null ? useGame.getState().towerAtPos(activeHover) : null;
 
   const showPlacement =
-    activeHover !== null && hoveredTower === null && status === "running" && selectedKind !== null;
+    activeHover !== null && hoveredTower === null && battlefieldUsable && selectedKind !== null;
   const placementState = useGame.getState();
   const selectedCost =
     selectedKind === null
@@ -512,7 +520,7 @@ export const Placement = () => {
         visible={false}
       />
 
-      {activeHover && status === "running" && hoveredTower && (
+      {activeHover && battlefieldUsable && hoveredTower && (
         <group position={[hoveredTower.pos.x, 0, -hoveredTower.pos.y]}>
           <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.7, 0.9, 32]} />

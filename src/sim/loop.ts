@@ -9,6 +9,7 @@ import {
   updateShake,
 } from "./effects";
 import { updateEnemies } from "./enemies";
+import { effectiveSimulationSpeed, type SimulationSpeed } from "./playControl";
 import { updateProjectiles } from "./projectiles";
 import { updateRobot } from "./robot";
 import { checkRunEnd, spawnerTick } from "./spawner";
@@ -29,7 +30,8 @@ export class Engine {
     this.lastRealTime = null;
   }
 
-  step(world: World, realTimeSec: number) {
+  step(world: World, realTimeSec: number, speed: SimulationSpeed = 1) {
+    if (!Number.isFinite(realTimeSec)) return;
     if (this.lastRealTime === null) {
       this.lastRealTime = realTimeSec;
       return;
@@ -39,12 +41,17 @@ export class Engine {
       this.accumulator = 0;
       return;
     }
-    const frameDt = Math.min(realTimeSec - this.lastRealTime, MAX_FRAME_DT);
+    // Scale accumulated time, never the fixed simulation step. A stalled frame
+    // has the same bounded work budget at both speeds.
+    const frameDt = Math.min(
+      Math.max(0, realTimeSec - this.lastRealTime) * effectiveSimulationSpeed(world, speed),
+      MAX_FRAME_DT,
+    );
     this.lastRealTime = realTimeSec;
     this.accumulator += frameDt;
-    while (this.accumulator >= TICK_DT) {
+    while (this.accumulator + 1e-10 >= TICK_DT && world.status === "running") {
       this.tick(world);
-      this.accumulator -= TICK_DT;
+      this.accumulator = Math.max(0, this.accumulator - TICK_DT);
     }
   }
 

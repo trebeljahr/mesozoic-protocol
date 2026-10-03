@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { canUseBattlefield } from "../sim/playControl";
 import { ROBOT_SPECS, robotAbilityDamageType } from "../sim/robotVariants";
 import type { RobotAbilitySlot } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
@@ -21,7 +22,7 @@ export const RobotSelectionPanel = () => {
   const { t } = useTranslation();
   const showKeyboardHints = useKeyboardHintsVisible();
   const open = useGame((s) => s.robotPanelOpen);
-  const status = useGame((s) => s.ui.status);
+  const battlefieldUsable = useGame(canUseBattlefield);
   const variant = useGame((s) => s.ui.robotVariant);
   const label = useGame((s) => s.ui.robotLabel);
   const level = useGame((s) => s.ui.robotLevel);
@@ -34,7 +35,7 @@ export const RobotSelectionPanel = () => {
   const glyphs = useGame((s) => s.ui.robotAbilityGlyphs);
   const setRobotPanelOpen = useGame((s) => s.setRobotPanelOpen);
 
-  if (!open || status !== "running") return null;
+  if (!open || !battlefieldUsable) return null;
 
   const robot = useGame.getState().world.robot;
   const spec = ROBOT_SPECS[variant];

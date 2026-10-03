@@ -65,6 +65,12 @@ import {
 } from "./sim/metaSkills";
 import { segmentLength } from "./sim/path";
 import {
+  canUseBattlefield,
+  effectiveSimulationSpeed,
+  isTrainingSession,
+  type SimulationSpeed,
+} from "./sim/playControl";
+import {
   cancelRobotDashAim as simCancelRobotDashAim,
   orderRobotMove as simOrderRobotMove,
   selectRobot as simSelectRobot,
@@ -635,6 +641,10 @@ type GameStore = {
 
   reset: () => void;
   setInterruptionBlocked: (reason: InterruptionReason, blocked: boolean) => void;
+  planningPaused: boolean;
+  simulationSpeed: SimulationSpeed;
+  togglePlanningPause: () => void;
+  setSimulationSpeed: (speed: SimulationSpeed) => void;
   togglePause: () => void;
   tick: (realTimeSec: number) => void;
 
@@ -835,6 +845,8 @@ const buildWorldForLevel = (
   });
   return {
     world,
+    planningPaused: false,
+    simulationSpeed: 1 as SimulationSpeed,
     ui: snapshot(world, 0, 0, emptyInspect),
     towerVersion: 0,
     treeVersion: 0,
@@ -1211,6 +1223,8 @@ export const useGame = create<GameStore>((set, get) => ({
     beginMission(s.activeSlot, world, progress);
     set({
       world,
+      planningPaused: false,
+      simulationSpeed: 1,
       ui: snapshot(world, 0, 0, emptyInspect),
       towerVersion: 0,
       treeVersion: 0,
@@ -1547,14 +1561,41 @@ export const useGame = create<GameStore>((set, get) => ({
     // Preserve the resume latch on a suspended campaign too. Foregrounding
     // training must not make the restored live mission resume implicitly.
     if (s.tutorialReturnState) sessionPause.enforce(s.tutorialReturnState.world);
+    if (blocked) set({ planningPaused: false });
     // Discard elapsed wall time, including when requestAnimationFrame was suspended.
     s.engine.reset();
     set({ ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy) });
   },
 
+  togglePlanningPause: () => {
+    const s = get();
+    if (!canUseBattlefield(s) || isTrainingSession(s.world) || !sessionPause.canAutoResume(s.world))
+      return;
+    if (s.planningPaused) {
+      if (!sessionPause.resume(s.world)) return;
+    } else s.world.status = "paused";
+    s.engine.reset();
+    set({
+      planningPaused: !s.planningPaused,
+      ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy),
+    });
+  },
+
+  setSimulationSpeed: (speed) => {
+    const s = get();
+    if (!canUseBattlefield(s)) return;
+    s.engine.reset();
+    set({ simulationSpeed: effectiveSimulationSpeed(s.world, speed) });
+  },
+
   togglePause: () => {
     const s = get();
     const { world } = s;
+    if (s.planningPaused) {
+      // Menu pause replaces planning; closing it requires a deliberate resume.
+      set({ planningPaused: false });
+      return;
+    }
     if (world.status === "running") world.status = "paused";
     else if (world.status === "paused") {
       if (
@@ -1589,7 +1630,7 @@ export const useGame = create<GameStore>((set, get) => ({
       if (!uiEqual(s.ui, ui)) set({ ui });
       return;
     }
-    s.engine.step(s.world, realTimeSec);
+    s.engine.step(s.world, realTimeSec, s.simulationSpeed);
 
     // Close placement when the armed tower stops being affordable.
     // Otherwise the picker would track a ghost the player can't drop —
@@ -1954,7 +1995,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   orderRobotMove: (pos) => {
     const s = get();
-    if (s.world.status !== "running") return false;
+    if (!canUseBattlefield(s)) return false;
     // simOrderRobotMove rejects off-road clicks and stores the accepted
     // order on the nearest path centerline. Movement itself remains
     // free-roam, so obstacle/terrain detours are allowed while travelling.
@@ -1996,6 +2037,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   selectRobotUnit: (on) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     simSelectRobot(s.world, on);
     if (on) {
       // Robot selection is mutually exclusive with the other detail panels —
@@ -2249,7 +2291,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectTree: (id) => {
     const s = get();
     const w = s.world;
-    if (w.status !== "running") return;
+    if (!canUseBattlefield(s)) return;
     const tree = treeById(w, id);
     if (!tree) return;
     w.selectedTowerId = null;
@@ -2289,7 +2331,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const s = get();
     const w = s.world;
     const id = s.selectedTreeId;
-    if (id === null || w.status !== "running") return;
+    if (id === null || !canUseBattlefield(s)) return;
     const tree = treeById(w, id);
     if (!tree) {
       set({ selectedTreeId: null });
@@ -2311,7 +2353,7 @@ export const useGame = create<GameStore>((set, get) => ({
   selectRock: (id) => {
     const s = get();
     const w = s.world;
-    if (w.status !== "running") return;
+    if (!canUseBattlefield(s)) return;
     const rock = rockById(w, id);
     if (!rock) return;
     w.selectedTowerId = null;
@@ -2453,7 +2495,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const s = get();
     const w = s.world;
     const id = s.selectedRockId;
-    if (id === null || w.status !== "running") return;
+    if (id === null || !canUseBattlefield(s)) return;
     const rock = rockById(w, id);
     if (!rock) {
       set({ selectedRockId: null });
@@ -2472,6 +2514,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   tryPlaceOrSelect: (pos, options) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     const w = s.world;
 
     const hit = towerAt(w, pos);
@@ -2570,10 +2613,8 @@ export const useGame = create<GameStore>((set, get) => ({
       }
       return;
     }
-    // Tower placement spends gold and adds entities — only allowed during
-    // an active wave. Selection/deselection above is fine in any state
-    // (auto-pause on new-enemy sighting is a common moment to deselect).
-    if (w.status !== "running") return;
+    // Tactical placement is available during live combat and planning.
+    // The shared access gate above excludes all modal/interruption pauses.
     // Mode rule check before spending gold. The HUD greys out denied
     // kinds, but a stale picker selection (e.g. the player armed a kind
     // before opening the breach/containment run) is rejected here so rules
@@ -2642,6 +2683,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   selectTower: (id) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     const { world, towerVersion, treeVersion } = s;
     // If switching to a non-hive tower (or closing the panel), drop any
     // in-flight drone-assignment cursor — it belonged to the previously
@@ -2668,6 +2710,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   upgradeSelected: (branch) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     if (s.world.selectedTowerId === null) return;
     const t = s.world.towerById.get(s.world.selectedTowerId);
     if (!t) return;
@@ -2688,6 +2731,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   sellSelected: () => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     if (s.world.selectedTowerId === null) return;
     const t = s.world.towerById.get(s.world.selectedTowerId);
     if (!t) return;
@@ -2708,6 +2752,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   setTargetingMode: (mode) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     if (s.world.selectedTowerId === null) return;
     const t = s.world.towerById.get(s.world.selectedTowerId);
     if (!t) return;
@@ -2740,6 +2785,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   selectBase: (on) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     const w = s.world;
     if (w.selectedBase === on) return;
     w.selectedBase = on;
@@ -2760,6 +2806,7 @@ export const useGame = create<GameStore>((set, get) => ({
   upgradeBase: (branch) => {
     const s = get();
     if (s.tutorial && lessonFor(s.tutorial).id !== "base") return;
+    if (!canUseBattlefield(s)) return;
     if (!applyBaseUpgrade(s.world, branch)) return;
     signalTutorial(s.tutorial, "base");
     // Bump towerVersion so the panel (which subscribes to it) re-reads
@@ -2785,6 +2832,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   beginDroneAssignment: (hiveId, droneIdx) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     const hive = s.world.towerById.get(hiveId);
     if (!hive || hive.kind !== "hive") return;
     if (droneIdx < 0 || droneIdx >= hive.droneCount) return;
@@ -2793,6 +2841,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   assignDroneToTower: (towerId) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     const slot = s.assigningDroneSlot;
     if (!slot) return;
     const hive = s.world.towerById.get(slot.hiveId);
@@ -2856,6 +2905,7 @@ export const useGame = create<GameStore>((set, get) => ({
 
   clearDroneAssignment: (hiveId, droneIdx) => {
     const s = get();
+    if (!canUseBattlefield(s)) return;
     const hive = s.world.towerById.get(hiveId);
     if (!hive || hive.kind !== "hive") return;
     if (droneIdx < 0 || droneIdx >= hive.droneCount) return;
@@ -3245,3 +3295,12 @@ if (import.meta.hot) {
   }
   (globalThis as HMRGlobal)[HMR_STORE_KEY] = useGame;
 }
+
+// Run controls are transient. Any world replacement (campaign, Endless,
+// training, checkpoint restore, or editor rebuild) starts from normal speed
+// with no planning ownership carried over from the previous world.
+useGame.subscribe((state, previous) => {
+  if (state.world !== previous.world && (state.planningPaused || state.simulationSpeed !== 1)) {
+    useGame.setState({ planningPaused: false, simulationSpeed: 1 });
+  }
+});
