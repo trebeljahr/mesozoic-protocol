@@ -327,7 +327,10 @@ export const App = () => {
       )}
 
       {screen === "worldMap" && !sceneBlockingModalOpen && !hideWorldMapChrome && <WorldMapUI />}
-      {screen !== "worldMap" && !sceneBlockingModalOpen && !hideLevelChrome && <HUD />}
+      {screen !== "worldMap" &&
+        screen !== "results" &&
+        !sceneBlockingModalOpen &&
+        !hideLevelChrome && <HUD />}
       {screen === "playing" && !sceneBlockingModalOpen && !hideLevelChrome && <PlannerHud />}
       {screen === "results" && !sceneBlockingModalOpen && <ResultsScreen />}
       {compendiumOpen && (
