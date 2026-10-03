@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { loadSlot, slotKey } from "../progress";
 import { useGame } from "../store";
 import { excludeWorldFromPersistence, restoreCheckpoint } from "./missionCheckpoint";
-import { detachMission } from "./missionPersistence";
+import { detachMission, hasMissionSession } from "./missionPersistence";
 import { persistActiveSave } from "./persistActiveSave";
 
 vi.mock("../analytics", () => ({ track: vi.fn() }));
@@ -78,4 +78,28 @@ it("reports checkpoint failure without committing newer rewards alone", () => {
   failWrites = true;
   expect(persistActiveSave()).toBe(false);
   expect(data.get(slotKey(1))).toBe(original);
+});
+
+it("permits closing during combat while preserving the last complete checkpoint", () => {
+  const original = data.get(slotKey(1));
+  state().world.waveActive = true;
+  state().world.time += 12;
+  useGame.setState({ progress: { ...state().progress, bolts: state().progress.bolts + 7 } });
+  expect(persistActiveSave()).toBe(true);
+  expect(data.get(slotKey(1))).toBe(original);
+});
+
+it.each(["won", "lost"] as const)("retries a failed %s result before closing", (status) => {
+  const world = state().world;
+  world.status = status;
+  const bolts = state().progress.bolts + 7;
+  useGame.setState({ progress: { ...state().progress, bolts } });
+  failWrites = true;
+  expect(persistActiveSave()).toBe(false);
+  expect(hasMissionSession(world)).toBe(true);
+  failWrites = false;
+  expect(persistActiveSave()).toBe(true);
+  expect(hasMissionSession(world)).toBe(false);
+  expect(loadSlot(1).checkpoint).toBeNull();
+  expect(loadSlot(1).progress.bolts).toBe(bolts);
 });
