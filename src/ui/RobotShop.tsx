@@ -1,7 +1,13 @@
 import { type FC, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { isDebug } from "../debug";
-import { DEMO_TEASER_ROBOT, DEMO_TEASER_ROBOT_BOLTS, IS_DEMO, STEAM_STORE_URL } from "../demo";
+import {
+  DEMO_TEASER_ROBOT,
+  DEMO_TEASER_ROBOT_BOLTS,
+  IS_DEMO,
+  STEAM_STORE_READY,
+  STEAM_STORE_URL,
+} from "../demo";
 import { robotSkillBoltDelta } from "../sim/robotBolts";
 import {
   levelForXp,
@@ -545,14 +551,18 @@ const RobotDetail = ({
               <span className="text-[12px] text-fg-muted">
                 {t("demo.teaserBody", { name: spec.label })}
               </span>
-              <a
-                href={STEAM_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-blue text-sm py-2 px-4 no-underline"
-              >
-                {t("demo.wishlist")}
-              </a>
+              {STEAM_STORE_READY ? (
+                <a
+                  href={STEAM_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-blue text-sm py-2 px-4 no-underline"
+                >
+                  {t("demo.wishlist")}
+                </a>
+              ) : (
+                <p className="text-sm text-fg-muted">{t("demo.storeSoon")}</p>
+              )}
             </div>
           ) : (
             <div className="border-t border-border-faint pt-3 flex items-center gap-3">

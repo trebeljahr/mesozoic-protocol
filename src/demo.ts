@@ -33,10 +33,10 @@ export const DEMO_TEASER_ROBOT: RobotVariant = "george";
 // unlockBolts on purpose: "you could have unlocked him — get the full game."
 export const DEMO_TEASER_ROBOT_BOLTS = 250;
 
-// Wishlist destination for the demo CTAs. Placeholder until the Steam App ID
-// is assigned.
-// TODO(steam): swap in the real store page URL once the app exists.
-export const STEAM_STORE_URL = "https://store.steampowered.com/app/0000000/Mesozoic_Protocol/";
+// Assigned app. Keep demo links disabled until its Coming Soon page is public.
+// Release builds opt in only after checking the destination in Steam.
+export const STEAM_STORE_URL = "https://store.steampowered.com/app/4798230/Mesozoic_Protocol/";
+export const STEAM_STORE_READY: boolean = import.meta.env.VITE_STEAM_STORE_READY === "1";
 
 // A campaign level is out of the demo's reach once it climbs past the forest
 // outposts. Returns false in the full build (IS_DEMO folds to false), so

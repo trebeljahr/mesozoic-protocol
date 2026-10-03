@@ -94,7 +94,9 @@
     "startingGold": "Startgold",
     "locked": "Gesperrt",
     "deploy": "Einsatz",
-    "endlessSteamNote": "In der Steam-Version verfügbar"
+    "endlessSteamNote": "In der Steam-Version verfügbar",
+    "endlessAria": "Endlosmodus öffnen",
+    "endlessTitle": "Endlos – überlebe immer stärkere Wellen"
   },
   "compendium": {
     "title": "Kompendium",
@@ -234,7 +236,8 @@
     "resultsTitle": "Das war die Demo",
     "resultsBody": "Du hast die fünf Waldaußenposten gehalten. Das volle Spiel bringt 25 weitere in fünf Biomen, vier Piloten und einen Endlosmodus.",
     "teaserTag": "Vollversion",
-    "teaserBody": "{{name}} kommt in der Vollversion zum Einsatz."
+    "teaserBody": "{{name}} kommt in der Vollversion zum Einsatz.",
+    "storeSoon": "Die Steam-Seite folgt bald."
   },
   "endlessPicker": {
     "title": "Endlos",
@@ -454,7 +457,15 @@
     "unlocked": "Freigeschaltet: {{level}}",
     "nextLevel": "Nächstes Level",
     "worldMap": "Weltkarte",
-    "retry": "Wiederholen"
+    "retry": "Wiederholen",
+    "endless": {
+      "overrun": "Überrannt.",
+      "newBest": "Neuer Rekord",
+      "waveReached": "Erreichte Welle",
+      "bestWave": "Beste Welle",
+      "enemiesKilled": "Besiegte Gegner",
+      "playAgain": "Erneut spielen"
+    }
   },
   "modePicker": {
     "subtitle": "Herausforderungsmodus wählen",
@@ -478,7 +489,8 @@
     "statusUnlocked": "FREIGESCHALTET",
     "statusLocked": "GESPERRT",
     "statusSecret": "GEHEIM",
-    "unknown": "???"
+    "unknown": "???",
+    "toastUnlocked": "Erfolg freigeschaltet"
   },
   "towerPanel": {
     "support": "Support",
@@ -590,5 +602,12 @@
     "shake": "Kamerawackeln",
     "motionHelp": "Reduzierte Bewegung stoppt Kamerawackeln und Umgebungsbewegung. Kämpfe bleiben sichtbar.",
     "unsaved": "Die Einstellungen gelten jetzt, konnten aber nicht gespeichert werden. Ändere eine Einstellung, um es erneut zu versuchen."
+  },
+  "renderFailure": {
+    "title": "Darstellungsfehler",
+    "module": "Ein Spielmodul konnte nicht geladen werden. Lade die Seite neu, um die aktuellen Dateien abzurufen.",
+    "scene": "Die Szene konnte nicht starten. Versuche es erneut oder lade die Seite neu, falls das Problem bleibt.",
+    "reload": "Neu laden",
+    "retry": "Erneut versuchen"
   }
 }

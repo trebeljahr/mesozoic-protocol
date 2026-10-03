@@ -2,7 +2,7 @@ import type React from "react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
-import { DEMO_MAX_LEVEL, IS_DEMO, STEAM_STORE_URL } from "../demo";
+import { DEMO_MAX_LEVEL, IS_DEMO, STEAM_STORE_READY, STEAM_STORE_URL } from "../demo";
 import { LEVELS } from "../levels";
 import { isLevelUnlocked } from "../progress";
 import { useGame } from "../store";
@@ -96,35 +96,39 @@ export const ResultsScreen = () => {
       <div className="overlay">
         <div className="overlay-card min-w-[420px] px-10 py-8">
           <div className="flex items-center justify-center gap-3 mb-1">
-            <h1 className="!mb-0">Overrun.</h1>
+            <h1 className="!mb-0">{t("results.endless.overrun")}</h1>
             {en.newBest && (
               <span className="inline-flex items-center rounded border border-gold text-gold font-bold text-[11px] uppercase tracking-wide px-2 py-0.5">
-                New Best
+                {t("results.endless.newBest")}
               </span>
             )}
           </div>
           <div className="text-[13px] tracking-uber uppercase text-fg-dim mb-5">
-            <span className="text-cyan mr-2">Endless ∞ ·</span>
+            <span className="text-cyan mr-2">{t("endlessPicker.title")} ∞ ·</span>
             {en.mapName}
           </div>
 
           <div className="bg-[rgba(8,12,18,0.45)] border border-[rgba(120,160,200,0.14)] rounded-lg px-4 py-3.5 mb-5">
             <div className="flex flex-col items-center gap-0.5 mb-3">
-              <div className="text-[11px] uppercase tracking-uber text-fg-muted">Reached wave</div>
+              <div className="text-[11px] uppercase tracking-uber text-fg-muted">
+                {t("results.endless.waveReached")}
+              </div>
               <div className="text-5xl font-bold text-blue tabular-nums leading-none">
                 {en.waveReached}
               </div>
             </div>
-            <ResultRow label="Best wave" value={`${en.bestWave}`} />
-            <ResultRow label="Enemies killed" value={`${en.enemiesKilled}`} />
+            <ResultRow label={t("results.endless.bestWave")} value={`${en.bestWave}`} />
+            <ResultRow label={t("results.endless.enemiesKilled")} value={`${en.enemiesKilled}`} />
           </div>
 
           <div className="flex gap-2.5 justify-center">
             <button type="button" onClick={retry} className="btn">
-              Play Again<span className="kbd-only"> (R)</span>
+              {t("results.endless.playAgain")}
+              <span className="kbd-only"> (R)</span>
             </button>
             <button type="button" onClick={goToMap} className="btn btn-secondary">
-              World Map<span className="kbd-only"> (Esc)</span>
+              {t("results.worldMap")}
+              <span className="kbd-only"> (Esc)</span>
             </button>
           </div>
         </div>
@@ -178,14 +182,18 @@ export const ResultsScreen = () => {
           <div className="bg-[rgba(10,40,60,0.55)] border border-blue/50 rounded-lg px-4 py-3.5 mb-5 text-center">
             <div className="text-sm font-bold text-cyan mb-1">{t("demo.resultsTitle")}</div>
             <p className="text-[12px] leading-snug text-fg-muted mb-3">{t("demo.resultsBody")}</p>
-            <a
-              href={STEAM_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-blue text-sm py-2 px-4 no-underline inline-flex"
-            >
-              {t("demo.wishlist")}
-            </a>
+            {STEAM_STORE_READY ? (
+              <a
+                href={STEAM_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-blue text-sm py-2 px-4 no-underline inline-flex"
+              >
+                {t("demo.wishlist")}
+              </a>
+            ) : (
+              <p className="text-sm text-fg-muted">{t("demo.storeSoon")}</p>
+            )}
           </div>
         )}
 

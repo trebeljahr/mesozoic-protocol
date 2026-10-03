@@ -94,7 +94,9 @@
     "startingGold": "Starting gold",
     "locked": "Locked",
     "deploy": "Deploy",
-    "endlessSteamNote": "Steam 版本中提供"
+    "endlessSteamNote": "Steam 版本中提供",
+    "endlessAria": "Open endless mode",
+    "endlessTitle": "Endless — survive escalating waves"
   },
   "compendium": {
     "title": "Compendium",
@@ -234,7 +236,8 @@
     "resultsTitle": "试玩到此结束",
     "resultsBody": "你守住了五个森林前哨。完整版还有 25 个前哨，横跨五种生态、四名机师，以及无尽模式。",
     "teaserTag": "完整版",
-    "teaserBody": "{{name}} 将在完整版中登场。"
+    "teaserBody": "{{name}} 将在完整版中登场。",
+    "storeSoon": "Steam page coming soon."
   },
   "endlessPicker": {
     "title": "Endless",
@@ -454,7 +457,15 @@
     "unlocked": "Unlocked: {{level}}",
     "nextLevel": "Next Level",
     "worldMap": "World Map",
-    "retry": "Retry"
+    "retry": "Retry",
+    "endless": {
+      "overrun": "Overrun.",
+      "newBest": "New best",
+      "waveReached": "Wave reached",
+      "bestWave": "Best wave",
+      "enemiesKilled": "Enemies killed",
+      "playAgain": "Play again"
+    }
   },
   "modePicker": {
     "subtitle": "Choose a challenge mode",
@@ -478,7 +489,8 @@
     "statusUnlocked": "UNLOCKED",
     "statusLocked": "LOCKED",
     "statusSecret": "SECRET",
-    "unknown": "???"
+    "unknown": "???",
+    "toastUnlocked": "Achievement unlocked"
   },
   "towerPanel": {
     "support": "Support",
@@ -590,5 +602,12 @@
     "shake": "Camera shake",
     "motionHelp": "Reduced motion stops camera shake and ambient movement. Combat remains visible.",
     "unsaved": "Settings apply now, but could not be saved. Change a setting to retry."
+  },
+  "renderFailure": {
+    "title": "Render glitch",
+    "module": "A game module could not load. Reload to request the current files from the server.",
+    "scene": "The scene could not start. Try again, or reload if the problem continues.",
+    "reload": "Reload",
+    "retry": "Try again"
   }
 }

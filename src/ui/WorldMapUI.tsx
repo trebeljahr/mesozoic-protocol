@@ -207,8 +207,8 @@ export const WorldMapUI = () => {
                 type="button"
                 className="world-map-utility-btn bg-surface-1 border border-blue/50 rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
                 onClick={() => setEndlessPickerOpen(true)}
-                aria-label="Open endless mode"
-                title="Endless — survive infinite escalating waves"
+                aria-label={t("worldMap.endlessAria")}
+                title={t("worldMap.endlessTitle")}
               >
                 <span className="text-base leading-none font-bold text-cyan shrink-0" aria-hidden>
                   ∞

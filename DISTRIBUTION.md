@@ -306,16 +306,34 @@ of [steam/README.md](steam/README.md).
 Promoting an uploaded build to a live branch stays a manual step in the
 Steamworks dashboard unless you set `STEAM_RELEASE_BRANCH`.
 
-### Optional: Steamworks SDK (achievements, overlay, cloud saves)
+### Steam store links and platform features
 
-The current build is **Steam-shippable as-is** — Steam wraps any plain executable. To get achievements, the Steam overlay, friends list, or cloud saves you'd add the SDK. This is optional and requires a real Steam App ID. Sketch:
+The assigned Steam app is `4798230`. Demo wishlist links use that app's
+[store URL](https://store.steampowered.com/app/4798230/Mesozoic_Protocol/).
+They remain disabled unless the build sets `VITE_STEAM_STORE_READY=1`.
+Before enabling it, verify the Coming Soon page is public without a partner
+login. For example: `VITE_DEMO=1 VITE_STEAM_STORE_READY=1 pnpm build`.
+This flag does not publish the page. The static about/press buttons have their
+own release step and remain disabled until the page is verified.
 
-1. Add `steamworks = "0.11"` to `src-tauri/Cargo.toml` and download the proprietary SDK (`STEAM_SDK_LOCATION` env var).
-2. In `src-tauri/src/lib.rs`, init `steamworks::Client::init_app(<APP_ID>)` in the Tauri `setup` hook and expose Tauri commands for achievement / cloud-save calls.
-3. Add a `steam_appid.txt` (single line: the app ID) next to the executable so the SDK can attach when you launch outside Steam during dev. **Do not commit this file** — it is already in the root [.gitignore](.gitignore), and the depot templates in [steam/](steam/) exclude it from uploads.
-4. From the renderer, invoke commands via `@tauri-apps/api`'s `invoke()`. Map game events (level cleared, achievement earned, save-slot updated) to Steamworks calls.
+The game currently has **local achievements and local saves**. It has no
+Steam achievement API bridge or configured cloud-save implementation in this
+repository. Do not advertise those Steam features based on the local systems.
+An uploaded depot alone does not confirm runtime integrations.
 
-Until then, the game saves locally via the existing Zustand persistence layer and posts no telemetry to Steam — fine for soft launch.
+[Steam achievements](https://partner.steamgames.com/doc/features/achievements)
+require configured achievement IDs and runtime API calls.
+[Steam Cloud](https://partner.steamgames.com/doc/features/cloud) supports both
+an API and Auto-Cloud file rules; an SDK is not required for Auto-Cloud.
+Either route needs Steamworks configuration and a real two-device sync test.
+Do not point Auto-Cloud at an entire webview profile: stable, game-owned save
+files and conflict handling must be established first.
+
+Before claiming platform support, verify a packaged build through Steam:
+achievement unlock and persistence, offline play followed by reconnect,
+cloud conflict choice, and restore on a second clean installation. The
+updater must remain disabled in Steam installs. Keep `steam_appid.txt`
+untracked and excluded from depots.
 
 ## Mobile (Capacitor → iOS / Android)
 

@@ -94,7 +94,9 @@
     "startingGold": "Starting gold",
     "locked": "Locked",
     "deploy": "Deploy",
-    "endlessSteamNote": "Disponível na versão Steam"
+    "endlessSteamNote": "Disponível na versão Steam",
+    "endlessAria": "Open endless mode",
+    "endlessTitle": "Endless — survive escalating waves"
   },
   "compendium": {
     "title": "Compendium",
@@ -234,7 +236,8 @@
     "resultsTitle": "Essa é a demo",
     "resultsBody": "Você defendeu os cinco postos da floresta. O jogo completo traz mais 25 em cinco biomas, quatro pilotos e um modo infinito.",
     "teaserTag": "Jogo completo",
-    "teaserBody": "{{name}} entra em ação no jogo completo."
+    "teaserBody": "{{name}} entra em ação no jogo completo.",
+    "storeSoon": "Steam page coming soon."
   },
   "endlessPicker": {
     "title": "Endless",
@@ -454,7 +457,15 @@
     "unlocked": "Unlocked: {{level}}",
     "nextLevel": "Next Level",
     "worldMap": "World Map",
-    "retry": "Retry"
+    "retry": "Retry",
+    "endless": {
+      "overrun": "Overrun.",
+      "newBest": "New best",
+      "waveReached": "Wave reached",
+      "bestWave": "Best wave",
+      "enemiesKilled": "Enemies killed",
+      "playAgain": "Play again"
+    }
   },
   "modePicker": {
     "subtitle": "Choose a challenge mode",
@@ -478,7 +489,8 @@
     "statusUnlocked": "UNLOCKED",
     "statusLocked": "LOCKED",
     "statusSecret": "SECRET",
-    "unknown": "???"
+    "unknown": "???",
+    "toastUnlocked": "Achievement unlocked"
   },
   "towerPanel": {
     "support": "Support",
@@ -590,5 +602,12 @@
     "shake": "Camera shake",
     "motionHelp": "Reduced motion stops camera shake and ambient movement. Combat remains visible.",
     "unsaved": "Settings apply now, but could not be saved. Change a setting to retry."
+  },
+  "renderFailure": {
+    "title": "Render glitch",
+    "module": "A game module could not load. Reload to request the current files from the server.",
+    "scene": "The scene could not start. Try again, or reload if the problem continues.",
+    "reload": "Reload",
+    "retry": "Try again"
   }
 }

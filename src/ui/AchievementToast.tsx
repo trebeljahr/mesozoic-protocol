@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { ACHIEVEMENT_BY_ID, type AchievementId } from "../achievements";
 import { audio } from "../audio/AudioManager";
 import { useGame } from "../store";
@@ -31,6 +32,7 @@ type AchievementToastItemProps = {
 };
 
 const AchievementToastItem = ({ toast, onDismiss }: AchievementToastItemProps) => {
+  const { t } = useTranslation();
   const dragStartRef = useRef<DragStart | null>(null);
   const suppressClickRef = useRef(false);
   const [dragX, setDragX] = useState(0);
@@ -109,15 +111,15 @@ const AchievementToastItem = ({ toast, onDismiss }: AchievementToastItemProps) =
         setDragX(0);
       }}
       style={dragStyle}
-      title="Dismiss"
+      title={t("common.close")}
     >
       <div className="achievement-toast-icon">
         <Icon size={40} />
       </div>
       <div className="achievement-toast-text">
-        <div className="achievement-toast-label">ACHIEVEMENT UNLOCKED</div>
-        <div className="achievement-toast-name">{def.name}</div>
-        <div className="achievement-toast-desc">{def.desc}</div>
+        <div className="achievement-toast-label">{t("achievements.toastUnlocked")}</div>
+        <div className="achievement-toast-name">{t(`achievements:${def.id}.name`)}</div>
+        <div className="achievement-toast-desc">{t(`achievements:${def.id}.desc`)}</div>
       </div>
     </button>
   );
