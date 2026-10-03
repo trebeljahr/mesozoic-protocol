@@ -31,6 +31,7 @@ import { LevelLoadOverlay } from "./ui/LevelLoadOverlay";
 import { NewEnemyAlert } from "./ui/NewEnemyAlert";
 import { PlannerHud } from "./ui/PlannerHud";
 import { ResultsScreen } from "./ui/ResultsScreen";
+import { SaveHealthNotice } from "./ui/SaveRecovery";
 import { SaveSlots } from "./ui/SaveSlots";
 import { Splash } from "./ui/Splash";
 import { UpdateNotice } from "./ui/UpdateNotice";
@@ -252,6 +253,7 @@ export const App = () => {
     return (
       <>
         <SaveSlots />
+        <SaveHealthNotice />
         <LandscapeNudge />
       </>
     );
@@ -373,6 +375,7 @@ export const App = () => {
       {screen === "playing" && levelIntroVisible && !hideLevelChrome && <LevelIntro />}
       {screen === "playing" && !modalOpen && !hideLevelChrome && <NewEnemyAlert />}
       {!hideEditorChrome && <AchievementToast />}
+      <SaveHealthNotice />
       {!hideEditorChrome && <LandscapeNudge />}
       {/* Deliberately not in the splash/slots early returns above: mounting
           here means the desktop update check cannot start until the player is

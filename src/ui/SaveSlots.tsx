@@ -3,17 +3,20 @@ import { Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { DEMO_MAX_LEVEL, IS_DEMO } from "../demo";
 import { LEVELS } from "../levels";
+import { useSaveIssues } from "../persistence/storageHealth";
 import { DIFFICULTY_ACCENT, listSlots, type SlotId, type SlotInfo } from "../progress";
 import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { SaveSlotsScene } from "../render/SaveSlotsScene";
 import { useGame } from "../store";
 import { DifficultyModelIcon } from "./DifficultyModelIcon";
+import { SaveRecoveryControls } from "./SaveRecovery";
 import { SettingsMenu } from "./SettingsMenu";
 import { useIsMobile } from "./useMediaQuery";
 
 type MobileStage = "menu" | "slots";
 
 export const SaveSlots = () => {
+  useSaveIssues();
   const { t } = useTranslation();
   const selectSlot = useGame((s) => s.selectSlot);
   const deleteSlot = useGame((s) => s.deleteSlot);
@@ -138,6 +141,7 @@ export const SaveSlots = () => {
               onBeginDelete={() => beginDelete(slot.id)}
               onConfirmDelete={confirmDelete}
               onCancelDelete={() => setConfirmDeleteId(null)}
+              onChange={() => setRevision((n) => n + 1)}
             />
           ))}
         </div>
@@ -154,6 +158,7 @@ type TileProps = {
   onBeginDelete: () => void;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
+  onChange: () => void;
 };
 
 const SaveSlotTile = ({
@@ -164,6 +169,7 @@ const SaveSlotTile = ({
   onBeginDelete,
   onConfirmDelete,
   onCancelDelete,
+  onChange,
 }: TileProps) => {
   const { t } = useTranslation();
   const filled = slot.exists;
@@ -171,7 +177,7 @@ const SaveSlotTile = ({
     <div className={`save-slot-tile ${filled ? "filled" : "empty"}`}>
       <div className="save-slot-tile-head">
         <div className="save-slot-id">{t("saveSlots.slot", { id: slot.id })}</div>
-        {filled && (
+        {slot.health === "ready" && (
           <div
             className={`save-slot-difficulty ${DIFFICULTY_ACCENT[slot.progress.difficulty].text}`}
           >
@@ -199,7 +205,7 @@ const SaveSlotTile = ({
       ) : (
         <>
           <div className="save-slot-name">{filled ? slot.meta.name : t("saveSlots.empty")}</div>
-          {filled ? (
+          {slot.health === "ready" ? (
             <div className="save-slot-stats">
               <div>
                 <span>{t("saveSlots.cleared")}</span>
@@ -212,12 +218,21 @@ const SaveSlotTile = ({
                 <strong>{slot.totalStars}</strong>
               </div>
             </div>
-          ) : (
+          ) : slot.health === "empty" ? (
             <div className="save-slot-empty-text">{t("saveSlots.emptyText")}</div>
-          )}
+          ) : null}
           <div className="save-slot-actions">
-            <button type="button" className="btn" onClick={onSelect}>
-              {filled ? t("saveSlots.continue") : t("saveSlots.start")}
+            <button
+              type="button"
+              className="btn"
+              onClick={onSelect}
+              disabled={slot.health === "corrupt" || slot.health === "unavailable"}
+            >
+              {slot.checkpoint
+                ? t("saveRecovery.resume")
+                : filled
+                  ? t("saveSlots.continue")
+                  : t("saveSlots.start")}
             </button>
             {filled && (
               <button type="button" className="btn btn-danger btn--sm" onClick={onBeginDelete}>
@@ -225,6 +240,7 @@ const SaveSlotTile = ({
               </button>
             )}
           </div>
+          <SaveRecoveryControls slot={slot} onChange={onChange} />
         </>
       )}
     </div>

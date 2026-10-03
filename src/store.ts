@@ -15,6 +15,14 @@ import { hasLevelBriefing } from "./levels/briefings";
 import { getEndlessArena } from "./levels/endless";
 import { LORE_FRAGMENT_ORDER } from "./levels/lore";
 import { outpostActivation } from "./outpostActivation";
+import { canPersistWorld, restoreCheckpoint } from "./persistence/missionCheckpoint";
+import {
+  beginMission,
+  checkpointMission,
+  detachMission,
+  finishMission,
+  hasMissionSession,
+} from "./persistence/missionPersistence";
 import type { Difficulty, LevelMode, ProgressData, SlotId, Stars } from "./progress";
 import {
   DEFAULT_DIFFICULTY,
@@ -871,6 +879,10 @@ const applyRobotVariantToWorld = (
 // change also bumps that slot's lastPlayed timestamp.
 const persistProgress = (slot: SlotId | null, progress: ProgressData): void => {
   if (slot === null || useGame.getState().tutorial !== null) return;
+  const s = useGame.getState();
+  if (!canPersistWorld(s.world)) return;
+  // Mission rewards and checkpoint state must move forward together.
+  if (hasMissionSession(s.world)) return;
   saveSlot(slot, progress);
 };
 
@@ -1054,11 +1066,13 @@ export const useGame = create<GameStore>((set, get) => ({
     if (!level) return;
     const s = get();
     if (!isLevelUnlocked(id, s.progress)) return;
+    if (!finishMission(s.world, s.progress)) return;
 
     // Builds the world and swaps to the play scene. Reads state at call time
     // (not at click time) since the cold path runs this a couple frames later.
     const enter = () => {
       const cur = get();
+      if (cur.activeSlot !== s.activeSlot || cur.screen !== s.screen) return;
       const { engine, progress } = cur;
       // Resolve the requested mode. Caller defaults to "normal"; breach /
       // containment must both be unlocked AND defined on the level (the picker
@@ -1070,6 +1084,7 @@ export const useGame = create<GameStore>((set, get) => ({
       }
       engine.reset();
       const built = buildWorldForLevel(level, mode, progress.difficulty, progress);
+      beginMission(cur.activeSlot, built.world, progress);
       // Carry the debug invincibility flag across level starts/retries so a
       // toggled-on tester doesn't have to flip it again every restart.
       built.world.invincible = cur.invincible;
@@ -1151,6 +1166,7 @@ export const useGame = create<GameStore>((set, get) => ({
     if (!hasUnlockedEndless(progress)) return;
     const arena = getEndlessArena(mapId);
     if (!arena) return;
+    if (!finishMission(s.world, progress)) return;
     engine.reset();
     const triggeredEggs = triggeredEasterEggIdsForLevel(progress, arena.id);
     const world = createWorld(
@@ -1175,6 +1191,7 @@ export const useGame = create<GameStore>((set, get) => ({
     // Carry the debug invincibility flag across endless starts/retries,
     // matching startLevel.
     world.invincible = s.invincible;
+    beginMission(s.activeSlot, world, progress);
     set({
       world,
       ui: snapshot(world, 0, 0, emptyInspect),
@@ -1226,6 +1243,7 @@ export const useGame = create<GameStore>((set, get) => ({
       s.exitTutorial();
       return;
     }
+    if (!finishMission(s.world, s.progress)) return;
     s.engine.reset();
     set({
       screen: "worldMap",
@@ -1254,7 +1272,10 @@ export const useGame = create<GameStore>((set, get) => ({
 
   goToSlots: () => {
     if (get().tutorial) get().exitTutorial();
-    const { engine } = get();
+    const s = get();
+    checkpointMission(s.world, s.progress, s.runMinDifficulty ?? s.progress.difficulty, true);
+    const { engine } = s;
+    detachMission(s.world);
     engine.reset();
     set({
       screen: "slots",
@@ -1272,7 +1293,47 @@ export const useGame = create<GameStore>((set, get) => ({
 
   selectSlot: (id) => {
     if (get().tutorial) get().exitTutorial();
-    const { progress } = loadSlot(id);
+    let loaded: ReturnType<typeof loadSlot>;
+    try {
+      loaded = loadSlot(id);
+    } catch {
+      return;
+    }
+    const { progress, checkpoint } = loaded;
+    detachMission(get().world);
+    if (checkpoint) {
+      const world = restoreCheckpoint(checkpoint);
+      get().engine.reset();
+      beginMission(id, world, progress, checkpoint);
+      set({
+        activeSlot: id,
+        progress,
+        world,
+        screen: "playing",
+        selectedLevelId: world.endless ? null : world.levelId,
+        selectedKind: null,
+        selectedTreeId: null,
+        selectedRockId: null,
+        pendingTouchPlacement: null,
+        assigningDroneSlot: null,
+        spotSelecting: false,
+        lastResult: null,
+        hoveredLevelId: null,
+        towerVersion: 0,
+        treeVersion: 0,
+        inspectedEnemy: emptyInspect,
+        newEnemyQueue: [],
+        deferredNewEnemyQueue: [],
+        autoPausedForNewEnemy: false,
+        levelIntroVisible: false,
+        levelLoadPending: false,
+        runMinDifficulty: checkpoint.minDifficulty,
+        treeClickCounts: {},
+        rockClickCounts: {},
+        ui: snapshot(world, 0, 0, emptyInspect),
+      });
+      return;
+    }
     // Materialize the slot on pick — even a fresh slot becomes "filled"
     // so the SaveSlots screen shows its name + zeroed stats next time
     // instead of looking empty when nothing's been played yet.
@@ -1294,11 +1355,11 @@ export const useGame = create<GameStore>((set, get) => ({
 
   deleteSlot: (id) => {
     const s = get();
-    deleteSlotStorage(id);
+    if (!deleteSlotStorage(id)) return;
     // If the player just nuked their active slot, drop them back to
     // the picker — there's no save to write to anymore.
     if (s.activeSlot === id) {
-      set({ activeSlot: null, progress: emptyProgress() });
+      set({ activeSlot: null, progress: emptyProgress(), screen: "slots" });
     }
   },
 
@@ -1774,6 +1835,10 @@ export const useGame = create<GameStore>((set, get) => ({
       s.world.robot.level = nextLevel;
     }
 
+    if (s.screen === "playing" && canPersistWorld(s.world)) {
+      if (s.world.status === "won" || s.world.status === "lost") finishMission(s.world, progress);
+      else checkpointMission(s.world, progress, s.runMinDifficulty ?? progress.difficulty);
+    }
     if (progress !== s.progress) persistProgress(s.activeSlot, progress);
 
     const updates: Partial<GameStore> = {};
@@ -2669,6 +2734,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const s = get();
     if (s.tutorial && !["wave", "early"].includes(lessonFor(s.tutorial).id)) return;
     const beforeGold = s.world.gold;
+    checkpointMission(s.world, s.progress, s.runMinDifficulty ?? s.progress.difficulty, true);
     if (!simCallWaveEarly(s.world)) return;
     signalTutorial(s.tutorial, "wave");
     if (s.world.gold > beforeGold) signalTutorial(s.tutorial, "early");

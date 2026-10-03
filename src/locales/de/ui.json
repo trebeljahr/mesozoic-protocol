@@ -1,4 +1,27 @@
 {
+  "saveRecovery": {
+    "warning": "Der Fortschritt ist nicht sicher gespeichert.",
+    "warningDetail": "Lass diese Sitzung geöffnet. Versuche es erneut oder exportiere den letzten gespeicherten Kontrollpunkt in der Spielstandauswahl.",
+    "nativeWarning": "Die Gerätesicherung ist fehlgeschlagen. Lass die App geöffnet und versuche es erneut.",
+    "retry": "Speichern wiederholen",
+    "failed": "Speichern fehlgeschlagen. Die Quelldaten bleiben erhalten. Gib Speicherplatz frei und versuche es erneut.",
+    "corrupt": "Dieser Spielstand ist beschädigt oder verwendet ein unbekanntes Format. Die Daten bleiben erhalten. Exportiere sie vor dem Löschen oder stelle die Sicherung wieder her.",
+    "unavailable": "Der Speicher ist nicht verfügbar. Dieser Spielstand kann nicht sicher geöffnet werden.",
+    "checkpoint": "Ein Missionskontrollpunkt ist vorhanden. Beim Fortsetzen bleibt das Spiel zunächst pausiert.",
+    "overwrite": "In Platz {{id}} importieren? Fortschritt und Mission werden ersetzt. Exportiere den bisherigen Spielstand zuerst, wenn du ihn behalten möchtest.",
+    "destination": "Diesen Spielstand in den leeren Platz {{id}} importieren?",
+    "confirmImport": "Import bestätigen",
+    "recoveryConfirm": "Die letzte gültige Kampagnensicherung wiederherstellen? Beschädigte Daten werden lokal archiviert. Der Missionskontrollpunkt wird verworfen.",
+    "recover": "Sicherung wiederherstellen",
+    "export": "Exportieren",
+    "import": "Importieren",
+    "importTo": "Spielstanddatei für Platz {{id}} wählen",
+    "invalid": "Diese Datei enthält keinen gültigen, unterstützten Spielstand. Es wurde nichts ersetzt.",
+    "imported": "Spielstand importiert.",
+    "resume": "Mission fortsetzen",
+    "suspend": "Kontrollpunkt speichern und zur Spielstandauswahl",
+    "policy": "Kontrollpunkte speichern in ruhigen Pausen zwischen Wellen. Türme, Ausrüstung, Gold, Leben und dauerhafte Belohnungen werden gemeinsam fortgesetzt. Kämpfe und Änderungen nach dem letzten Kontrollpunkt werden wiederholt. Überlappende Wellen können denselben früheren Kontrollpunkt verwenden."
+  },
   "common": {
     "close": "Schließen",
     "cancel": "Abbrechen",

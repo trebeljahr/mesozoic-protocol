@@ -1,3 +1,4 @@
+import { migrateStorageKey } from "../persistence/storageHealth";
 import { audio, type SfxBus } from "./AudioManager";
 
 const STORAGE_KEY_V2 = "mesozoic-protocol:audio:v2";
@@ -103,6 +104,8 @@ export const loadAudioPrefs = (): AudioPrefs => {
   const forceMute = isPreviewAgentBrowser();
   const defaultMute = isDevBuild();
   try {
+    migrateStorageKey(localStorage, "extinction-protocol:audio:v2", STORAGE_KEY_V2);
+    migrateStorageKey(localStorage, "extinction-protocol:audio:v1", STORAGE_KEY_V1);
     const v2 = localStorage.getItem(STORAGE_KEY_V2);
     if (v2) {
       const parsed = parseV2(v2);
@@ -112,9 +115,9 @@ export const loadAudioPrefs = (): AudioPrefs => {
     if (v1) {
       const migrated = migrateFromV1(v1);
       if (migrated) {
-        saveAudioPrefs(migrated);
+        const copied = saveAudioPrefs(migrated);
         try {
-          localStorage.removeItem(STORAGE_KEY_V1);
+          if (copied) localStorage.removeItem(STORAGE_KEY_V1);
         } catch {
           /* ignore */
         }
@@ -129,9 +132,11 @@ export const loadAudioPrefs = (): AudioPrefs => {
 
 export const saveAudioPrefs = (p: AudioPrefs) => {
   try {
-    localStorage.setItem(STORAGE_KEY_V2, JSON.stringify(p));
+    const raw = JSON.stringify(p);
+    localStorage.setItem(STORAGE_KEY_V2, raw);
+    return localStorage.getItem(STORAGE_KEY_V2) === raw;
   } catch {
-    /* ignore */
+    return false;
   }
 };
 

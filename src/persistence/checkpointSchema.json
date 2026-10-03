@@ -1,0 +1,2268 @@
+{
+  "World": {
+    "properties": {
+      "time": "number",
+      "tickCount": "number",
+      "levelId": "number",
+      "biome": {
+        "union": [
+          {
+            "literal": "forest"
+          },
+          {
+            "literal": "desert"
+          },
+          {
+            "literal": "snow"
+          },
+          {
+            "literal": "wasteland"
+          },
+          {
+            "literal": "lava"
+          },
+          {
+            "literal": "alien"
+          }
+        ]
+      },
+      "paths": {
+        "array": {
+          "array": {
+            "ref": "Vec2"
+          }
+        }
+      },
+      "pathRibbonStart": {
+        "array": "number"
+      },
+      "plannedWaves": {
+        "array": {
+          "ref": "WaveSpec"
+        }
+      },
+      "enemies": {
+        "array": {
+          "ref": "Enemy"
+        }
+      },
+      "enemyById": {
+        "map": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "ref": "Enemy"
+          }
+        ]
+      },
+      "towers": {
+        "array": {
+          "ref": "Tower"
+        }
+      },
+      "towerById": {
+        "map": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "ref": "Tower"
+          }
+        ]
+      },
+      "trees": {
+        "array": {
+          "ref": "Tree"
+        }
+      },
+      "rocks": {
+        "array": {
+          "ref": "Rock"
+        }
+      },
+      "outposts": {
+        "array": {
+          "ref": "Outpost"
+        }
+      },
+      "props": {
+        "array": {
+          "ref": "PlacedProp"
+        }
+      },
+      "overrideActive": "boolean",
+      "proceduralSeed": "number",
+      "erasedProcedural": {
+        "set": "string"
+      },
+      "rivers": {
+        "array": {
+          "ref": "River"
+        }
+      },
+      "autoBridges": {
+        "array": {
+          "ref": "AutoBridge"
+        }
+      },
+      "lakes": {
+        "array": {
+          "ref": "AuthoredLake"
+        }
+      },
+      "projectiles": {
+        "array": {
+          "ref": "Projectile"
+        }
+      },
+      "beams": {
+        "array": {
+          "ref": "Beam"
+        }
+      },
+      "explosions": {
+        "array": {
+          "ref": "Explosion"
+        }
+      },
+      "cryoWaves": {
+        "array": {
+          "ref": "CryoWave"
+        }
+      },
+      "coalEmbers": {
+        "array": {
+          "ref": "CoalEmber"
+        }
+      },
+      "robotCraters": {
+        "array": {
+          "ref": "RobotCrater"
+        }
+      },
+      "particles": {
+        "array": {
+          "ref": "Particle"
+        }
+      },
+      "puffs": {
+        "array": {
+          "ref": "Puff"
+        }
+      },
+      "spawnQueue": {
+        "array": {
+          "ref": "SpawnRequest"
+        }
+      },
+      "bossTrickleStreams": {
+        "array": {
+          "ref": "ActiveBossTrickle"
+        }
+      },
+      "bossTrickleIntervalMul": "number",
+      "wave": "number",
+      "totalWaves": "number",
+      "waveActive": "boolean",
+      "nextWaveIn": "number",
+      "waveTotalEnemies": "number",
+      "midwaveTimer": "number",
+      "midwaveTimerMax": "number",
+      "gold": "number",
+      "lives": "number",
+      "startLives": "number",
+      "status": {
+        "ref": "RunStatus"
+      },
+      "winHoldTimer": "number",
+      "killingPathIndex": {
+        "union": [
+          "number",
+          {
+            "literal": null
+          }
+        ]
+      },
+      "nextEntityId": "number",
+      "events": {
+        "array": {
+          "ref": "GameEvent"
+        }
+      },
+      "shake": {
+        "ref": "Shake"
+      },
+      "selectedTowerId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "selectedBase": "boolean",
+      "base": {
+        "ref": "Base"
+      },
+      "runEnemyKinds": {
+        "partial": {
+          "record": "boolean"
+        }
+      },
+      "runTowerKinds": {
+        "partial": {
+          "record": "boolean"
+        }
+      },
+      "easterEggs": {
+        "array": {
+          "ref": "EasterEgg"
+        }
+      },
+      "easterEggSchedule": {
+        "array": {
+          "ref": "EasterEggScheduleEntry"
+        }
+      },
+      "authoredEasterEggs": {
+        "array": {
+          "ref": "PlacedEasterEgg"
+        }
+      },
+      "speedMul": "number",
+      "goldKillMul": "number",
+      "invincible": "boolean",
+      "flowFeatures": {
+        "union": [
+          {
+            "ref": "FlowFeatures"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "robot": {
+        "ref": "Robot"
+      },
+      "mode": {
+        "ref": "LevelMode"
+      },
+      "forbiddenTowers": {
+        "set": {
+          "ref": "TowerKind"
+        }
+      },
+      "lockedLoadout": {
+        "union": [
+          {
+            "array": {
+              "ref": "TowerKind"
+            }
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "sellingDisabled": "boolean",
+      "endless": {
+        "union": [
+          {
+            "ref": "EndlessState"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "adaptation": {
+        "ref": "AdaptiveResistanceState"
+      }
+    },
+    "required": [
+      "time",
+      "tickCount",
+      "levelId",
+      "biome",
+      "paths",
+      "pathRibbonStart",
+      "plannedWaves",
+      "enemies",
+      "enemyById",
+      "towers",
+      "towerById",
+      "trees",
+      "rocks",
+      "outposts",
+      "props",
+      "overrideActive",
+      "proceduralSeed",
+      "erasedProcedural",
+      "rivers",
+      "autoBridges",
+      "lakes",
+      "projectiles",
+      "beams",
+      "explosions",
+      "cryoWaves",
+      "coalEmbers",
+      "robotCraters",
+      "particles",
+      "puffs",
+      "spawnQueue",
+      "bossTrickleStreams",
+      "bossTrickleIntervalMul",
+      "wave",
+      "totalWaves",
+      "waveActive",
+      "nextWaveIn",
+      "waveTotalEnemies",
+      "midwaveTimer",
+      "midwaveTimerMax",
+      "gold",
+      "lives",
+      "startLives",
+      "status",
+      "winHoldTimer",
+      "killingPathIndex",
+      "nextEntityId",
+      "events",
+      "shake",
+      "selectedTowerId",
+      "selectedBase",
+      "base",
+      "runEnemyKinds",
+      "runTowerKinds",
+      "easterEggs",
+      "easterEggSchedule",
+      "authoredEasterEggs",
+      "speedMul",
+      "goldKillMul",
+      "invincible",
+      "flowFeatures",
+      "robot",
+      "mode",
+      "forbiddenTowers",
+      "lockedLoadout",
+      "sellingDisabled",
+      "endless",
+      "adaptation"
+    ]
+  },
+  "Vec2": {
+    "properties": {
+      "x": "number",
+      "y": "number"
+    },
+    "required": ["x", "y"]
+  },
+  "WaveSpec": {
+    "properties": {
+      "spawns": {
+        "array": {
+          "ref": "EnemySpec"
+        }
+      },
+      "spacing": "number",
+      "hpMul": "number",
+      "archetype": {
+        "ref": "WaveArchetype"
+      },
+      "bossWave": "boolean",
+      "bossTrickle": {
+        "array": {
+          "ref": "BossTrickleStream"
+        }
+      }
+    },
+    "required": ["spawns"]
+  },
+  "EnemySpec": {
+    "properties": {
+      "kind": {
+        "ref": "EnemyKind"
+      },
+      "count": "number",
+      "pathIndex": "number",
+      "shielded": "boolean",
+      "healAura": "boolean",
+      "regen": "boolean",
+      "resists": {
+        "partial": {
+          "record": "number"
+        }
+      },
+      "bossVariant": {
+        "ref": "BossVariant"
+      }
+    },
+    "required": ["kind", "count"]
+  },
+  "EnemyKind": {
+    "union": [
+      {
+        "literal": "raptor"
+      },
+      {
+        "literal": "allosaur"
+      },
+      {
+        "literal": "stego"
+      },
+      {
+        "literal": "swarm"
+      },
+      {
+        "literal": "armored"
+      },
+      {
+        "literal": "para"
+      },
+      {
+        "literal": "titan"
+      },
+      {
+        "literal": "boss"
+      }
+    ]
+  },
+  "BossVariant": {
+    "union": [
+      {
+        "literal": "raptor"
+      },
+      {
+        "literal": "stego"
+      },
+      {
+        "literal": "para"
+      },
+      {
+        "literal": "allosaur"
+      },
+      {
+        "literal": "armored"
+      },
+      {
+        "literal": "apex"
+      }
+    ]
+  },
+  "WaveArchetype": {
+    "union": [
+      {
+        "literal": "intro"
+      },
+      {
+        "literal": "mixed"
+      },
+      {
+        "literal": "swarm"
+      },
+      {
+        "literal": "heavy"
+      },
+      {
+        "literal": "chaos"
+      },
+      {
+        "literal": "vanguard"
+      },
+      {
+        "literal": "echelon"
+      },
+      {
+        "literal": "trickle"
+      },
+      {
+        "literal": "convoy"
+      }
+    ]
+  },
+  "BossTrickleStream": {
+    "properties": {
+      "kinds": {
+        "array": {
+          "ref": "EnemyKind"
+        }
+      },
+      "pathIndex": "number",
+      "minInterval": "number",
+      "maxInterval": "number",
+      "startDelay": "number",
+      "shielded": "boolean"
+    },
+    "required": ["kinds", "pathIndex", "minInterval", "maxInterval"]
+  },
+  "Enemy": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "kind": {
+        "ref": "EnemyKind"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "pathIndex": "number",
+      "segment": "number",
+      "segmentT": "number",
+      "lateralOffset": "number",
+      "hp": "number",
+      "maxHp": "number",
+      "speed": "number",
+      "bounty": "number",
+      "damage": "number",
+      "alive": "boolean",
+      "slowUntil": "number",
+      "slowFactor": "number",
+      "flashUntil": "number",
+      "frost": "number",
+      "shield": "number",
+      "maxShield": "number",
+      "shieldBrokenAt": "number",
+      "healAura": "boolean",
+      "regen": "boolean",
+      "regenPausedUntil": "number",
+      "engagedRobotId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "extraResists": {
+        "partial": {
+          "record": "number"
+        }
+      },
+      "igniteUntil": "number",
+      "igniteDps": "number",
+      "igniteTickAt": "number",
+      "igniteAttackerTowerId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "freezeUntil": "number",
+      "bossVariant": {
+        "ref": "BossVariant"
+      },
+      "childSpawnAt": "number",
+      "barrageSpawnAt": "number",
+      "leak": {
+        "properties": {
+          "startedAt": "number",
+          "impactAt": "number",
+          "startPos": {
+            "ref": "Vec2"
+          },
+          "attackPos": {
+            "ref": "Vec2"
+          }
+        },
+        "required": ["startedAt", "impactAt", "startPos", "attackPos"]
+      },
+      "engagedWithRobot": "boolean",
+      "adaptiveResistType": {
+        "ref": "DamageType"
+      },
+      "adaptiveResistAmount": "number",
+      "footstepAccum": "number"
+    },
+    "required": [
+      "id",
+      "kind",
+      "pos",
+      "pathIndex",
+      "segment",
+      "segmentT",
+      "lateralOffset",
+      "hp",
+      "maxHp",
+      "speed",
+      "bounty",
+      "damage",
+      "alive",
+      "slowUntil",
+      "slowFactor",
+      "flashUntil",
+      "frost",
+      "shield",
+      "maxShield",
+      "shieldBrokenAt",
+      "healAura",
+      "regen",
+      "regenPausedUntil",
+      "engagedRobotId",
+      "extraResists",
+      "igniteUntil",
+      "igniteDps",
+      "igniteTickAt",
+      "igniteAttackerTowerId",
+      "freezeUntil",
+      "footstepAccum"
+    ]
+  },
+  "EntityId": "number",
+  "DamageType": {
+    "union": [
+      {
+        "literal": "kinetic"
+      },
+      {
+        "literal": "electric"
+      },
+      {
+        "literal": "cold"
+      },
+      {
+        "literal": "explosive"
+      },
+      {
+        "literal": "flame"
+      }
+    ]
+  },
+  "Tower": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "kind": {
+        "ref": "TowerKind"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "range": "number",
+      "damage": "number",
+      "fireRate": "number",
+      "cooldown": "number",
+      "targetId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "targetingMode": {
+        "ref": "TargetingMode"
+      },
+      "targetSpot": {
+        "union": [
+          {
+            "ref": "Vec2"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "upgrades": {
+        "ref": "TowerUpgrades"
+      },
+      "totalSpent": "number",
+      "splashRadius": "number",
+      "chainCount": "number",
+      "chainFalloff": "number",
+      "slowFactor": "number",
+      "slowDuration": "number",
+      "droneCount": "number",
+      "droneAssignments": {
+        "array": {
+          "union": [
+            {
+              "ref": "EntityId"
+            },
+            {
+              "literal": null
+            }
+          ]
+        }
+      },
+      "serviceBuff": "number",
+      "serviceFireRateBonus": "number",
+      "shieldDamageMul": "number",
+      "armorPierce": "boolean",
+      "resistStrip": "number",
+      "regenSuppressOnHit": "number",
+      "freezeBlocksRegen": "boolean",
+      "critChance": "number",
+      "critMul": "number",
+      "freezeChance": "number",
+      "freezeDuration": "number",
+      "chainSlowFactor": "number",
+      "chainSlowDuration": "number",
+      "clusterDamageBonus": "number",
+      "flameIgniteDuration": "number",
+      "flameIgniteDps": "number",
+      "serviceDamageBonus": "number",
+      "serviceDamageBonusFrom": "number",
+      "kills": "number",
+      "damageDealt": "number",
+      "flameActive": "boolean"
+    },
+    "required": [
+      "id",
+      "kind",
+      "pos",
+      "range",
+      "damage",
+      "fireRate",
+      "cooldown",
+      "targetId",
+      "targetingMode",
+      "targetSpot",
+      "upgrades",
+      "totalSpent",
+      "splashRadius",
+      "chainCount",
+      "chainFalloff",
+      "slowFactor",
+      "slowDuration",
+      "droneCount",
+      "droneAssignments",
+      "serviceBuff",
+      "serviceFireRateBonus",
+      "shieldDamageMul",
+      "armorPierce",
+      "resistStrip",
+      "regenSuppressOnHit",
+      "freezeBlocksRegen",
+      "critChance",
+      "critMul",
+      "freezeChance",
+      "freezeDuration",
+      "chainSlowFactor",
+      "chainSlowDuration",
+      "clusterDamageBonus",
+      "flameIgniteDuration",
+      "flameIgniteDps",
+      "serviceDamageBonus",
+      "serviceDamageBonusFrom",
+      "kills",
+      "damageDealt",
+      "flameActive"
+    ]
+  },
+  "TowerKind": {
+    "union": [
+      {
+        "literal": "pulse"
+      },
+      {
+        "literal": "chain"
+      },
+      {
+        "literal": "cryo"
+      },
+      {
+        "literal": "mortar"
+      },
+      {
+        "literal": "flame"
+      },
+      {
+        "literal": "hive"
+      }
+    ]
+  },
+  "TargetingMode": {
+    "union": [
+      {
+        "literal": "tower"
+      },
+      {
+        "literal": "start"
+      },
+      {
+        "literal": "end"
+      },
+      {
+        "literal": "strongest"
+      },
+      {
+        "literal": "weakest"
+      },
+      {
+        "literal": "vulnerable"
+      },
+      {
+        "literal": "spot"
+      }
+    ]
+  },
+  "TowerUpgrades": {
+    "properties": {
+      "a": "number",
+      "b": "number"
+    },
+    "required": ["a", "b"]
+  },
+  "Tree": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "variant": "number",
+      "scale": "number",
+      "rot": "number"
+    },
+    "required": ["id", "pos", "variant", "scale", "rot"]
+  },
+  "Rock": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "layerIndex": "number",
+      "variant": "number",
+      "scale": "number",
+      "rot": "number"
+    },
+    "required": ["id", "pos", "layerIndex", "variant", "scale", "rot"]
+  },
+  "Outpost": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "templateId": "string",
+      "pos": {
+        "ref": "Vec2"
+      },
+      "yaw": "number",
+      "scale": "number",
+      "radius": "number",
+      "interior": "boolean"
+    },
+    "required": ["id", "templateId", "pos", "yaw", "scale", "radius", "interior"]
+  },
+  "PlacedProp": {
+    "properties": {
+      "id": "string",
+      "url": "string",
+      "pos": {
+        "ref": "Vec2"
+      },
+      "scale": "number",
+      "rot": "number",
+      "blocks": "boolean",
+      "groupId": "string"
+    },
+    "required": ["id", "url", "pos", "scale", "rot", "blocks"]
+  },
+  "River": {
+    "properties": {
+      "points": {
+        "array": {
+          "ref": "Vec2"
+        }
+      },
+      "width": "number"
+    },
+    "required": ["points", "width"]
+  },
+  "AutoBridge": {
+    "intersection": [
+      {
+        "properties": {
+          "id": "string",
+          "riverIds": {
+            "array": "string"
+          },
+          "material": {
+            "ref": "RiverMaterial"
+          },
+          "userOverride": "boolean"
+        },
+        "required": ["id", "riverIds", "material", "userOverride"]
+      },
+      {
+        "union": [
+          {
+            "properties": {
+              "kind": {
+                "literal": "rect"
+              },
+              "pos": {
+                "ref": "Vec2"
+              },
+              "rotY": "number",
+              "length": "number"
+            },
+            "required": ["kind", "pos", "rotY", "length"]
+          },
+          {
+            "properties": {
+              "kind": {
+                "literal": "plaza"
+              },
+              "pos": {
+                "ref": "Vec2"
+              },
+              "radius": "number"
+            },
+            "required": ["kind", "pos", "radius"]
+          }
+        ]
+      }
+    ]
+  },
+  "RiverMaterial": {
+    "union": [
+      {
+        "literal": "water"
+      },
+      {
+        "literal": "lava"
+      },
+      {
+        "literal": "toxic"
+      }
+    ]
+  },
+  "AuthoredLake": {
+    "properties": {
+      "id": "string",
+      "pos": {
+        "ref": "Vec2"
+      },
+      "rx": "number",
+      "ry": "number",
+      "rot": "number",
+      "material": {
+        "ref": "RiverMaterial"
+      }
+    },
+    "required": ["id", "pos", "rx", "ry", "rot"]
+  },
+  "Projectile": {
+    "properties": {
+      "ballistic": {
+        "properties": {
+          "tail": {
+            "ref": "Vec2"
+          },
+          "height": "number",
+          "tailHeight": "number",
+          "targetHeight": "number",
+          "knockback": "number"
+        },
+        "required": ["tail", "height", "tailHeight", "targetHeight", "knockback"]
+      },
+      "id": {
+        "ref": "EntityId"
+      },
+      "kind": {
+        "ref": "ProjectileKind"
+      },
+      "damageType": {
+        "ref": "DamageType"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "targetId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "targetPos": {
+        "ref": "Vec2"
+      },
+      "damage": "number",
+      "speed": "number",
+      "splashRadius": "number",
+      "alive": "boolean",
+      "pierceShield": "boolean",
+      "shieldDamageMul": "number",
+      "armorPierce": "boolean",
+      "resistStrip": "number",
+      "regenSuppressOnHit": "number",
+      "ownerTowerId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "fromRobot": "boolean",
+      "suppressShake": "boolean",
+      "clusterDamageBonus": "number"
+    },
+    "required": [
+      "id",
+      "kind",
+      "damageType",
+      "pos",
+      "targetId",
+      "targetPos",
+      "damage",
+      "speed",
+      "splashRadius",
+      "alive",
+      "pierceShield",
+      "shieldDamageMul",
+      "armorPierce",
+      "resistStrip",
+      "regenSuppressOnHit",
+      "ownerTowerId",
+      "fromRobot",
+      "suppressShake",
+      "clusterDamageBonus"
+    ]
+  },
+  "ProjectileKind": {
+    "union": [
+      {
+        "literal": "direct"
+      },
+      {
+        "literal": "splash"
+      }
+    ]
+  },
+  "Beam": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "points": {
+        "array": {
+          "ref": "BeamPoint"
+        }
+      },
+      "color": "string",
+      "expiresAt": "number"
+    },
+    "required": ["id", "points", "color", "expiresAt"]
+  },
+  "BeamPoint": {
+    "intersection": [
+      {
+        "ref": "Vec2"
+      },
+      {
+        "properties": {
+          "h": "number"
+        },
+        "required": []
+      }
+    ]
+  },
+  "Explosion": {
+    "properties": {
+      "damageType": {
+        "ref": "DamageType"
+      },
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "radius": "number",
+      "expiresAt": "number",
+      "maxLife": "number"
+    },
+    "required": ["id", "pos", "radius", "expiresAt", "maxLife"]
+  },
+  "CryoWave": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "maxRadius": "number",
+      "expiresAt": "number",
+      "maxLife": "number",
+      "towerId": {
+        "ref": "EntityId"
+      },
+      "hitIds": {
+        "set": {
+          "ref": "EntityId"
+        }
+      }
+    },
+    "required": ["id", "pos", "maxRadius", "expiresAt", "maxLife", "towerId", "hitIds"]
+  },
+  "CoalEmber": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "expiresAt": "number",
+      "maxLife": "number",
+      "nextTickAt": "number",
+      "tickDamage": "number",
+      "radius": "number"
+    },
+    "required": ["id", "pos", "expiresAt", "maxLife", "nextTickAt", "tickDamage", "radius"]
+  },
+  "RobotCrater": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "expiresAt": "number",
+      "maxLife": "number",
+      "nextTickAt": "number",
+      "tickInterval": "number",
+      "tickDamage": "number",
+      "radius": "number"
+    },
+    "required": [
+      "id",
+      "pos",
+      "expiresAt",
+      "maxLife",
+      "nextTickAt",
+      "tickInterval",
+      "tickDamage",
+      "radius"
+    ]
+  },
+  "Particle": {
+    "properties": {
+      "kind": {
+        "literal": "flame"
+      },
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "vel": {
+        "ref": "Vec2"
+      },
+      "expiresAt": "number",
+      "maxLife": "number",
+      "color": "string"
+    },
+    "required": ["id", "pos", "vel", "expiresAt", "maxLife", "color"]
+  },
+  "Puff": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "vel": {
+        "ref": "Vec2"
+      },
+      "h": "number",
+      "vh": "number",
+      "expiresAt": "number",
+      "maxLife": "number",
+      "size0": "number",
+      "size1": "number",
+      "rot": "number",
+      "rotVel": "number",
+      "tint": "string",
+      "alpha0": "number"
+    },
+    "required": [
+      "id",
+      "pos",
+      "vel",
+      "h",
+      "vh",
+      "expiresAt",
+      "maxLife",
+      "size0",
+      "size1",
+      "rot",
+      "rotVel",
+      "tint",
+      "alpha0"
+    ]
+  },
+  "SpawnRequest": {
+    "properties": {
+      "kind": {
+        "ref": "EnemyKind"
+      },
+      "at": "number",
+      "hpMul": "number",
+      "pathIndex": "number",
+      "shielded": "boolean",
+      "healAura": "boolean",
+      "regen": "boolean",
+      "resists": {
+        "partial": {
+          "record": "number"
+        }
+      },
+      "bossVariant": {
+        "ref": "BossVariant"
+      }
+    },
+    "required": ["kind", "at", "hpMul", "pathIndex"]
+  },
+  "ActiveBossTrickle": {
+    "properties": {
+      "kinds": {
+        "array": {
+          "ref": "EnemyKind"
+        }
+      },
+      "pathIndex": "number",
+      "minInterval": "number",
+      "maxInterval": "number",
+      "nextAt": "number",
+      "hpMul": "number",
+      "shielded": "boolean"
+    },
+    "required": ["kinds", "pathIndex", "minInterval", "maxInterval", "nextAt", "hpMul"]
+  },
+  "RunStatus": {
+    "union": [
+      {
+        "literal": "running"
+      },
+      {
+        "literal": "paused"
+      },
+      {
+        "literal": "won"
+      },
+      {
+        "literal": "lost"
+      }
+    ]
+  },
+  "GameEvent": {
+    "union": [
+      {
+        "properties": {
+          "type": {
+            "literal": "shoot"
+          },
+          "towerId": "number",
+          "towerKind": {
+            "ref": "TowerKind"
+          },
+          "pos": {
+            "ref": "Vec2"
+          }
+        },
+        "required": ["type", "towerId", "towerKind", "pos"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "impact"
+          },
+          "pos": {
+            "ref": "Vec2"
+          }
+        },
+        "required": ["type", "pos"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "hq-laser"
+          },
+          "pos": {
+            "ref": "Vec2"
+          }
+        },
+        "required": ["type", "pos"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "death"
+          },
+          "pos": {
+            "ref": "Vec2"
+          },
+          "target": {
+            "literal": "enemy"
+          },
+          "enemyKind": {
+            "ref": "EnemyKind"
+          },
+          "bolts": "number"
+        },
+        "required": ["type", "pos", "target", "enemyKind", "bolts"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "death"
+          },
+          "pos": {
+            "ref": "Vec2"
+          },
+          "target": {
+            "literal": "robot"
+          }
+        },
+        "required": ["type", "pos", "target"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "wave-start"
+          },
+          "wave": "number"
+        },
+        "required": ["type", "wave"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "wave-clear"
+          },
+          "wave": "number"
+        },
+        "required": ["type", "wave"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "boss-wave-start"
+          },
+          "wave": "number"
+        },
+        "required": ["type", "wave"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "boss-defeated"
+          },
+          "wave": "number",
+          "bonus": "number",
+          "variant": {
+            "ref": "BossVariant"
+          }
+        },
+        "required": ["type", "wave", "bonus", "variant"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "life-lost"
+          },
+          "pathIndex": "number"
+        },
+        "required": ["type", "pathIndex"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "game-over"
+          },
+          "won": "boolean"
+        },
+        "required": ["type", "won"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "upgrade"
+          }
+        },
+        "required": ["type"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "tower-placed"
+          },
+          "towerKind": {
+            "ref": "TowerKind"
+          }
+        },
+        "required": ["type", "towerKind"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "tower-sold"
+          }
+        },
+        "required": ["type"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "place-failed"
+          },
+          "reason": {
+            "union": [
+              {
+                "literal": "gold"
+              },
+              {
+                "literal": "spot"
+              },
+              {
+                "literal": "limit"
+              }
+            ]
+          }
+        },
+        "required": ["type", "reason"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "drone-assign-failed"
+          },
+          "reason": {
+            "union": [
+              {
+                "literal": "unsupported"
+              },
+              {
+                "literal": "full"
+              }
+            ]
+          }
+        },
+        "required": ["type", "reason"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "new-enemy"
+          }
+        },
+        "required": ["type"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "wave-called-early"
+          }
+        },
+        "required": ["type"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "easter-egg-click"
+          },
+          "defId": "string"
+        },
+        "required": ["type", "defId"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "flame-start"
+          },
+          "towerId": "number",
+          "pos": {
+            "ref": "Vec2"
+          }
+        },
+        "required": ["type", "towerId", "pos"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "flame-stop"
+          },
+          "towerId": "number"
+        },
+        "required": ["type", "towerId"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "footstep"
+          },
+          "source": {
+            "union": [
+              {
+                "literal": "dino"
+              },
+              {
+                "literal": "robot"
+              }
+            ]
+          },
+          "pos": {
+            "ref": "Vec2"
+          },
+          "weight": "number"
+        },
+        "required": ["type", "source", "pos", "weight"]
+      },
+      {
+        "properties": {
+          "type": {
+            "literal": "robot-ability"
+          },
+          "kind": {
+            "union": [
+              {
+                "literal": "dash-aim"
+              },
+              {
+                "literal": "dash"
+              },
+              {
+                "literal": "burst"
+              },
+              {
+                "literal": "buff"
+              },
+              {
+                "literal": "barrage"
+              },
+              {
+                "literal": "storm"
+              },
+              {
+                "literal": "flameRings"
+              },
+              {
+                "literal": "frenzy"
+              },
+              {
+                "literal": "killshot"
+              }
+            ]
+          },
+          "pos": {
+            "ref": "Vec2"
+          }
+        },
+        "required": ["type", "kind", "pos"]
+      }
+    ]
+  },
+  "Shake": {
+    "properties": {
+      "magnitude": "number",
+      "decay": "number"
+    },
+    "required": ["magnitude", "decay"]
+  },
+  "Base": {
+    "properties": {
+      "damage": "number",
+      "fireRate": "number",
+      "range": "number",
+      "cooldowns": {
+        "array": "number"
+      },
+      "targetIds": {
+        "array": {
+          "union": [
+            {
+              "ref": "EntityId"
+            },
+            {
+              "literal": null
+            }
+          ]
+        }
+      },
+      "upgrades": {
+        "properties": {
+          "a": {
+            "union": [
+              {
+                "literal": 0
+              },
+              {
+                "literal": 1
+              },
+              {
+                "literal": 2
+              },
+              {
+                "literal": 3
+              }
+            ]
+          },
+          "b": {
+            "union": [
+              {
+                "literal": 0
+              },
+              {
+                "literal": 1
+              },
+              {
+                "literal": 2
+              },
+              {
+                "literal": 3
+              }
+            ]
+          }
+        },
+        "required": ["a", "b"]
+      },
+      "totalSpent": "number",
+      "kills": "number",
+      "damageDealt": "number"
+    },
+    "required": [
+      "damage",
+      "fireRate",
+      "range",
+      "cooldowns",
+      "targetIds",
+      "upgrades",
+      "totalSpent",
+      "kills",
+      "damageDealt"
+    ]
+  },
+  "EasterEgg": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "defId": "string",
+      "pos": {
+        "ref": "Vec2"
+      },
+      "rotY": "number",
+      "clickCount": "number",
+      "triggered": "boolean",
+      "vel": {
+        "union": [
+          {
+            "ref": "Vec2"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "despawnAt": {
+        "union": [
+          "number",
+          {
+            "literal": null
+          }
+        ]
+      },
+      "spin": "number",
+      "rollPitch": "number"
+    },
+    "required": [
+      "id",
+      "defId",
+      "pos",
+      "rotY",
+      "clickCount",
+      "triggered",
+      "vel",
+      "despawnAt",
+      "spin",
+      "rollPitch"
+    ]
+  },
+  "EasterEggScheduleEntry": {
+    "properties": {
+      "defId": "string",
+      "triggerTime": "number",
+      "authoredStart": {
+        "properties": {
+          "pos": {
+            "ref": "Vec2"
+          },
+          "rotY": "number"
+        },
+        "required": ["pos", "rotY"]
+      }
+    },
+    "required": ["defId", "triggerTime"]
+  },
+  "PlacedEasterEgg": {
+    "properties": {
+      "id": "string",
+      "defId": "string",
+      "pos": {
+        "ref": "Vec2"
+      },
+      "rotY": "number"
+    },
+    "required": ["id", "defId", "pos", "rotY"]
+  },
+  "FlowFeatures": {
+    "properties": {
+      "rivers": {
+        "array": {
+          "ref": "River"
+        }
+      },
+      "lakes": {
+        "array": {
+          "ref": "Lake"
+        }
+      },
+      "bridges": {
+        "array": {
+          "ref": "Bridge"
+        }
+      }
+    },
+    "required": ["rivers", "lakes", "bridges"]
+  },
+  "Lake": {
+    "properties": {
+      "x": "number",
+      "y": "number",
+      "rx": "number",
+      "ry": "number",
+      "rot": "number"
+    },
+    "required": ["x", "y", "rx", "ry", "rot"]
+  },
+  "Bridge": {
+    "union": [
+      {
+        "ref": "RectBridge"
+      },
+      {
+        "ref": "PlazaBridge"
+      }
+    ]
+  },
+  "RectBridge": {
+    "properties": {
+      "kind": {
+        "literal": "rect"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "rotY": "number",
+      "length": "number"
+    },
+    "required": ["kind", "pos", "rotY", "length"]
+  },
+  "PlazaBridge": {
+    "properties": {
+      "kind": {
+        "literal": "plaza"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "radius": "number"
+    },
+    "required": ["kind", "pos", "radius"]
+  },
+  "Robot": {
+    "properties": {
+      "id": {
+        "ref": "EntityId"
+      },
+      "variant": {
+        "ref": "RobotVariant"
+      },
+      "pos": {
+        "ref": "Vec2"
+      },
+      "vel": {
+        "ref": "Vec2"
+      },
+      "facing": "number",
+      "hp": "number",
+      "maxHp": "number",
+      "damage": "number",
+      "range": "number",
+      "fireRate": "number",
+      "speed": "number",
+      "attackSplashRadius": "number",
+      "damageType": {
+        "ref": "DamageType"
+      },
+      "attackCooldown": "number",
+      "abilityReadyAt": {
+        "tuple": ["number", "number", "number", "number"]
+      },
+      "abilityActiveUntil": {
+        "tuple": ["number", "number", "number", "number"]
+      },
+      "abilityCooldownMul": "number",
+      "damageMul": "number",
+      "fireRateMul": "number",
+      "speedMul": "number",
+      "damageResist": "number",
+      "kills": "number",
+      "damageDealt": "number",
+      "payload": {
+        "union": [
+          {
+            "ref": "RobotPayloadState"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "selfBuff": {
+        "union": [
+          {
+            "ref": "RobotSelfBuff"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "pendingShots": {
+        "array": {
+          "ref": "RobotPendingShot"
+        }
+      },
+      "targetId": {
+        "union": [
+          {
+            "ref": "EntityId"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "moveTarget": {
+        "union": [
+          {
+            "ref": "Vec2"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "lateralOffset": "number",
+      "pathIndex": "number",
+      "alive": "boolean",
+      "flashUntil": "number",
+      "shootFlashUntil": "number",
+      "respawnAt": {
+        "union": [
+          "number",
+          {
+            "literal": null
+          }
+        ]
+      },
+      "iFrameUntil": "number",
+      "lastDamagedAt": "number",
+      "selected": "boolean",
+      "xp": "number",
+      "level": "number",
+      "stuckTimer": "number",
+      "hovering": "boolean",
+      "hoverHeight": "number",
+      "motionState": {
+        "union": [
+          {
+            "literal": "idle"
+          },
+          {
+            "literal": "walk"
+          },
+          {
+            "literal": "dash"
+          },
+          {
+            "literal": "shoot"
+          },
+          {
+            "literal": "dead"
+          }
+        ]
+      },
+      "footstepAccum": "number",
+      "lastDeathAt": "number",
+      "mikeCoalDropAt": "number",
+      "dashAim": {
+        "union": [
+          {
+            "properties": {
+              "dir": {
+                "ref": "Vec2"
+              },
+              "expiresAt": "number"
+            },
+            "required": ["dir", "expiresAt"]
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "pendingCrit": {
+        "union": [
+          {
+            "properties": {
+              "mul": "number",
+              "pierce": "boolean"
+            },
+            "required": ["mul", "pierce"]
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "muzzlePos": {
+        "union": [
+          {
+            "ref": "BeamPoint"
+          },
+          {
+            "literal": null
+          }
+        ]
+      }
+    },
+    "required": [
+      "id",
+      "variant",
+      "pos",
+      "vel",
+      "facing",
+      "hp",
+      "maxHp",
+      "damage",
+      "range",
+      "fireRate",
+      "speed",
+      "attackSplashRadius",
+      "damageType",
+      "attackCooldown",
+      "abilityReadyAt",
+      "abilityActiveUntil",
+      "abilityCooldownMul",
+      "damageMul",
+      "fireRateMul",
+      "speedMul",
+      "damageResist",
+      "kills",
+      "damageDealt",
+      "payload",
+      "selfBuff",
+      "pendingShots",
+      "targetId",
+      "moveTarget",
+      "lateralOffset",
+      "pathIndex",
+      "alive",
+      "flashUntil",
+      "shootFlashUntil",
+      "respawnAt",
+      "iFrameUntil",
+      "lastDamagedAt",
+      "selected",
+      "xp",
+      "level",
+      "stuckTimer",
+      "hovering",
+      "hoverHeight",
+      "motionState",
+      "footstepAccum",
+      "lastDeathAt",
+      "mikeCoalDropAt",
+      "dashAim",
+      "pendingCrit",
+      "muzzlePos"
+    ]
+  },
+  "RobotVariant": {
+    "union": [
+      {
+        "literal": "george"
+      },
+      {
+        "literal": "leela"
+      },
+      {
+        "literal": "mike"
+      },
+      {
+        "literal": "stan"
+      }
+    ]
+  },
+  "RobotPayloadState": {
+    "union": [
+      {
+        "properties": {
+          "kind": {
+            "literal": "barrage"
+          },
+          "endAt": "number",
+          "nextTickAt": "number",
+          "tickInterval": "number",
+          "range": "number",
+          "halfAngle": "number",
+          "facing": "number",
+          "damage": "number",
+          "damageType": {
+            "ref": "DamageType"
+          }
+        },
+        "required": [
+          "kind",
+          "endAt",
+          "nextTickAt",
+          "tickInterval",
+          "range",
+          "halfAngle",
+          "facing",
+          "damage",
+          "damageType"
+        ]
+      },
+      {
+        "properties": {
+          "kind": {
+            "literal": "storm"
+          },
+          "frost": {
+            "properties": {
+              "factor": "number",
+              "duration": "number",
+              "freezeDuration": "number"
+            },
+            "required": ["factor", "duration", "freezeDuration"]
+          },
+          "endAt": "number",
+          "nextTickAt": "number",
+          "tickInterval": "number",
+          "radius": "number",
+          "arcsPerTick": "number",
+          "damagePerArc": "number",
+          "damageType": {
+            "ref": "DamageType"
+          }
+        },
+        "required": [
+          "kind",
+          "endAt",
+          "nextTickAt",
+          "tickInterval",
+          "radius",
+          "arcsPerTick",
+          "damagePerArc",
+          "damageType"
+        ]
+      },
+      {
+        "properties": {
+          "kind": {
+            "literal": "flameRings"
+          },
+          "endAt": "number",
+          "nextRingAt": "number",
+          "ringsRemaining": "number",
+          "ringInterval": "number",
+          "maxRadius": "number",
+          "expandSpeed": "number",
+          "damagePerRing": "number",
+          "damageType": {
+            "ref": "DamageType"
+          },
+          "burn": {
+            "properties": {
+              "duration": "number",
+              "totalDamage": "number"
+            },
+            "required": ["duration", "totalDamage"]
+          },
+          "rings": {
+            "array": {
+              "properties": {
+                "radius": "number",
+                "hitIds": {
+                  "set": {
+                    "ref": "EntityId"
+                  }
+                }
+              },
+              "required": ["radius", "hitIds"]
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "endAt",
+          "nextRingAt",
+          "ringsRemaining",
+          "ringInterval",
+          "maxRadius",
+          "expandSpeed",
+          "damagePerRing",
+          "damageType",
+          "rings"
+        ]
+      },
+      {
+        "properties": {
+          "kind": {
+            "literal": "frenzy"
+          },
+          "endAt": "number",
+          "damageMul": "number",
+          "fireRateMul": "number"
+        },
+        "required": ["kind", "endAt", "damageMul", "fireRateMul"]
+      },
+      {
+        "properties": {
+          "kind": {
+            "literal": "killshot"
+          },
+          "targetId": {
+            "ref": "EntityId"
+          },
+          "targetPos": {
+            "ref": "Vec2"
+          },
+          "fireAt": "number",
+          "endAt": "number",
+          "damage": "number",
+          "splashDamage": "number",
+          "splashRadius": "number",
+          "damageType": {
+            "ref": "DamageType"
+          }
+        },
+        "required": [
+          "kind",
+          "targetId",
+          "targetPos",
+          "fireAt",
+          "endAt",
+          "damage",
+          "splashDamage",
+          "splashRadius",
+          "damageType"
+        ]
+      }
+    ]
+  },
+  "RobotSelfBuff": {
+    "properties": {
+      "endAt": "number",
+      "damageMul": "number",
+      "fireRateMul": "number",
+      "speedMul": "number",
+      "damageResist": "number"
+    },
+    "required": ["endAt", "damageMul", "fireRateMul", "speedMul", "damageResist"]
+  },
+  "RobotPendingShot": {
+    "properties": {
+      "when": "number",
+      "range": "number",
+      "damage": "number",
+      "splashRadius": "number",
+      "damageType": {
+        "ref": "DamageType"
+      }
+    },
+    "required": ["when", "range", "damage", "splashRadius", "damageType"]
+  },
+  "LevelMode": {
+    "union": [
+      {
+        "literal": "normal"
+      },
+      {
+        "literal": "breach"
+      },
+      {
+        "literal": "containment"
+      }
+    ]
+  },
+  "EndlessState": {
+    "properties": {
+      "seed": "number",
+      "mapId": "string",
+      "mapName": "string",
+      "hpMul": "number",
+      "baseSpeedMul": "number",
+      "bestWave": "number"
+    },
+    "required": ["seed", "mapId", "mapName", "hpMul", "baseSpeedMul", "bestWave"]
+  },
+  "AdaptiveResistanceState": {
+    "properties": {
+      "perWave": {
+        "map": [
+          "number",
+          {
+            "record": "number"
+          }
+        ]
+      },
+      "dominantNext": {
+        "union": [
+          {
+            "ref": "DamageType"
+          },
+          {
+            "literal": null
+          }
+        ]
+      },
+      "dominantStreak": "number",
+      "dominantShare": "number"
+    },
+    "required": ["perWave", "dominantNext", "dominantStreak", "dominantShare"]
+  }
+}

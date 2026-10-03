@@ -151,12 +151,12 @@ describe("slot persistence", () => {
     expect(totalStars(loaded.progress)).toBe(3);
   });
 
-  it("falls back to an empty save for an unwritten or corrupt slot", () => {
+  it("returns an empty unwritten slot but refuses corrupt or unsupported data", () => {
     expect(loadSlot(2).progress).toEqual(emptyProgress());
     storage.setItem(slotKey(2), "{not json");
-    expect(loadSlot(2).progress).toEqual(emptyProgress());
+    expect(() => loadSlot(2)).toThrow();
     storage.setItem(slotKey(2), JSON.stringify({ progress: { version: 99 } }));
-    expect(loadSlot(2).progress).toEqual(emptyProgress());
+    expect(() => loadSlot(2)).toThrow();
   });
 
   it("repairs an out-of-range difficulty instead of trusting the blob", () => {
@@ -232,7 +232,7 @@ describe("save migrations", () => {
     const { progress, meta } = progressModule.loadSlot(1);
     expect(meta.name).toBe("keep me");
     expect(progressModule.getStars(progress, 9)).toBe(3);
-    expect(storage.getItem(LEGACY_KEY)).toBeNull();
+    expect(storage.getItem(LEGACY_KEY)).not.toBeNull();
   });
 });
 

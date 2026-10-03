@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
+import { clearSaveIssue, reportSaveIssue } from "./persistence/storageHealth";
 
 // Save-data durability for the Capacitor shells.
 //
@@ -54,9 +55,12 @@ const flushNow = (): Promise<void> => {
   flushInFlight = flushInFlight.then(async () => {
     try {
       await Preferences.set({ key: MIRROR_KEY, value: JSON.stringify(readMirroredEntries()) });
+      clearSaveIssue(MIRROR_KEY);
     } catch {
-      // A failed mirror is not worth breaking a save over — localStorage
-      // still holds the authoritative copy for this session.
+      reportSaveIssue({ key: MIRROR_KEY, reason: "native" }, async () => {
+        await flushNow();
+        return true;
+      });
     }
   });
   return flushInFlight;
@@ -87,7 +91,11 @@ export const restoreNativeSaveBackup = async (): Promise<void> => {
     const parsed: unknown = JSON.parse(value);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
     for (const [key, entry] of Object.entries(parsed as Record<string, unknown>)) {
-      if (!key.startsWith(MIRRORED_PREFIX) || typeof entry !== "string") continue;
+      if (
+        (!key.startsWith(MIRRORED_PREFIX) && !key.startsWith("extinction-protocol:")) ||
+        typeof entry !== "string"
+      )
+        continue;
       if (window.localStorage.getItem(key) !== null) continue;
       window.localStorage.setItem(key, entry);
     }

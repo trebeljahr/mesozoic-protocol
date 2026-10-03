@@ -1,12 +1,14 @@
 import { isLevelBeyondDemo } from "./demo";
 import enModes from "./locales/en/modes.json";
+import { isMissionCheckpoint, type MissionCheckpoint } from "./persistence/missionCheckpoint";
+import { clearSaveIssue, migrateStorageKey, reportSaveIssue } from "./persistence/storageHealth";
 import { type AllMetaSkills, migrateLegacyMetaSkills } from "./sim/metaSkills";
 import type { AllRobotSkills } from "./sim/robotSkills";
 import type { BossVariant, EnemyKind, RobotVariant } from "./sim/types";
 
 const withLocalStorage = <T>(fn: (ls: Storage) => T, fallback: T): T => {
-  if (typeof window === "undefined" || !window.localStorage) return fallback;
   try {
+    if (typeof window === "undefined" || !window.localStorage) return fallback;
     return fn(window.localStorage);
   } catch {
     return fallback;
@@ -211,11 +213,18 @@ export type SlotInfo = {
   progress: ProgressData;
   levelsCleared: number;
   totalStars: number;
+  health: "empty" | "ready" | "corrupt" | "unavailable";
+  recoverable: boolean;
+  checkpoint: MissionCheckpoint | null;
 };
 
 export const SLOT_IDS: readonly SlotId[] = [1, 2, 3] as const;
 
-const slotKey = (id: SlotId) => `mesozoic-protocol:slot:${id}:v1`;
+export const slotKey = (id: SlotId) => `mesozoic-protocol:slot:${id}:v1`;
+export const backupKey = (id: SlotId) => `${slotKey(id)}:backup`;
+const slotRevisions = new Map<SlotId, number>();
+export const getSlotRevision = (id: SlotId) => slotRevisions.get(id) ?? 0;
+const invalidateSlotSession = (id: SlotId) => slotRevisions.set(id, getSlotRevision(id) + 1);
 const LEGACY_KEY = "mesozoic-protocol:progress:v1";
 const STARTING_LIVES = 20;
 const NAME_MAX_LEN = 24;
@@ -250,7 +259,7 @@ const isProgressLike = (parsed: unknown): parsed is Partial<ProgressData> => {
   if (typeof parsed !== "object" || parsed === null) return false;
   const v = (parsed as { version?: unknown }).version;
   if (v !== 1 && v !== 2 && v !== 3 && v !== 4 && v !== 5) return false;
-  return typeof (parsed as { starsByLevel?: unknown }).starsByLevel === "object";
+  return isRecord((parsed as { starsByLevel?: unknown }).starsByLevel);
 };
 
 // Normalize a per-level entry from any historical shape into ModeStars.
@@ -401,61 +410,212 @@ const normalizeProgress = (raw: Partial<ProgressData>): ProgressData => {
   };
 };
 
-type SlotPayload = { meta: SlotMeta; progress: ProgressData };
+export type SlotPayload = {
+  meta: SlotMeta;
+  progress: ProgressData;
+  checkpoint: MissionCheckpoint | null;
+};
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === "object" && !Array.isArray(v);
+const safeNumber = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const safeTree = (value: unknown, depth = 0): boolean => {
+  if (depth > 40) return false;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.every((v) => safeTree(v, depth + 1));
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([k, v]) => !["__proto__", "constructor", "prototype"].includes(k) && safeTree(v, depth + 1),
+    )
+  );
+};
 
-const readSlotRaw = (id: SlotId): SlotPayload | null =>
-  withLocalStorage((ls) => {
-    const raw = ls.getItem(slotKey(id));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { meta?: SlotMeta; progress?: Partial<ProgressData> };
-    if (!parsed.progress || !isProgressLike(parsed.progress)) return null;
-    const rawName = parsed.meta?.name;
-    const meta: SlotMeta = {
+// Historical versions may omit fields, but provided fields must have the
+// right shape. Normalization is migration, not a license to erase corruption.
+const validProgress = (raw: unknown): raw is Partial<ProgressData> => {
+  if (!isProgressLike(raw) || !safeTree(raw)) return false;
+  const p = raw as Record<string, unknown>;
+  for (const key of [
+    "stats",
+    "encountered",
+    "matriarchsEncountered",
+    "unlocked",
+    "seenIntros",
+    "metaSkills",
+    "robotUnlocks",
+    "heroUnlocks",
+    "robotXp",
+    "heroXp",
+    "robotSkills",
+    "heroSkills",
+    "triggeredEasterEggs",
+    "endlessBest",
+  ]) {
+    if (p[key] !== undefined && !isRecord(p[key])) return false;
+  }
+  for (const key of ["robotXp", "heroXp", "stats", "unlocked", "endlessBest"]) {
+    if (isRecord(p[key]) && !Object.values(p[key]).every(safeNumber)) return false;
+  }
+  for (const key of [
+    "encountered",
+    "matriarchsEncountered",
+    "robotUnlocks",
+    "heroUnlocks",
+    "seenIntros",
+    "triggeredEasterEggs",
+  ]) {
+    if (isRecord(p[key]) && !Object.values(p[key]).every((v) => typeof v === "boolean"))
+      return false;
+  }
+  for (const key of ["robotSkills", "heroSkills", "metaSkills"]) {
+    if (
+      isRecord(p[key]) &&
+      !Object.values(p[key]).every((v) => isRecord(v) && Object.values(v).every(safeNumber))
+    )
+      return false;
+  }
+  if (p.bolts !== undefined && !safeNumber(p.bolts)) return false;
+  return Object.values(p.starsByLevel as Record<string, unknown>).every(
+    (v) => safeNumber(v) || (isRecord(v) && Object.values(v).every(safeNumber)),
+  );
+};
+
+export const parseSlotPayload = (raw: string, id: SlotId = 1): SlotPayload => {
+  if (raw.length > 10_000_000) throw new Error("Save too large");
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed) || !validProgress(parsed.progress) || !safeTree(parsed))
+    throw new Error("Invalid save schema");
+  if (parsed.checkpoint != null && !isMissionCheckpoint(parsed.checkpoint))
+    throw new Error("Invalid checkpoint");
+  const meta = isRecord(parsed.meta) ? parsed.meta : {};
+  return {
+    meta: {
       name:
-        typeof rawName === "string" && rawName.trim() !== ""
-          ? rawName.slice(0, NAME_MAX_LEN)
+        typeof meta.name === "string" && meta.name.trim()
+          ? meta.name.slice(0, NAME_MAX_LEN)
           : defaultName(id),
-      lastPlayed: typeof parsed.meta?.lastPlayed === "number" ? parsed.meta.lastPlayed : 0,
-    };
-    return { meta, progress: normalizeProgress(parsed.progress) };
-  }, null);
-
-const writeSlotRaw = (id: SlotId, payload: SlotPayload): void => {
-  withLocalStorage<void>((ls) => {
-    ls.setItem(slotKey(id), JSON.stringify(payload));
-  }, undefined);
+      lastPlayed: safeNumber(meta.lastPlayed) ? (meta.lastPlayed as number) : 0,
+    },
+    progress: normalizeProgress(parsed.progress),
+    checkpoint: (parsed.checkpoint as MissionCheckpoint | null | undefined) ?? null,
+  };
 };
 
-// Promote a pre-slot save (single-key v1 schema) into slot 1 the first
-// time the new build runs. Skipped if slot 1 already has data — the user
-// has already started fresh on the new system, so the legacy blob is
-// dropped without overwriting their slot 1.
-const migrateLegacyToSlot1 = (): void => {
-  withLocalStorage<void>((ls) => {
-    const legacy = ls.getItem(LEGACY_KEY);
-    if (!legacy) return;
-    if (ls.getItem(slotKey(1))) {
-      ls.removeItem(LEGACY_KEY);
-      return;
+type SlotRead = { health: SlotInfo["health"]; payload: SlotPayload | null; raw: string | null };
+const DELETED_SLOT = '{"deleted":true}';
+const readSlot = (id: SlotId): SlotRead => {
+  try {
+    if (typeof window === "undefined") return { health: "empty", payload: null, raw: null };
+    const raw = window.localStorage.getItem(slotKey(id));
+    if (raw === null) {
+      const pending =
+        window.localStorage.getItem(`extinction-protocol:slot:${id}:v1`) ??
+        (id === 1
+          ? (window.localStorage.getItem(LEGACY_KEY) ??
+            window.localStorage.getItem("extinction-protocol:progress:v1"))
+          : null);
+      if (pending !== null) return { health: "unavailable", payload: null, raw: pending };
     }
-    const parsed = JSON.parse(legacy) as Partial<ProgressData>;
-    if (!isProgressLike(parsed)) {
-      ls.removeItem(LEGACY_KEY);
-      return;
+    if (raw === null || raw === DELETED_SLOT) return { health: "empty", payload: null, raw };
+    try {
+      return { health: "ready", payload: parseSlotPayload(raw, id), raw };
+    } catch {
+      return { health: "corrupt", payload: null, raw };
     }
-    writeSlotRaw(1, {
-      meta: { name: defaultName(1), lastPlayed: Date.now() },
-      progress: normalizeProgress(parsed),
+  } catch {
+    reportSaveIssue({ key: slotKey(id), reason: "read" }, () => {
+      if (readSlot(id).health === "unavailable") return false;
+      clearSaveIssue(slotKey(id));
+      return true;
     });
-    ls.removeItem(LEGACY_KEY);
-  }, undefined);
+    return { health: "unavailable", payload: null, raw: null };
+  }
 };
 
-let migrationRun = false;
+const writeSlotRaw = (
+  id: SlotId,
+  payload: SlotPayload,
+  replaceCorrupt = false,
+  onSuccess?: () => void,
+): boolean => {
+  const key = slotKey(id);
+  const attempt = (): boolean => {
+    try {
+      const ls = window.localStorage;
+      const stored = ls.getItem(key);
+      const old = stored === DELETED_SLOT ? null : stored;
+      if (old !== null) {
+        try {
+          parseSlotPayload(old, id);
+        } catch {
+          if (!replaceCorrupt) {
+            reportSaveIssue({ key, reason: "corrupt" });
+            return false;
+          }
+        }
+      }
+      const next = JSON.stringify(payload);
+      parseSlotPayload(next, id);
+      // Archive an unreadable source before deliberate recovery/import.
+      if (old !== null && replaceCorrupt) {
+        const archiveKey = `${key}:recovered:${Date.now()}`;
+        ls.setItem(archiveKey, old);
+        if (ls.getItem(archiveKey) !== old) throw new Error("Archive verification failed");
+      }
+      // Keep the last verified state. Backup failure blocks the primary write.
+      const backup = old ?? next;
+      if (!replaceCorrupt) {
+        ls.setItem(backupKey(id), backup);
+        if (ls.getItem(backupKey(id)) !== backup) throw new Error("Backup verification failed");
+      }
+      ls.setItem(key, next);
+      if (ls.getItem(key) !== next) throw new Error("Save verification failed");
+      clearSaveIssue(key);
+      onSuccess?.();
+      return true;
+    } catch {
+      reportSaveIssue({ key, reason: "write" }, attempt);
+      return false;
+    }
+  };
+  return attempt();
+};
+
 const ensureMigrated = () => {
-  if (migrationRun) return;
-  migrationRun = true;
-  migrateLegacyToSlot1();
+  withLocalStorage<void>((ls) => {
+    for (const id of SLOT_IDS)
+      migrateStorageKey(ls, `extinction-protocol:slot:${id}:v1`, slotKey(id));
+    migrateStorageKey(ls, "extinction-protocol:progress:v1", LEGACY_KEY);
+    const legacy = ls.getItem(LEGACY_KEY);
+    if (legacy === null || ls.getItem(slotKey(1)) !== null) return;
+    try {
+      const parsed: unknown = JSON.parse(legacy);
+      if (!validProgress(parsed)) {
+        // Surface unreadable pre-slot data as occupied, while retaining the
+        // untouched legacy source for export/recovery.
+        ls.setItem(slotKey(1), legacy);
+        return;
+      }
+      if (
+        writeSlotRaw(1, {
+          meta: { name: defaultName(1), lastPlayed: Date.now() },
+          progress: normalizeProgress(parsed),
+          checkpoint: null,
+        })
+      )
+        ls.removeItem(LEGACY_KEY);
+    } catch {
+      try {
+        if (ls.getItem(slotKey(1)) === null) ls.setItem(slotKey(1), legacy);
+      } catch {
+        reportSaveIssue({ key: slotKey(1), reason: "write" }, () => {
+          ensureMigrated();
+          return readSlot(1).health !== "empty";
+        });
+      }
+    }
+  }, undefined);
 };
 
 // Total stars summed across every level × every mode. Normal contributes
@@ -478,11 +638,23 @@ const levelsClearedCount = (p: ProgressData): number => {
 export const listSlots = (): SlotInfo[] => {
   ensureMigrated();
   return SLOT_IDS.map((id) => {
-    const payload = readSlotRaw(id);
+    const read = readSlot(id);
+    const payload = read.payload;
+    const recoverable = withLocalStorage((ls) => {
+      try {
+        parseSlotPayload(ls.getItem(backupKey(id)) ?? "", id);
+        return read.health !== "empty";
+      } catch {
+        return false;
+      }
+    }, false);
     if (!payload) {
       return {
         id,
-        exists: false,
+        exists: read.health !== "empty",
+        health: read.health,
+        recoverable,
+        checkpoint: null,
         meta: { name: defaultName(id), lastPlayed: 0 },
         progress: emptyProgress(),
         levelsCleared: 0,
@@ -492,6 +664,9 @@ export const listSlots = (): SlotInfo[] => {
     return {
       id,
       exists: true,
+      health: read.health,
+      recoverable,
+      checkpoint: payload.checkpoint,
       meta: payload.meta,
       progress: payload.progress,
       levelsCleared: levelsClearedCount(payload.progress),
@@ -500,29 +675,107 @@ export const listSlots = (): SlotInfo[] => {
   });
 };
 
-export const loadSlot = (id: SlotId): { progress: ProgressData; meta: SlotMeta } => {
+export const loadSlot = (id: SlotId): SlotPayload => {
   ensureMigrated();
-  const payload = readSlotRaw(id);
+  const { payload, health } = readSlot(id);
   if (payload) return payload;
-  return { progress: emptyProgress(), meta: { name: defaultName(id), lastPlayed: 0 } };
+  if (health !== "empty") {
+    reportSaveIssue({ key: slotKey(id), reason: health === "corrupt" ? "corrupt" : "read" });
+    throw new Error(`Slot ${id} is ${health}`);
+  }
+  return {
+    progress: emptyProgress(),
+    meta: { name: defaultName(id), lastPlayed: 0 },
+    checkpoint: null,
+  };
 };
 
-export const saveSlot = (id: SlotId, progress: ProgressData, name?: string): void => {
-  const existing = readSlotRaw(id);
+export const saveSlot = (
+  id: SlotId,
+  progress: ProgressData,
+  name?: string,
+  checkpoint?: MissionCheckpoint | null,
+): boolean => {
+  const read = readSlot(id);
+  if (read.health === "unavailable" && read.raw !== null) return false;
+  const existing = read.payload;
   const nextName = name ?? existing?.meta.name ?? defaultName(id);
-  writeSlotRaw(id, {
+  return writeSlotRaw(id, {
     meta: { name: nextName, lastPlayed: Date.now() },
     progress,
+    checkpoint: checkpoint === undefined ? (existing?.checkpoint ?? null) : checkpoint,
   });
 };
 
-export const deleteSlot = (id: SlotId): void => {
-  if (typeof window === "undefined" || !window.localStorage) return;
+export const deleteSlot = (id: SlotId): boolean => {
+  const attempt = () => {
+    try {
+      // A durable tombstone prevents an old native mirror or legacy source
+      // from bringing a deleted mission back after reload.
+      window.localStorage.setItem(slotKey(id), DELETED_SLOT);
+      if (window.localStorage.getItem(slotKey(id)) !== DELETED_SLOT)
+        throw new Error("Delete failed");
+      invalidateSlotSession(id);
+      window.localStorage.removeItem(backupKey(id));
+      clearSaveIssue(slotKey(id));
+      return true;
+    } catch {
+      reportSaveIssue({ key: slotKey(id), reason: "write" }, attempt);
+      return false;
+    }
+  };
+  return attempt();
+};
+
+export const recoverSlot = (id: SlotId): boolean => {
   try {
-    window.localStorage.removeItem(slotKey(id));
+    const payload = parseSlotPayload(window.localStorage.getItem(backupKey(id)) ?? "", id);
+    // A last-good copy may predate a finished/abandoned mission. Recover
+    // campaign progress only, so stale checkpoints can never replay rewards.
+    return writeSlotRaw(id, { ...payload, checkpoint: null }, true, () =>
+      invalidateSlotSession(id),
+    );
   } catch {
-    // ignore
+    reportSaveIssue({ key: slotKey(id), reason: "corrupt" });
+    return false;
   }
+};
+
+export const exportSlot = (id: SlotId): { filename: string; text: string } => {
+  const read = readSlot(id);
+  if (!read.raw || read.health === "empty") throw new Error("No save to export");
+  const name = (read.payload?.meta.name ?? `damaged-slot-${id}`).replace(/[^a-zA-Z0-9_-]+/g, "-");
+  return {
+    filename: `mesozoic-protocol-slot-${id}-${name}-${new Date().toISOString().slice(0, 10)}.json`,
+    text: read.payload
+      ? JSON.stringify(
+          { format: "mesozoic-protocol-save", version: 1, slot: read.payload },
+          null,
+          2,
+        )
+      : read.raw,
+  };
+};
+
+export const parseSaveImport = (text: string): SlotPayload => {
+  if (text.length > 10_000_000) throw new Error("Save too large");
+  const value: unknown = JSON.parse(text);
+  if (
+    !isRecord(value) ||
+    value.format !== "mesozoic-protocol-save" ||
+    value.version !== 1 ||
+    !isRecord(value.slot)
+  )
+    throw new Error("Invalid save export");
+  return parseSlotPayload(JSON.stringify(value.slot));
+};
+
+export const importSlot = (id: SlotId, text: string, overwrite = false): boolean => {
+  const payload = parseSaveImport(text);
+  const read = readSlot(id);
+  if (read.health !== "empty" && !overwrite) throw new Error("Destination occupied");
+  if (read.health === "unavailable") return false;
+  return writeSlotRaw(id, payload, read.health === "corrupt", () => invalidateSlotSession(id));
 };
 
 export const starsForLives = (lives: number): Stars => {

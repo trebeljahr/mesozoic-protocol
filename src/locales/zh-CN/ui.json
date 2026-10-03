@@ -1,4 +1,27 @@
 {
+  "saveRecovery": {
+    "warning": "Progress is not safely saved.",
+    "warningDetail": "Keep this session open. Retry, or use the slot screen to export your last saved checkpoint.",
+    "nativeWarning": "The device backup failed. Keep the app open and retry.",
+    "retry": "Retry saving",
+    "failed": "Save failed. Your source data was kept. Free device space, then retry.",
+    "corrupt": "This slot is damaged or uses an unsupported save format. Its data is preserved. Export it before deleting, or restore its backup.",
+    "unavailable": "Storage is unavailable. This slot cannot be opened safely.",
+    "checkpoint": "A mission checkpoint is ready. Continue to resume while paused.",
+    "overwrite": "Import into slot {{id}}? This replaces its progress and mission. Export the existing save first if you want to keep it.",
+    "destination": "Import this save into empty slot {{id}}?",
+    "confirmImport": "Confirm import",
+    "recoveryConfirm": "Restore the last good campaign backup? The damaged data will be archived locally. Its mission checkpoint will be discarded.",
+    "recover": "Restore backup",
+    "export": "Export",
+    "import": "Import",
+    "importTo": "Choose a save file for slot {{id}}",
+    "invalid": "This file is not a supported, valid save. Nothing was replaced.",
+    "imported": "Save imported.",
+    "resume": "Resume mission",
+    "suspend": "Save checkpoint and return to slots",
+    "policy": "Checkpoints save during quiet gaps between waves. Towers, loadout, gold, lives and permanent rewards resume together. Combat and changes after the last checkpoint are replayed. Overlapping waves may share an earlier checkpoint."
+  },
   "common": {
     "close": "Close",
     "cancel": "Cancel",
