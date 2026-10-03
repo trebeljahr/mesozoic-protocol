@@ -19,8 +19,7 @@
     "invalid": "This file is not a supported, valid save. Nothing was replaced.",
     "imported": "Save imported.",
     "resume": "Resume mission",
-    "suspend": "Save checkpoint and return to slots",
-    "policy": "Checkpoints save during quiet gaps between waves. Towers, loadout, gold, lives and permanent rewards resume together. Combat and changes after the last checkpoint are replayed. Overlapping waves may share an earlier checkpoint."
+    "suspend": "Save checkpoint and return to slots"
   },
   "common": {
     "close": "Close",

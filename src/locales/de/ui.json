@@ -19,8 +19,7 @@
     "invalid": "Diese Datei enthält keinen gültigen, unterstützten Spielstand. Es wurde nichts ersetzt.",
     "imported": "Spielstand importiert.",
     "resume": "Mission fortsetzen",
-    "suspend": "Kontrollpunkt speichern und zur Spielstandauswahl",
-    "policy": "Kontrollpunkte speichern in ruhigen Pausen zwischen Wellen. Türme, Ausrüstung, Gold, Leben und dauerhafte Belohnungen werden gemeinsam fortgesetzt. Kämpfe und Änderungen nach dem letzten Kontrollpunkt werden wiederholt. Überlappende Wellen können denselben früheren Kontrollpunkt verwenden."
+    "suspend": "Kontrollpunkt speichern und zur Spielstandauswahl"
   },
   "common": {
     "close": "Schließen",

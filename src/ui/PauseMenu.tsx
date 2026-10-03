@@ -66,7 +66,6 @@ export const PauseMenu = ({ onResume }: Props) => {
       closeTitle={showKeyboardHints ? `${t("pause.resume")} (Esc)` : t("pause.resume")}
     >
       <div className="menu-panel-scroll">
-        <p className="mb-3 text-sm text-fg-secondary">{t("saveRecovery.policy")}</p>
         <button
           type="button"
           className="btn btn-ghost w-full mb-3"
