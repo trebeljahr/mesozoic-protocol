@@ -30,10 +30,10 @@
       },
       "abilityBlurb": {
         "0": "Fast electric zap. Each shot chains to two nearby targets.",
-        "1": "I-frame dash; end arcs hit 3 enemies for 24 electric.",
-        "2": "4-radius electric pulse, then 4 chain hops for 35 each.",
-        "3": "3s veil: speed, fire rate, damage, and 80% resist.",
-        "4": "5s storm: 4 electric arcs every 0.2s inside 7 radius."
+        "1": "I-frame dash; end arcs hit 3 enemies for 14 electric.",
+        "2": "4-radius electric pulse, then 4 chain hops for 20 each.",
+        "3": "3s veil: speed, fire rate, damage, and 50% resist.",
+        "4": "3s storm: 4 electric arcs every 0.5s inside 7 radius."
       }
     },
     "mike": {

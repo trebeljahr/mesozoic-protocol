@@ -17,16 +17,16 @@ export const availableDamageTypes = (
   return Array.from(types);
 };
 
-// Ensures every damage type the player can deploy has at least one
-// enemy spawn that is fully immune (resist multiplier 0) somewhere in
-// the level. Per playtest note 11/1: single-tower spam should not be
-// able to coast through a whole level untouched. EnemyPanel already
-// renders `0×` resist chips with a red tint so an inspecting player
-// understands why their tower is doing zero damage to the holdout.
+// Diversification checks enter after the opening two levels. Levels 3–5
+// introduce partial resistance; level 6 onward can include full immunity.
+// Preserve explicitly authored resist chips at every level.
 export const ensureImmunityCoverage = (
   waves: WaveSpec[],
   damageTypes: DamageType[],
+  levelId: number,
 ): WaveSpec[] => {
+  if (levelId < 3) return waves;
+  const resistMultiplier = levelId < 6 ? 0.5 : 0;
   if (waves.length === 0 || damageTypes.length === 0) return waves;
 
   const covered = new Set<DamageType>();
@@ -34,7 +34,7 @@ export const ensureImmunityCoverage = (
     for (const s of w.spawns) {
       if (!s.resists) continue;
       for (const t of damageTypes) {
-        if (s.resists[t] === 0) covered.add(t);
+        if ((s.resists[t] ?? 1) <= resistMultiplier) covered.add(t);
       }
     }
   }
@@ -69,9 +69,8 @@ export const ensureImmunityCoverage = (
       const s = wave.spawns[i];
       if (s.kind === "boss") continue;
       if (s.count < 1) continue;
-      // Already immune to this type — no need to overwrite, but also
-      // not a useful carrier for adding NEW immunity. Skip.
-      if (s.resists?.[type] === 0) continue;
+      // Existing resistance already meets this level’s coverage threshold.
+      if ((s.resists?.[type] ?? 1) <= resistMultiplier) continue;
       const base = ENEMY_RESIST[s.kind][type] ?? 1;
       if (base > bestScore) {
         bestScore = base;
@@ -96,15 +95,15 @@ export const ensureImmunityCoverage = (
     if (!picked) return;
     const spawn = picked.wave.spawns[picked.spawnIdx];
     if (spawn.count <= 1) {
-      spawn.resists = { ...(spawn.resists ?? {}), [type]: 0 };
+      spawn.resists = { ...(spawn.resists ?? {}), [type]: resistMultiplier };
     } else {
       spawn.count -= 1;
-      const immune: EnemySpec = {
+      const resistant: EnemySpec = {
         ...spawn,
         count: 1,
-        resists: { ...(spawn.resists ?? {}), [type]: 0 },
+        resists: { ...(spawn.resists ?? {}), [type]: resistMultiplier },
       };
-      picked.wave.spawns.push(immune);
+      picked.wave.spawns.push(resistant);
     }
   });
   return out;

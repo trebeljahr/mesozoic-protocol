@@ -51,7 +51,7 @@ describe("robot combat identities", () => {
     expect(pack.every((e) => e.freezeUntil === 0 && e.slowUntil === 0)).toBe(true);
     expect(w.beams.some((b) => b.points.length === 4)).toBe(true);
   });
-  it("Leela keeps her original lightning dash, pulse, veil, and storm", () => {
+  it("Leela retains her lightning dash, pulse, veil, and storm", () => {
     const w = setup("leela");
     const enemies = [enemyAt(w, 0, -4), enemyAt(w, 0, -5), enemyAt(w, 0, -6)];
     triggerRobotAbility(w, 0);
@@ -59,15 +59,15 @@ describe("robot combat identities", () => {
     expect(enemies.every((e) => e.hp < 10000)).toBe(true);
     triggerRobotAbility(w, 1);
     triggerRobotAbility(w, 2);
-    expect(w.robot.selfBuff).toMatchObject({ fireRateMul: 1.6, speedMul: 1.7, damageResist: 0.8 });
+    expect(w.robot.selfBuff).toMatchObject({ fireRateMul: 1.3, speedMul: 1.7, damageResist: 0.5 });
     const before = enemies.map((e) => e.hp);
     triggerRobotAbility(w, 3);
     updateRobot(w, 1 / 60);
     expect(w.robot.payload).toMatchObject({
       kind: "storm",
       damageType: "electric",
-      tickInterval: 0.2,
-      damagePerArc: 26,
+      tickInterval: 0.5,
+      damagePerArc: 12,
     });
     expect(enemies.every((e, i) => e.hp < before[i] && e.freezeUntil === 0)).toBe(true);
   });

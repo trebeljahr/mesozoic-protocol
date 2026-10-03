@@ -925,6 +925,7 @@ export const createWorld = (
   const plannedWaves = ensureImmunityCoverage(
     scaledWaves,
     availableDamageTypes(modeForbidden, modeLocked),
+    level.id,
   );
   // Containment mode caps lives at 1; every other mode starts at the full HQ
   // life pool. The runtime never tops these up, so this is the only

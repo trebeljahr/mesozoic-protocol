@@ -30,10 +30,10 @@
       },
       "abilityBlurb": {
         "0": "Schneller elektrischer Zap. Jeder Schuss springt auf zwei nahe Ziele über.",
-        "1": "Sprint mit Unverwundbarkeit; am Ende treffen Bögen 3 Gegner für 24 Elektro.",
-        "2": "Elektrischer Puls mit Radius 4, dann 4 Kettensprünge für je 35.",
-        "3": "3s Schleier: Tempo, Feuerrate, Schaden und 80% Resistenz.",
-        "4": "5s Sturm: 4 elektrische Bögen alle 0,2s im Radius 7."
+        "1": "Sprint mit Unverwundbarkeit; am Ende treffen Bögen 3 Gegner für 14 Elektro.",
+        "2": "Elektrischer Puls mit Radius 4, dann 4 Kettensprünge für je 20.",
+        "3": "3s Schleier: Tempo, Feuerrate, Schaden und 50% Resistenz.",
+        "4": "3s Sturm: 4 elektrische Bögen alle 0,5s im Radius 7."
       }
     },
     "mike": {

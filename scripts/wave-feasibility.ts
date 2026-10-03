@@ -43,8 +43,8 @@
  *
  * Runtime spawn-time mutations modeled:
  *   - ensureImmunityCoverage (src/sim/immunityCoverage.ts) — replays the same
- *     0× resist injection the real game runs at run start, so the analyzer
- *     sees the immunity holdouts that punish single-tower spam. Disable with
+ *     progressive resistance injection the real game runs at run start:
+ *     none at L1–2, partial at L3–5, full immunity at L6+. Disable with
  *     --no-immunity-coverage.
  *   - adaptiveBoost / adaptiveCoverage (src/sim/world.ts) — for levels >=
  *     ADAPT_TRIGGER_LEVEL the herd retunes against the dominant damage type
@@ -871,14 +871,16 @@ const analyzeLevel = (levelIdx: number, opts: AnalysisOpts, mode: LevelMode = "n
   const configs = buildAllConfigs(towerStarBudget);
   const baseConfigs = opts.searchBaseUpgrades ? ALL_BASE_CONFIGS : [ZERO_BASE_CONFIG];
 
-  // Replay the runtime spawn-mutation that injects a 0× resist holdout per
+  // Replay the runtime spawn-mutation that injects a resist holdout per
   // damage type the player can reach. Mode forbidden/locked sets gate
   // which types qualify, so breach/containment with reduced rosters get only the
-  // immunities they can actually crack.
+  // resistances they can actually counter. Opening levels skip injection;
+  // levels 3–5 use partial resistance before full immunity enters at level 6.
   const waves = opts.applyImmunityCoverage
     ? ensureImmunityCoverage(
         baseWaves,
         availableDamageTypes(new Set(cfg.forbiddenTowers ?? []), cfg.lockedLoadout ?? null),
+        level.id,
       )
     : baseWaves;
 

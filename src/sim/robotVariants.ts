@@ -187,29 +187,29 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
     maxHp: 200,
     speed: 6.0,
     range: 6.5,
-    damage: 7,
-    fireRate: 5.5,
+    damage: 4,
+    fireRate: 3.5,
     damageType: "electric",
     attackSplashRadius: 0,
-    attackChain: { hops: 2, damagePerHop: 5, radius: 2.6 },
+    attackChain: { hops: 2, damagePerHop: 2, radius: 2.6 },
     unlockBolts: 0,
     abilities: [
       // Q — Phase Step: forward dash, on lunge end arcs to 3 closest dinos.
       {
         type: "dash",
-        cooldown: 4.0,
+        cooldown: 6.0,
         duration: 0.4,
         speed: 13.0,
-        endChain: { hops: 3, damagePerHop: 24, radius: 3.5, damageType: "electric" },
+        endChain: { hops: 3, damagePerHop: 14, radius: 3.5, damageType: "electric" },
       },
       // W — Tesla Pulse: radial blast that forks beams to 4 more targets.
       {
         type: "burst",
-        cooldown: 9.0,
+        cooldown: 12.0,
         radius: 4.0,
-        damage: 70,
+        damage: 40,
         damageType: "electric",
-        chainHops: { hops: 4, damagePerHop: 35, radius: 6.0 },
+        chainHops: { hops: 4, damagePerHop: 20, radius: 6.0 },
       },
       // E — Phase Veil: hit-and-run buff. Pure mobility + offence.
       {
@@ -217,20 +217,20 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
         cooldown: 13.0,
         duration: 3.0,
         damageMul: 1.15,
-        fireRateMul: 1.6,
+        fireRateMul: 1.3,
         speedMul: 1.7,
-        damageResist: 0.8,
+        damageResist: 0.5,
       },
-      // R — Storm Surge: ring of lightning around the robot for 5s.
-      // Every 0.2s, lashes the 4 nearest enemies in 7 range.
+      // R — Storm Surge: ring of lightning around the robot for 3s.
+      // Every 0.5s, lashes the 4 nearest enemies in 7 range.
       {
         type: "storm",
-        cooldown: 16.0,
-        duration: 5.0,
+        cooldown: 22.0,
+        duration: 3.0,
         radius: 7.0,
-        tickInterval: 0.2,
+        tickInterval: 0.5,
         arcsPerTick: 4,
-        damagePerArc: 26,
+        damagePerArc: 12,
         damageType: "electric",
       },
     ],
@@ -239,10 +239,10 @@ export const ROBOT_SPECS: Record<RobotVariant, RobotVariantSpec> = {
     abilityGlyphs: ["»", "⚡", "◈", "✺"],
     abilityBlurbs: [
       "Fast electric zap. Each shot chains to two nearby targets.",
-      "I-frame dash; end arcs hit 3 enemies for 24 electric.",
-      "4-radius electric pulse, then 4 chain hops for 35 each.",
-      "3s veil: speed, fire rate, damage, and 80% resist.",
-      "5s storm: 4 electric arcs every 0.2s inside 7 radius.",
+      "I-frame dash; end arcs hit 3 enemies for 14 electric.",
+      "4-radius electric pulse, then 4 chain hops for 20 each.",
+      "3s veil: speed, fire rate, damage, and 50% resist.",
+      "3s storm: 4 electric arcs every 0.5s inside 7 radius.",
     ],
   },
   george: {
