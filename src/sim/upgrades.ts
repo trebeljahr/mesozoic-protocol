@@ -394,7 +394,7 @@ export const UPGRADES: Record<TowerKind, UpgradeTree> = {
       tiers: [
         {
           name: "Tuned Coils",
-          desc: "+5% service buff (35% total)",
+          desc: "+5 percentage points to service buff",
           cost: 80,
           apply: (t) => {
             t.serviceBuff += 0.05;
@@ -402,7 +402,7 @@ export const UPGRADES: Record<TowerKind, UpgradeTree> = {
         },
         {
           name: "Boosted Link",
-          desc: "+5% service buff (40% total)",
+          desc: "+5 percentage points to service buff",
           cost: 150,
           apply: (t) => {
             t.serviceBuff += 0.05;
@@ -410,7 +410,7 @@ export const UPGRADES: Record<TowerKind, UpgradeTree> = {
         },
         {
           name: "Overdrive",
-          desc: "+10% service buff (50% total)",
+          desc: "+10 percentage points to service buff",
           cost: 240,
           apply: (t) => {
             t.serviceBuff += 0.1;

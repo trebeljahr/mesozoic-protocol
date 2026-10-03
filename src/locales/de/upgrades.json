@@ -114,9 +114,9 @@
       "b": {
         "label": "Servicelink",
         "tier": {
-          "0": { "name": "Abgestimmte Spulen", "desc": "+5% Service-Buff (35% gesamt)" },
-          "1": { "name": "Verstärkter Link", "desc": "+5% Service-Buff (40% gesamt)" },
-          "2": { "name": "Overdrive", "desc": "+10% Service-Buff (50% gesamt)" }
+          "0": { "name": "Abgestimmte Spulen", "desc": "+5 Prozentpunkte Service-Buff" },
+          "1": { "name": "Verstärkter Link", "desc": "+5 Prozentpunkte Service-Buff" },
+          "2": { "name": "Overdrive", "desc": "+10 Prozentpunkte Service-Buff" }
         }
       }
     }

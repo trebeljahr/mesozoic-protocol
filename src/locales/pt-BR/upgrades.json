@@ -105,9 +105,9 @@
       "b": {
         "label": "Service Link",
         "tier": {
-          "0": { "name": "Tuned Coils", "desc": "+5% service buff (35% total)" },
-          "1": { "name": "Boosted Link", "desc": "+5% service buff (40% total)" },
-          "2": { "name": "Overdrive", "desc": "+10% service buff (50% total)" }
+          "0": { "name": "Tuned Coils", "desc": "+5 percentage points to service buff" },
+          "1": { "name": "Boosted Link", "desc": "+5 percentage points to service buff" },
+          "2": { "name": "Overdrive", "desc": "+10 percentage points to service buff" }
         }
       }
     }
