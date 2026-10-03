@@ -39,7 +39,7 @@ jobs:
   build:
     outputs:
       digest: ${{ steps.image.outputs.digest }}
-    if: github.repository == 'trebeljahr/mesozoic-protocol' && github.ref == 'refs/heads/main' && inputs.operation != 'verify' && inputs.operation != 'deploy'
+    if: github.repository == 'trebeljahr/extinction-protocol' && github.ref == 'refs/heads/main' && inputs.operation != 'verify' && inputs.operation != 'deploy'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -96,7 +96,7 @@ jobs:
           if-no-files-found: error
 
   verify:
-    if: github.repository == 'trebeljahr/mesozoic-protocol' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.operation == 'verify'
+    if: github.repository == 'trebeljahr/extinction-protocol' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.operation == 'verify'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
