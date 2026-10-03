@@ -6578,20 +6578,55 @@
 @media (max-width: 560px) { .mode-picker-grid { grid-template-columns: 1fr; } }
 
 @layer components {
-  .presentation-controls {
-    background: rgba(8, 12, 18, 0.45);
-    border: 1px solid rgba(120, 160, 200, 0.14);
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 20px;
-  }
-  .presentation-controls .presentation-title {
-    margin: 0 0 16px;
-    color: var(--color-gold);
-    font-size: calc(10px * var(--text-scale));
+  .presentation-controls { margin-bottom: 20px; }
+  .settings-drawer-button {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface-1);
+    color: var(--color-fg-secondary);
+    font: inherit;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 120ms, color 120ms;
+  }
+  .settings-drawer-button[aria-expanded="true"] { border-radius: 6px 6px 0 0; }
+  .settings-drawer-button:hover, .settings-drawer-button[aria-expanded="true"] {
+    border-color: var(--color-border-strong);
+    color: white;
+  }
+  .settings-drawer-button:focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+  .settings-drawer-chevron {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 120ms;
+  }
+  .settings-drawer-button[aria-expanded="true"] .settings-drawer-chevron {
+    transform: rotate(225deg);
+  }
+  .settings-drawer-panel[hidden] { display: none; }
+  .settings-drawer-panel {
+    padding: 16px;
+    border: 1px solid rgba(120, 160, 200, 0.14);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    background: rgba(8, 12, 18, 0.45);
   }
   fieldset.presentation-setting {
     min-width: 0;
@@ -6684,15 +6719,7 @@
     outline: 2px solid var(--color-cyan);
     outline-offset: 2px;
   }
-  .presentation-controls .keyboard-controls {
-    margin: 18px 0 0;
-    padding: 16px 0 0;
-    border: 0;
-    border-top: 1px solid var(--color-border);
-    border-radius: 0;
-    background: none;
-  }
-  .keyboard-controls summary { color: var(--color-fg-secondary); cursor: pointer; font-weight: 700; }
+  .settings-drawer-panel .keyboard-controls { margin: 0; }
   .keyboard-controls fieldset { border: 0; padding: 0; margin: 12px 0; }
   .keyboard-controls label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; }
   .keyboard-controls p { color: var(--color-fg-muted); font-size: calc(11px * var(--text-scale)); line-height: 1.45; }
@@ -6724,7 +6751,6 @@
 
 @layer components {
   .keyboard-controls { margin-top: 16px; }
-  .keyboard-controls summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
   .keyboard-controls label { min-height: 40px; }
   .keyboard-controls button { min-width: 70px; }
 }

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BINDING_ACTIONS,
@@ -10,15 +10,13 @@ import { TOWER_LABEL } from "../sim/world";
 
 export const KeyboardControls = () => {
   const { t } = useTranslation();
-  const titleId = useId();
   const { bindings, bind, reset, storageFailed } = useKeyBindings();
   const [listening, setListening] = useState<BindingAction | null>(null);
   const [error, setError] = useState<"invalid" | "conflict" | null>(null);
   return (
-    <details className="keyboard-controls presentation-controls">
-      <summary id={titleId}>{t("keyboard.title")}</summary>
+    <div className="keyboard-controls">
       <p>{t("keyboard.help")}</p>
-      <fieldset aria-labelledby={titleId}>
+      <fieldset>
         {BINDING_ACTIONS.map((action) => {
           const label =
             action in TOWER_LABEL
@@ -69,6 +67,6 @@ export const KeyboardControls = () => {
       >
         {t("keyboard.reset")}
       </button>
-    </details>
+    </div>
   );
 };
