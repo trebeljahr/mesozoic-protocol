@@ -14,6 +14,7 @@ import { DroneAssignNotice } from "./DroneAssignNotice";
 import { prewarmEnemyIcons } from "./EnemyIcon.specs";
 import { EnemyPanel } from "./EnemyPanel";
 import { IconCog } from "./MenuIcons";
+import { activeModal } from "./modalFocus";
 import { PauseMenu } from "./PauseMenu";
 import { QuickSettings } from "./QuickSettings";
 import { RobotPanel } from "./RobotPanel";
@@ -179,7 +180,7 @@ export const HUD = () => {
       // abilities, pause toggle and tower-kind digits are all gameplay
       // actions that have no meaning while the run is on hold. Esc still
       // routes through the editor's own listener (it owns close).
-      if (useEditor.getState().active || e.defaultPrevented) return;
+      if (useEditor.getState().active || e.defaultPrevented || activeModal()) return;
       const target = e.target;
       if (
         target instanceof HTMLElement &&

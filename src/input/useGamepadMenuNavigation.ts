@@ -1,9 +1,10 @@
 import { useRef } from "react";
+import { activeModal, focusableElements } from "../ui/modalFocus";
 import { dispatchGamepadKeyboard } from "../ui/useInputMode";
 import { type GamepadInputFrame, snapGamepadDirection, useGamepadInput } from "./gamepad";
 
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const handledFrames = new WeakSet<GamepadInputFrame>();
+export const isMenuFrameHandled = (frame: GamepadInputFrame) => handledFrames.has(frame);
 
 const GAMEPAD_FOCUS_CLASS = "gamepad-focus";
 const MENU_INITIAL_REPEAT_MS = 320;
@@ -13,11 +14,7 @@ type MenuBridgeOptions = {
   confirmAsKeyboard?: boolean;
 };
 
-const visibleFocusableElements = () =>
-  Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((el) => {
-    const rect = el.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && getComputedStyle(el).visibility !== "hidden";
-  });
+const visibleFocusableElements = () => focusableElements(activeModal() ?? document);
 
 const clearGamepadFocus = () => {
   for (const el of document.querySelectorAll<HTMLElement>(`.${GAMEPAD_FOCUS_CLASS}`)) {
@@ -48,7 +45,10 @@ const focusRelative = (direction: -1 | 1) => {
 
 const activateFocused = () => {
   const active = document.activeElement;
-  if (active instanceof HTMLButtonElement || active instanceof HTMLAnchorElement) {
+  if (
+    visibleFocusableElements().includes(active as HTMLElement) &&
+    (active instanceof HTMLButtonElement || active instanceof HTMLAnchorElement)
+  ) {
     active.click();
     return;
   }
@@ -81,6 +81,8 @@ export const useGamepadMenuNavigation = (enabled: boolean, options: MenuBridgeOp
   });
 
   useGamepadInput((frame) => {
+    if (handledFrames.has(frame)) return;
+    handledFrames.add(frame);
     if (!frame.gamepad) {
       repeatRef.current = { direction: 0, nextAt: 0 };
       return;
@@ -103,7 +105,7 @@ export const useGamepadMenuNavigation = (enabled: boolean, options: MenuBridgeOp
     }
 
     if (frame.buttonPressed("a")) {
-      if (options.confirmAsKeyboard) dispatchGamepadKeyboard("Enter");
+      if (options.confirmAsKeyboard && !activeModal()) dispatchGamepadKeyboard("Enter");
       else activateFocused();
     }
     if (frame.buttonPressed("b") || frame.buttonPressed("start")) {

@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
 import {
@@ -9,6 +8,7 @@ import {
 } from "../progress";
 import { useGame } from "../store";
 import { DifficultyModelIcon } from "./DifficultyModelIcon";
+import { useModalFocus } from "./useModalFocus";
 
 const GLOW: Record<Difficulty, string> = {
   easy: "shadow-[0_0_24px_rgba(180,255,201,0.18)]",
@@ -32,21 +32,18 @@ export const DifficultyPicker = () => {
   const setDifficulty = useGame((s) => s.setDifficulty);
   const setOpen = useGame((s) => s.setDifficultyPickerOpen);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [setOpen]);
+  const dialogRef = useModalFocus(() => setOpen(false));
 
   return (
     <div className="overlay difficulty-overlay">
-      <div className="difficulty-card">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("difficulty.title")}
+        tabIndex={-1}
+        className="difficulty-card"
+      >
         <header className="difficulty-header">
           <div>
             <h1>{t("difficulty.title")}</h1>

@@ -1,11 +1,12 @@
 import type { TFunction } from "i18next";
-import { useEffect, useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
 import { getLevel, levelHasMode, resolveLevelMode } from "../levels";
 import { getModeStars, isModeUnlocked, LEVEL_MODES, type LevelMode } from "../progress";
 import { TOWER_LABEL } from "../sim/world";
 import { useGame } from "../store";
+import { useModalFocus } from "./useModalFocus";
 
 const MODE_ACCENT: Record<LevelMode, { text: string; border: string; tint: string }> = {
   normal: { text: "text-blue", border: "border-blue", tint: "bg-tint-blue" },
@@ -49,6 +50,11 @@ export const ModePicker = () => {
     };
     const swallowGhostClick = (e: MouseEvent) => {
       if (!armed) return;
+      // Keyboard and gamepad button clicks have detail 0, never a trailing touch click.
+      if (e.detail === 0) {
+        armed = false;
+        return;
+      }
       armed = false;
       e.stopPropagation();
       e.preventDefault();
@@ -63,17 +69,7 @@ export const ModePicker = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        close();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [close]);
+  const dialogRef = useModalFocus(() => close(), levelId !== null);
 
   const level = useMemo(() => (levelId !== null ? getLevel(levelId) : null), [levelId]);
   if (!level) return null;
@@ -82,7 +78,14 @@ export const ModePicker = () => {
 
   return (
     <div className="overlay achievements-overlay">
-      <div className="achievements-card">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("modePicker.subtitle")}
+        tabIndex={-1}
+        className="achievements-card"
+      >
         <header className="achievements-header">
           <div>
             <h1>{t(`levels:names.${level.id}`)}</h1>

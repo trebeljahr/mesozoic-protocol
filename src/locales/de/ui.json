@@ -432,7 +432,7 @@
     "eyebrow": "Lagebericht · Außenposten {{id}}",
     "beginDefense": "Verteidigung beginnen",
     "hintGamepad": "Knopf drücken zum Beginnen",
-    "hintKeyboard": "Beliebige Taste oder außerhalb tippen zum Beginnen",
+    "hintKeyboard": "Enter oder Leertaste drücken oder außerhalb tippen zum Beginnen",
     "hintTouchScroll": "Zum Lesen scrollen · Beginnen tippen zum Start",
     "hintTouch": "Beginnen oder außerhalb tippen zum Start"
   },

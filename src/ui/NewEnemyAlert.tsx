@@ -13,6 +13,8 @@ import {
 import { useGame } from "../store";
 import { DamageIcon } from "./DamageIcon";
 import { EnemyIcon } from "./EnemyIcon";
+import { activeModal, isActivationKey } from "./modalFocus";
+import { useModalFocus } from "./useModalFocus";
 
 const DAMAGE_TYPES: DamageType[] = ["kinetic", "electric", "cold", "explosive", "flame"];
 
@@ -21,6 +23,7 @@ export const NewEnemyAlert = () => {
   const queue = useGame((s) => s.newEnemyQueue);
   const dismiss = useGame((s) => s.dismissNewEnemy);
   const sighting = queue[0];
+  const dialogRef = useModalFocus(dismiss, !!sighting);
 
   useEffect(() => {
     if (!sighting) return;
@@ -32,15 +35,16 @@ export const NewEnemyAlert = () => {
     // Swallow every key while the alert is up — otherwise game hotkeys
     // (P, R, 1–4, Space) leak through and confuse state.
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape" || e.code === "Space" || e.code === "Enter") {
+      if (activeModal() !== dialogRef.current) return;
+      if (isActivationKey(e)) {
         e.preventDefault();
         dismiss();
       }
-      e.stopPropagation();
+      if (isActivationKey(e)) e.stopImmediatePropagation();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [sighting, dismiss]);
+  }, [sighting, dismiss, dialogRef]);
 
   if (!sighting) return null;
 
@@ -69,7 +73,14 @@ export const NewEnemyAlert = () => {
 
   return (
     <div className="overlay new-enemy-overlay">
-      <div className="new-enemy-card flex flex-col items-stretch gap-2 sm:gap-2.5 w-[360px] max-w-[calc(100vw-16px)] pt-3 px-4 pb-4 sm:pt-[22px] sm:px-[26px] sm:pb-6 rounded-2xl border border-[rgba(255,170,110,0.35)]">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
+        className="new-enemy-card flex flex-col items-stretch gap-2 sm:gap-2.5 w-[360px] max-w-[calc(100vw-16px)] pt-3 px-4 pb-4 sm:pt-[22px] sm:px-[26px] sm:pb-6 rounded-2xl border border-[rgba(255,170,110,0.35)]"
+      >
         <div className="new-enemy-body-top flex flex-col items-stretch gap-2 sm:gap-2.5">
           <div className="self-center text-[10px] tracking-uber text-orange font-bold px-2.5 py-1 rounded-sm border border-[rgba(255,178,102,0.45)] bg-[rgba(255,178,102,0.08)] uppercase">
             {isMatriarch ? t("newEnemy.matriarchDetected") : t("newEnemy.newHostile")}

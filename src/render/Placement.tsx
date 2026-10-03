@@ -4,11 +4,13 @@ import * as THREE from "three";
 import { audio } from "../audio/AudioManager";
 import { useEditor } from "../editor/editorStore";
 import { GAMEPAD_STICK_DEADZONE, scaleGamepadAxis, useGamepadInput } from "../input/gamepad";
+import { isMenuFrameHandled } from "../input/useGamepadMenuNavigation";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { effectiveTowerCost } from "../sim/metaSkills";
 import type { TowerKind } from "../sim/types";
 import { TOWER_CLEAR_RADIUS, TOWER_STATS, towerKindAtBuildLimit } from "../sim/world";
 import { useGame } from "../store";
+import { activeModal } from "../ui/modalFocus";
 import { GhostTower } from "./GhostTower";
 
 type Vec2 = { x: number; y: number };
@@ -143,6 +145,8 @@ export const Placement = () => {
 
     const state = useGame.getState();
     if (
+      activeModal() ||
+      isMenuFrameHandled(frame) ||
       state.screen !== "playing" ||
       state.ui.status !== "running" ||
       state.compendiumOpen ||

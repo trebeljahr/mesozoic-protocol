@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { hasLevelInterstitial } from "../levels/briefings";
 import { useGame } from "../store";
+import { activeModal, isActivationKey } from "./modalFocus";
 import { useInputMode } from "./useInputMode";
+import { useModalFocus } from "./useModalFocus";
 
 const FADE_MS = 220;
 
@@ -38,35 +40,18 @@ export const LevelIntro = () => {
     };
   }, []);
 
-  // Dismiss only on an explicit signal: any key (gamepad confirm arrives
-  // as a synthetic keydown), or a tap on the backdrop outside the card.
-  // Taps and scroll gestures *on* the card never dismiss — otherwise the
-  // first touch a player makes to scroll a long briefing would skip it.
-  // The "Begin defense" button starts the level from the card itself. A
-  // scroll gesture does not fire `click`, so dragging to read is safe.
+  const dialogRef = useModalFocus(undefined, !!report);
   useEffect(() => {
     if (!report) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      e.stopPropagation();
-      e.preventDefault();
+    const onKey = (event: KeyboardEvent) => {
+      if (activeModal() !== dialogRef.current || !isActivationKey(event)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
       beginDefense();
     };
-    const onClick = (e: MouseEvent) => {
-      const target = e.target as Element | null;
-      if (target?.closest(".quick-settings")) return;
-      if (target?.closest(".level-intro-card")) return;
-      beginDefense();
-    };
-
     window.addEventListener("keydown", onKey, true);
-    window.addEventListener("click", onClick, true);
-
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("click", onClick, true);
-    };
-  }, [report, beginDefense]);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [report, beginDefense, dialogRef]);
 
   if (!report) return null;
 
@@ -81,7 +66,21 @@ export const LevelIntro = () => {
 
   return (
     <div className={`level-intro-overlay ${exiting ? "level-intro-exit" : ""}`}>
-      <div className="level-intro-card">
+      <button
+        type="button"
+        className="absolute inset-0"
+        tabIndex={-1}
+        aria-label={t("levelIntro.beginDefense")}
+        onClick={beginDefense}
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("levelIntro.eyebrow", { id: levelId })}
+        tabIndex={-1}
+        className="level-intro-card relative"
+      >
         <div className="level-intro-eyebrow">{t("levelIntro.eyebrow", { id: levelId })}</div>
         <p className="level-intro-text">{report}</p>
         <button

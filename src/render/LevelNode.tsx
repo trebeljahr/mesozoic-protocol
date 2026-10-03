@@ -12,7 +12,6 @@ import {
   isLevelUnlocked,
   isModeUnlocked,
   LEVEL_MODE_LABEL,
-  type LevelMode,
 } from "../progress";
 import { useGame } from "../store";
 import { IconBreach, IconLockdown } from "../ui/MenuIcons";
@@ -42,8 +41,7 @@ export const LevelNode = ({ level }: Props) => {
   const groupRef = useRef<THREE.Group>(null);
   const progress = useGame((s) => s.progress);
   const hoveredLevelId = useGame((s) => s.hoveredLevelId);
-  const startLevel = useGame((s) => s.startLevel);
-  const openModePicker = useGame((s) => s.openModePicker);
+  const activateOutpost = useGame((s) => s.activateOutpost);
   const setHoveredLevel = useGame((s) => s.setHoveredLevel);
   const editorActive = useWorldMapEditor((s) => s.active);
   const [pointerHovered, setPointerHovered] = useState(false);
@@ -54,15 +52,6 @@ export const LevelNode = ({ level }: Props) => {
   const unplayed = unlocked && !completed;
   const hovered = pointerHovered || hoveredLevelId === level.id;
 
-  // Mode picker opens only when at least one challenge mode is both
-  // authored on this level AND unlocked for the player. Early-game
-  // levels without breach/containment content go straight into normal so
-  // the player isn't prompted with a one-option modal.
-  const modePickerAvailable =
-    unlocked &&
-    (["breach", "containment"] as LevelMode[]).some(
-      (m) => levelHasMode(level, m) && isModeUnlocked(progress, level.id, m),
-    );
   const modeStars = getModeStars(progress, level.id);
 
   // Challenge-mode badges surface per-level state (locked / unlocked /
@@ -110,8 +99,7 @@ export const LevelNode = ({ level }: Props) => {
     if (!unlocked) return;
     audio.ensureResumed();
     audio.play("level-select", "ui", 0.7, 80);
-    if (modePickerAvailable) openModePicker(level.id);
-    else startLevel(level.id);
+    activateOutpost(level.id);
   };
 
   const handleOver = (e: ThreeEvent<PointerEvent>) => {
@@ -210,8 +198,7 @@ export const LevelNode = ({ level }: Props) => {
             e.stopPropagation();
             audio.ensureResumed();
             audio.play("level-select", "ui", 0.7, 80);
-            if (modePickerAvailable) openModePicker(level.id);
-            else startLevel(level.id);
+            activateOutpost(level.id);
           }}
           onFocus={() => setHoveredLevel(level.id)}
           onBlur={() => setHoveredLevel(null)}

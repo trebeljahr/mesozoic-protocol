@@ -1,27 +1,34 @@
 import { useTranslation } from "react-i18next";
 import { useIsMobile, useIsPortrait } from "./useMediaQuery";
+import { useModalFocus } from "./useModalFocus";
 
-// Full-screen "rotate to landscape" overlay shown only on mobile while
-// in portrait. The HUD layout assumes a wide aspect — towers below,
-// stats above, panels on the side — so portrait feels broken without
-// this prompt. Sits above the HUD/Canvas (z-50) but below modal panels
-// like the new-enemy alert (z-50) so it doesn't block their dismiss
-// gestures; in practice the player sees this *first* and rotates.
+// The rotate prompt owns input above every other dialog. Session interruption
+// tracking uses these same media queries and requires explicit resume on return.
 export const LandscapeNudge = () => {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const isPortrait = useIsPortrait();
+  const dialogRef = useModalFocus(undefined, isMobile && isPortrait, 100);
   if (!isMobile || !isPortrait) return null;
   return (
-    <div className="fixed inset-0 z-[100] bg-[rgba(8,12,18,0.94)] flex flex-col items-center justify-center text-center px-8 backdrop-blur-md">
-      <div className="text-[64px] mb-6 animate-[rotateNudge_2.4s_ease-in-out_infinite]">
-        <RotateGlyph />
-      </div>
-      <div className="font-display text-[22px] font-bold tracking-[0.04em] text-white mb-2">
-        {t("landscape.title")}
-      </div>
-      <div className="text-[13px] text-fg-muted leading-[1.5] max-w-[280px]">
-        {t("landscape.body")}
+    <div>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("landscape.title")}
+        tabIndex={-1}
+        className="fixed inset-0 z-[100] bg-[rgba(8,12,18,0.94)] flex flex-col items-center justify-center text-center px-8 backdrop-blur-md"
+      >
+        <div className="text-[64px] mb-6 animate-[rotateNudge_2.4s_ease-in-out_infinite]">
+          <RotateGlyph />
+        </div>
+        <div className="font-display text-[22px] font-bold tracking-[0.04em] text-white mb-2">
+          {t("landscape.title")}
+        </div>
+        <div className="text-[13px] text-fg-muted leading-[1.5] max-w-[280px]">
+          {t("landscape.body")}
+        </div>
       </div>
     </div>
   );

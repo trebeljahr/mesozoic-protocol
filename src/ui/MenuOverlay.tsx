@@ -1,6 +1,7 @@
 import type React from "react";
-import { useEffect } from "react";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
+import { useModalFocus } from "./useModalFocus";
 
 type Props = {
   title: string;
@@ -29,20 +30,8 @@ export const MenuOverlay = ({
 }: Props) => {
   const { t } = useTranslation();
   const resolvedCloseLabel = closeLabel ?? t("common.close");
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      // Capture-phase + stopImmediatePropagation: the HUD also listens on
-      // window for Escape→togglePause, which would fight this handler and
-      // re-pause the game on the same key event. Eat the event here so
-      // the modal owns Escape while it's open.
-      e.stopImmediatePropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  const titleId = useId();
+  const dialogRef = useModalFocus(onClose);
 
   return (
     /* biome-ignore lint/a11y/noStaticElementInteractions: intentional —
@@ -59,12 +48,19 @@ export const MenuOverlay = ({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={`overlay-card menu-overlay-card relative min-w-[440px] pt-7 px-8 pb-6 text-left ${cardClassName}`}
       >
         <div className={`menu-overlay-header ${headerLeading ? "has-leading" : ""}`}>
           <div className="menu-overlay-leading">{headerLeading}</div>
           <div className="menu-overlay-title-group">
-            <h1 className="menu-overlay-title text-center mb-1">{title}</h1>
+            <h1 id={titleId} className="menu-overlay-title text-center mb-1">
+              {title}
+            </h1>
             {subtitle && (
               <div className="menu-overlay-subtitle text-center text-xs tracking-[0.22em] uppercase text-fg-dim mb-[18px]">
                 {subtitle}

@@ -1,10 +1,10 @@
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
 import { biomeForPos } from "../biomes";
 import { ENDLESS_ARENAS } from "../levels/endless";
 import { getEndlessBest } from "../progress";
 import { useGame } from "../store";
+import { useModalFocus } from "./useModalFocus";
 
 // Endless arena selector. Reuses the achievements overlay/card visual
 // language (X-close, header, responsive card grid) so it matches the
@@ -16,21 +16,18 @@ export const EndlessPicker = () => {
   const startEndless = useGame((s) => s.startEndless);
   const setOpen = useGame((s) => s.setEndlessPickerOpen);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [setOpen]);
+  const dialogRef = useModalFocus(() => setOpen(false));
 
   return (
     <div className="overlay achievements-overlay">
-      <div className="achievements-card">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("endlessPicker.title")}
+        tabIndex={-1}
+        className="achievements-card"
+      >
         <header className="achievements-header">
           <div>
             <h1>{t("endlessPicker.title")}</h1>

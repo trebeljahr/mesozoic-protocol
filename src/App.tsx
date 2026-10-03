@@ -39,6 +39,7 @@ import { useInputModeSignal } from "./ui/useInputMode";
 import { useLevelLoadProgress } from "./ui/useLevelLoadProgress";
 import { useIsMobile } from "./ui/useMediaQuery";
 import { useReducedMotion } from "./ui/useReducedMotion";
+import { useSessionInterruptions } from "./ui/useSessionInterruptions";
 import { WorldMapUI } from "./ui/WorldMapUI";
 import { isTauriShell } from "./updater";
 
@@ -148,6 +149,7 @@ export const App = () => {
     worldMapEditorActive &&
     worldMapEditorChromeHidden;
   const hideEditorChrome = hideLevelChrome || hideWorldMapChrome;
+  useSessionInterruptions();
   useInputModeSignal();
   useAudioBridge();
   useLevelLoadProgress();

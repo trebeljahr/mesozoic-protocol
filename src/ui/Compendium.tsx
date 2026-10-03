@@ -31,9 +31,11 @@ import { EnemyIcon } from "./EnemyIcon";
 import { EnemyPreview } from "./EnemyPreview";
 import { MechanicIcon } from "./MechanicIcon";
 import { MechanicPreview } from "./MechanicPreview";
+import { activeModal } from "./modalFocus";
 import { RobotCompendiumSection } from "./RobotCompendiumSection";
 import { TowerDiorama } from "./TowerDiorama";
 import { TowerPreview } from "./TowerPreview";
+import { useModalFocus } from "./useModalFocus";
 
 type Section = CompendiumSection;
 
@@ -123,17 +125,7 @@ export const Compendium = () => {
   const [selectedTower, setSelectedTower] = useState<TowerKind>(TOWER_ORDER[0]);
   const [selectedMech, setSelectedMech] = useState<MechanicId>(MECHANIC_ORDER[0]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setCompendiumOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [setCompendiumOpen]);
+  const dialogRef = useModalFocus(() => setCompendiumOpen(false));
 
   // The global menu-nav hook (App.tsx) already wires dpad focus, A
   // activate, and B/Start escape for every modal. Compendium adds
@@ -144,7 +136,7 @@ export const Compendium = () => {
   const sectionRef = useRef(section);
   sectionRef.current = section;
   useGamepadInput((frame) => {
-    if (!frame.gamepad) return;
+    if (!frame.gamepad || activeModal() !== dialogRef.current) return;
     const cycle = (direction: -1 | 1) => {
       const idx = SECTION_ORDER.indexOf(sectionRef.current);
       const next = (idx + direction + SECTION_ORDER.length) % SECTION_ORDER.length;
@@ -156,7 +148,14 @@ export const Compendium = () => {
 
   return (
     <div className="overlay compendium-overlay">
-      <div className="compendium-card">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("compendium.title")}
+        tabIndex={-1}
+        className="compendium-card"
+      >
         <header className="compendium-header">
           <div>
             <h1>{t("compendium.title")}</h1>

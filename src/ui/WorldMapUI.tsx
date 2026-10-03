@@ -6,7 +6,7 @@ import { isDebug } from "../debug";
 import { DEMO_MAX_LEVEL, IS_DEMO } from "../demo";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { type GamepadInputFrame, snapGamepadDirection, useGamepadInput } from "../input/gamepad";
-import { useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
+import { isMenuFrameHandled, useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
 import { LEVELS } from "../levels";
 import { hasLevelBriefing } from "../levels/briefings";
 import {
@@ -40,6 +40,7 @@ import {
 } from "./MenuIcons";
 import { MenuOverlay } from "./MenuOverlay";
 import { ModesUnlockedModal } from "./ModesUnlockedModal";
+import { activeModal } from "./modalFocus";
 import { PresentationControls } from "./PresentationControls";
 import { QuickSettings } from "./QuickSettings";
 import { SoundControls } from "./SoundControls";
@@ -65,7 +66,7 @@ export const WorldMapUI = () => {
   const { t } = useTranslation();
   const progress = useGame((s) => s.progress);
   const hoveredLevelId = useGame((s) => s.hoveredLevelId);
-  const startLevel = useGame((s) => s.startLevel);
+  const activateOutpost = useGame((s) => s.activateOutpost);
   const setHoveredLevel = useGame((s) => s.setHoveredLevel);
   const setCompendiumOpen = useGame((s) => s.setCompendiumOpen);
   const setAchievementsOpen = useGame((s) => s.setAchievementsOpen);
@@ -121,10 +122,18 @@ export const WorldMapUI = () => {
   const availableStars = Math.max(0, total - spentMetaStars(progress.metaSkills));
   const bolts = progress.bolts;
 
-  useGamepadMenuNavigation(menuOpen);
+  useGamepadMenuNavigation(menuOpen || showModesUnlocked || showEndlessUnlocked);
 
   useGamepadInput((frame) => {
-    if (!frame.gamepad || menuOpen) return;
+    if (
+      !frame.gamepad ||
+      menuOpen ||
+      showModesUnlocked ||
+      showEndlessUnlocked ||
+      activeModal() ||
+      isMenuFrameHandled(frame)
+    )
+      return;
     if (useWorldMapEditor.getState().active) return;
 
     const unlocked = LEVELS.filter((level) => isLevelUnlocked(level.id, progress));
@@ -156,7 +165,7 @@ export const WorldMapUI = () => {
       if (!target || !isLevelUnlocked(target.id, progress)) return;
       audio.ensureResumed();
       audio.play("level-select", "ui", 0.7, 80);
-      startLevel(target.id);
+      activateOutpost(target.id);
       return;
     }
 

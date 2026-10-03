@@ -1,31 +1,28 @@
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ACHIEVEMENTS, isAchievementUnlocked, totalUnlocked } from "../achievements";
 import { useGame } from "../store";
 import { IconHiddenAchievement } from "./AchievementIcons";
+import { useModalFocus } from "./useModalFocus";
 
 export const AchievementsPanel = () => {
   const { t } = useTranslation();
   const progress = useGame((s) => s.progress);
   const setAchievementsOpen = useGame((s) => s.setAchievementsOpen);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setAchievementsOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [setAchievementsOpen]);
+  const dialogRef = useModalFocus(() => setAchievementsOpen(false));
 
   const unlockedCount = totalUnlocked(progress);
 
   return (
     <div className="overlay achievements-overlay">
-      <div className="achievements-card">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("achievements.title")}
+        tabIndex={-1}
+        className="achievements-card"
+      >
         <header className="achievements-header">
           <div>
             <h1>{t("achievements.title")}</h1>

@@ -14,6 +14,7 @@ import { getLevel, LEVELS, levelHasMode, resolveLevelMode } from "./levels";
 import { hasLevelBriefing } from "./levels/briefings";
 import { getEndlessArena } from "./levels/endless";
 import { LORE_FRAGMENT_ORDER } from "./levels/lore";
+import { outpostActivation } from "./outpostActivation";
 import type { Difficulty, LevelMode, ProgressData, SlotId, Stars } from "./progress";
 import {
   DEFAULT_DIFFICULTY,
@@ -40,6 +41,7 @@ import {
   totalStars,
   triggeredEasterEggIdsForLevel,
 } from "./progress";
+import { type InterruptionReason, sessionPause } from "./sessionPause";
 import { endlessSpeedFactor } from "./sim/endless";
 import { Engine } from "./sim/loop";
 import { MECHANIC_ORDER, type MechanicId } from "./sim/mechanicsText";
@@ -560,6 +562,7 @@ type GameStore = {
   // closed; set to a level id when the world map opens the picker so
   // the picker UI knows which level to show modes for.
   modePickerLevelId: number | null;
+  activateOutpost: (id: number) => void;
   openModePicker: (id: number) => void;
   closeModePicker: () => void;
   retryCurrentLevel: () => void;
@@ -599,6 +602,7 @@ type GameStore = {
   dismissAchievementToast: (key: number) => void;
 
   reset: () => void;
+  setInterruptionBlocked: (reason: InterruptionReason, blocked: boolean) => void;
   togglePause: () => void;
   tick: (realTimeSec: number) => void;
 
@@ -945,6 +949,8 @@ export const useGame = create<GameStore>((set, get) => ({
       built.world.invincible = cur.invincible;
       const showIntro = hasLevelBriefing(id) && !progress.seenIntros?.[id];
       if (showIntro) built.world.status = "paused";
+      sessionPause.enforce(built.world);
+      built.ui = snapshot(built.world, 0, 0, emptyInspect);
       set({
         ...built,
         selectedKind: null,
@@ -979,6 +985,13 @@ export const useGame = create<GameStore>((set, get) => ({
     if (s.levelLoadPending) return;
     set({ levelLoadPending: true });
     requestAnimationFrame(() => requestAnimationFrame(enter));
+  },
+
+  activateOutpost: (id) => {
+    const s = get();
+    const action = outpostActivation(id, s.progress);
+    if (action === "picker") s.openModePicker(id);
+    else if (action === "normal") s.startLevel(id);
   },
 
   openModePicker: (id) => {
@@ -1221,7 +1234,17 @@ export const useGame = create<GameStore>((set, get) => ({
         autoPaused = true;
       }
     } else {
-      if (autoPaused && world.status === "paused") world.status = "running";
+      if (
+        autoPaused &&
+        world.status === "paused" &&
+        sessionPause.canAutoResume(world) &&
+        !s.levelIntroVisible &&
+        s.newEnemyQueue.length === 0 &&
+        !s.robotShopOpen
+      ) {
+        world.status = "running";
+        s.engine.reset();
+      }
       autoPaused = false;
     }
     set({
@@ -1294,16 +1317,39 @@ export const useGame = create<GameStore>((set, get) => ({
     get().retryCurrentLevel();
   },
 
+  setInterruptionBlocked: (reason, blocked) => {
+    const s = get();
+    sessionPause.setBlocked(reason, blocked, s.world);
+    // Discard elapsed wall time, including when requestAnimationFrame was suspended.
+    s.engine.reset();
+    set({ ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy) });
+  },
+
   togglePause: () => {
     const s = get();
     const { world } = s;
     if (world.status === "running") world.status = "paused";
-    else if (world.status === "paused") world.status = "running";
+    else if (world.status === "paused") {
+      if (
+        s.levelIntroVisible ||
+        s.newEnemyQueue.length > 0 ||
+        s.difficultyPickerOpen ||
+        s.compendiumOpen ||
+        s.achievementsOpen ||
+        s.creditsOpen ||
+        s.robotShopOpen ||
+        s.skillTreeOpen
+      )
+        return;
+      if (!sessionPause.resume(world)) return;
+      s.engine.reset();
+    }
     set({ ui: snapshot(world, s.towerVersion, s.treeVersion, s.inspectedEnemy) });
   },
 
   tick: (realTimeSec: number) => {
     const s = get();
+    sessionPause.enforce(s.world);
     s.engine.step(s.world, realTimeSec);
 
     // Close placement when the armed tower stops being affordable.
@@ -1876,7 +1922,15 @@ export const useGame = create<GameStore>((set, get) => ({
     const s = get();
     if (!s.levelIntroVisible) return;
     const levelId = s.selectedLevelId;
-    s.world.status = "running";
+    if (
+      sessionPause.canAutoResume(s.world) &&
+      !s.difficultyPickerOpen &&
+      s.newEnemyQueue.length === 0 &&
+      !s.robotShopOpen
+    ) {
+      s.world.status = "running";
+      s.engine.reset();
+    }
     let progress = s.progress;
     if (levelId !== null) {
       progress = {
@@ -1901,8 +1955,17 @@ export const useGame = create<GameStore>((set, get) => ({
     const remaining = s.newEnemyQueue.slice(1);
     // Resume only when the queue empties AND we were the ones who paused.
     const shouldResume =
-      remaining.length === 0 && s.autoPausedForNewEnemy && s.world.status === "paused";
-    if (shouldResume) s.world.status = "running";
+      remaining.length === 0 &&
+      s.autoPausedForNewEnemy &&
+      s.world.status === "paused" &&
+      sessionPause.canAutoResume(s.world) &&
+      !s.levelIntroVisible &&
+      !s.difficultyPickerOpen &&
+      !s.robotShopOpen;
+    if (shouldResume) {
+      s.world.status = "running";
+      s.engine.reset();
+    }
     set({
       newEnemyQueue: remaining,
       autoPausedForNewEnemy: remaining.length === 0 ? false : s.autoPausedForNewEnemy,

@@ -432,7 +432,7 @@
     "eyebrow": "Field Report · Outpost {{id}}",
     "beginDefense": "Begin defense",
     "hintGamepad": "press a button to begin",
-    "hintKeyboard": "press any key, or tap outside, to begin",
+    "hintKeyboard": "press Enter or Space, or tap outside, to begin",
     "hintTouchScroll": "scroll to read · tap Begin to start",
     "hintTouch": "tap Begin, or tap outside, to start"
   },

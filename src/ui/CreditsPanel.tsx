@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useGame } from "../store";
+import { useModalFocus } from "./useModalFocus";
 
 type CreditEntry = {
   name: string;
@@ -475,21 +475,18 @@ export const CreditsPanel = () => {
   const { t } = useTranslation();
   const setCreditsOpen = useGame((s) => s.setCreditsOpen);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        setCreditsOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [setCreditsOpen]);
+  const dialogRef = useModalFocus(() => setCreditsOpen(false));
 
   return (
     <div className="overlay achievements-overlay">
-      <div className="achievements-card">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("credits.title")}
+        tabIndex={-1}
+        className="achievements-card"
+      >
         <header className="achievements-header">
           <div>
             <h1>{t("credits.title")}</h1>
