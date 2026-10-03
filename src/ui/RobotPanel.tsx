@@ -1,18 +1,12 @@
 import { useTranslation } from "react-i18next";
+import { type BindingAction, keyLabel, useKeyBindings } from "../input/keyBindings";
 import type { RobotAbilitySlot } from "../sim/types";
 import { clamp01 } from "../sim/vec2";
 import { useGame } from "../store";
 import { fmtCompact } from "./format";
 import { useKeyboardHintsVisible } from "./useInputMode";
 
-// QWER hotkey map. Slot 3 (R) is always the ultimate so the climactic
-// move sits on the same key across pilots — League-style muscle memory.
-const SLOT_KEYS: Array<{ slot: RobotAbilitySlot; key: "Q" | "W" | "E" | "R" }> = [
-  { slot: 0, key: "Q" },
-  { slot: 1, key: "W" },
-  { slot: 2, key: "E" },
-  { slot: 3, key: "R" },
-];
+const ABILITY_SLOTS: RobotAbilitySlot[] = [0, 1, 2, 3];
 
 // In-game HUD strip: HP/XP bar plus the four ability buttons. Clicking
 // the portrait area (name / HP / XP / combat stats) selects the robot as
@@ -22,6 +16,7 @@ const SLOT_KEYS: Array<{ slot: RobotAbilitySlot; key: "Q" | "W" | "E" | "R" }> =
 // ability triggers it the same way the hotkey would.
 export const RobotPanel = () => {
   const { t } = useTranslation();
+  const bindings = useKeyBindings((s) => s.bindings);
   const showKeyboardHints = useKeyboardHintsVisible();
   const label = useGame((s) => s.ui.robotLabel);
   const variant = useGame((s) => s.ui.robotVariant);
@@ -66,7 +61,11 @@ export const RobotPanel = () => {
         onClick={() => selectRobotUnit(!selected)}
         aria-pressed={selected}
         aria-label={t("robotShop.selectRobot")}
-        title={t("robotShop.selectRobot")}
+        title={
+          showKeyboardHints
+            ? `${t("robotShop.selectRobot")} [${keyLabel(bindings.robot)}]`
+            : t("robotShop.selectRobot")
+        }
       >
         <div className="robot-name">
           {t("robotShop.mecha")} · {label.toUpperCase()}
@@ -102,7 +101,8 @@ export const RobotPanel = () => {
         </div>
       </button>
       <div className="robot-abilities">
-        {SLOT_KEYS.map(({ slot, key }) => {
+        {ABILITY_SLOTS.map((slot) => {
+          const key = keyLabel(bindings[`ability${slot + 1}` as BindingAction]);
           const cd = cooldowns[slot];
           const active = activeRemaining[slot] > 0;
           const max = maxCooldowns[slot];
@@ -119,7 +119,7 @@ export const RobotPanel = () => {
             : `${abilityLabel}${hint}`;
           return (
             <button
-              key={key}
+              key={slot}
               type="button"
               className={`robot-ability ${active ? "active" : ""} ${ready ? "ready" : "cooling"}`}
               onClick={() => trigger(slot)}

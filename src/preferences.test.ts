@@ -22,11 +22,13 @@ describe("presentation preferences", () => {
       graphics: "auto",
       motion: "reduced",
       cameraShake: false,
+      textScale: 1,
     });
     expect(normalizePresentation({ graphics: "low", motion: 3, cameraShake: "false" })).toEqual({
       graphics: "low",
       motion: "system",
       cameraShake: true,
+      textScale: 1,
     });
   });
 
@@ -54,6 +56,7 @@ describe("presentation preferences", () => {
       graphics: "low",
       motion: "system",
       cameraShake: false,
+      textScale: 1,
     });
     expect(write.mock.calls[1][0]).toBe(PRESENTATION_KEY);
   });

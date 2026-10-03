@@ -96,6 +96,13 @@ const SceneRoot = () => {
 };
 
 export const App = () => {
+  const textScale = usePresentation((s) => s.preferences.textScale);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--text-scale", String(textScale));
+    return () => {
+      document.documentElement.style.removeProperty("--text-scale");
+    };
+  }, [textScale]);
   const graphicsPreference = usePresentation((s) => s.preferences.graphics);
   const quality = qualityForPreference(graphicsPreference);
   const renderSettings = QUALITY_SETTINGS[quality];

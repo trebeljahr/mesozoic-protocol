@@ -7,6 +7,7 @@ export type PresentationPreferences = {
   graphics: GraphicsPreference;
   motion: MotionPreference;
   cameraShake: boolean;
+  textScale: 1 | 1.15 | 1.3;
 };
 
 export const PRESENTATION_KEY = "mesozoic-protocol:presentation:v1";
@@ -14,6 +15,7 @@ export const DEFAULT_PRESENTATION: PresentationPreferences = {
   graphics: "auto",
   motion: "system",
   cameraShake: true,
+  textScale: 1,
 };
 
 export const normalizePresentation = (raw: unknown): PresentationPreferences => {
@@ -24,6 +26,7 @@ export const normalizePresentation = (raw: unknown): PresentationPreferences => 
         ? value.graphics
         : "auto",
     motion: value.motion === "reduced" || value.motion === "full" ? value.motion : "system",
+    textScale: value.textScale === 1.15 || value.textScale === 1.3 ? value.textScale : 1,
     cameraShake: typeof value.cameraShake === "boolean" ? value.cameraShake : true,
   };
 };

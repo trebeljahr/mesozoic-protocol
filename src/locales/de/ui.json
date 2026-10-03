@@ -601,7 +601,8 @@
     },
     "shake": "Kamerawackeln",
     "motionHelp": "Reduzierte Bewegung stoppt Kamerawackeln und Umgebungsbewegung. Kämpfe bleiben sichtbar.",
-    "unsaved": "Die Einstellungen gelten jetzt, konnten aber nicht gespeichert werden. Ändere eine Einstellung, um es erneut zu versuchen."
+    "unsaved": "Die Einstellungen gelten jetzt, konnten aber nicht gespeichert werden. Ändere eine Einstellung, um es erneut zu versuchen.",
+    "textSize": "Textgröße"
   },
   "renderFailure": {
     "title": "Darstellungsfehler",
@@ -609,5 +610,24 @@
     "scene": "Die Szene konnte nicht starten. Versuche es erneut oder lade die Seite neu, falls das Problem bleibt.",
     "reload": "Neu laden",
     "retry": "Erneut versuchen"
+  },
+  "keyboard": {
+    "title": "Tastaturbelegung",
+    "help": "Wähle eine Taste und drücke einen Buchstaben, eine Zahl oder die Leertaste. Escape und Tab bleiben für Menüs reserviert.",
+    "press": "Taste drücken",
+    "invalid": "Nutze A–Z, 0–9 oder die Leertaste.",
+    "conflict": "Diese Taste ist bereits belegt. Wähle eine andere.",
+    "reset": "Standardbelegung",
+    "change": "Taste für {{action}} ändern, derzeit {{key}}",
+    "action": {
+      "wave": "Welle starten / vorzeitig rufen",
+      "menu": "Menü öffnen",
+      "clear": "Auswahl aufheben",
+      "robot": "Roboter auswählen",
+      "ability1": "Fähigkeit 1",
+      "ability2": "Fähigkeit 2",
+      "ability3": "Fähigkeit 3",
+      "ability4": "Ultimative Fähigkeit"
+    }
   }
 }

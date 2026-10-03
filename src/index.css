@@ -135,23 +135,25 @@
 }
 
 :root {
+  --text-scale: 1;
+  font-size: calc(16px * var(--text-scale));
   color-scheme: dark;
   font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   -webkit-font-smoothing: antialiased;
 
   /* === Type scale (custom CSS only; not exposed as Tailwind utilities) === */
-  --fs-2xs: 9px;
-  --fs-xs: 10px;
-  --fs-sm: 11px;
-  --fs-md: 12px;
-  --fs-base: 13px;
-  --fs-lg: 14px;
-  --fs-xl: 15px;
-  --fs-h3: 17px; /* tower-card swatch text, mid-density labels */
-  --fs-h2: 18px; /* section / panel titles */
-  --fs-2xl: 22px; /* modal h1 */
-  --fs-h1: 24px; /* full-screen overlay h1 */
-  --fs-display: 28px; /* robot / new-enemy / results title */
+  --fs-2xs: calc(9px * var(--text-scale));
+  --fs-xs: calc(10px * var(--text-scale));
+  --fs-sm: calc(11px * var(--text-scale));
+  --fs-md: calc(12px * var(--text-scale));
+  --fs-base: calc(13px * var(--text-scale));
+  --fs-lg: calc(14px * var(--text-scale));
+  --fs-xl: calc(15px * var(--text-scale));
+  --fs-h3: calc(17px * var(--text-scale)); /* tower-card swatch text, mid-density labels */
+  --fs-h2: calc(18px * var(--text-scale)); /* section / panel titles */
+  --fs-2xl: calc(22px * var(--text-scale)); /* modal h1 */
+  --fs-h1: calc(24px * var(--text-scale)); /* full-screen overlay h1 */
+  --fs-display: calc(28px * var(--text-scale)); /* robot / new-enemy / results title */
 
   /* === Spacing aliases (used by hand-written CSS rules below) === */
   --space-1: 4px;
@@ -1686,7 +1688,7 @@
     min-width: 0;
   }
   .compendium-lore-tab-num {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.18em;
     color: var(--color-gold);
@@ -1705,7 +1707,7 @@
     font-style: italic;
   }
   .compendium-lore-tab-kind {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     color: var(--color-fg-muted);
     text-transform: uppercase;
     letter-spacing: 0.14em;
@@ -1733,7 +1735,7 @@
   }
   .compendium-lore-kind-chip {
     align-self: flex-start;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.22em;
     color: var(--color-blue);
@@ -1746,7 +1748,7 @@
   .compendium-lore-title {
     margin: 0;
     font-family: "Rajdhani", system-ui, sans-serif;
-    font-size: 22px;
+    font-size: calc(22px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--color-fg);
@@ -1770,7 +1772,7 @@
     text-transform: uppercase;
     letter-spacing: 0.16em;
     font-weight: 700;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
   }
   .compendium-lore-meta-value {
     color: var(--color-fg-secondary);
@@ -1778,7 +1780,7 @@
   .compendium-lore-body {
     margin: 0;
     font-family: "Iowan Old Style", "Georgia", "Times New Roman", serif;
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     line-height: 1.6;
     color: var(--color-fg);
     white-space: pre-wrap;
@@ -2042,7 +2044,7 @@
     align-items: center;
     gap: 3px;
     font-family: inherit;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
     line-height: 1.2;
     color: #fff;
@@ -2063,9 +2065,9 @@
     align-items: center;
     gap: 5px;
   }
-  .map-label-number { min-width: 14px; font-size: 12px; }
+  .map-label-number { min-width: 14px; font-size: calc(12px * var(--text-scale)); }
   .map-label-modes { gap: 10px; }
-  .map-label-modes > span { gap: 2px; font-size: 9px; }
+  .map-label-modes > span { gap: 2px; font-size: calc(9px * var(--text-scale)); }
 
   .stars-row {
     display: inline-flex;
@@ -2215,7 +2217,7 @@
   }
 
   .boss-banner-eyebrow {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.22em;
     text-transform: uppercase;
@@ -2225,7 +2227,7 @@
 
   .boss-banner-title {
     font-family: var(--font-display, inherit);
-    font-size: 28px;
+    font-size: calc(28px * var(--text-scale));
     font-weight: 800;
     letter-spacing: 0.08em;
     color: #ffe6ec;
@@ -2234,7 +2236,7 @@
   }
 
   .boss-banner-sub {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: rgba(255, 220, 230, 0.78);
@@ -2285,7 +2287,7 @@
     max-width: 80vw;
     padding: 9px 16px;
     border-radius: 10px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 600;
     letter-spacing: 0.02em;
     text-align: center;
@@ -2363,7 +2365,7 @@
   }
 
   .level-intro-eyebrow {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -2372,7 +2374,7 @@
   }
 
   .level-intro-text {
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     line-height: 1.6;
     color: #d8e2ee;
     margin: 0 0 16px;
@@ -2396,7 +2398,7 @@
     );
     color: #eaf3fb;
     font-family: inherit;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -2426,7 +2428,7 @@
   }
 
   .level-intro-hint {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: rgba(140, 170, 200, 0.5);
@@ -3090,7 +3092,7 @@
     border-radius: 50%;
     background: rgba(255, 120, 120, 0.18);
     border: 1px solid rgba(255, 120, 120, 0.55);
-    font-size: 16px;
+    font-size: calc(16px * var(--text-scale));
     line-height: 1;
     color: #ffd6d6;
   }
@@ -3114,7 +3116,7 @@
     border-radius: 50%;
     background: rgba(120, 255, 160, 0.18);
     border: 1px solid rgba(120, 255, 160, 0.55);
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     line-height: 1;
     color: #d6ffe2;
   }
@@ -3147,7 +3149,7 @@
     background: rgba(14, 20, 28, 0.95);
     color: var(--color-fg);
     border: 1px solid rgba(120, 160, 200, 0.32);
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
     line-height: 1;
     pointer-events: auto;
     cursor: pointer;
@@ -3241,7 +3243,7 @@
     color: inherit;
     cursor: pointer;
     font-family: inherit;
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 800;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -3309,7 +3311,7 @@
 
   .hive-drone-slot-id {
     flex: 0 0 auto;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.1em;
     color: var(--color-fg-muted);
@@ -3318,7 +3320,7 @@
   .hive-drone-slot-target {
     min-width: 0;
     flex: 1;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -3340,7 +3342,7 @@
     border: 1px solid var(--color-border-faint);
     background: rgba(255, 255, 255, 0.03);
     color: var(--color-fg-secondary);
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -3659,7 +3661,7 @@
       padding: 5px 4px;
     }
     .compendium-stats dt {
-      font-size: 8px;
+      font-size: calc(8px * var(--text-scale));
     }
     .compendium-stats dd {
       font-size: var(--fs-base);
@@ -3719,7 +3721,7 @@
       height: 56px;
       min-width: 56px;
       min-height: 56px;
-      font-size: 22px;
+      font-size: calc(22px * var(--text-scale));
       border: 2px solid var(--color-blue);
       flex-shrink: 0;
     }
@@ -3744,7 +3746,7 @@
     .difficulty-active-badge {
       top: 6px;
       right: 6px;
-      font-size: 8px;
+      font-size: calc(8px * var(--text-scale));
       letter-spacing: 0.1em;
     }
     .difficulty-option-icon {
@@ -3810,7 +3812,7 @@
     .menu-overlay-close {
       width: 56px;
       height: 56px;
-      font-size: 22px;
+      font-size: calc(22px * var(--text-scale));
       /* 2px light-blue outline so the only exit from a fullscreen overlay
          reads as a real, tappable target. Declared here (not on base
          .btn-close) so it beats the shared `border: 1px solid transparent`
@@ -3882,12 +3884,12 @@
       text-align: left;
     }
     .world-map-title .text-xl {
-      font-size: 18px;
+      font-size: calc(18px * var(--text-scale));
       letter-spacing: 0.12em;
     }
     .world-map-title .text-xs {
       margin-top: 2px;
-      font-size: 10px;
+      font-size: calc(10px * var(--text-scale));
       letter-spacing: 0.18em;
     }
     .world-map-actions {
@@ -3912,10 +3914,10 @@
       padding: 6px 8px;
     }
     .world-map-meta .text-\[10px\] {
-      font-size: 9px;
+      font-size: calc(9px * var(--text-scale));
     }
     .world-map-meta .text-xl {
-      font-size: 16px;
+      font-size: calc(16px * var(--text-scale));
     }
     .world-map-utility-btn {
       flex: 1 1 calc(50% - 3px);
@@ -3973,7 +3975,7 @@
     .debug-level-control button {
       min-width: 28px;
       padding: 0 8px;
-      font-size: 12px;
+      font-size: calc(12px * var(--text-scale));
     }
     .debug-level-star-button {
       min-width: 24px !important;
@@ -3990,13 +3992,13 @@
     .debug-menu-section .btn--sm {
       min-height: 36px;
       padding: 8px 12px;
-      font-size: 12px;
+      font-size: calc(12px * var(--text-scale));
     }
     .debug-menu-section button[aria-pressed],
     .debug-menu-section .debug-chip-grid button {
       min-height: 36px;
       padding: 8px 10px;
-      font-size: 11px;
+      font-size: calc(11px * var(--text-scale));
     }
     .debug-menu-section .debug-chip-grid {
       max-height: none;
@@ -4205,7 +4207,7 @@
       line-height: 1;
     }
     .compendium-detail-subtitle {
-      font-size: 9px;
+      font-size: calc(9px * var(--text-scale));
       line-height: 1.25;
       letter-spacing: 0.12em;
     }
@@ -4223,7 +4225,7 @@
       padding: 5px 4px;
     }
     .compendium-stats dt {
-      font-size: 8px;
+      font-size: calc(8px * var(--text-scale));
       letter-spacing: 0.1em;
     }
     .compendium-stats dd {
@@ -4231,7 +4233,7 @@
     }
     .compendium-resist-label {
       margin-bottom: 4px;
-      font-size: 8px;
+      font-size: calc(8px * var(--text-scale));
       letter-spacing: 0.12em;
     }
     .compendium-resist-chips {
@@ -4244,7 +4246,7 @@
       font-size: var(--fs-xs);
     }
     .compendium-chip-label {
-      font-size: 9px;
+      font-size: calc(9px * var(--text-scale));
       letter-spacing: 0.04em;
     }
     .compendium-chip-val {
@@ -4262,7 +4264,7 @@
     }
     .compendium-branch-label {
       margin-bottom: 5px;
-      font-size: 8px;
+      font-size: calc(8px * var(--text-scale));
       letter-spacing: 0.08em;
     }
     .compendium-branch-tiers {
@@ -4275,7 +4277,7 @@
       font-size: var(--fs-xs);
     }
     .compendium-tier-desc {
-      font-size: 9px;
+      font-size: calc(9px * var(--text-scale));
       line-height: 1.25;
     }
     .compendium-mech-head {
@@ -4815,7 +4817,7 @@
     border-radius: 50%;
     color: var(--color-blue);
     font-family: Georgia, "Times New Roman", serif;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
     font-style: italic;
     line-height: 1;
@@ -4957,13 +4959,13 @@
       0 0 14px rgba(90, 214, 255, 0.58);
   }
   .robot-ability-glyph {
-    font-size: 16px;
+    font-size: calc(16px * var(--text-scale));
     line-height: 1;
     color: var(--color-blue);
     text-shadow: 0 0 6px rgba(159, 216, 255, 0.4);
   }
   .robot-ability-key {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg-soft);
     letter-spacing: 0.06em;
@@ -4980,7 +4982,7 @@
     position: absolute;
     top: 3px;
     right: 5px;
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg);
     background: rgba(0, 0, 0, 0.55);
@@ -4992,7 +4994,7 @@
     position: absolute;
     top: 3px;
     left: 5px;
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 900;
     line-height: 1;
     color: #04131a;
@@ -5031,7 +5033,7 @@
     color: #fff;
   }
   .robot-level {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg-soft);
     background: rgba(159, 216, 255, 0.12);
@@ -5058,7 +5060,7 @@
     transition: width 0.18s linear;
   }
   .robot-xp-value {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg-muted);
     min-width: 70px;
@@ -5070,7 +5072,7 @@
     border: 1px solid rgba(120, 160, 200, 0.22);
     color: var(--color-fg-soft);
     font: inherit;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     padding: 4px 6px;
     border-radius: 6px;
     cursor: pointer;
@@ -5099,12 +5101,12 @@
     padding: 1px 2px;
   }
   body.is-mobile .robot-name {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     letter-spacing: 0.06em;
     gap: 5px;
   }
   body.is-mobile .robot-level {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     padding: 1px 5px;
   }
   body.is-mobile .robot-xp-row,
@@ -5115,7 +5117,7 @@
   body.is-mobile .robot-hp-label,
   body.is-mobile .robot-hp-value,
   body.is-mobile .robot-xp-value {
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
   }
   body.is-mobile .robot-hp-value {
     min-width: 48px;
@@ -5137,14 +5139,14 @@
     gap: 2px;
   }
   body.is-mobile .robot-ability-glyph {
-    font-size: 24px;
+    font-size: calc(24px * var(--text-scale));
   }
   body.is-mobile .robot-ability-key {
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
   }
   body.is-mobile .robot-ability-cd,
   body.is-mobile .robot-ability-active {
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
   }
 
   @media (max-width: 340px) {
@@ -5249,7 +5251,7 @@
     min-width: 0;
   }
   .robot-sel-ability-glyph {
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
     line-height: 1;
     color: var(--color-blue);
     text-shadow: 0 0 6px rgba(159, 216, 255, 0.4);
@@ -5267,7 +5269,7 @@
     min-width: 0;
   }
   .robot-sel-ability-key {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg-soft);
     background: rgba(159, 216, 255, 0.12);
@@ -5302,7 +5304,7 @@
     background: rgba(159, 216, 255, 0.05);
   }
   .robot-sel-blurb {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     line-height: 1.4;
     color: var(--color-fg-muted);
     padding: 8px 10px;
@@ -5426,7 +5428,7 @@
     position: absolute;
     top: 6px;
     right: 6px;
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -5453,10 +5455,10 @@
   }
   .robot-roster-lock-cost {
     color: #d7bf82;
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
   }
   .robot-roster-lock-label {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     letter-spacing: 0.16em;
   }
   .robot-roster-meta {
@@ -5466,13 +5468,13 @@
     min-width: 0;
   }
   .robot-roster-name {
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg);
     line-height: 1.2;
   }
   .robot-roster-callsign {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     color: var(--color-fg-muted);
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -5484,7 +5486,7 @@
     margin-top: 4px;
   }
   .robot-roster-level {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     color: var(--color-fg-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -5503,7 +5505,7 @@
     align-items: center;
     justify-content: center;
     align-self: flex-start;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--color-fg-muted);
@@ -5576,14 +5578,14 @@
     letter-spacing: 0.02em;
   }
   .robot-detail-callsign {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     color: var(--color-fg-muted);
     text-transform: uppercase;
     letter-spacing: 0.16em;
   }
   .robot-detail-active {
     margin-left: auto;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -5599,7 +5601,7 @@
   }
   .robot-detail-blurb {
     margin: 0;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     color: #c5cfda;
     line-height: 1.5;
   }
@@ -5607,7 +5609,7 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     color: var(--color-fg);
     font-variant-numeric: tabular-nums;
   }
@@ -5620,7 +5622,7 @@
   }
   .robot-detail-stats > div > span {
     display: block;
-    font-size: 9px;
+    font-size: calc(9px * var(--text-scale));
     color: var(--color-fg-dim);
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -5661,13 +5663,13 @@
     text-align: left;
   }
   .robot-ability-summary .robot-ability-glyph {
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     line-height: 1;
     color: var(--color-blue);
     flex-shrink: 0;
   }
   .robot-ability-name {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg);
     letter-spacing: 0;
@@ -5690,7 +5692,7 @@
     border: 1px solid rgba(120, 160, 200, 0.18);
     border-radius: 6px;
     background: rgba(8, 12, 18, 0.42);
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
     font-weight: 700;
     line-height: 1;
     color: var(--color-fg-muted);
@@ -5776,19 +5778,19 @@
     gap: 8px;
   }
   .robot-level-lvl {
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg);
     letter-spacing: 0.04em;
   }
   .robot-level-max {
     color: var(--color-fg-dim);
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     margin-left: 3px;
     font-weight: 600;
   }
   .robot-level-xp {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     color: var(--color-fg-muted);
     font-variant-numeric: tabular-nums;
   }
@@ -5812,7 +5814,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     color: var(--color-fg-muted);
     letter-spacing: 0.04em;
   }
@@ -5872,7 +5874,7 @@
     gap: 8px;
   }
   .robot-skill-name {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 700;
     color: var(--color-fg);
     letter-spacing: 0.02em;
@@ -5914,7 +5916,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     font-variant-numeric: tabular-nums;
     flex-wrap: wrap;
   }
@@ -5946,7 +5948,7 @@
     border: 1px solid rgba(215, 191, 130, 0.35);
     border-radius: 999px;
     background: rgba(215, 191, 130, 0.08);
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     line-height: 1.3;
   }
   .robot-skill-cost.locked {
@@ -5957,7 +5959,7 @@
   .robot-skill-refund {
     align-self: flex-start;
     min-height: 40px;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--color-fg);
@@ -5996,7 +5998,7 @@
     align-items: center;
     gap: 6px;
     padding: 2px 6px;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
     color: var(--color-fg);
   }
   .lab-stars-chip svg {
@@ -6007,14 +6009,14 @@
     color: #d7bf82;
   }
   .lab-stars-lbl {
-    font-size: 10px;
+    font-size: calc(10px * var(--text-scale));
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--color-fg-muted);
   }
   .lab-stars-refund {
     margin-left: 4px;
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--color-fg);
@@ -6039,7 +6041,7 @@
   .robot-shop-card .menu-overlay-close {
     width: 42px;
     height: 42px;
-    font-size: 18px;
+    font-size: calc(18px * var(--text-scale));
   }
 
   .robot-shop-card--detail .menu-overlay-title-group {
@@ -6075,7 +6077,7 @@
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
-      font-size: 11px;
+      font-size: calc(11px * var(--text-scale));
       letter-spacing: 0.14em;
       line-height: 1;
       margin: 0;
@@ -6088,12 +6090,12 @@
     }
     .robot-shop-card .menu-overlay-close {
       width: 44px;
-      font-size: 19px;
+      font-size: calc(19px * var(--text-scale));
     }
     .robot-detail-back {
       min-width: 82px;
       padding: 0 11px;
-      font-size: 12px;
+      font-size: calc(12px * var(--text-scale));
     }
     .robot-ability-summary {
       min-height: 44px;
@@ -6103,7 +6105,7 @@
       width: 34px;
       min-width: 34px;
       height: 34px;
-      font-size: 20px;
+      font-size: calc(20px * var(--text-scale));
     }
     .robot-skill-card {
       padding: 9px 10px;
@@ -6391,7 +6393,7 @@
 
   .level-load-eyebrow {
     font-family: var(--font-display);
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     font-weight: 700;
     letter-spacing: 0.24em;
     text-transform: uppercase;
@@ -6428,7 +6430,7 @@
   }
 
   .level-load-status {
-    font-size: 11px;
+    font-size: calc(11px * var(--text-scale));
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: rgba(140, 170, 200, 0.7);
@@ -6468,7 +6470,7 @@
 .world-map-footer .world-map-utility-btn { min-height: 40px; flex: 0 0 auto; }
 .map-developer-tools { margin: 16px 0; border-top: 1px solid #35404b; padding-top: 12px; }
 .map-developer-tools summary { cursor: pointer; color: #9aa9b9; margin-bottom: 12px; }
-.map-developer-tools label { display: block; font-size: 12px; margin-bottom: 6px; }
+.map-developer-tools label { display: block; font-size: calc(12px * var(--text-scale)); margin-bottom: 6px; }
 .map-developer-tools select { width: 100%; padding: 10px; margin-bottom: 10px; background: #151e29; color: #fff; }
 .map-developer-tools > div { margin-top: 10px; }
 .map-developer-tools [aria-pressed="true"] { border-color: #ffd66a; color: #ffd66a; }
@@ -6478,8 +6480,8 @@
   .world-map-footer { gap: 6px; align-items: flex-end; bottom: calc(8px + var(--safe-bottom, 0px)); left: 8px; right: 8px; }
   .world-map-difficulty { align-self: flex-start; }
   .world-map-rd { gap: 4px; }
-  .world-map-footer .world-map-utility-btn { font-size: 11px; padding: 6px 8px; min-height: 38px; }
-  .world-map-footer .world-map-utility-btn .text-sm { font-size: 10px; }
+  .world-map-footer .world-map-utility-btn { font-size: calc(11px * var(--text-scale)); padding: 6px 8px; min-height: 38px; }
+  .world-map-footer .world-map-utility-btn .text-sm { font-size: calc(10px * var(--text-scale)); }
 }
 @media (hover: none) { .world-map-hover-card { display: none; } }
 .world-map-meta { white-space: nowrap; }
@@ -6495,7 +6497,7 @@
   }
   .presentation-controls h2 {
     margin: 0 0 12px;
-    font-size: 14px;
+    font-size: calc(14px * var(--text-scale));
     color: var(--color-fg-secondary);
   }
   .presentation-controls label {
@@ -6504,7 +6506,7 @@
     align-items: center;
     gap: 12px;
     margin: 10px 0;
-    font-size: 13px;
+    font-size: calc(13px * var(--text-scale));
   }
   .presentation-controls select {
     min-height: 40px;
@@ -6521,7 +6523,7 @@
     accent-color: var(--color-blue);
   }
   .presentation-controls p {
-    font-size: 12px;
+    font-size: calc(12px * var(--text-scale));
     line-height: 1.5;
     color: var(--color-fg-muted);
     margin: 6px 0 16px;
@@ -6534,4 +6536,27 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Keep legacy arbitrary pixel text utilities aligned with the player text scale. */
+@layer utilities {
+  .text-\[8\.5px\] { font-size: calc(8.5px * var(--text-scale)); }
+  .text-\[9px\] { font-size: calc(9px * var(--text-scale)); }
+  .text-\[10px\] { font-size: calc(10px * var(--text-scale)); }
+  .text-\[10\.5px\] { font-size: calc(10.5px * var(--text-scale)); }
+  .text-\[11px\] { font-size: calc(11px * var(--text-scale)); }
+  .text-\[12px\] { font-size: calc(12px * var(--text-scale)); }
+  .text-\[13px\] { font-size: calc(13px * var(--text-scale)); }
+  .text-\[15px\] { font-size: calc(15px * var(--text-scale)); }
+  .text-\[17px\] { font-size: calc(17px * var(--text-scale)); }
+  .text-\[20px\] { font-size: calc(20px * var(--text-scale)); }
+  .text-\[22px\] { font-size: calc(22px * var(--text-scale)); }
+  .text-\[28px\] { font-size: calc(28px * var(--text-scale)); }
+}
+
+@layer components {
+  .keyboard-controls { margin-top: 16px; }
+  .keyboard-controls summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+  .keyboard-controls label { min-height: 40px; }
+  .keyboard-controls button { min-width: 70px; }
 }

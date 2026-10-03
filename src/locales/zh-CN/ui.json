@@ -601,7 +601,8 @@
     },
     "shake": "Camera shake",
     "motionHelp": "Reduced motion stops camera shake and ambient movement. Combat remains visible.",
-    "unsaved": "Settings apply now, but could not be saved. Change a setting to retry."
+    "unsaved": "Settings apply now, but could not be saved. Change a setting to retry.",
+    "textSize": "Text size"
   },
   "renderFailure": {
     "title": "Render glitch",
@@ -609,5 +610,24 @@
     "scene": "The scene could not start. Try again, or reload if the problem continues.",
     "reload": "Reload",
     "retry": "Try again"
+  },
+  "keyboard": {
+    "title": "Keyboard controls",
+    "help": "Choose a binding, then press a letter, number, or Space. Escape and Tab stay reserved for menus.",
+    "press": "Press a key",
+    "invalid": "Use A–Z, 0–9, or Space.",
+    "conflict": "That key already has an action. Choose another key.",
+    "reset": "Restore defaults",
+    "change": "Change {{action}} key, currently {{key}}",
+    "action": {
+      "wave": "Start / call wave early",
+      "menu": "Open menu",
+      "clear": "Clear selection",
+      "robot": "Select robot",
+      "ability1": "Ability 1",
+      "ability2": "Ability 2",
+      "ability3": "Ability 3",
+      "ability4": "Ultimate ability"
+    }
   }
 }

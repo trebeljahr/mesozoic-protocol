@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditor } from "../editor/editorStore";
+import { actionForKey, bindingForTower, keyLabel, useKeyBindings } from "../input/keyBindings";
 import { getLevelOrdinal } from "../levels";
 import { effectiveTowerCost } from "../sim/metaSkills";
 import type { TowerKind } from "../sim/types";
@@ -27,12 +28,10 @@ import { useKeyboardHintsVisible } from "./useInputMode";
 import { useIsMobile } from "./useMediaQuery";
 
 const KINDS: TowerKind[] = ["pulse", "chain", "flame", "hive", "mortar", "cryo"];
-// "1" is reserved for robot select — towers shift up by one so the row
-// reads "1 = robot, 2..7 = towers" left-to-right.
-const ROBOT_HOTKEY = "1";
 
 export const HUD = () => {
   const { t } = useTranslation();
+  const bindings = useKeyBindings((s) => s.bindings);
   // Atomic selectors so a single tick ticking down `nextWaveIn` doesn't
   // re-render the whole tower picker (and its 6 Canvas previews).
   const gold = useGame((s) => s.ui.gold);
@@ -62,13 +61,13 @@ export const HUD = () => {
   const runMode = useGame((s) => s.world.mode);
   const forbidden = useGame((s) => s.world.forbiddenTowers);
   const lockedLoadout = useGame((s) => s.world.lockedLoadout);
-  // Number only visible towers, keeping labels and keyboard selection in sync.
+  // Keep each tower’s binding stable even when a challenge hides other towers.
   const buildOptions = useMemo(
     () =>
       KINDS.filter(
         (kind) => !forbidden.has(kind) && (lockedLoadout === null || lockedLoadout.includes(kind)),
-      ).map((kind, index) => ({ kind, hotkey: String(index + 2) })),
-    [forbidden, lockedLoadout],
+      ).map((kind) => ({ kind, hotkey: keyLabel(bindings[bindingForTower(kind)]) })),
+    [forbidden, lockedLoadout, bindings],
   );
 
   // Endless drives the name off the snapshot (selectedLevelId is null on
@@ -187,16 +186,18 @@ export const HUD = () => {
         target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")
       )
         return;
-      if (e.code === "Space") {
+      const action = actionForKey(e, bindings);
+      if (action) e.preventDefault();
+      if (action === "wave") {
         e.preventDefault();
         callWaveEarly();
         return;
       }
-      if (e.code === "KeyP") {
+      if (action === "menu") {
         togglePause();
         return;
       }
-      if (e.code === "Escape" || e.code === "KeyX") {
+      if (e.code === "Escape" || action === "clear") {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         e.preventDefault();
         if (e.repeat) return;
@@ -220,45 +221,44 @@ export const HUD = () => {
           (document.activeElement as HTMLElement | null)?.blur();
           return;
         }
-        if (e.code === "KeyX") return;
+        if (action === "clear") return;
         if (s.world.status === "paused") togglePause();
         else if (isFullscreen()) void exitFullscreen();
         else if (s.world.status === "running") togglePause();
         (document.activeElement as HTMLElement | null)?.blur();
         return;
       }
-      if (e.code === "KeyQ") {
+      if (action === "ability1") {
         e.preventDefault();
         useGame.getState().triggerRobotAbility(0);
         return;
       }
-      if (e.code === "KeyW") {
+      if (action === "ability2") {
         e.preventDefault();
         useGame.getState().triggerRobotAbility(1);
         return;
       }
-      if (e.code === "KeyE") {
+      if (action === "ability3") {
         e.preventDefault();
         useGame.getState().triggerRobotAbility(2);
         return;
       }
-      if (e.code === "KeyR") {
+      if (action === "ability4") {
         e.preventDefault();
         useGame.getState().triggerRobotAbility(3);
         return;
       }
-      const digit = e.key;
-      if (digit === ROBOT_HOTKEY) {
+      if (action === "robot") {
         const s = useGame.getState();
         s.selectRobotUnit(!s.world.robot.selected);
         return;
       }
-      const kind = buildOptions.find((option) => option.hotkey === digit)?.kind;
+      const kind = buildOptions.find((option) => bindingForTower(option.kind) === action)?.kind;
       if (kind) setSelectedKind(selectedKind === kind ? null : kind);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePause, setSelectedKind, selectedKind, callWaveEarly, buildOptions]);
+  }, [togglePause, setSelectedKind, selectedKind, callWaveEarly, buildOptions, bindings]);
 
   return (
     <div className="hud">
@@ -287,7 +287,8 @@ export const HUD = () => {
             title={showKeyboardHints ? t("hud.startWavesTitleKey") : t("hud.startWavesTitle")}
           >
             <div className="stat-label">
-              ▶ {t("hud.startWavesBtn")} <span className="kbd-only">[Space]</span>
+              ▶ {t("hud.startWavesBtn")}{" "}
+              <span className="kbd-only">[{keyLabel(bindings.wave)}]</span>
             </div>
             <div className="stat-value">{t("hud.clickToBegin")}</div>
           </button>
@@ -299,7 +300,7 @@ export const HUD = () => {
             title={showKeyboardHints ? t("hud.callWaveTitleKey") : t("hud.callWaveTitle")}
           >
             <div className="stat-label">
-              ▶ {t("hud.callWaveBtn")} <span className="kbd-only">[Space]</span>
+              ▶ {t("hud.callWaveBtn")} <span className="kbd-only">[{keyLabel(bindings.wave)}]</span>
             </div>
             <div className="stat-value">
               +{callEarlyBonus}g<span className="call-wave-sub"> · {callEarlyTimer}s</span>
@@ -357,11 +358,15 @@ export const HUD = () => {
           className="hud-menu-btn"
           onClick={togglePause}
           aria-label={t("common.openMenu")}
-          title={showKeyboardHints ? `${t("common.menu")} (P)` : t("common.menu")}
+          title={
+            showKeyboardHints
+              ? `${t("common.menu")} (${keyLabel(bindings.menu)})`
+              : t("common.menu")
+          }
         >
           <IconCog size={18} />
           <span className="kbd-only text-[10px] font-bold tracking-wide px-1.5 py-0.5 border border-[rgba(159,216,255,0.35)] rounded-sm text-blue bg-tint-blue-soft uppercase">
-            P
+            {keyLabel(bindings.menu)}
           </span>
         </button>
       </div>
