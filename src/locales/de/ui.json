@@ -650,7 +650,10 @@
       "ability1": "Fähigkeit 1",
       "ability2": "Fähigkeit 2",
       "ability3": "Fähigkeit 3",
-      "ability4": "Ultimative Fähigkeit"
+      "ability4": "Ultimative Fähigkeit",
+      "planning": "Planungspause",
+      "speed": "Simulationsgeschwindigkeit wechseln",
+      "preview": "Nächste Welle anzeigen"
     }
   },
   "tutorial": {
@@ -810,7 +813,9 @@
     "robot": "Roboter",
     "base": "HQ",
     "supportNote": "Schaden zählt Schilde, aber keinen Überschussschaden. Verlangsamung, Einfrieren und Unterstützung werden hier nicht gemessen.",
-    "robotXp": "{{robot}} +{{count}} EP"
+    "robotXp": "{{robot}} +{{count}} EP",
+    "partialHistory": "Dieser ältere Kontrollpunkt enthält keine früheren Durchbrüche oder Belohnungen. Diese Summen beginnen bei der Wiederaufnahme.",
+    "noNewLeaks": "Seit der Wiederaufnahme erreichte kein Gegner das HQ."
   },
   "epilogue": {
     "title": "Der letzte Befehl",
@@ -834,9 +839,9 @@
     "pause": "Planen",
     "resume": "Verteidigung fortsetzen",
     "active": "Planungspause · Bauen, aufrüsten, verkaufen und Drohnen zuweisen. Danach bewusst fortsetzen.",
-    "shortcut": "Planungspause (T / Controller Select). Menüpause: P / Start.",
+    "shortcut": "Planungspause ({{planning}} / Controller Select). Menüpause: {{menu}} / Start.",
     "speedLabel": "Simulationsgeschwindigkeit: {{speed}}×. Geschwindigkeit ändern.",
-    "speedHint": "Zwischen 1× und 2× Simulationszeit wechseln. In der Pause bleibt die Zeit stehen.",
+    "speedHint": "Zwischen 1× und 2× wechseln ({{key}}). In der Pause bleibt die Zeit stehen.",
     "training": "Das Training bestimmt Tempo und verfügbare Aktionen.",
     "abilitiesPaused": "Verteidigung fortsetzen, um Fähigkeiten zu nutzen."
   },
@@ -862,6 +867,7 @@
     "laneHint": "Route wählen, um ihren Eingang auf dem Feld zu markieren.",
     "stream": "Zusätzliche {{kinds}} alle {{min}}–{{max}} s, solange der Boss aktiv ist.",
     "adaptive": "Einige Gegner können sich zusätzlich an deine bisherigen Schadensarten anpassen.",
-    "countHint": "Die Zahlen umfassen geplante Gegner. Beschworene Gegner und laufende Bosseskorten kommen hinzu."
+    "countHint": "Die Zahlen umfassen geplante Gegner. Beschworene Gegner und laufende Bosseskorten kommen hinzu.",
+    "shortcut": "Nächste Welle anzeigen ({{key}})."
   }
 }

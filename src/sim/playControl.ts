@@ -1,3 +1,4 @@
+import { sessionPause } from "../sessionPause";
 import type { World } from "./types";
 
 export type SimulationSpeed = 1 | 2;
@@ -27,6 +28,7 @@ export type BattleAccess = {
 
 export const canUseBattlefield = (s: BattleAccess) =>
   s.screen === "playing" &&
+  sessionPause.canAutoResume(s.world) &&
   (s.world.status === "running" ||
     (s.world.status === "paused" && s.planningPaused && !isTrainingSession(s.world))) &&
   !s.levelIntroVisible &&

@@ -210,6 +210,9 @@
       "base": {
         "ref": "Base"
       },
+      "runHistory": {
+        "ref": "RunHistory"
+      },
       "runEnemyKinds": {
         "partial": {
           "record": "boolean"
@@ -338,6 +341,7 @@
       "selectedTowerId",
       "selectedBase",
       "base",
+      "runHistory",
       "runEnemyKinds",
       "runTowerKinds",
       "easterEggs",
@@ -1664,6 +1668,52 @@
       "kills",
       "damageDealt"
     ]
+  },
+  "RunHistory": {
+    "properties": {
+      "complete": "boolean",
+      "leaks": {
+        "partial": {
+          "record": {
+            "ref": "LeakRecord"
+          }
+        }
+      },
+      "soldTowers": {
+        "record": {
+          "ref": "TowerContribution"
+        }
+      },
+      "boltsEarned": "number",
+      "robotXpEarned": {
+        "partial": {
+          "record": "number"
+        }
+      },
+      "enemiesKilled": "number"
+    },
+    "required": ["complete", "leaks", "soldTowers", "boltsEarned", "robotXpEarned", "enemiesKilled"]
+  },
+  "LeakRecord": {
+    "properties": {
+      "kind": {
+        "ref": "EnemyKind"
+      },
+      "count": "number",
+      "livesLost": "number"
+    },
+    "required": ["kind", "count", "livesLost"]
+  },
+  "TowerContribution": {
+    "properties": {
+      "id": "number",
+      "kind": {
+        "ref": "TowerKind"
+      },
+      "kills": "number",
+      "damageDealt": "number"
+    },
+    "required": ["id", "kind", "kills", "damageDealt"]
   },
   "EasterEgg": {
     "properties": {

@@ -956,6 +956,8 @@ export const useGame = create<GameStore>((set, get) => ({
     sessionPause.enforce(built.world);
     s.engine.reset();
     set({
+      planningPaused: false,
+      simulationSpeed: 1,
       tutorialReturnState: s.tutorialReturnState ?? s,
       tutorial: built.session,
       tutorialControlsFocused: false,
@@ -1049,6 +1051,8 @@ export const useGame = create<GameStore>((set, get) => ({
     restored.engine.reset();
     set({
       ...restored,
+      planningPaused: false,
+      simulationSpeed: 1,
       ui: snapshot(
         restored.world,
         restored.towerVersion,
@@ -1618,7 +1622,11 @@ export const useGame = create<GameStore>((set, get) => ({
   tick: (realTimeSec: number) => {
     const s = get();
     sessionPause.enforce(s.world);
-    if (s.tutorial && isTutorialWorld(s.world)) {
+    if (isTutorialWorld(s.world)) {
+      if (!s.tutorial) {
+        s.world.events.length = 0;
+        return;
+      }
       maintainTraining(s.world, s.tutorial);
       sessionPause.enforce(s.world);
       s.engine.step(s.world, realTimeSec);
@@ -1843,6 +1851,7 @@ export const useGame = create<GameStore>((set, get) => ({
               campaignCompleted: isCampaignFinale(w.levelId, mode, ev.won, {
                 debug: isDebug,
                 demo: IS_DEMO,
+                practice: isTutorialWorld(w),
               }),
               levelName: level?.name ?? `Level ${w.levelId}`,
               won: ev.won,

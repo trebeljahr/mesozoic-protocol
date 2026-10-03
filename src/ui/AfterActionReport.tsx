@@ -17,6 +17,9 @@ export const AfterActionReport = ({ report }: { report: RunReport }) => {
       className="text-left text-sm border-t border-border pt-3 mb-4"
     >
       <h2 className="text-gold text-sm font-bold mb-2">{t("report.title")}</h2>
+      {!report.historyComplete && (
+        <p className="text-xs text-fg-muted mb-2">{t("report.partialHistory")}</p>
+      )}
       <p className="text-fg-secondary mb-2">
         {report.totalWaves === null
           ? t("report.endlessWave", { wave: report.waveReached })
@@ -70,7 +73,9 @@ export const AfterActionReport = ({ report }: { report: RunReport }) => {
           </button>
         </div>
       ) : (
-        <p className="mt-2 text-fg-muted">{t("report.noLeaks")}</p>
+        <p className="mt-2 text-fg-muted">
+          {t(report.historyComplete ? "report.noLeaks" : "report.noNewLeaks")}
+        </p>
       )}
       {topTower && (
         <p className="mt-2 text-fg-secondary">

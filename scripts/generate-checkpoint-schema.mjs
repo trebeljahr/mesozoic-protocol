@@ -5,6 +5,7 @@ import ts from "typescript";
 
 const sources = [
   "src/sim/types.ts",
+  "src/sim/runReport.ts",
   "src/flowGeometry.ts",
   "src/progress.ts",
   "src/biomes.ts",

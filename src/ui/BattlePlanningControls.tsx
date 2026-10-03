@@ -1,16 +1,20 @@
 import { useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
+import { useEditor } from "../editor/editorStore";
+import { actionForKey, keyLabel, useKeyBindings } from "../input/keyBindings";
 import { canUseBattlefield, isTrainingSession } from "../sim/playControl";
 import { PREVIEW_DAMAGE_TYPES, type PreviewGroup } from "../sim/wavePreview";
 import { ENEMY_LABEL } from "../sim/world";
 import { useGame } from "../store";
 import { useBattleView } from "./battleView";
+import { activeModal } from "./modalFocus";
 import { useIncomingWave } from "./useIncomingWave";
 import "./battlePlanning.css";
 
 export function BattlePlanningControls() {
   const { t } = useTranslation();
   const panelId = useId();
+  const bindings = useKeyBindings((s) => s.bindings);
   const world = useGame((s) => s.world);
   const usable = useGame(canUseBattlefield);
   const planning = useGame((s) => s.planningPaused);
@@ -30,6 +34,36 @@ export function BattlePlanningControls() {
   useEffect(() => {
     setLane(null);
   }, [preview?.number, setLane]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || activeModal() || useEditor.getState().active) return;
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest(
+          "input, textarea, select, [contenteditable]:not([contenteditable='false'])",
+        )
+      )
+        return;
+      const action = actionForKey(event, bindings);
+      const state = useGame.getState();
+      if (!canUseBattlefield(state)) return;
+      if (action === "planning") {
+        event.preventDefault();
+        state.togglePlanningPause();
+      }
+      if (action === "speed") {
+        event.preventDefault();
+        state.setSimulationSpeed(state.simulationSpeed === 1 ? 2 : 1);
+      }
+      if (action === "preview") {
+        event.preventDefault();
+        const view = useBattleView.getState();
+        view.setPreviewOpen(!view.previewOpen);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [bindings]);
   if (screen !== "playing") return null;
   return (
     <section className="battle-planning" aria-label={t("planning.controls")}>
@@ -39,7 +73,14 @@ export function BattlePlanningControls() {
           className="battle-control"
           aria-pressed={planning}
           disabled={!usable || training}
-          title={training ? t("planning.training") : t("planning.shortcut")}
+          title={
+            training
+              ? t("planning.training")
+              : t("planning.shortcut", {
+                  planning: keyLabel(bindings.planning),
+                  menu: keyLabel(bindings.menu),
+                })
+          }
           onClick={() => useGame.getState().togglePlanningPause()}
         >
           {planning ? t("planning.resume") : t("planning.pause")}
@@ -49,7 +90,11 @@ export function BattlePlanningControls() {
           className="battle-control"
           aria-label={t("planning.speedLabel", { speed })}
           disabled={!usable || training}
-          title={training ? t("planning.training") : t("planning.speedHint")}
+          title={
+            training
+              ? t("planning.training")
+              : t("planning.speedHint", { key: keyLabel(bindings.speed) })
+          }
           onClick={() => useGame.getState().setSimulationSpeed(speed === 1 ? 2 : 1)}
         >
           {speed}×
@@ -59,6 +104,7 @@ export function BattlePlanningControls() {
           className="battle-control"
           aria-expanded={open}
           aria-controls={panelId}
+          title={t("wavePreview.shortcut", { key: keyLabel(bindings.preview) })}
           disabled={!usable}
           onClick={() => setOpen(!open)}
         >

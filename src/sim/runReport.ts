@@ -2,11 +2,13 @@ import type { Difficulty, LevelMode } from "../progress";
 import type { EnemyKind, RobotVariant, Tower, TowerKind, World } from "./types";
 
 export type LeakRecord = { kind: EnemyKind; count: number; livesLost: number };
-export type TowerContribution = Pick<Tower, "id" | "kind" | "kills" | "damageDealt">;
+export type TowerContribution = { id: number; kind: TowerKind; kills: number; damageDealt: number };
 
 // Plain data so between-wave checkpoints can preserve the complete run.
 // Reset only by createWorld, never when a wave starts or a report is viewed.
 export type RunHistory = {
+  // False only when restoring a checkpoint made before recording existed.
+  complete: boolean;
   leaks: Partial<Record<EnemyKind, LeakRecord>>;
   soldTowers: Record<number, TowerContribution>;
   boltsEarned: number;
@@ -15,6 +17,7 @@ export type RunHistory = {
 };
 
 export const createRunHistory = (): RunHistory => ({
+  complete: true,
   leaks: {},
   soldTowers: {},
   boltsEarned: 0,
@@ -42,6 +45,7 @@ export const towerContributor = (world: World, id: number) =>
   world.towerById.get(id) ?? world.runHistory.soldTowers[id];
 
 export type RunReport = {
+  historyComplete: boolean;
   waveReached: number;
   totalWaves: number | null;
   elapsedSeconds: number;
@@ -86,6 +90,7 @@ export const buildRunReport = (
     ...Object.values(world.runHistory.soldTowers).map((tower) => ({ ...tower, sold: true })),
   ].sort((a, b) => b.damageDealt - a.damageDealt || a.id - b.id);
   return {
+    historyComplete: world.runHistory.complete,
     waveReached: world.wave,
     totalWaves: world.endless ? null : world.totalWaves,
     elapsedSeconds: Math.floor(world.time),

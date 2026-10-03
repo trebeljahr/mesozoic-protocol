@@ -1,16 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { track } from "../analytics";
 import { getLevel } from "../levels";
 import { emptyProgress } from "../progress";
+import { sessionPause } from "../sessionPause";
 import { useGame } from "../store";
 import { canUseBattlefield } from "./playControl";
-import { createTower, createWorld } from "./world";
+import { applyDamage, createTower, createWorld, spawnEnemy } from "./world";
 
+vi.mock("../analytics", () => ({ track: vi.fn() }));
 const state = () => useGame.getState();
 beforeEach(() => {
   for (const reason of ["hidden", "orientation", "page-hidden", "native-background"] as const)
     state().setInterruptionBlocked(reason, false);
   useGame.setState({
     assetsPrewarmed: true,
+    tutorial: null,
+    tutorialReturnState: null,
     activeSlot: null,
     progress: emptyProgress(),
     difficultyPickerOpen: false,
@@ -127,5 +132,61 @@ describe("planning pause", () => {
     expect(state().simulationSpeed).toBe(1);
     expect(state().planningPaused).toBe(false);
     expect(state().world.status).toBe("running");
+  });
+});
+
+describe("combined practice and interruption controls", () => {
+  it("rejects stale planning ownership during interruption and until explicit resume", () => {
+    const tower = build();
+    state().selectTower(tower.id);
+    state().togglePlanningPause();
+    // Exercise the shared access guard independently of the setter that normally clears planning.
+    sessionPause.setBlocked("hidden", true, state().world);
+    expect(state().planningPaused).toBe(true);
+    expect(canUseBattlefield(state())).toBe(false);
+    const gold = state().world.gold;
+    state().upgradeSelected("a");
+    state().sellSelected();
+    expect(state().world.gold).toBe(gold);
+    sessionPause.setBlocked("hidden", false, state().world);
+    expect(canUseBattlefield(state())).toBe(false);
+    state().setInterruptionBlocked("hidden", true);
+    state().setInterruptionBlocked("hidden", false);
+    state().togglePause();
+    expect(canUseBattlefield(state())).toBe(true);
+  });
+
+  it("resets controls through practice start/restart/return and excludes real practice kills from reports", () => {
+    const original = state().world;
+    const progress = state().progress;
+    state().setSimulationSpeed(2);
+    state().togglePlanningPause();
+    vi.mocked(track).mockClear();
+    state().startTutorial("robot");
+    expect(state().simulationSpeed).toBe(1);
+    expect(state().planningPaused).toBe(false);
+    state().setSimulationSpeed(2);
+    state().togglePlanningPause();
+    expect(state().simulationSpeed).toBe(1);
+    expect(state().planningPaused).toBe(false);
+    const practice = state().world;
+    applyDamage(practice, spawnEnemy(practice, "titan"), 100000, "electric", undefined, 0, false, {
+      fromRobot: true,
+    });
+    practice.events.push({ type: "game-over", won: true });
+    state().tick(0);
+    expect(practice.runHistory.boltsEarned).toBeGreaterThan(0);
+    expect(state().lastResult).toBeNull();
+    expect(track).not.toHaveBeenCalled();
+    state().restartTutorialLesson();
+    expect(state().world.runHistory.boltsEarned).toBe(0);
+    expect(state().planningPaused).toBe(false);
+    state().exitTutorial();
+    expect(state().world).toBe(original);
+    expect(state().progress).toBe(progress);
+    expect(state().planningPaused).toBe(false);
+    expect(state().simulationSpeed).toBe(1);
+    expect(original.runHistory.boltsEarned).toBe(0);
+    expect(original.status).toBe("paused");
   });
 });

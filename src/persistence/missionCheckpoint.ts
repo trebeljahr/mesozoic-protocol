@@ -1,4 +1,5 @@
 import type { Difficulty } from "../progress";
+import { createRunHistory } from "../sim/runReport";
 import type { World } from "../sim/types";
 import { matchesWorldSchema } from "./checkpointValidation";
 
@@ -229,6 +230,33 @@ const validWorld = (w: unknown): w is World => {
       typeof w.endless.mapName !== "string")
   )
     return false;
+  const history = w.runHistory as World["runHistory"];
+  const nonnegative = (n: unknown): n is number => finite(n) && n >= 0;
+  const count = (n: unknown) => nonnegative(n) && Number.isInteger(n);
+  if (!count(history.boltsEarned) || !count(history.enemiesKilled)) return false;
+  if (
+    !Object.entries(history.robotXpEarned).every(
+      ([variant, xp]) => robots.includes(variant) && count(xp),
+    )
+  )
+    return false;
+  if (
+    !Object.entries(history.leaks).every(
+      ([kind, leak]) => leak?.kind === kind && count(leak.count) && nonnegative(leak.livesLost),
+    )
+  )
+    return false;
+  if (
+    !Object.entries(history.soldTowers).every(
+      ([id, tower]) =>
+        String(tower.id) === id &&
+        count(tower.id) &&
+        count(tower.kills) &&
+        nonnegative(tower.damageDealt) &&
+        !ids.has(tower.id),
+    )
+  )
+    return false;
   return true;
 };
 
@@ -261,6 +289,11 @@ export const captureCheckpoint = (
 
 export const restoreCheckpoint = (checkpoint: MissionCheckpoint): World => {
   const world: unknown = JSON.parse(checkpoint.world, reviver);
+  // Earlier version-1 checkpoints predate run recording. Preserve their
+  // mission and saved combat stats, but label unrecorded rewards/leaks honestly.
+  if (record(world) && !("runHistory" in world)) {
+    world.runHistory = { ...createRunHistory(), complete: false };
+  }
   if (!validWorld(world)) throw new Error("Invalid mission checkpoint");
   world.enemyById = new Map();
   world.towerById = new Map(world.towers.map((t) => [t.id, t]));

@@ -4,6 +4,9 @@ import type { TowerKind } from "../sim/types";
 export const DEFAULT_BINDINGS = {
   wave: "Space",
   menu: "KeyP",
+  planning: "KeyT",
+  speed: "KeyF",
+  preview: "KeyV",
   clear: "KeyX",
   robot: "Digit1",
   ability1: "KeyQ",

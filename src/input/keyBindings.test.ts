@@ -47,3 +47,22 @@ it("keeps working on write failure and restores defaults on reset", () => {
   expect(useKeyBindings.getState().bindings).toEqual(DEFAULT_BINDINGS);
   expect(useKeyBindings.getState().storageFailed).toBe(false);
 });
+
+it("adds remappable tactical controls without overriding saved bindings", () => {
+  const old = { ...DEFAULT_BINDINGS, menu: "KeyT" };
+  delete (old as Partial<typeof old>).planning;
+  const bindings = normalizeBindings(old);
+  expect(bindings.menu).toBe("KeyT");
+  expect(bindings.planning).not.toBe("KeyT");
+  expect(new Set(Object.values(bindings)).size).toBe(BINDING_ACTIONS.length);
+  const event = {
+    code: bindings.planning,
+    ctrlKey: false,
+    altKey: false,
+    metaKey: false,
+    repeat: false,
+  };
+  expect(actionForKey(event, bindings)).toBe("planning");
+  expect(actionForKey({ ...event, code: bindings.speed }, bindings)).toBe("speed");
+  expect(actionForKey({ ...event, code: bindings.preview }, bindings)).toBe("preview");
+});

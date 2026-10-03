@@ -650,7 +650,10 @@
       "ability1": "Ability 1",
       "ability2": "Ability 2",
       "ability3": "Ability 3",
-      "ability4": "Ultimate ability"
+      "ability4": "Ultimate ability",
+      "planning": "Planning pause",
+      "speed": "Change simulation speed",
+      "preview": "Preview incoming wave"
     }
   },
   "tutorial": {
@@ -810,7 +813,9 @@
     "robot": "Robot",
     "base": "HQ",
     "supportNote": "Damage includes shields and excludes overkill. Slows, freezes, and support effects are not measured here.",
-    "robotXp": "{{robot}} +{{count}} XP"
+    "robotXp": "{{robot}} +{{count}} XP",
+    "partialHistory": "This older checkpoint has no earlier leak or reward history. Those totals start when you resume.",
+    "noNewLeaks": "No enemies reached HQ after this checkpoint."
   },
   "epilogue": {
     "title": "The last directive",
@@ -834,9 +839,9 @@
     "pause": "Plan",
     "resume": "Resume defense",
     "active": "Planning paused · build, upgrade, sell and assign drones. Resume when ready.",
-    "shortcut": "Planning pause (T / controller Select). Menu pause: P / Start.",
+    "shortcut": "Planning pause ({{planning}} / controller Select). Menu pause: {{menu}} / Start.",
     "speedLabel": "Simulation speed: {{speed}}×. Change speed.",
-    "speedHint": "Switch between 1× and 2× simulation time. Paused time stays frozen.",
+    "speedHint": "Switch between 1× and 2× ({{key}}). Paused time stays frozen.",
     "training": "Training controls its own pace and available actions.",
     "abilitiesPaused": "Resume defense to use abilities."
   },
@@ -862,6 +867,7 @@
     "laneHint": "Select a lane to highlight its entry on the field.",
     "stream": "Extra {{kinds}} every {{min}}–{{max}}s while the boss is active.",
     "adaptive": "Some enemies may adapt further to your recent damage types.",
-    "countHint": "Counts cover scheduled spawns. Summons and continuing boss escorts are additional."
+    "countHint": "Counts cover scheduled spawns. Summons and continuing boss escorts are additional.",
+    "shortcut": "Preview incoming wave ({{key}})."
   }
 }
