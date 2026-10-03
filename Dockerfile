@@ -19,6 +19,9 @@ COPY package.json pnpm-lock.yaml* ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
+ARG RELEASE_SHA
+COPY scripts/write-version.mjs /tmp/write-version.mjs
+RUN node /tmp/write-version.mjs dist "$RELEASE_SHA" --stamp-html
 
 FROM nginx:alpine AS runner
 RUN apk add --no-cache curl
