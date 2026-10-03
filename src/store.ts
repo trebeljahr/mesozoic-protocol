@@ -937,6 +937,7 @@ export const useGame = create<GameStore>((set, get) => ({
   startTutorial: (chapter = "robot") => {
     const s = get();
     const built = createTraining(chapter);
+    sessionPause.enforce(built.world);
     s.engine.reset();
     set({
       tutorialReturnState: s.tutorialReturnState ?? s,
@@ -984,6 +985,7 @@ export const useGame = create<GameStore>((set, get) => ({
     if (!s.tutorial || !tutorialStepSatisfied(s.world, s.tutorial)) return false;
     const tutorial = { ...s.tutorial, step: s.tutorial.step + 1 };
     prepareLesson(s.world, tutorial);
+    sessionPause.enforce(s.world);
     const towerVersion = s.towerVersion + 1;
     const treeVersion = s.treeVersion + 1;
     const inspectedEnemy = lessonFor(tutorial).id === "counter" ? s.inspectedEnemy : emptyInspect;
@@ -1013,6 +1015,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const tutorial = { ...fresh.tutorial!, step: s.tutorial.step };
     // Rebuild just this lesson's prerequisites, including spent progression tokens.
     prepareLesson(fresh.world, tutorial);
+    sessionPause.enforce(fresh.world);
     if (id === "moveRobot") fresh.world.robot.pos = { x: -6, y: 0 };
     set({
       tutorial,
@@ -1024,9 +1027,18 @@ export const useGame = create<GameStore>((set, get) => ({
   exitTutorial: () => {
     const s = get();
     if (!s.tutorial || !s.tutorialReturnState) return;
+    const restored = s.tutorialReturnState;
+    sessionPause.enforce(restored.world);
     s.engine.reset();
+    restored.engine.reset();
     set({
-      ...s.tutorialReturnState,
+      ...restored,
+      ui: snapshot(
+        restored.world,
+        restored.towerVersion,
+        restored.treeVersion,
+        restored.inspectedEnemy,
+      ),
       eventListeners: s.eventListeners,
       glContextEpoch: s.glContextEpoch,
       assetsPrewarmed: s.assetsPrewarmed,
@@ -1191,6 +1203,7 @@ export const useGame = create<GameStore>((set, get) => ({
     // Carry the debug invincibility flag across endless starts/retries,
     // matching startLevel.
     world.invincible = s.invincible;
+    sessionPause.enforce(world);
     beginMission(s.activeSlot, world, progress);
     set({
       world,
@@ -1271,7 +1284,12 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   goToSlots: () => {
-    if (get().tutorial) get().exitTutorial();
+    // An exit from practice restores the original session verbatim. It must
+    // not checkpoint, detach, or bank the suspended campaign's dirty rewards.
+    if (get().tutorial) {
+      get().exitTutorial();
+      return;
+    }
     const s = get();
     checkpointMission(s.world, s.progress, s.runMinDifficulty ?? s.progress.difficulty, true);
     const { engine } = s;
@@ -1303,6 +1321,7 @@ export const useGame = create<GameStore>((set, get) => ({
     detachMission(get().world);
     if (checkpoint) {
       const world = restoreCheckpoint(checkpoint);
+      sessionPause.enforce(world);
       get().engine.reset();
       beginMission(id, world, progress, checkpoint);
       set({
@@ -1521,6 +1540,9 @@ export const useGame = create<GameStore>((set, get) => ({
   setInterruptionBlocked: (reason, blocked) => {
     const s = get();
     sessionPause.setBlocked(reason, blocked, s.world);
+    // Preserve the resume latch on a suspended campaign too. Foregrounding
+    // training must not make the restored live mission resume implicitly.
+    if (s.tutorialReturnState) sessionPause.enforce(s.tutorialReturnState.world);
     // Discard elapsed wall time, including when requestAnimationFrame was suspended.
     s.engine.reset();
     set({ ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy) });
@@ -1553,6 +1575,7 @@ export const useGame = create<GameStore>((set, get) => ({
     sessionPause.enforce(s.world);
     if (s.tutorial && isTutorialWorld(s.world)) {
       maintainTraining(s.world, s.tutorial);
+      sessionPause.enforce(s.world);
       s.engine.step(s.world, realTimeSec);
       const events = s.world.events.splice(0);
       recordTutorialEvents(s.tutorial, events, s.world);

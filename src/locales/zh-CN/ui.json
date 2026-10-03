@@ -674,7 +674,7 @@
       "progression": "6 · Stars, bolts and XP"
     },
     "hints": {
-      "mouse": "Click controls and amber field markers. 1 selects Leela; Q/W/E/R use her abilities.",
+      "mouse": "Click controls and amber field markers. {{robot}} selects Leela; {{abilities}} use her abilities.",
       "touch": "Tap controls and amber field markers. Open Build for towers; drag then confirm, or tap to place.",
       "gamepad": "X switches between HUD controls and the field. D-pad + A uses controls; stick + A picks a field position."
     },

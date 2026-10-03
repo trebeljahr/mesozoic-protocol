@@ -674,7 +674,7 @@
       "progression": "6 · Sterne, Bolzen und EP"
     },
     "hints": {
-      "mouse": "Klicke auf Bedienelemente und gelbe Feldmarkierungen. 1 wählt Leela; Q/W/E/R nutzen ihre Fähigkeiten.",
+      "mouse": "Klicke auf Bedienelemente und gelbe Feldmarkierungen. {{robot}} wählt Leela; {{abilities}} nutzt ihre Fähigkeiten.",
       "touch": "Tippe auf Bedienelemente und gelbe Feldmarkierungen. Öffne Bauen für Türme; ziehe und bestätige oder tippe zum Platzieren.",
       "gamepad": "X wechselt zwischen Bedienelementen und Feld. Steuerkreuz + A bedient die Menüs; Stick + A wählt eine Feldposition."
     },

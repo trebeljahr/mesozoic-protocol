@@ -15,7 +15,8 @@ const excluded = new WeakSet<World>();
 export const excludeWorldFromPersistence = (world: World) => {
   excluded.add(world);
 };
-export const canPersistWorld = (world: World) => !excluded.has(world);
+export const canPersistWorld = (world: World) =>
+  world.sessionKind !== "tutorial" && !excluded.has(world);
 
 // Keep Maps, Sets and infinite ability deadlines intact. Entity lookup maps
 // are rebuilt on restore so their entries share identity with the arrays.
@@ -67,6 +68,9 @@ const reviver = (key: string, value: unknown): unknown => {
 // independent of transient enemy/projectile/render state.
 const validWorld = (w: unknown): w is World => {
   if (!matchesWorldSchema(w)) return false;
+  // The optional schema field keeps pre-training checkpoints compatible, but
+  // training payloads must never be accepted as resumable campaign missions.
+  if ((w as World).sessionKind === "tutorial") return false;
   if (
     !record(w) ||
     !numbered(w, [

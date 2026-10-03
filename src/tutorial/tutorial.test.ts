@@ -278,7 +278,7 @@ describe("interactive training", () => {
     state().startTutorial();
     state().goToSlots();
     expect(state().tutorial).toBeNull();
-    expect(state().screen).toBe("slots");
+    expect(state().screen).toBe("worldMap");
     expect(setItem).not.toHaveBeenCalled();
   });
 

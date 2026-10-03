@@ -29,7 +29,10 @@ so stale legacy keys and native mirror entries cannot resurrect that slot.
 Call `excludeWorldFromPersistence(trainingWorld)` from
 `src/persistence/missionCheckpoint.ts` **before** installing the training world
 or calling `beginMission`. `canPersistWorld` is the common checkpoint and
-store-progress gate. Training must use its own world/progress and restore the
+store-progress gate; it also rejects `world.sessionKind === "tutorial"` without
+WeakSet registration. The schema accepts legacy checkpoints without this
+optional field, while checkpoint import/restore rejects tagged training worlds.
+Training must use its own world/progress and restore the
 previous state when it ends. Do not create training through the normal
 `startLevel` action: that action starts a real saved mission. An excluded world
 cannot create, update, or finish a slot's mission. It never replaces a

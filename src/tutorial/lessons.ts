@@ -1,4 +1,5 @@
 import type { LevelConfig } from "../levels";
+import { excludeWorldFromPersistence } from "../persistence/missionCheckpoint";
 import { emptyProgress, type ProgressData } from "../progress";
 import { startWave } from "../sim/spawner";
 import type { GameEvent, TowerKind, Vec2, World } from "../sim/types";
@@ -125,6 +126,7 @@ const dummy = (w: World, pos: Vec2, armored = false) => {
 export const createTraining = (chapter: TutorialChapter = "robot") => {
   const world = createWorld(TRAINING_LEVEL);
   world.sessionKind = "tutorial";
+  excludeWorldFromPersistence(world);
   world.invincible = true;
   world.trees = [];
   world.rocks = [];

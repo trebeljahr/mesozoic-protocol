@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGamepadInput } from "../input/gamepad";
-import { useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
+import { useKeyBindings } from "../input/keyBindings";
+import { isMenuFrameHandled, useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
 import { totalStars } from "../progress";
 import { HIVE_BASE_SERVICE_BUFF, HIVE_MAX_DRONES_PER_TOWER } from "../sim/world";
 import { useGame } from "../store";
+import { MenuOverlay } from "../ui/MenuOverlay";
+import { activeModal } from "../ui/modalFocus";
 import { useInputMode } from "../ui/useInputMode";
+import { tutorialKeyboardHints } from "./keyboardHints";
 import { CHAPTERS, LESSONS, lessonFor } from "./lessons";
 import "./tutorial.css";
 
@@ -45,10 +49,15 @@ export const TutorialWelcome = () => {
   const { t } = useTranslation();
   const progress = useGame((s) => s.progress);
   const [dismissed, setDismissed] = useState(offerSeen);
-  if (dismissed || totalStars(progress) > 0 || progress.stats.killsTotal > 0) return null;
+  const visible = !dismissed && totalStars(progress) === 0 && progress.stats.killsTotal === 0;
+  const dismiss = () => {
+    rememberOffer();
+    setDismissed(true);
+  };
+  useGamepadMenuNavigation(visible);
+  if (!visible) return null;
   return (
-    <aside className="tutorial-welcome" aria-label={t("tutorial.welcomeTitle")}>
-      <strong>{t("tutorial.welcomeTitle")}</strong>
+    <MenuOverlay title={t("tutorial.welcomeTitle")} onClose={dismiss}>
       <p>{t("tutorial.welcome")}</p>
       <div className="tutorial-actions">
         <TutorialEntry />
@@ -63,7 +72,7 @@ export const TutorialWelcome = () => {
           {t("tutorial.skip")}
         </button>
       </div>
-    </aside>
+    </MenuOverlay>
   );
 };
 
@@ -98,16 +107,18 @@ export const TutorialUI = () => {
     (s) => s.compendiumOpen || s.achievementsOpen || s.creditsOpen || s.difficultyPickerOpen,
   );
   const input = useInputMode();
+  const bindings = useKeyBindings((s) => s.bindings);
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const lesson = tutorial ? lessonFor(tutorial) : null;
   const modal = labOpen || shopOpen || otherModal;
   const running = !!tutorial && status === "running" && !modal;
 
   useGamepadInput((frame) => {
+    if (activeModal() || isMenuFrameHandled(frame)) return;
     if (frame.buttonPressed("x"))
       useGame.setState({ tutorialControlsFocused: !useGame.getState().tutorialControlsFocused });
   }, running);
-  useGamepadMenuNavigation(running && focused);
+  useGamepadMenuNavigation(running && (focused || chaptersOpen));
 
   useEffect(() => {
     if (!lesson || !running) return;
@@ -186,7 +197,9 @@ export const TutorialUI = () => {
           })}
         </p>
       </div>
-      <p className="tutorial-input">{t(`tutorial.hints.${mode}`)}</p>
+      <p className="tutorial-input">
+        {t(`tutorial.hints.${mode}`, tutorialKeyboardHints(bindings))}
+      </p>
       {input.mode === "gamepad" && (
         <p className="tutorial-input">
           {t(focused ? "tutorial.controlsFocused" : "tutorial.fieldFocused")}
@@ -242,21 +255,23 @@ export const TutorialUI = () => {
         </button>
       </div>
       {chaptersOpen && (
-        <nav aria-label={t("tutorial.chapters")} className="tutorial-chapters">
-          {CHAPTERS.map((chapter) => (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              key={chapter}
-              onClick={() => {
-                setChaptersOpen(false);
-                useGame.getState().startTutorial(chapter);
-              }}
-            >
-              {t(`tutorial.chapter.${chapter}`)}
-            </button>
-          ))}
-        </nav>
+        <MenuOverlay title={t("tutorial.chapters")} onClose={() => setChaptersOpen(false)}>
+          <nav aria-label={t("tutorial.chapters")} className="tutorial-chapters">
+            {CHAPTERS.map((chapter) => (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                key={chapter}
+                onClick={() => {
+                  setChaptersOpen(false);
+                  useGame.getState().startTutorial(chapter);
+                }}
+              >
+                {t(`tutorial.chapter.${chapter}`)}
+              </button>
+            ))}
+          </nav>
+        </MenuOverlay>
       )}
     </aside>
   );

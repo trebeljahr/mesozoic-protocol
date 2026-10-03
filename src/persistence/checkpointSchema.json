@@ -1,6 +1,9 @@
 {
   "World": {
     "properties": {
+      "sessionKind": {
+        "literal": "tutorial"
+      },
       "time": "number",
       "tickCount": "number",
       "levelId": "number",
