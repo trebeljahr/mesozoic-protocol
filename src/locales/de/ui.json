@@ -871,7 +871,7 @@
     "xp": "+{{count}} Roboter-EP",
     "stars": "{{stars}} Sterne in diesem Einsatz · {{newStars}} neu",
     "rewardUse": "Gib neue Sterne im Labor aus. Kaufe mit Bolzen Roboter und Roboterfähigkeiten. Roboter-EP geben Stufen und Fähigkeitspunkte.",
-    "nextStar": "Nächste Bestleistung: {{stars}} Sterne. Gewinne mit mindestens {{lives}} verbleibenden Leben.",
+    "nextStar": "Nächste Bestleistung: {{stars}}★. Benötigte Leben beim Sieg: {{lives}}.",
     "allStars": "Alle Sterne für diesen Modus sind bereits verdient.",
     "leakConclusion": "Größter Lebensverlust: {{count}} × {{species}}, {{lives}} Leben verloren.",
     "inspectLeaks": "Vor dem nächsten Versuch die Gegnerabwehr prüfen",

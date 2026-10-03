@@ -871,7 +871,7 @@
     "xp": "+{{count}} robot XP",
     "stars": "{{stars}} stars this run · {{newStars}} new",
     "rewardUse": "Spend new stars in the Lab. Spend bolts on robots and robot skills. Robot XP grants levels and skill points.",
-    "nextStar": "Next best: {{stars}} stars. Win with at least {{lives}} lives remaining.",
+    "nextStar": "Next best: {{stars}}★. Lives required at victory: {{lives}}.",
     "allStars": "All stars for this mode are already earned.",
     "leakConclusion": "Largest life loss: {{count}} × {{species}}, {{lives}} lives lost.",
     "inspectLeaks": "Inspect enemy defenses before retrying",
