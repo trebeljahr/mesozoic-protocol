@@ -1,4 +1,4 @@
-import { useEffect, useId } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEditor } from "../editor/editorStore";
 import { actionForKey, keyLabel, useKeyBindings } from "../input/keyBindings";
@@ -14,6 +14,8 @@ import "./battlePlanning.css";
 export function BattlePlanningControls() {
   const { t } = useTranslation();
   const panelId = useId();
+  const sectionRef = useRef<HTMLElement>(null);
+  const [availableHeight, setAvailableHeight] = useState<number>();
   const bindings = useKeyBindings((s) => s.bindings);
   const world = useGame((s) => s.world);
   const usable = useGame(canUseBattlefield);
@@ -64,9 +66,36 @@ export function BattlePlanningControls() {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [bindings]);
+  useLayoutEffect(() => {
+    if (screen !== "playing" || training) return;
+    const section = sectionRef.current;
+    if (!section) return;
+    const robot = document.querySelector(".robot-panel");
+    const measure = () => {
+      const top = section.getBoundingClientRect().top;
+      const bottom = robot?.getBoundingClientRect().top ?? window.innerHeight;
+      setAvailableHeight(Math.max(0, bottom - top - 8));
+    };
+    measure();
+    // Text scaling and translated HUD content can resize the robot strip even
+    // when the viewport does not change. Observe both ends of the free space.
+    const observer = new ResizeObserver(measure);
+    if (robot) observer.observe(robot);
+    observer.observe(section);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [screen, training]);
   if (screen !== "playing" || training) return null;
   return (
-    <section className="battle-planning" aria-label={t("planning.controls")}>
+    <section
+      ref={sectionRef}
+      className="battle-planning"
+      style={{ maxHeight: availableHeight }}
+      aria-label={t("planning.controls")}
+    >
       <div className="battle-planning-row">
         <button
           type="button"
@@ -111,7 +140,7 @@ export function BattlePlanningControls() {
           {t("wavePreview.button", { wave: preview?.number ?? "—" })}
         </button>
       </div>
-      {planning && (
+      {planning && !(open && usable) && (
         <p className="planning-notice" role="status">
           {t("planning.active")}
         </p>
@@ -167,6 +196,11 @@ export function BattlePlanningControls() {
             <p className="wave-preview-help">{t("wavePreview.adaptive")}</p>
           )}
           {preview && <p className="wave-preview-help">{t("wavePreview.countHint")}</p>}
+          {planning && (
+            <p className="planning-notice" role="status">
+              {t("planning.active")}
+            </p>
+          )}
         </div>
       )}
     </section>
