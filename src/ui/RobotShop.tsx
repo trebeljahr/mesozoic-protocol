@@ -25,6 +25,7 @@ import { ROBOT_SPECS, type RobotVariantSpec, robotAbilityDamageType } from "../s
 import type { RobotVariant } from "../sim/types";
 import { DAMAGE_TYPE_COLOR } from "../sim/world";
 import { useGame } from "../store";
+import { TutorialPanelPrompt } from "../tutorial/TutorialUI";
 import { DamageIcon } from "./DamageIcon";
 import {
   IconBolt,
@@ -629,6 +630,7 @@ export const RobotShop = () => {
       cardClassName={`robot-shop-card ${selected ? "robot-shop-card--detail" : ""} !w-[min(1100px,calc(100vw-24px))] !max-w-none !min-w-0 !px-4 sm:!px-6 md:!px-8`}
     >
       <div className="robot-shop-panel w-full">
+        <TutorialPanelPrompt />
         {selected ? (
           <RobotDetail
             variant={selected}

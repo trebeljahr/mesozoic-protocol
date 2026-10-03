@@ -121,6 +121,18 @@ import {
   TREE_REMOVE_COST,
   towerKindAtBuildLimit,
 } from "./sim/world";
+import {
+  createTraining,
+  isTutorialWorld,
+  lessonFor,
+  maintainTraining,
+  prepareLesson,
+  recordTutorialEvents,
+  signalTutorial,
+  type TutorialChapter,
+  type TutorialSession,
+  tutorialStepSatisfied,
+} from "./tutorial/lessons";
 
 export type Screen = "splash" | "slots" | "worldMap" | "playing" | "results";
 
@@ -472,6 +484,14 @@ type InspectState = {
 };
 
 type GameStore = {
+  /** Non-null only for isolated practice; persistence consumers must skip it. */
+  tutorial: TutorialSession | null;
+  tutorialReturnState: GameStore | null;
+  tutorialControlsFocused: boolean;
+  startTutorial: (chapter?: TutorialChapter) => void;
+  restartTutorialLesson: () => void;
+  exitTutorial: () => void;
+  advanceTutorial: () => boolean;
   world: World;
   engine: Engine;
   ui: UiSnapshot;
@@ -850,7 +870,7 @@ const applyRobotVariantToWorld = (
 // clobber another slot's data. Once a slot is active, every progress
 // change also bumps that slot's lastPlayed timestamp.
 const persistProgress = (slot: SlotId | null, progress: ProgressData): void => {
-  if (slot === null) return;
+  if (slot === null || useGame.getState().tutorial !== null) return;
   saveSlot(slot, progress);
 };
 
@@ -899,6 +919,111 @@ export const useGame = create<GameStore>((set, get) => ({
   eventListeners: [],
   glContextEpoch: 0,
 
+  tutorial: null,
+  tutorialReturnState: null,
+  tutorialControlsFocused: false,
+  startTutorial: (chapter = "robot") => {
+    const s = get();
+    const built = createTraining(chapter);
+    s.engine.reset();
+    set({
+      tutorialReturnState: s.tutorialReturnState ?? s,
+      tutorial: built.session,
+      tutorialControlsFocused: false,
+      world: built.world,
+      progress: built.progress,
+      activeSlot: null,
+      screen: "playing",
+      selectedLevelId: null,
+      selectedKind: null,
+      selectedTreeId: null,
+      selectedRockId: null,
+      pendingTouchPlacement: null,
+      assigningDroneSlot: null,
+      spotSelecting: false,
+      lastResult: null,
+      levelIntroVisible: false,
+      levelLoadPending: false,
+      newEnemyQueue: [],
+      deferredNewEnemyQueue: [],
+      autoPausedForNewEnemy: false,
+      compendiumOpen: false,
+      achievementsOpen: false,
+      creditsOpen: false,
+      difficultyPickerOpen: false,
+      skillTreeOpen: false,
+      robotShopOpen: false,
+      robotPanelOpen: false,
+      modePickerLevelId: null,
+      endlessPickerOpen: false,
+      achievementToasts: [],
+      treeClickCounts: {},
+      rockClickCounts: {},
+      runMinDifficulty: null,
+      freeTowers: false,
+      inspectedEnemy: emptyInspect,
+      towerVersion: 0,
+      treeVersion: 0,
+      ui: snapshot(built.world, 0, 0, emptyInspect),
+    });
+  },
+  advanceTutorial: () => {
+    const s = get();
+    if (!s.tutorial || !tutorialStepSatisfied(s.world, s.tutorial)) return false;
+    const tutorial = { ...s.tutorial, step: s.tutorial.step + 1 };
+    prepareLesson(s.world, tutorial);
+    const towerVersion = s.towerVersion + 1;
+    const treeVersion = s.treeVersion + 1;
+    const inspectedEnemy = lessonFor(tutorial).id === "counter" ? s.inspectedEnemy : emptyInspect;
+    set({
+      tutorial,
+      towerVersion,
+      treeVersion,
+      inspectedEnemy,
+      selectedKind: null,
+      selectedTreeId: null,
+      selectedRockId: null,
+      pendingTouchPlacement: null,
+      assigningDroneSlot: null,
+      spotSelecting: false,
+      skillTreeOpen: false,
+      robotShopOpen: false,
+      ui: snapshot(s.world, towerVersion, treeVersion, inspectedEnemy),
+    });
+    return true;
+  },
+  restartTutorialLesson: () => {
+    const s = get();
+    if (!s.tutorial) return;
+    const id = lessonFor(s.tutorial).id;
+    s.startTutorial(lessonFor(s.tutorial).chapter);
+    const fresh = get();
+    const tutorial = { ...fresh.tutorial!, step: s.tutorial.step };
+    // Rebuild just this lesson's prerequisites, including spent progression tokens.
+    prepareLesson(fresh.world, tutorial);
+    if (id === "moveRobot") fresh.world.robot.pos = { x: -6, y: 0 };
+    set({
+      tutorial,
+      ui: snapshot(fresh.world, 1, 1, emptyInspect),
+      towerVersion: 1,
+      treeVersion: 1,
+    });
+  },
+  exitTutorial: () => {
+    const s = get();
+    if (!s.tutorial || !s.tutorialReturnState) return;
+    s.engine.reset();
+    set({
+      ...s.tutorialReturnState,
+      eventListeners: s.eventListeners,
+      glContextEpoch: s.glContextEpoch,
+      assetsPrewarmed: s.assetsPrewarmed,
+      tutorial: null,
+      tutorialReturnState: null,
+      tutorialControlsFocused: false,
+    });
+  },
+
   screen: "splash",
   activeSlot: null,
   selectedLevelId: null,
@@ -924,6 +1049,7 @@ export const useGame = create<GameStore>((set, get) => ({
   rockClickCounts: {},
 
   startLevel: (id, modeArg) => {
+    if (get().tutorial) return;
     const level = LEVELS.find((l) => l.id === id);
     if (!level) return;
     const s = get();
@@ -1019,6 +1145,7 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   startEndless: (mapId) => {
+    if (get().tutorial) return;
     const s = get();
     const { engine, progress } = s;
     if (!hasUnlockedEndless(progress)) return;
@@ -1078,6 +1205,10 @@ export const useGame = create<GameStore>((set, get) => ({
 
   retryCurrentLevel: () => {
     const s = get();
+    if (s.tutorial) {
+      s.startTutorial(lessonFor(s.tutorial).chapter);
+      return;
+    }
     if (s.world.endless) {
       s.startEndless(s.world.endless.mapId);
       return;
@@ -1091,6 +1222,10 @@ export const useGame = create<GameStore>((set, get) => ({
 
   goToWorldMap: () => {
     const s = get();
+    if (s.tutorial) {
+      s.exitTutorial();
+      return;
+    }
     s.engine.reset();
     set({
       screen: "worldMap",
@@ -1118,6 +1253,7 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   goToSlots: () => {
+    if (get().tutorial) get().exitTutorial();
     const { engine } = get();
     engine.reset();
     set({
@@ -1135,6 +1271,7 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   selectSlot: (id) => {
+    if (get().tutorial) get().exitTutorial();
     const { progress } = loadSlot(id);
     // Materialize the slot on pick — even a fresh slot becomes "filled"
     // so the SaveSlots screen shows its name + zeroed stats next time
@@ -1199,10 +1336,13 @@ export const useGame = create<GameStore>((set, get) => ({
     const next = setMetaSkillTier(s.progress.metaSkills, kind, branch, tier);
     if (next === s.progress.metaSkills) return;
     if (spentMetaStars(next) > earned) return;
+    if (spentMetaStars(next) > spentMetaStars(s.progress.metaSkills))
+      signalTutorial(s.tutorial, "lab");
     const progress = { ...s.progress, metaSkills: next };
     const updated = checkMetaAchievements(progress, s.world, s.achievementToasts);
     persistProgress(s.activeSlot, updated.progress);
     set(updated);
+    get().advanceTutorial();
   },
 
   resetMetaSkillsForKind: (kind) => {
@@ -1350,6 +1490,17 @@ export const useGame = create<GameStore>((set, get) => ({
   tick: (realTimeSec: number) => {
     const s = get();
     sessionPause.enforce(s.world);
+    if (s.tutorial && isTutorialWorld(s.world)) {
+      maintainTraining(s.world, s.tutorial);
+      s.engine.step(s.world, realTimeSec);
+      const events = s.world.events.splice(0);
+      recordTutorialEvents(s.tutorial, events, s.world);
+      for (const event of events) for (const listener of s.eventListeners) listener(event);
+      if (s.advanceTutorial()) return;
+      const ui = snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy);
+      if (!uiEqual(s.ui, ui)) set({ ui });
+      return;
+    }
     s.engine.step(s.world, realTimeSec);
 
     // Close placement when the armed tower stops being affordable.
@@ -1649,6 +1800,15 @@ export const useGame = create<GameStore>((set, get) => ({
     // Reject arming a kind the active mode forbids. Keyboard hotkeys and
     // the picker both route through here, so this is the single chokepoint.
     if (kind !== null && !isTowerKindAllowed(world, kind)) return;
+    if (kind !== null && s.tutorial) {
+      const allowed: Record<string, TowerKind> = {
+        build: "pulse",
+        hive: "hive",
+        mortar: "mortar",
+        counter: "pulse",
+      };
+      if (allowed[lessonFor(s.tutorial).id] !== kind) return;
+    }
     if (kind !== null) {
       world.selectedTowerId = null;
       world.selectedBase = false;
@@ -1692,12 +1852,15 @@ export const useGame = create<GameStore>((set, get) => ({
     // simOrderRobotMove rejects off-road clicks and stores the accepted
     // order on the nearest path centerline. Movement itself remains
     // free-roam, so obstacle/terrain detours are allowed while travelling.
-    return simOrderRobotMove(s.world, pos);
+    const accepted = simOrderRobotMove(s.world, pos);
+    if (accepted) signalTutorial(s.tutorial, "move");
+    return accepted;
   },
 
   triggerRobotAbility: (slot) => {
     const s = get();
     if (s.world.status !== "running") return;
+    if (s.tutorial && lessonFor(s.tutorial).id !== ["dash", "burst", "buff", "storm"][slot]) return;
     const hadAim = s.world.robot.dashAim !== null;
     if (!simTriggerRobotAbility(s.world, slot)) return;
     // Entering a re-targeting stage (dash aim) cancels active tower
@@ -1753,7 +1916,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const w = s.world;
     // Open behaves like the difficulty picker — auto-pause running
     // levels so the player can browse without a wave eating their HP.
-    if (open && w.status === "running") w.status = "paused";
+    if (open && w.status === "running" && !s.tutorial) w.status = "paused";
     set({
       robotShopOpen: open,
       ui: snapshot(w, s.towerVersion, s.treeVersion, s.inspectedEnemy),
@@ -1818,6 +1981,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const nextRank = getRobotRank(next, variant, id);
     const boltDelta = robotSkillBoltDelta(currentRank, nextRank);
     if (!isDebug && boltDelta > 0 && s.progress.bolts < boltDelta) return;
+    if (boltDelta > 0) signalTutorial(s.tutorial, "robotSkill");
     const progress: ProgressData = {
       ...s.progress,
       bolts: isDebug ? s.progress.bolts : Math.max(0, s.progress.bolts - boltDelta),
@@ -1826,6 +1990,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const updated = checkMetaAchievements(progress, s.world, s.achievementToasts);
     persistProgress(s.activeSlot, updated.progress);
     set(updated);
+    get().advanceTutorial();
   },
 
   resetRobotSkills: (variant) => {
@@ -1884,6 +2049,8 @@ export const useGame = create<GameStore>((set, get) => ({
   },
 
   inspectEnemy: (id, kind, maxHp, bossVariant) => {
+    const tutorial = get().tutorial;
+    if (tutorial?.targetId === id) signalTutorial(tutorial, "enemy");
     const { world, towerVersion, treeVersion } = get();
     world.selectedTowerId = null;
     world.selectedBase = false;
@@ -1985,7 +2152,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const nextCount = (s.treeClickCounts[id] ?? 0) + 1;
     const nextCounts = { ...s.treeClickCounts, [id]: nextCount };
     const unlock =
-      nextCount === EASTER_EGG_CLICK_THRESHOLD
+      !s.tutorial && nextCount === EASTER_EGG_CLICK_THRESHOLD
         ? tryUnlockEasterEgg(s.progress, "tree_hugger")
         : null;
     if (unlock) {
@@ -2022,9 +2189,11 @@ export const useGame = create<GameStore>((set, get) => ({
       set({ selectedTreeId: null });
       return;
     }
+    if (s.tutorial && lessonFor(s.tutorial).id !== "prop") return;
     if (w.gold < TREE_REMOVE_COST) return;
     w.gold -= TREE_REMOVE_COST;
     w.trees = w.trees.filter((t) => t.id !== id);
+    signalTutorial(s.tutorial, "prop");
     const newTreeVersion = s.treeVersion + 1;
     set({
       treeVersion: newTreeVersion,
@@ -2045,7 +2214,7 @@ export const useGame = create<GameStore>((set, get) => ({
     const nextCount = (s.rockClickCounts[id] ?? 0) + 1;
     const nextCounts = { ...s.rockClickCounts, [id]: nextCount };
     const unlock =
-      nextCount === EASTER_EGG_CLICK_THRESHOLD
+      !s.tutorial && nextCount === EASTER_EGG_CLICK_THRESHOLD
         ? tryUnlockEasterEgg(s.progress, "diamond_in_the_rough")
         : null;
     if (unlock) {
@@ -2208,6 +2377,7 @@ export const useGame = create<GameStore>((set, get) => ({
         get().assignDroneToTower(hit.id);
         return;
       }
+      if (s.tutorial?.towerId === hit.id) signalTutorial(s.tutorial, "inspectTower");
       w.selectedTowerId = hit.id;
       w.selectedBase = false;
       if (w.robot.selected) w.robot.selected = false;
@@ -2259,6 +2429,8 @@ export const useGame = create<GameStore>((set, get) => ({
         const dy = pos.y - sel.pos.y;
         if (dx * dx + dy * dy <= sel.range * sel.range) {
           sel.targetSpot = { x: pos.x, y: pos.y };
+          if (s.tutorial?.marker && distSq(s.tutorial.marker, pos) < 2.25)
+            signalTutorial(s.tutorial, "spot");
           sel.targetId = null;
           const newVersion = s.towerVersion + 1;
           set({
@@ -2318,6 +2490,10 @@ export const useGame = create<GameStore>((set, get) => ({
       emit(w, { type: "place-failed", reason: "gold" });
       return;
     }
+    if (s.tutorial?.marker && distSq(s.tutorial.marker, pos) > 2.25) {
+      emit(w, { type: "place-failed", reason: "spot" });
+      return;
+    }
     if (!canPlaceAt(w, pos)) {
       emit(w, { type: "place-failed", reason: "spot" });
       return;
@@ -2369,6 +2545,7 @@ export const useGame = create<GameStore>((set, get) => ({
       s.assigningDroneSlot !== null &&
       nextHive?.kind === "hive" &&
       nextHive.id === s.assigningDroneSlot.hiveId;
+    if (s.tutorial?.towerId === id) signalTutorial(s.tutorial, "inspectTower");
     world.selectedTowerId = id;
     if (id !== null) world.selectedBase = false;
     const nextInspect = id !== null ? emptyInspect : s.inspectedEnemy;
@@ -2388,7 +2565,9 @@ export const useGame = create<GameStore>((set, get) => ({
     if (s.world.selectedTowerId === null) return;
     const t = s.world.towerById.get(s.world.selectedTowerId);
     if (!t) return;
+    if (s.tutorial && lessonFor(s.tutorial).id !== "upgrade") return;
     if (applyUpgrade(s.world, t, branch)) {
+      signalTutorial(s.tutorial, "upgrade");
       // Hive drone-bay path adds an idle drone slot. Leave it idle so the
       // player assigns it deliberately via the hive panel — auto-routing
       // the extra drone to whatever neighbour had room read as the tower
@@ -2409,7 +2588,10 @@ export const useGame = create<GameStore>((set, get) => ({
     // Containment mode disables selling entirely — every placement is committed
     // for the run. The UI hides the sell button, but reject defensively.
     if (s.world.sellingDisabled) return;
+    if (s.tutorial && (lessonFor(s.tutorial).id !== "sell" || s.tutorial.towerId !== t.id)) return;
+    const beforeGold = s.world.gold;
     sellTower(s.world, t);
+    if (s.world.gold > beforeGold) signalTutorial(s.tutorial, "sell");
     emit(s.world, { type: "tower-sold" });
     const newVersion = s.towerVersion + 1;
     set({
@@ -2438,6 +2620,8 @@ export const useGame = create<GameStore>((set, get) => ({
       return;
     }
     if (t.targetingMode === mode) return;
+    if (mode === "strongest") signalTutorial(s.tutorial, "target");
+    if (mode === "vulnerable") signalTutorial(s.tutorial, "vulnerable");
     t.targetingMode = mode;
     t.targetId = null;
     const newVersion = s.towerVersion + 1;
@@ -2469,7 +2653,9 @@ export const useGame = create<GameStore>((set, get) => ({
 
   upgradeBase: (branch) => {
     const s = get();
+    if (s.tutorial && lessonFor(s.tutorial).id !== "base") return;
     if (!applyBaseUpgrade(s.world, branch)) return;
+    signalTutorial(s.tutorial, "base");
     // Bump towerVersion so the panel (which subscribes to it) re-reads
     // the new tier without needing its own version counter.
     const newVersion = s.towerVersion + 1;
@@ -2481,7 +2667,11 @@ export const useGame = create<GameStore>((set, get) => ({
 
   callWaveEarly: () => {
     const s = get();
+    if (s.tutorial && !["wave", "early"].includes(lessonFor(s.tutorial).id)) return;
+    const beforeGold = s.world.gold;
     if (!simCallWaveEarly(s.world)) return;
+    signalTutorial(s.tutorial, "wave");
+    if (s.world.gold > beforeGold) signalTutorial(s.tutorial, "early");
     emit(s.world, { type: "wave-called-early" });
     set({ ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy) });
   },
@@ -2532,6 +2722,10 @@ export const useGame = create<GameStore>((set, get) => ({
       }
     }
     hive.droneAssignments[slot.droneIdx] = towerId;
+    if (s.tutorial?.towerId === towerId && currentAssignment !== towerId) {
+      if (currentAssignment === null) signalTutorial(s.tutorial, "assign");
+      else signalTutorial(s.tutorial, "reassign");
+    }
     const newVersion = s.towerVersion + 1;
     // Drone assignments aren't tick-driven sim events, so the
     // achievement check loop in tick() never sees them. Run a check

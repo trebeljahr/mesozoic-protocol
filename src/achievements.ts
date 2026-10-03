@@ -343,6 +343,7 @@ export const checkAchievements = (
   world: World,
   ev: GameEvent | null,
 ): { progress: ProgressData; unlocked: AchievementId[] } => {
+  if (world.sessionKind === "tutorial") return { progress, unlocked: [] };
   let p = progress;
   const unlocked: AchievementId[] = [];
   for (const def of ACHIEVEMENTS) {

@@ -18,6 +18,7 @@ import {
 } from "../progress";
 import { spentMetaStars } from "../sim/metaSkills";
 import { useGame } from "../store";
+import { TutorialEntry, TutorialWelcome } from "../tutorial/TutorialUI";
 import { isTauriShell } from "../updater";
 import { DebugProgressSettings } from "./DebugProgressSettings";
 import { DifficultyButton } from "./DifficultyButton";
@@ -180,6 +181,7 @@ export const WorldMapUI = () => {
       </div>
 
       <div className="world-map-actions absolute top-6 right-6 pointer-events-none flex items-center gap-1.5">
+        <TutorialEntry />
         <QuickSettings />
         <button
           type="button"
@@ -277,6 +279,7 @@ export const WorldMapUI = () => {
         </div>
       </div>
 
+      <TutorialWelcome />
       {menuOpen && (
         <MenuOverlay title={t("common.menu")} onClose={() => setMenuOpen(false)}>
           <div className="menu-panel-scroll">

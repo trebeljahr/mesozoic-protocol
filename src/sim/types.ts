@@ -893,6 +893,8 @@ export type Shake = {
 };
 
 export type World = {
+  /** Training worlds must never be persisted as mission checkpoints or award campaign rewards. */
+  sessionKind?: "tutorial";
   time: number;
   tickCount: number;
   levelId: number;

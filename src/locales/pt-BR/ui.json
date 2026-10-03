@@ -629,5 +629,141 @@
       "ability3": "Ability 3",
       "ability4": "Ultimate ability"
     }
+  },
+  "tutorial": {
+    "entry": "Training",
+    "practice": "Practice · save protected",
+    "welcomeTitle": "Learn the controls on a safe field",
+    "welcome": "Move Leela, try every ability, then build and command your defense. Replay any chapter later.",
+    "skip": "Explore the map",
+    "retry": "Reset lesson",
+    "chapters": "Chapters",
+    "exit": "Exit training",
+    "inspectMarked": "Inspect objective",
+    "controlsFocused": "HUD controls: D-pad to focus, A to use. X returns to the field.",
+    "fieldFocused": "Field cursor: stick + A. X switches to HUD controls.",
+    "chapter": {
+      "robot": "1 · Robot and abilities",
+      "towers": "2 · Towers and targeting",
+      "drones": "3 · Support drones",
+      "field": "4 · Mortar, props and HQ",
+      "waves": "5 · Resistances and waves",
+      "progression": "6 · Stars, bolts and XP"
+    },
+    "hints": {
+      "mouse": "Click controls and amber field markers. 1 selects Leela; Q/W/E/R use her abilities.",
+      "touch": "Tap controls and amber field markers. Open Build for towers; drag then confirm, or tap to place.",
+      "gamepad": "X switches between HUD controls and the field. D-pad + A uses controls; stick + A picks a field position."
+    },
+    "lessons": {
+      "selectRobot": {
+        "objective": "Select Leela, your robot.",
+        "detail": "Click her portrait or the marked robot. She fires automatically at nearby enemies."
+      },
+      "moveRobot": {
+        "objective": "Move Leela into the amber ring.",
+        "detail": "With Leela selected, choose the marked point on the road. Move orders need a legal road destination."
+      },
+      "dash": {
+        "objective": "Aim Phase Step toward the marked target.",
+        "detail": "Activate the first ability, then choose the amber ring to commit the dash. Activating aim alone does not finish this lesson."
+      },
+      "burst": {
+        "objective": "Hit the nearby target with Tesla Pulse.",
+        "detail": "Use the second ability for a short-range electric burst. The target is close enough; cooldowns let you try again."
+      },
+      "buff": {
+        "objective": "Use Phase Veil while Leela attacks.",
+        "detail": "The third ability boosts speed, fire rate, damage and resistance. Stay near the target until a boosted shot lands."
+      },
+      "storm": {
+        "objective": "Hit the target with Storm Surge.",
+        "detail": "Use the fourth ability. Its electric storm keeps striking enemies nearby. Every pilot has a different set of abilities."
+      },
+      "build": {
+        "objective": "Place a Pulse tower beside the road.",
+        "detail": "Choose Pulse from Build, then place it in the amber ring. Towers fire automatically; roads and blocking props reject construction."
+      },
+      "inspectTower": {
+        "objective": "Inspect your Pulse tower.",
+        "detail": "Select the tower to see range, damage, upgrade branches and shooting priorities."
+      },
+      "upgrade": {
+        "objective": "Buy one upgrade on either branch.",
+        "detail": "Use the tower panel. Field upgrades spend mission gold and last for this mission. Each branch changes different stats."
+      },
+      "target": {
+        "objective": "Change the shooting priority to Strong.",
+        "detail": "Select Strong in the tower panel. The tower now favors enemies with the highest maximum HP in range."
+      },
+      "vulnerable": {
+        "objective": "Change the priority to Vuln (vulnerable).",
+        "detail": "This mode favors targets vulnerable to this tower’s damage type. Re-selecting the current mode does not count as a change."
+      },
+      "hive": {
+        "objective": "Place a Hive beside the two towers.",
+        "detail": "Hive is support: its drones boost other towers rather than shoot enemies. Place it at the amber ring."
+      },
+      "assign": {
+        "objective": "Assign an idle drone to the marked Pulse.",
+        "detail": "In the Hive panel, choose an idle drone, then select Pulse on the field. Each base drone adds {{buff}}% fire rate; at most {{cap}} drones can support one tower."
+      },
+      "reassign": {
+        "objective": "Move that drone from Pulse to Chain.",
+        "detail": "Select the assigned drone in the Hive panel, then the marked Chain tower. Drones can serve any offensive tower across the map."
+      },
+      "mortar": {
+        "objective": "Place a Mortar beside the road.",
+        "detail": "Mortars deal explosive area damage. Place one at the amber ring to practice fixed-position fire."
+      },
+      "spot": {
+        "objective": "Aim Mortar’s Spot mode at the amber ring.",
+        "detail": "Select Spot, then choose the marked road point inside its range. Spot fires at a fixed position rather than following an enemy."
+      },
+      "prop": {
+        "objective": "Clear the marked blocking tree.",
+        "detail": "Inspect the tree, then pay to remove it. Removing trees and rocks opens build space and costs mission gold."
+      },
+      "base": {
+        "objective": "Upgrade the HQ’s defense.",
+        "detail": "Inspect the marked base at the end of the road, then buy one upgrade. HQ weapons are your last line of defense."
+      },
+      "sell": {
+        "objective": "Sell the marked Pulse and receive its refund.",
+        "detail": "Use Sell in its panel. You recover part of its cost. Some challenge modes disable selling."
+      },
+      "enemy": {
+        "objective": "Inspect the marked Triceratops.",
+        "detail": "Read its damage multipliers: kinetic is effective; electric, flame and explosive damage are resisted. Higher multipliers mean more damage."
+      },
+      "counter": {
+        "objective": "Place a kinetic Pulse and hit the Triceratops.",
+        "detail": "Build Pulse at the amber ring. Watch it damage the armored target. Cryo can slow enemies; damage types and resistance chips affect your choices."
+      },
+      "wave": {
+        "objective": "Start the first practice wave.",
+        "detail": "Use Start waves. Before a real wave, check the lanes and enemy defenses, then build. Starting the first wave gives no early-call bonus."
+      },
+      "early": {
+        "objective": "Call the next wave early and earn gold.",
+        "detail": "A fresh between-wave window is ready. Use Call wave while its reward is positive. This trades preparation time for extra mission gold."
+      },
+      "lab": {
+        "objective": "Open the Lab and spend one practice star.",
+        "detail": "Campaign results award permanent stars. Lab upgrades improve future towers. These 3 stars are practice tokens; your saved stars stay unchanged."
+      },
+      "robotSkill": {
+        "objective": "Open Robots and buy a skill rank for Leela.",
+        "detail": "Select Leela, then buy a skill rank. Kills earn permanent bolts and robot XP; XP grants skill points. This wallet and XP are practice copies."
+      },
+      "complete": {
+        "objective": "Training complete.",
+        "detail": "You moved, fought, built, supported and upgraded using real controls. Exit to your unchanged save, or replay any chapter. Mission gold resets; stars, bolts and robot XP persist in campaign play."
+      },
+      "defend": {
+        "objective": "Let your defense defeat a wave enemy.",
+        "detail": "Watch the wave you started. Your Pulse fires when enemies enter range. This lesson waits for a real kill."
+      }
+    }
   }
 }

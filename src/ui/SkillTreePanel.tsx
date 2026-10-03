@@ -17,6 +17,7 @@ import {
 import type { TowerKind } from "../sim/types";
 import { DAMAGE_TYPE_COLOR, TOWER_DAMAGE_TYPE, TOWER_LABEL } from "../sim/world";
 import { useGame } from "../store";
+import { TutorialPanelPrompt } from "../tutorial/TutorialUI";
 import { DamageIcon } from "./DamageIcon";
 import { MenuOverlay } from "./MenuOverlay";
 import { TowerPreview } from "./TowerPreview";
@@ -231,6 +232,7 @@ export const SkillTreePanel = () => {
       onClose={() => setOpen(false)}
       cardClassName="!w-[min(1280px,calc(100vw-48px))] !max-w-none"
     >
+      <TutorialPanelPrompt />
       <div className="skill-tree-panel w-full">
         <div className="flex items-center justify-between gap-3 px-1 mb-3">
           <p className="text-[11px] text-fg-muted leading-snug flex-1 min-w-0">

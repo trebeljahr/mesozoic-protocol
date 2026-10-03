@@ -3,6 +3,7 @@ import { BIOME_STYLE } from "../biomes";
 import { MAP_HEIGHT } from "../level";
 import { BOSS_VARIANT_MODEL } from "../sim/world";
 import { useGame } from "../store";
+import { TutorialMarker } from "../tutorial/TutorialMarker";
 import { AmbientHaze } from "./AmbientHaze";
 import { AutoBridges } from "./AutoBridges";
 import { BiomeAmbientVfx } from "./BiomeAmbientVfx";
@@ -95,6 +96,7 @@ export const PlayScene = () => {
       <HQBase />
       <PathLine />
       <Placement />
+      <TutorialMarker />
       {/* Frame 1 — bulk of the static decor (trees, rocks, biome cosmetics
           live here so their material compiles don't pile onto the same
           frame as core scene programs). */}

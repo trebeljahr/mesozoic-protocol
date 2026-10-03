@@ -20,6 +20,7 @@ import { PaintedPostFx } from "./render/PaintedPostFx";
 import { playEvents } from "./render/playEvents";
 import { PlayScene } from "./render/Scene";
 import { useGame } from "./store";
+import { TutorialUI } from "./tutorial/TutorialUI";
 import { AchievementToast } from "./ui/AchievementToast";
 import { CanvasFailure } from "./ui/CanvasFailure";
 import { ErrorBoundary } from "./ui/ErrorBoundary";
@@ -368,6 +369,7 @@ export const App = () => {
         </Suspense>
       )}
       <LevelLoadOverlay />
+      {screen === "playing" && <TutorialUI />}
       {screen === "playing" && levelIntroVisible && !hideLevelChrome && <LevelIntro />}
       {screen === "playing" && !modalOpen && !hideLevelChrome && <NewEnemyAlert />}
       {!hideEditorChrome && <AchievementToast />}

@@ -629,5 +629,141 @@
       "ability3": "Fähigkeit 3",
       "ability4": "Ultimative Fähigkeit"
     }
+  },
+  "tutorial": {
+    "entry": "Training",
+    "practice": "Übung · Spielstand geschützt",
+    "welcomeTitle": "Lerne die Steuerung auf einem sicheren Feld",
+    "welcome": "Bewege Leela, teste jede Fähigkeit und baue dann deine Verteidigung. Alle Kapitel bleiben wiederholbar.",
+    "skip": "Karte erkunden",
+    "retry": "Lektion zurücksetzen",
+    "chapters": "Kapitel",
+    "exit": "Training verlassen",
+    "inspectMarked": "Ziel untersuchen",
+    "controlsFocused": "Bedienelemente: Steuerkreuz zum Auswählen, A zum Aktivieren. X wechselt zum Feld.",
+    "fieldFocused": "Feldzeiger: Stick + A. X wechselt zu den Bedienelementen.",
+    "chapter": {
+      "robot": "1 · Roboter und Fähigkeiten",
+      "towers": "2 · Türme und Zielwahl",
+      "drones": "3 · Unterstützungsdrohnen",
+      "field": "4 · Mörser, Hindernisse und HQ",
+      "waves": "5 · Resistenzen und Wellen",
+      "progression": "6 · Sterne, Bolzen und EP"
+    },
+    "hints": {
+      "mouse": "Klicke auf Bedienelemente und gelbe Feldmarkierungen. 1 wählt Leela; Q/W/E/R nutzen ihre Fähigkeiten.",
+      "touch": "Tippe auf Bedienelemente und gelbe Feldmarkierungen. Öffne Bauen für Türme; ziehe und bestätige oder tippe zum Platzieren.",
+      "gamepad": "X wechselt zwischen Bedienelementen und Feld. Steuerkreuz + A bedient die Menüs; Stick + A wählt eine Feldposition."
+    },
+    "lessons": {
+      "selectRobot": {
+        "objective": "Wähle Leela, deinen Roboter.",
+        "detail": "Wähle ihr Porträt oder den markierten Roboter. Sie schießt automatisch auf Gegner in der Nähe."
+      },
+      "moveRobot": {
+        "objective": "Bewege Leela in den gelben Ring.",
+        "detail": "Wähle mit ausgewählter Leela den markierten Straßenpunkt. Bewegungsbefehle brauchen ein gültiges Ziel auf der Straße."
+      },
+      "dash": {
+        "objective": "Richte den Phasenschritt auf das markierte Ziel.",
+        "detail": "Aktiviere die erste Fähigkeit und wähle dann den gelben Ring für den Sprung. Nur den Zielmodus zu öffnen reicht nicht."
+      },
+      "burst": {
+        "objective": "Triff das nahe Ziel mit dem Tesla-Puls.",
+        "detail": "Die zweite Fähigkeit erzeugt einen elektrischen Nahbereichsimpuls. Das Ziel ist nah genug; nach der Abklingzeit kannst du es erneut versuchen."
+      },
+      "buff": {
+        "objective": "Nutze den Phasenschleier während Leelas Angriff.",
+        "detail": "Die dritte Fähigkeit verstärkt Tempo, Feuerrate, Schaden und Widerstand. Bleibe beim Ziel, bis ein verstärkter Schuss trifft."
+      },
+      "storm": {
+        "objective": "Triff das Ziel mit der Sturmwoge.",
+        "detail": "Nutze die vierte Fähigkeit. Ihr elektrischer Sturm trifft nahe Gegner wiederholt. Jeder Pilot hat eigene Fähigkeiten."
+      },
+      "build": {
+        "objective": "Platziere einen Pulse-Turm neben der Straße.",
+        "detail": "Wähle Pulse unter Bauen und platziere ihn im gelben Ring. Türme schießen automatisch; Straßen und Hindernisse verhindern das Bauen."
+      },
+      "inspectTower": {
+        "objective": "Untersuche deinen Pulse-Turm.",
+        "detail": "Wähle den Turm für Reichweite, Schaden, Ausbauzweige und Schussprioritäten."
+      },
+      "upgrade": {
+        "objective": "Kaufe ein Upgrade in einem der Zweige.",
+        "detail": "Nutze das Turmfenster. Feld-Upgrades kosten Missionsgold und gelten für diese Mission. Die Zweige ändern unterschiedliche Werte."
+      },
+      "target": {
+        "objective": "Ändere die Schusspriorität auf Stark.",
+        "detail": "Wähle Stark im Turmfenster. Der Turm bevorzugt Gegner mit den höchsten maximalen Lebenspunkten in Reichweite."
+      },
+      "vulnerable": {
+        "objective": "Ändere die Priorität auf Verw. (verwundbar).",
+        "detail": "Dieser Modus bevorzugt Ziele, die gegen den Schadenstyp des Turms schwach sind. Den aktuellen Modus erneut zu wählen zählt nicht als Änderung."
+      },
+      "hive": {
+        "objective": "Platziere einen Hive neben den beiden Türmen.",
+        "detail": "Hive unterstützt: Seine Drohnen verstärken andere Türme statt Gegner zu beschießen. Platziere ihn im gelben Ring."
+      },
+      "assign": {
+        "objective": "Weise eine freie Drohne dem markierten Pulse zu.",
+        "detail": "Wähle im Hive-Fenster eine freie Drohne und dann Pulse auf dem Feld. Jede Basisdrohne gibt {{buff}} % Feuerrate; höchstens {{cap}} Drohnen unterstützen einen Turm."
+      },
+      "reassign": {
+        "objective": "Versetze diese Drohne von Pulse zu Chain.",
+        "detail": "Wähle die zugewiesene Drohne im Hive-Fenster und dann den markierten Chain-Turm. Drohnen erreichen jeden Angriffsturm auf der Karte."
+      },
+      "mortar": {
+        "objective": "Platziere einen Mörser neben der Straße.",
+        "detail": "Mörser verursachen explosiven Flächenschaden. Platziere einen im gelben Ring, um ein festes Ziel zu beschießen."
+      },
+      "spot": {
+        "objective": "Richte den Punktmodus auf den gelben Ring.",
+        "detail": "Wähle Punkt und dann die markierte Straßenstelle in Reichweite. Dieser Modus beschießt eine feste Position statt einen Gegner zu verfolgen."
+      },
+      "prop": {
+        "objective": "Entferne den markierten blockierenden Baum.",
+        "detail": "Untersuche den Baum und bezahle seine Entfernung. Bäume und Felsen zu entfernen schafft Bauplatz und kostet Missionsgold."
+      },
+      "base": {
+        "objective": "Verbessere die Verteidigung des HQ.",
+        "detail": "Untersuche die markierte Basis am Straßenende und kaufe ein Upgrade. HQ-Waffen sind deine letzte Verteidigungslinie."
+      },
+      "sell": {
+        "objective": "Verkaufe den markierten Pulse für eine Erstattung.",
+        "detail": "Nutze Verkaufen im Turmfenster. Du erhältst einen Teil der Kosten zurück. Einige Herausforderungsmodi verbieten den Verkauf."
+      },
+      "enemy": {
+        "objective": "Untersuche den markierten Triceratops.",
+        "detail": "Lies seine Schadensmultiplikatoren: Kinetik wirkt gut; Elektrizität, Feuer und Explosionen wirken schwächer. Höhere Werte bedeuten mehr Schaden."
+      },
+      "counter": {
+        "objective": "Baue einen kinetischen Pulse und triff den Triceratops.",
+        "detail": "Baue Pulse im gelben Ring und beobachte den Schaden. Cryo kann Gegner verlangsamen; Schadenstypen und Resistenzchips beeinflussen deine Wahl."
+      },
+      "wave": {
+        "objective": "Starte die erste Übungswelle.",
+        "detail": "Nutze Wellen starten. Prüfe vor echten Wellen die Wege und Abwehrwerte und baue dann. Die erste Welle gibt keinen Frühstartbonus."
+      },
+      "early": {
+        "objective": "Rufe die nächste Welle früh und erhalte Gold.",
+        "detail": "Eine frische Pause zwischen Wellen ist bereit. Rufe die Welle, solange die Belohnung positiv ist. Du tauschst Vorbereitungszeit gegen Missionsgold."
+      },
+      "lab": {
+        "objective": "Öffne das Labor und investiere einen Übungsstern.",
+        "detail": "Kampagnenergebnisse bringen dauerhafte Sterne. Labor-Upgrades verbessern künftige Türme. Diese 3 Sterne sind Übungsguthaben; gespeicherte Sterne bleiben unverändert."
+      },
+      "robotSkill": {
+        "objective": "Öffne Roboter und kaufe einen Fähigkeitsrang für Leela.",
+        "detail": "Wähle Leela und kaufe einen Rang. Abschüsse bringen dauerhafte Bolzen und Roboter-EP; EP geben Fähigkeitspunkte. Guthaben und EP sind hier nur Übungskopien."
+      },
+      "complete": {
+        "objective": "Training abgeschlossen.",
+        "detail": "Du hast dich bewegt, gekämpft, gebaut und verbessert. Kehre zum unveränderten Spielstand zurück oder wiederhole ein Kapitel. Missionsgold wird zurückgesetzt; Sterne, Bolzen und Roboter-EP bleiben in der Kampagne."
+      },
+      "defend": {
+        "objective": "Lass deine Verteidigung einen Gegner ausschalten.",
+        "detail": "Beobachte die gestartete Welle. Dein Pulse schießt automatisch, sobald Gegner in Reichweite sind. Die nächste Lektion wartet auf einen echten Abschuss."
+      }
+    }
   }
 }

@@ -147,6 +147,9 @@ export const Placement = () => {
     if (
       activeModal() ||
       isMenuFrameHandled(frame) ||
+      state.tutorialControlsFocused ||
+      state.skillTreeOpen ||
+      state.robotShopOpen ||
       state.screen !== "playing" ||
       state.ui.status !== "running" ||
       state.compendiumOpen ||
