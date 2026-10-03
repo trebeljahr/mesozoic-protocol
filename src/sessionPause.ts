@@ -1,6 +1,11 @@
 import type { World } from "./sim/types";
 
-export type InterruptionReason = "hidden" | "page-hidden" | "native-background" | "orientation";
+export type InterruptionReason =
+  | "hidden"
+  | "page-hidden"
+  | "native-background"
+  | "orientation"
+  | "update-install";
 
 // Blockers belong to the app; the resume latch belongs to a mission. A new
 // mission inherits current blockers, but never an old mission's resume latch.

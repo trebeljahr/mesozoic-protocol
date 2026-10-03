@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { checkForUpdate, installUpdate, isTauriShell, type UpdateInfo } from "../updater";
+import { mountModal } from "./modalFocus";
 
 // The check is a network round trip plus a signature parse, and it competes
 // with shader compilation and model loading for the same main thread. So it
@@ -14,8 +15,10 @@ const IDLE_TIMEOUT_MS = 5_000;
 // One check per app run, not per mount — returning to the splash screen
 // unmounts this component and would otherwise re-ask on the way back.
 let checkedThisSession = false;
+let offeredUpdate: UpdateInfo | null = null;
+let dismissedThisSession = false;
 
-type Phase = "hidden" | "available" | "installing" | "failed";
+type Phase = "hidden" | "available" | "downloading" | "installing" | "failed";
 
 /**
  * Desktop-only "an update is ready" card. Renders nothing on the web build,
@@ -25,9 +28,37 @@ type Phase = "hidden" | "available" | "installing" | "failed";
  */
 export const UpdateNotice = () => {
   const { t } = useTranslation();
-  const [phase, setPhase] = useState<Phase>("hidden");
-  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const [phase, setPhase] = useState<Phase>(
+    offeredUpdate && !dismissedThisSession ? "available" : "hidden",
+  );
+  const [info, setInfo] = useState<UpdateInfo | null>(offeredUpdate);
   const [pct, setPct] = useState<number | null>(null);
+  const installDialog = useRef<HTMLDivElement>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "installing" || !installDialog.current) return;
+    const unmount = mountModal(installDialog.current, undefined, 1000);
+    // The final disk flush and install form one uninterrupted step. This also
+    // blocks shortcuts and controls outside the pointer overlay.
+    const block = (event: Event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    for (const name of ["keydown", "pointerdown", "click"])
+      document.addEventListener(name, block, { capture: true, passive: false });
+    return () => {
+      unmount();
+      for (const name of ["keydown", "pointerdown", "click"])
+        document.removeEventListener(name, block, true);
+    };
+  }, [phase]);
 
   useEffect(() => {
     if (!isTauriShell() || checkedThisSession) return;
@@ -39,6 +70,7 @@ export const UpdateNotice = () => {
       checkedThisSession = true;
       void checkForUpdate().then((update) => {
         if (cancelled || !update) return;
+        offeredUpdate = update;
         setInfo(update);
         setPhase("available");
       });
@@ -64,22 +96,43 @@ export const UpdateNotice = () => {
   if (phase === "hidden" || !info) return null;
 
   const install = () => {
-    setPhase("installing");
+    setPhase("downloading");
     setPct(0);
-    void installUpdate(({ downloaded, total }) => {
-      setPct(total && total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : null);
-    }).then((ok) => {
+    void installUpdate(
+      ({ downloaded, total }) => {
+        if (mounted.current)
+          setPct(total && total > 0 ? Math.min(100, Math.round((downloaded / total) * 100)) : null);
+      },
+      () => {
+        if (!mounted.current) throw new Error("Update interface is no longer visible");
+        setPhase("installing");
+      },
+    ).then((ok) => {
       // Only reached when the install did not happen — on success the process
       // is already gone.
-      if (!ok) setPhase("failed");
+      if (!ok && mounted.current) setPhase("failed");
     });
   };
 
   return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-[45] flex justify-end">
+    <div
+      className={
+        phase === "installing"
+          ? "fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4"
+          : "pointer-events-none fixed right-4 bottom-4 z-[45] flex justify-end"
+      }
+    >
       <div
+        ref={installDialog}
         className="overlay-card pointer-events-auto w-[min(100%,320px)] min-w-0 p-4 text-left"
-        role="status"
+        role="dialog"
+        aria-modal={phase === "installing"}
+        aria-label={
+          phase === "installing"
+            ? t("update.installing")
+            : t("update.title", { version: info.version })
+        }
+        tabIndex={phase === "installing" ? -1 : undefined}
         aria-live="polite"
       >
         <div className="text-[10px] font-bold tracking-[0.18em] text-cyan uppercase">
@@ -93,15 +146,24 @@ export const UpdateNotice = () => {
           {phase === "failed"
             ? t("update.failed")
             : phase === "installing"
-              ? pct === null
-                ? t("update.downloading")
-                : t("update.downloadingPct", { pct })
-              : t("update.body")}
+              ? t("update.installing")
+              : phase === "downloading"
+                ? pct === null
+                  ? t("update.downloading")
+                  : t("update.downloadingPct", { pct })
+                : t("update.body")}
         </div>
 
-        {phase !== "installing" && (
+        {phase !== "installing" && phase !== "downloading" && (
           <div className="mt-3 flex justify-end gap-2">
-            <button type="button" className="btn-ghost btn--sm" onClick={() => setPhase("hidden")}>
+            <button
+              type="button"
+              className="btn-ghost btn--sm"
+              onClick={() => {
+                dismissedThisSession = true;
+                setPhase("hidden");
+              }}
+            >
               {t("update.later")}
             </button>
             <button type="button" className="btn btn--sm" onClick={install}>

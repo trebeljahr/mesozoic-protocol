@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "macOS": {
+      "frameworks": ["target/steam-sdk/macos/libsteam_api.dylib"]
+    },
+    "resources": {
+      "target/steam-sdk/macos/STEAM-SDK-NOTICE.txt": "licenses/STEAM-SDK-NOTICE.txt"
+    }
+  }
+}

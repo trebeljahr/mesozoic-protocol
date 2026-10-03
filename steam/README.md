@@ -13,6 +13,7 @@ notice while the App ID and secrets are unset, so the repo stays green.
 | `depot_windows.vdf` | Windows depot template — unpacked `.exe`, not the installer. |
 | `depot_macos.vdf` | macOS depot template — the `.app` bundle, not the `.dmg`. |
 | `depot_linux.vdf` | Linux depot template — the plain binary, not the AppImage. |
+| `CLOUD.md` | Native save paths, per-account Steam Cloud configuration, and SDK packaging. |
 
 CI does not read these. `steam.yml` uses `game-ci/steam-deploy`, which generates
 an equivalent build script from its inputs. The templates are here for uploading
@@ -99,7 +100,8 @@ development. It is **gitignored and must stay that way**, and the depot
 templates exclude it explicitly: shipping it makes the retail build ignore the
 App ID Steam hands it at launch.
 
-The game does not link the Steamworks SDK today — it ships as a plain
-executable, which Steam supports fine. Achievements, the overlay, and Steam
-Cloud need the SDK; see the "Optional: Steamworks SDK" section in
-[DISTRIBUTION.md](../DISTRIBUTION.md).
+The game loads the Steamworks SDK at runtime only when `SteamAppId` or
+`SteamGameId` equals `4798230`. A development `steam_appid.txt` alone does not
+select a Steam save profile. The SDK supplies the signed-in account identity;
+Steam Auto-Cloud synchronizes the native save files. See [CLOUD.md](CLOUD.md)
+for the complete save and packaging contract.

@@ -92,6 +92,10 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Resolve tag and commit
         id: ref
         run: |
@@ -108,13 +112,9 @@ jobs:
           OUT_DIR: ${{ runner.temp }}/artifacts
         run: bash scripts/ci/gather-build-artifacts.sh
 
-      # Steam depots contain the runnable game directory. The `*-portable`
-      # artifacts are the unpacked builds; the macOS depot uses the .app from
-      # macos-bundles.
-      #
-      # GitHub artifacts do not preserve the POSIX executable bit, so the
-      # binaries come back as mode 644 and Steam would ship an unlaunchable
-      # build. Restoring it here is not optional.
+      # Steam depots contain the runnable game directory. Windows and Linux
+      # use the portable artifacts. macOS uses the signed .app.tar.gz archive
+      # so GitHub artifact storage cannot discard its modes or symlinks.
       - name: Stage depot contents
         env:
           ART_DIR: ${{ runner.temp }}/artifacts
@@ -126,17 +126,33 @@ jobs:
           cp -R "$ART_DIR/windows-portable/." "$DEPOT_DIR/windows/"
           cp -R "$ART_DIR/linux-portable/."   "$DEPOT_DIR/linux/"
 
-          # upload-artifact strips the common prefix of its `path:` globs, so
-          # the bundle currently lands at macos-bundles/macos/<name>.app —
-          # depth 3. The bound is generous on purpose: adding one more glob to
-          # the macOS upload step would shift that prefix and silently move
-          # the bundle deeper.
-          APP_DIR=$(find "$ART_DIR" -maxdepth 6 -name '*.app' -type d | head -1)
-          test -n "$APP_DIR" || { echo "::error::no .app bundle found in the macOS artifact"; exit 1; }
-          cp -R "$APP_DIR" "$DEPOT_DIR/macos/"
+          # The macOS build always archives the final signed/notarized app,
+          # including when updater signing is disabled. Reject an ambiguous
+          # artifact set instead of silently selecting the first candidate.
+          mapfile -t APP_ARCHIVES < <(find "$ART_DIR/macos-bundles" -maxdepth 6 -type f -name '*.app.tar.gz')
+          if [ "${#APP_ARCHIVES[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one signed macOS app archive, found ${#APP_ARCHIVES[@]}"
+            exit 1
+          fi
+          tar -xzpf "${APP_ARCHIVES[0]}" -C "$DEPOT_DIR/macos"
+          mapfile -t MAC_CONTENTS < <(find "$DEPOT_DIR/macos" -mindepth 1 -maxdepth 1)
+          if [ "${#MAC_CONTENTS[@]}" -ne 1 ] || [[ "${MAC_CONTENTS[0]}" != *.app ]] || [ ! -d "${MAC_CONTENTS[0]}" ]; then
+            echo "::error::macOS archive must contain exactly one .app bundle"
+            exit 1
+          fi
+          APP_DIR="${MAC_CONTENTS[0]}"
+          test -x "$APP_DIR/Contents/MacOS/mesozoic-protocol"
 
-          find "$DEPOT_DIR/linux" -type f -exec chmod +x {} \;
-          find "$DEPOT_DIR/macos" -type d -name MacOS -exec sh -c 'chmod +x "$1"/*' _ {} \;
+          # Windows/Linux standalone binaries stay SDK-free. Only their Steam
+          # depots receive the runtime-loaded libraries. macOS already embeds
+          # its dylib before signing and notarization; never mutate that bundle.
+          node scripts/ci/prepare-steam-sdk.mjs windows "$DEPOT_DIR/windows"
+          node scripts/ci/prepare-steam-sdk.mjs linux "$DEPOT_DIR/linux"
+          test -s "$APP_DIR/Contents/Frameworks/libsteam_api.dylib"
+          test -s "$APP_DIR/Contents/Resources/licenses/STEAM-SDK-NOTICE.txt"
+
+          # The Linux portable executable still travels as a raw artifact.
+          chmod +x "$DEPOT_DIR/linux/mesozoic-protocol"
 
           # A depot holds the runnable game, never an installer and never an
           # updater payload. If one of those ever shows up here, an

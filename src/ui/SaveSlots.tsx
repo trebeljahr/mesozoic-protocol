@@ -8,6 +8,7 @@ import { DIFFICULTY_ACCENT, listSlots, type SlotId, type SlotInfo } from "../pro
 import { ExpectedCanvasTeardown } from "../render/ExpectedCanvasTeardown";
 import { SaveSlotsScene } from "../render/SaveSlotsScene";
 import { useGame } from "../store";
+import { DesktopSaveLocation } from "./DesktopSaveLocation";
 import { DifficultyModelIcon } from "./DifficultyModelIcon";
 import { SaveRecoveryControls } from "./SaveRecovery";
 import { SettingsMenu } from "./SettingsMenu";
@@ -144,6 +145,7 @@ export const SaveSlots = () => {
               onChange={() => setRevision((n) => n + 1)}
             />
           ))}
+          <DesktopSaveLocation />
         </div>
       )}
     </div>

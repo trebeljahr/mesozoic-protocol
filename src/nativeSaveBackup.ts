@@ -152,10 +152,10 @@ export const restoreNativeSaveBackup = async (): Promise<void> => {
 };
 
 /**
- * Patches localStorage's mutating methods so every write schedules a bounded
- * snapshot, and flushes on backgrounding. Patching the instance is the one
- * choke point that covers all ~18 call sites without threading an async
- * storage API through the save layer.
+ * Observes localStorage mutations so every write schedules a bounded snapshot,
+ * and flushes on backgrounding. Storage instances have exotic named-property
+ * setters, so wrap the prototype and filter by the target instance instead of
+ * assigning methods on localStorage. Session storage must stay independent.
  */
 export const installNativeSaveMirror = (): void => {
   if (!isNative()) return;
@@ -168,23 +168,24 @@ export const installNativeSaveMirror = (): void => {
     reportNativeFailure();
     return;
   }
-  const setItem = ls.setItem.bind(ls);
-  const removeItem = ls.removeItem.bind(ls);
-  const clear = ls.clear.bind(ls);
-  mirrorInstalled = true;
+  const prototype = Object.getPrototypeOf(ls) as Storage;
+  const setItem = prototype.setItem;
+  const removeItem = prototype.removeItem;
+  const clear = prototype.clear;
 
-  ls.setItem = (key: string, value: string): void => {
-    setItem(key, value);
-    if (isMirroredKey(key)) scheduleFlush();
+  prototype.setItem = function (key: string, value: string): void {
+    setItem.call(this, key, value);
+    if (this === ls && isMirroredKey(String(key))) scheduleFlush();
   };
-  ls.removeItem = (key: string): void => {
-    removeItem(key);
-    if (isMirroredKey(key)) scheduleFlush();
+  prototype.removeItem = function (key: string): void {
+    removeItem.call(this, key);
+    if (this === ls && isMirroredKey(String(key))) scheduleFlush();
   };
-  ls.clear = (): void => {
-    clear();
-    scheduleFlush();
+  prototype.clear = function (): void {
+    clear.call(this);
+    if (this === ls) scheduleFlush();
   };
+  mirrorInstalled = true;
 
   // pagehide is the reliable "app is going away" signal in WKWebView;
   // visibilitychange covers the Android task-switch path.

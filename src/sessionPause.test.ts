@@ -5,7 +5,13 @@ import { listenForSessionInterruptions, SessionPause } from "./sessionPause";
 import { createWorld, spawnEnemy } from "./sim/world";
 import { useGame } from "./store";
 
-const reasons = ["hidden", "page-hidden", "native-background", "orientation"] as const;
+const reasons = [
+  "hidden",
+  "page-hidden",
+  "native-background",
+  "orientation",
+  "update-install",
+] as const;
 beforeEach(() => {
   for (const reason of reasons) useGame.getState().setInterruptionBlocked(reason, false);
   useGame.setState({

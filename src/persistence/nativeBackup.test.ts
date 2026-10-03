@@ -37,6 +37,9 @@ const SLOT = "mesozoic-protocol:slot:1:v1";
 const SECOND = "mesozoic-protocol:slot:2:v1";
 const TOMBSTONE = '{"deleted":true}';
 let storage: Storage;
+let sessionStorage: Storage;
+let failLocalWriteKey: string | null;
+let dropLocalWrites: boolean;
 let events: Map<string, () => void>;
 
 beforeEach(() => {
@@ -50,24 +53,40 @@ beforeEach(() => {
   native.beforeWrite = null;
   native.inFlight = 0;
   native.maxInFlight = 0;
-  const map = new Map<string, string>();
+  failLocalWriteKey = null;
+  dropLocalWrites = false;
   events = new Map();
-  storage = {
+  // A fresh prototype isolates each test's interception. Non-extensible
+  // instances also reject method shadowing, which cannot reliably intercept
+  // actual WebStorage writes through its exotic named-property setters.
+  class TestStorage implements Storage {
+    private values = new Map<string, string>();
     get length() {
-      return map.size;
-    },
-    key: (i) => [...map.keys()][i] ?? null,
-    getItem: (key) => map.get(key) ?? null,
-    setItem: (key, value) => {
-      map.set(key, value);
-    },
-    removeItem: (key) => {
-      map.delete(key);
-    },
-    clear: () => map.clear(),
-  };
+      return this.values.size;
+    }
+    key(index: number) {
+      return [...this.values.keys()][index] ?? null;
+    }
+    getItem(key: string) {
+      return this.values.get(key) ?? null;
+    }
+    setItem(key: string, value: string) {
+      if (this === storage && key === failLocalWriteKey) throw new Error("quota");
+      if (this === storage && dropLocalWrites) return;
+      this.values.set(key, value);
+    }
+    removeItem(key: string) {
+      this.values.delete(key);
+    }
+    clear() {
+      this.values.clear();
+    }
+  }
+  storage = Object.preventExtensions(new TestStorage());
+  sessionStorage = Object.preventExtensions(new TestStorage());
   vi.stubGlobal("window", {
     localStorage: storage,
+    sessionStorage,
     addEventListener: (name: string, fn: () => void) => events.set(name, fn),
   });
 });
@@ -196,18 +215,14 @@ it("refuses seeding before any successful native read", async () => {
 
 it("preserves the mirror after a partial restore and retains newer local values on retry", async () => {
   native.value = JSON.stringify({ [SLOT]: "first", [SECOND]: "second" });
-  const set = storage.setItem;
-  storage.setItem = (key, value) => {
-    if (key === SECOND) throw new Error("quota");
-    set(key, value);
-  };
+  failLocalWriteKey = SECOND;
   const s = await api();
   await s.restoreNativeSaveBackup();
   expect(storage.getItem(SLOT)).toBe("first");
   s.installNativeSaveMirror();
   await vi.advanceTimersByTimeAsync(1500);
   expect(native.writes).toEqual([]);
-  storage.setItem = set;
+  failLocalWriteKey = null;
   storage.setItem(SLOT, "newer local");
   await s.retryFailedSaves();
   expect(storage.getItem(SLOT)).toBe("newer local");
@@ -218,7 +233,7 @@ it("preserves the mirror after a partial restore and retains newer local values 
 it("detects a silently dropped local restore without overwriting its source", async () => {
   const original = JSON.stringify({ [SLOT]: "original" });
   native.value = original;
-  storage.setItem = () => {};
+  dropLocalWrites = true;
   const s = await api();
   await s.restoreNativeSaveBackup();
   s.installNativeSaveMirror();
@@ -247,4 +262,36 @@ it("serializes slow native writes and eventually flushes the latest checkpoint",
   await vi.advanceTimersByTimeAsync(0);
   expect(native.maxInFlight).toBe(1);
   expect(JSON.parse(native.value!)[SLOT]).toBe("latest");
+});
+
+it("intercepts prototype mutations without mirroring sessionStorage or unrelated keys", async () => {
+  const s = await api();
+  await s.restoreNativeSaveBackup();
+  s.installNativeSaveMirror();
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(native.writes).toHaveLength(1);
+  for (const method of ["setItem", "removeItem", "clear"]) {
+    expect(Object.hasOwn(storage, method)).toBe(false);
+  }
+
+  sessionStorage.setItem(SLOT, "session only");
+  sessionStorage.removeItem(SLOT);
+  sessionStorage.setItem(SECOND, "another session save");
+  sessionStorage.clear();
+  storage.setItem("unrelated:key", "local only");
+  storage.removeItem("unrelated:key");
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(native.writes).toHaveLength(1);
+  expect(storage.getItem(SLOT)).toBeNull();
+
+  storage.setItem(SLOT, "campaign");
+  storage.setItem(SECOND, "other campaign");
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(JSON.parse(native.value!)).toEqual({ [SLOT]: "campaign", [SECOND]: "other campaign" });
+  storage.removeItem(SLOT);
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(JSON.parse(native.value!)).toEqual({ [SECOND]: "other campaign" });
+  storage.clear();
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(JSON.parse(native.value!)).toEqual({});
 });

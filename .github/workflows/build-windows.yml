@@ -136,6 +136,12 @@ jobs:
         run: pnpm tauri build ${{ steps.updater.outputs.args }}
 
       # Tauri restores the unsigned Cargo executable after packaging installers.
+      - name: Native save and updater tests
+        env:
+          CARGO_BUILD_JOBS: 2
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --release --lib --features updater
+
+      # Re-sign after Rust validation so the portable artifact is checked last.
       # Sign the final standalone artifact used by the portable/Steam upload.
       - name: Sign final portable executable
         shell: pwsh

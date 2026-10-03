@@ -1,4 +1,21 @@
 {
+  "desktopSaves": {
+    "folder": "Lokale Spielstände:",
+    "locating": "Speicherordner wird gesucht…",
+    "openFolder": "Ordner öffnen",
+    "recovered": "Aus der lokalen Sicherung wiederhergestellt.",
+    "openFailed": "Der Ordner konnte nicht geöffnet werden. Kopiere den Pfad oben in deinen Dateimanager.",
+    "startupTitle": "Spielstände konnten nicht geöffnet werden",
+    "startupBody": "Deine Spielstände bleiben erhalten. Schließe andere laufende Kopien des Spiels und versuche es erneut. Prüfe bei Bedarf den Speicherordner und stelle eine Sicherung wieder her.",
+    "retry": "Erneut versuchen",
+    "retrying": "Spielstände werden geöffnet…",
+    "opening": "Ordner wird geöffnet…",
+    "quit": "Beenden",
+    "quitting": "Spiel wird beendet…",
+    "startupOpenFailed": "Der Speicherordner konnte nicht geöffnet werden. Öffne ihn im Dateimanager oder versuche es erneut.",
+    "startupQuitFailed": "Das Spiel konnte nicht beendet werden. Schließe es über die Fenstersteuerung deines Systems.",
+    "startupRetryFailed": "Das Spiel konnte nicht gestartet werden. Deine Spielstände bleiben erhalten. Versuche es erneut."
+  },
   "saveRecovery": {
     "warning": "Der Fortschritt ist nicht sicher gespeichert.",
     "warningDetail": "Lass diese Sitzung geöffnet. Versuche es erneut oder exportiere den letzten gespeicherten Kontrollpunkt in der Spielstandauswahl.",
@@ -598,6 +615,7 @@
     "install": "Installieren",
     "retry": "Wiederholen",
     "later": "Später",
+    "installing": "Speichern und installieren…",
     "downloading": "Wird geladen…",
     "downloadingPct": "Wird geladen… {{pct}}%",
     "failed": "Das Update konnte nicht installiert werden."

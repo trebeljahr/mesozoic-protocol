@@ -185,6 +185,11 @@ jobs:
           REQUIRE_UPDATER: auto
         run: bash scripts/ci/updater-gate.sh
 
+      # The same signed app ships standalone and through Steam. Embed the inert
+      # SDK before signing; it is loaded only for this game's Steam launches.
+      - name: Prepare pinned Steam SDK
+        run: node scripts/ci/prepare-steam-sdk.mjs macos src-tauri/target/steam-sdk/macos
+
       # The updater tarball is packed from the already-signed, notarized and
       # stapled .app, so the update a user installs passes Gatekeeper exactly
       # like a fresh DMG download does.
@@ -194,7 +199,10 @@ jobs:
           # APPLE_CERTIFICATE would trigger a second import by Tauri.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build --target universal-apple-darwin ${{ steps.updater.outputs.args }}
+        run: pnpm tauri build --target universal-apple-darwin --config src-tauri/tauri.steam.conf.json ${{ steps.updater.outputs.args }}
+
+      - name: Test native saves and Steam identity
+        run: CARGO_BUILD_JOBS=2 cargo test --manifest-path src-tauri/Cargo.toml --locked --release --lib --features updater
 
       # Tauri notarizes and staples the app before packaging it. Submit the
       # signed disk image as well so the downloaded installer has its own ticket.
@@ -240,6 +248,12 @@ jobs:
           codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -Fx "TeamIdentifier=$APPLE_TEAM_ID"
           ARCHES=$(lipo -archs "$APP_PATH/Contents/MacOS/mesozoic-protocol")
           [[ "$ARCHES" == *arm64* && "$ARCHES" == *x86_64* ]]
+          STEAM_LIBRARY="$APP_PATH/Contents/Frameworks/libsteam_api.dylib"
+          test -s "$STEAM_LIBRARY"
+          codesign --verify --strict --verbose=2 "$STEAM_LIBRARY"
+          STEAM_ARCHES=$(lipo -archs "$STEAM_LIBRARY")
+          [[ "$STEAM_ARCHES" == *arm64* && "$STEAM_ARCHES" == *x86_64* ]]
+          test -s "$APP_PATH/Contents/Resources/licenses/STEAM-SDK-NOTICE.txt"
           VERSION=$(node -p "require('./package.json').version")
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")" = "$VERSION"
           export APP_PATH DMG_PATH
@@ -279,8 +293,7 @@ jobs:
           # `if-no-files-found` is evaluated over all patterns together, so the
           # updater globs matching nothing (not activated yet) is fine.
           #
-          # NOTE for steam.yml: it locates the .app with `find -maxdepth 6 -name
-          # '*.app' -type d`, so the added globs cannot confuse it — they are
-          # files, not directories, and do not change the common path prefix
-          # upload-artifact strips.
+          # steam.yml requires exactly one .app.tar.gz, then extracts the
+          # signed bundle with its modes and symlinks intact. It never stages
+          # this raw .app directory, whose modes GitHub artifacts discard.
           if-no-files-found: error

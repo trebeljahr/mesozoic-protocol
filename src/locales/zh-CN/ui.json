@@ -1,4 +1,21 @@
 {
+  "desktopSaves": {
+    "folder": "Local saves:",
+    "locating": "Locating save folder…",
+    "openFolder": "Open folder",
+    "recovered": "Recovered from the local backup.",
+    "openFailed": "Could not open the folder. Copy the path above into your file manager.",
+    "startupTitle": "Could not open your saves",
+    "startupBody": "Your save files have been kept. Close any other copy of the game, then retry. If needed, check the save folder and restore a backup.",
+    "retry": "Retry",
+    "retrying": "Opening saves…",
+    "opening": "Opening folder…",
+    "quit": "Quit",
+    "quitting": "Closing the game…",
+    "startupOpenFailed": "Could not open the save folder. Open it in your file manager or try again.",
+    "startupQuitFailed": "Could not close the game. Use your system window controls to quit.",
+    "startupRetryFailed": "Could not start the game. Your save files have been kept. Try again."
+  },
   "saveRecovery": {
     "warning": "Progress is not safely saved.",
     "warningDetail": "Keep this session open. Retry, or use the slot screen to export your last saved checkpoint.",
@@ -598,6 +615,7 @@
     "install": "Install & restart",
     "retry": "Try again",
     "later": "Later",
+    "installing": "正在保存并安装…",
     "downloading": "Downloading…",
     "downloadingPct": "Downloading… {{pct}}%",
     "failed": "The update could not be installed."

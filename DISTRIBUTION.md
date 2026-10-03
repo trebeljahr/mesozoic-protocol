@@ -316,18 +316,21 @@ login. For example: `VITE_DEMO=1 VITE_STEAM_STORE_READY=1 pnpm build`.
 This flag does not publish the page. The static about/press buttons have their
 own release step and remain disabled until the page is verified.
 
-The game currently has **local achievements and local saves**. It has no
-Steam achievement API bridge or configured cloud-save implementation in this
-repository. Do not advertise those Steam features based on the local systems.
-An uploaded depot alone does not confirm runtime integrations.
+The game has local achievements and durable desktop save files. Steam builds
+read the current account's Steam ID through the SDK and keep that account's
+saves in its own directory. Steam Auto-Cloud synchronizes the files after
+Steamworks rules are configured and published. See [the Cloud contract](steam/CLOUD.md).
+The achievement API bridge is still absent. An uploaded depot alone does not
+confirm Cloud synchronization or achievement support.
 
 [Steam achievements](https://partner.steamgames.com/doc/features/achievements)
 require configured achievement IDs and runtime API calls.
 [Steam Cloud](https://partner.steamgames.com/doc/features/cloud) supports both
 an API and Auto-Cloud file rules; an SDK is not required for Auto-Cloud.
 Either route needs Steamworks configuration and a real two-device sync test.
-Do not point Auto-Cloud at an entire webview profile: stable, game-owned save
-files and conflict handling must be established first.
+Do not point Auto-Cloud at the WebView profile or all account folders. Only the
+current account's two campaign JSON files belong in Cloud storage. Machine
+preferences and the native write lock remain local.
 
 Before claiming platform support, verify a packaged build through Steam:
 achievement unlock and persistence, offline play followed by reconnect,
@@ -812,35 +815,32 @@ depot, and `release.yml` strips `.sig` / `.app.tar.gz` before handing the
 artifacts to butler — the itch.io app runs its own differential updates and has
 no use for the Tauri payload.
 
-### Save data and the Windows force-exit
+### Durable saves before installation
 
-Windows installers terminate the app mid-install (`std::process::exit(0)`), so
-the frontend gets no ordinary shutdown. `updater_check` installs an
-`UpdaterBuilder::on_before_exit` hook that emits `updater://before-exit` and
-blocks for 600 ms before the process dies;
-[src/updater.ts](src/updater.ts) listens for it and re-persists the active save
-slot, and also persists once before the download even starts.
+Updates use three native commands: check, download, and install. Download
+verifies the updater signature and retains the payload in memory. Before
+installation, the frontend pauses the mission, blocks input, snapshots the
+active slot, and awaits the native save-file write. A failed save prevents
+installation; retry can reuse the verified download. This also protects the
+Windows path, where the installer terminates the process without a normal close.
 
-Be clear about what that does and does not guarantee. Progress writes in this
-game are already synchronous and write-through — every mutation routes through
-`persistProgress` in [src/store.ts](src/store.ts) straight into localStorage —
-so there is no dirty buffer to flush and the hook is a backstop, not a rescue.
-What it cannot promise is durability: there is no API to make a WebView fsync
-its storage, the event is delivered asynchronously, and 600 ms is a heuristic.
-The realistic failure mode is losing the last few seconds of play, not a save
-file; and it only exists on Windows, because macOS and Linux swap the bundle in
-place and return normally.
+The desktop save backend writes `progress.json` and `progress.backup.json`
+under the application data directory. Writes use a temporary file, flush it,
+and atomically replace the destination. The backup retains the previous valid
+document. An OS file lock prevents two game instances from writing the same
+profile. Unexpected external changes block further writes until restart.
 
-The flow is driven from Rust commands (`updater_check` / `updater_install`)
-rather than the plugin's JavaScript API, for two reasons. The plugin's own
-`download_and_install` command hardcodes its `on_before_exit` hook, so there is
-no way to attach the one above. And capability permissions cannot be
-conditioned on a Cargo feature: putting `updater:allow-check` in
-[src-tauri/capabilities/default.json](src-tauri/capabilities/default.json)
-fails the build with *"Permission updater:allow-check not found"* whenever the
-feature is off — exactly the state the repo has to stay green in. App-defined
-commands are not ACL-checked (Tauri v2 only resolves the ACL for
-`plugin:`-prefixed commands), so the capability file needs no changes at all.
+Startup loads disk files before importing the game store. A valid disk document
+replaces campaign entries in the WebView cache, including deletions. Standalone
+builds migrate old WebView saves on first use; Steam profiles require explicit
+import of standalone saves, preventing account switching from copying another
+player's progress. If both disk copies are unreadable, startup shows recovery
+controls and leaves the files untouched. A normal window close or macOS Quit
+waits for pending writes; failed writes keep the game open with a retry notice.
+
+The app commands are registered together with the optional updater so save
+support works with or without the updater feature. The web and Capacitor builds
+retain their existing persistence paths.
 
 ### The update prompt
 

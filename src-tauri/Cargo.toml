@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Mesozoic Protocol — roguelite tower defense"
 authors = ["you"]
 edition = "2021"
+rust-version = "1.89"
 
 [lib]
 name = "mesozoic_protocol_lib"
@@ -21,6 +22,11 @@ serde_json = "1"
 # desktop targets only. It is also `optional` — see the `updater` feature below.
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-updater = { version = "2", optional = true }
+tempfile = "3"
+libloading = "0.8.9"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 
 [features]
 default = ["custom-protocol"]
