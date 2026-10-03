@@ -13,7 +13,7 @@ import {
 import { useGame } from "../store";
 import { DamageIcon } from "./DamageIcon";
 import { EnemyIcon } from "./EnemyIcon";
-import { activeModal, isActivationKey } from "./modalFocus";
+import { activeModal, isActivationKey, isModalUtilityTarget } from "./modalFocus";
 import { useModalFocus } from "./useModalFocus";
 
 const DAMAGE_TYPES: DamageType[] = ["kinetic", "electric", "cold", "explosive", "flame"];
@@ -35,7 +35,7 @@ export const NewEnemyAlert = () => {
     // Swallow every key while the alert is up — otherwise game hotkeys
     // (P, R, 1–4, Space) leak through and confuse state.
     const onKey = (e: KeyboardEvent) => {
-      if (activeModal() !== dialogRef.current) return;
+      if (isModalUtilityTarget(e.target) || activeModal() !== dialogRef.current) return;
       if (isActivationKey(e)) {
         e.preventDefault();
         dismiss();

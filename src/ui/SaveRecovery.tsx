@@ -10,6 +10,7 @@ export const SaveHealthNotice = () => {
   return (
     <aside
       role="alert"
+      data-modal-utility="save-health"
       className="fixed bottom-3 left-3 right-3 z-[250] rounded border border-red bg-surface-1 p-3 text-sm text-fg-primary pointer-events-auto"
     >
       <strong>{t("saveRecovery.warning")}</strong>{" "}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { hasLevelInterstitial } from "../levels/briefings";
 import { useGame } from "../store";
-import { activeModal, isActivationKey } from "./modalFocus";
+import { activeModal, isActivationKey, isModalUtilityTarget } from "./modalFocus";
 import { useInputMode } from "./useInputMode";
 import { useModalFocus } from "./useModalFocus";
 
@@ -44,7 +44,12 @@ export const LevelIntro = () => {
   useEffect(() => {
     if (!report) return;
     const onKey = (event: KeyboardEvent) => {
-      if (activeModal() !== dialogRef.current || !isActivationKey(event)) return;
+      if (
+        isModalUtilityTarget(event.target) ||
+        activeModal() !== dialogRef.current ||
+        !isActivationKey(event)
+      )
+        return;
       event.preventDefault();
       event.stopImmediatePropagation();
       beginDefense();
