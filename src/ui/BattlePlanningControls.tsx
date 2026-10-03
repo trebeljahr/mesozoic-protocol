@@ -46,7 +46,7 @@ export function BattlePlanningControls() {
         return;
       const action = actionForKey(event, bindings);
       const state = useGame.getState();
-      if (!canUseBattlefield(state)) return;
+      if (!canUseBattlefield(state) || isTrainingSession(state.world)) return;
       if (action === "planning") {
         event.preventDefault();
         state.togglePlanningPause();
@@ -64,7 +64,7 @@ export function BattlePlanningControls() {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [bindings]);
-  if (screen !== "playing") return null;
+  if (screen !== "playing" || training) return null;
   return (
     <section className="battle-planning" aria-label={t("planning.controls")}>
       <div className="battle-planning-row">
