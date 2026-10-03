@@ -2,6 +2,7 @@ import type React from "react";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { isDebug } from "../debug";
+import { isInstalledApp } from "../installedApp";
 import { getLevel } from "../levels";
 import { useGame } from "../store";
 import { ConfirmationDialog } from "./ConfirmationDialog";
@@ -66,13 +67,15 @@ export const PauseMenu = ({ onResume }: Props) => {
       closeTitle={showKeyboardHints ? `${t("pause.resume")} (Esc)` : t("pause.resume")}
     >
       <div className="menu-panel-scroll">
-        <button
-          type="button"
-          className="btn btn-ghost w-full mb-3"
-          onClick={() => useGame.getState().goToSlots()}
-        >
-          {t("saveRecovery.suspend")}
-        </button>
+        {!isInstalledApp() && (
+          <button
+            type="button"
+            className="btn btn-ghost w-full mb-3"
+            onClick={() => useGame.getState().goToSlots()}
+          >
+            {t("saveRecovery.suspend")}
+          </button>
+        )}
         <DifficultyButton
           className="w-full min-h-11 mb-3 bg-surface-1 border border-border rounded-md px-3 py-2.5 flex items-center gap-3 cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-border-strong hover:text-white"
           title={t("difficulty.change")}
