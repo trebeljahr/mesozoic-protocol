@@ -13,6 +13,7 @@ import { LevelEditorPanel } from "./editor/LevelEditorPanel";
 import { WorldMapEditorPanel } from "./editor/WorldMapEditorPanel";
 import { useWorldMapEditor } from "./editor/worldMapEditorStore";
 import { useGamepadMenuNavigation } from "./input/useGamepadMenuNavigation";
+import { QUALITY_SETTINGS, qualityForPreference, usePresentation } from "./preferences";
 import { ComposerBufferCleanup } from "./render/ComposerBufferCleanup";
 import { ExpectedCanvasTeardown } from "./render/ExpectedCanvasTeardown";
 import { PaintedPostFx } from "./render/PaintedPostFx";
@@ -37,6 +38,7 @@ import { enterFullscreen, isFullscreen, loadFullscreenPref } from "./ui/useFulls
 import { useInputModeSignal } from "./ui/useInputMode";
 import { useLevelLoadProgress } from "./ui/useLevelLoadProgress";
 import { useIsMobile } from "./ui/useMediaQuery";
+import { useReducedMotion } from "./ui/useReducedMotion";
 import { WorldMapUI } from "./ui/WorldMapUI";
 import { isTauriShell } from "./updater";
 
@@ -92,31 +94,15 @@ const SceneRoot = () => {
   );
 };
 
-// Lightweight device tier check used to scale bloom kernel and DPR cap.
-// `low` = mobile-ish (<=4 logical cores or coarse pointer / mobile UA);
-// other devices keep the higher-quality MEDIUM kernel.
-const isLowEndDevice = (): boolean => {
-  if (typeof navigator === "undefined") return false;
-  const cores = navigator.hardwareConcurrency ?? 8;
-  if (cores <= 4) return true;
-  if (typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches) return true;
-  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-};
-
-const lowEnd = isLowEndDevice();
-const bloomKernel = lowEnd ? KernelSize.SMALL : KernelSize.MEDIUM;
-// Bumped low-end ceiling from 1.75 → 2 so retina phones don't sub-sample
-// the framebuffer. Sub-2× on a 3× device produces stair-step edges along
-// dinosaur silhouettes that no MSAA pass can fully hide.
-const dprCap: [number, number] = lowEnd ? [1, 2] : [1, 2];
-// MSAA in the postprocessing composer. The Canvas-level antialias prop
-// is bypassed once EffectComposer renders into its own multisample-less
-// render target, so silhouettes go jagged. 4x is the sweet-spot —
-// 2x leaves thin animated silhouettes (dino legs, antennae) flickering
-// frame-to-frame on retina mobile.
-const composerMultisampling = 4;
-
 export const App = () => {
+  const graphicsPreference = usePresentation((s) => s.preferences.graphics);
+  const quality = qualityForPreference(graphicsPreference);
+  const renderSettings = QUALITY_SETTINGS[quality];
+  const reducedMotion = useReducedMotion();
+  useEffect(() => {
+    document.body.classList.toggle("reduced-motion", reducedMotion);
+    return () => document.body.classList.remove("reduced-motion");
+  }, [reducedMotion]);
   const screen = useGame((s) => s.screen);
   const glContextEpoch = useGame((s) => s.glContextEpoch);
   const levelIntroVisible = useGame((s) => s.levelIntroVisible);
@@ -268,9 +254,10 @@ export const App = () => {
               toDataURL for press screenshots; costs a buffer copy per frame,
               so keep it out of normal play. Dead-codes out of prod builds. */}
           <Canvas
+            key={quality}
             events={playEvents}
-            shadows
-            dpr={dprCap}
+            shadows={renderSettings.shadows}
+            dpr={[1, renderSettings.dpr]}
             gl={{
               antialias: true,
               powerPreference: "high-performance",
@@ -309,7 +296,7 @@ export const App = () => {
           >
             <ExpectedCanvasTeardown />
             <SceneRoot key={`scene-${glContextEpoch}`} />
-            <EffectComposer key={`fx-${glContextEpoch}`} multisampling={composerMultisampling}>
+            <EffectComposer key={`fx-${glContextEpoch}`} multisampling={renderSettings.samples}>
               <ComposerBufferCleanup />
               {screen === "playing" ? (
                 <PaintedPostFx />
@@ -319,7 +306,7 @@ export const App = () => {
                   luminanceThreshold={bloomThreshold}
                   luminanceSmoothing={bloomSmoothing}
                   mipmapBlur
-                  kernelSize={bloomKernel}
+                  kernelSize={quality === "low" ? KernelSize.SMALL : KernelSize.MEDIUM}
                 />
               )}
             </EffectComposer>

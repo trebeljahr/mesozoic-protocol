@@ -12,7 +12,7 @@ vi.mock("@react-three/fiber", () => ({
   useThree: (select: (state: unknown) => unknown) =>
     select({ gl: { capabilities: { getMaxAnisotropy: () => 4 } } }),
 }));
-vi.mock("./effectsTunables", () => ({ GRAPHICS_QUALITY: "high" }));
+vi.mock("./effectsTunables", () => ({ getGraphicsQuality: () => "high" }));
 
 import { TerrainSoilMaterial } from "./TerrainSoilMaterial";
 

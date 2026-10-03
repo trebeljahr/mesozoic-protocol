@@ -2,13 +2,13 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
-import { BLOOM_LAYER, GRAPHICS_QUALITY } from "./effectsTunables";
+import { BLOOM_LAYER, getGraphicsQuality } from "./effectsTunables";
 import { softParticleShader, useSoftParticles } from "./SoftParticles";
 
 // Short moving ribbons, inspired by the rifle's trailing bolts. Stan uses
 // broad brass pellets with ivory tips, rather than cyan continuous trails.
 export const BallisticTracers = () => {
-  const capacity = GRAPHICS_QUALITY === "low" ? 96 : 192;
+  const capacity = getGraphicsQuality() === "low" ? 96 : 192;
   const ref = useRef<THREE.InstancedMesh>(null);
   const soft = useSoftParticles();
   const scratch = useMemo(

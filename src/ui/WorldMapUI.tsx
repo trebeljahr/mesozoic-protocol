@@ -40,6 +40,7 @@ import {
 } from "./MenuIcons";
 import { MenuOverlay } from "./MenuOverlay";
 import { ModesUnlockedModal } from "./ModesUnlockedModal";
+import { PresentationControls } from "./PresentationControls";
 import { QuickSettings } from "./QuickSettings";
 import { SoundControls } from "./SoundControls";
 import { StarDisplay } from "./StarDisplay";
@@ -271,6 +272,7 @@ export const WorldMapUI = () => {
         <MenuOverlay title={t("common.menu")} onClose={() => setMenuOpen(false)}>
           <div className="menu-panel-scroll">
             <SoundControls />
+            <PresentationControls />
             <FullscreenToggle />
             <LanguageControls />
             {isDebug && <DebugProgressSettings />}

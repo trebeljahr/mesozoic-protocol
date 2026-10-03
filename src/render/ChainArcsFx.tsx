@@ -2,7 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 import {
   CHAIN_BEAM_COLOR,
   isLightningBeam,
@@ -137,8 +137,8 @@ export const ChainArcsFx = () => {
     const flash = flashRef.current;
     if (!core || !halo || !flash) return;
     const now = world.time;
-    const forksPerHop = FORKS_PER_HOP[GRAPHICS_QUALITY];
-    const wantFlash = GRAPHICS_QUALITY !== "low";
+    const forksPerHop = FORKS_PER_HOP[getGraphicsQuality()];
+    const wantFlash = getGraphicsQuality() !== "low";
 
     const corePos = core.geometry.attributes.position.array as Float32Array;
     const coreCol = core.geometry.attributes.color.array as Float32Array;

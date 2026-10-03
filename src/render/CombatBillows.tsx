@@ -3,7 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useGame } from "../store";
-import { BLOOM_LAYER, GRAPHICS_QUALITY } from "./effectsTunables";
+import { BLOOM_LAYER, getGraphicsQuality } from "./effectsTunables";
 import { softParticleShader, useSoftParticles } from "./SoftParticles";
 
 const vertexShader = `
@@ -70,7 +70,7 @@ const seed = (id: number) => (id * 0.61803398875) % 1;
 // Smoke and cold vapor share one sorted batch and one atlas. Explosions reuse
 // the flame atlas in a second batch, replacing the old two sphere batches.
 export const CombatBillows = ({ kind }: { kind: "blast" | "vapor" }) => {
-  const low = GRAPHICS_QUALITY === "low";
+  const low = getGraphicsQuality() === "low";
   const capacity = kind === "blast" ? (low ? 48 : 96) : low ? 160 : 320;
   const atlas = useTexture(`/textures/fx/${kind === "blast" ? "flame" : "smoke"}-billow-atlas.png`);
   const soft = useSoftParticles();

@@ -6486,3 +6486,52 @@
 .map-label:disabled { pointer-events: none; }
 
 @media (max-width: 560px) { .mode-picker-grid { grid-template-columns: 1fr; } }
+
+@layer components {
+  .presentation-controls {
+    border-top: 1px solid var(--color-border);
+    padding: 16px 0;
+    margin-bottom: 12px;
+  }
+  .presentation-controls h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--color-fg-secondary);
+  }
+  .presentation-controls label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    font-size: 13px;
+  }
+  .presentation-controls select {
+    min-height: 40px;
+    max-width: 58%;
+    padding: 6px 10px;
+    color: var(--color-fg);
+    background: #101a24;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 5px;
+  }
+  .presentation-controls input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--color-blue);
+  }
+  .presentation-controls p {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-fg-muted);
+    margin: 6px 0 16px;
+  }
+  body.reduced-motion *,
+  body.reduced-motion *::before,
+  body.reduced-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

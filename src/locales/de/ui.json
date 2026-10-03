@@ -565,5 +565,30 @@
     "downloading": "Wird geladen…",
     "downloadingPct": "Wird geladen… {{pct}}%",
     "failed": "Das Update konnte nicht installiert werden."
+  },
+  "presentation": {
+    "title": "Anzeige und Bewegung",
+    "graphics": "Grafikqualität",
+    "quality": {
+      "auto": "Automatisch",
+      "low": "Niedrig",
+      "medium": "Mittel",
+      "high": "Hoch"
+    },
+    "qualityHelp": {
+      "auto": "Wählt eine Stufe für dieses Gerät. Deine Mission bleibt bei Änderungen erhalten.",
+      "low": "Geringere Auflösung, weniger Effekte und keine Echtzeitschatten.",
+      "medium": "Ausgewogene Auflösung, Effekte und Schatten.",
+      "high": "Schärfere Darstellung, volle Effekte und detaillierte Schatten."
+    },
+    "motion": "Bewegung",
+    "motionChoice": {
+      "system": "Geräteeinstellung",
+      "reduced": "Reduziert",
+      "full": "Vollständig"
+    },
+    "shake": "Kamerawackeln",
+    "motionHelp": "Reduzierte Bewegung stoppt Kamerawackeln und Umgebungsbewegung. Kämpfe bleiben sichtbar.",
+    "unsaved": "Die Einstellungen gelten jetzt, konnten aber nicht gespeichert werden. Ändere eine Einstellung, um es erneut zu versuchen."
   }
 }

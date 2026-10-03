@@ -17,6 +17,7 @@ import {
 import { useGame } from "../store";
 import { IconBreach, IconLockdown } from "../ui/MenuIcons";
 import { StarDisplay } from "../ui/StarDisplay";
+import { useReducedMotion } from "../ui/useReducedMotion";
 import { mapLevelPosition } from "./worldMapLayout";
 
 type Props = { level: LevelConfig };
@@ -37,6 +38,7 @@ const MODE_BADGE: Record<"breach" | "containment", { Icon: typeof IconBreach; te
 };
 
 export const LevelNode = ({ level }: Props) => {
+  const reducedMotion = useReducedMotion();
   const groupRef = useRef<THREE.Group>(null);
   const progress = useGame((s) => s.progress);
   const hoveredLevelId = useGame((s) => s.hoveredLevelId);
@@ -92,7 +94,9 @@ export const LevelNode = ({ level }: Props) => {
     const g = groupRef.current;
     if (!g) return;
     const hoverBoost = hovered ? (unlocked ? 1.18 : 1.08) : 1.0;
-    if (unplayed) {
+    if (reducedMotion) {
+      g.scale.setScalar(hoverBoost);
+    } else if (unplayed) {
       const t = state.clock.elapsedTime;
       const pulse = 1 + Math.sin(t * 3.2) * 0.08;
       g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, pulse * hoverBoost, 12, delta));

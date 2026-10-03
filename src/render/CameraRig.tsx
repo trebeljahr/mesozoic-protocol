@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef } from "react";
 import type { OrthographicCamera as OrthographicCameraImpl } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useEditor } from "../editor/editorStore";
+import { usePresentation } from "../preferences";
 import { useGame } from "../store";
+import { useReducedMotion } from "../ui/useReducedMotion";
 import {
   ABS_MAX_ZOOM,
   BATTLE_MAX_POLAR,
@@ -20,6 +22,8 @@ import { PLAY_CAMERA_FRAME_PRIORITY, PLAY_PAN_CLAMP_FRAME_PRIORITY } from "./pla
 import { MapOrbitControls } from "./useMapGestures";
 
 export const CameraRig = () => {
+  const cameraShake = usePresentation((s) => s.preferences.cameraShake);
+  const reducedMotion = useReducedMotion();
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const cameraRef = useRef<OrthographicCameraImpl>(null);
 
@@ -146,6 +150,7 @@ export const CameraRig = () => {
       if (t >= 1) lossShakeStartRef.current = null;
     }
 
+    if (!cameraShake || reducedMotion) mag = 0;
     const desiredX = mag > 0.001 ? (Math.random() - 0.5) * mag : 0;
     const desiredZ = mag > 0.001 ? (Math.random() - 0.5) * mag : 0;
     const last = shakeOffsetRef.current;

@@ -12,7 +12,7 @@ import { useGame } from "../store";
 import { useIsMobile } from "../ui/useMediaQuery";
 import { BiomeGround } from "./BiomeGround";
 import { BiomeProps } from "./BiomeProps";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 import { LevelNode } from "./LevelNode";
 import { MapRoute } from "./MapRoute";
 import { MapOrbitControls } from "./useMapGestures";
@@ -255,8 +255,8 @@ export const WorldMapScene = () => {
         intensity={2.8}
         color="#ffe8cf"
         castShadow
-        shadow-mapSize-width={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
-        shadow-mapSize-height={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
+        shadow-mapSize-width={getGraphicsQuality() === "low" ? 1024 : 2048}
+        shadow-mapSize-height={getGraphicsQuality() === "low" ? 1024 : 2048}
         shadow-camera-left={-CONTENT_H}
         shadow-camera-right={CONTENT_H}
         shadow-camera-top={CONTENT_H}

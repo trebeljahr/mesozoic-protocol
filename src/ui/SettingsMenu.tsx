@@ -6,6 +6,7 @@ import { FullscreenToggle } from "./FullscreenToggle";
 import { LanguageControls } from "./LanguageControls";
 import { IconCog } from "./MenuIcons";
 import { MenuOverlay } from "./MenuOverlay";
+import { PresentationControls } from "./PresentationControls";
 import { SoundControls } from "./SoundControls";
 import { useBackNavigation } from "./useBackNavigation";
 
@@ -33,6 +34,7 @@ export const SettingsMenu = () => {
         <MenuOverlay title={t("settings.title")} onClose={() => setOpen(false)}>
           <div className="menu-panel-scroll">
             <SoundControls />
+            <PresentationControls />
             <FullscreenToggle />
             <LanguageControls />
             {isDebug && <DebugProgressSettings />}

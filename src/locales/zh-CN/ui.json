@@ -565,5 +565,30 @@
     "downloading": "Downloading…",
     "downloadingPct": "Downloading… {{pct}}%",
     "failed": "The update could not be installed."
+  },
+  "presentation": {
+    "title": "Display and motion",
+    "graphics": "Graphics quality",
+    "quality": {
+      "auto": "Automatic",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "qualityHelp": {
+      "auto": "Choose a preset for this device. Changes keep your mission intact.",
+      "low": "Lower resolution, fewer effects and no real-time shadows.",
+      "medium": "Balanced resolution, effects and shadows.",
+      "high": "Sharper rendering, full effects and detailed shadows."
+    },
+    "motion": "Motion",
+    "motionChoice": {
+      "system": "Use device setting",
+      "reduced": "Reduced",
+      "full": "Full"
+    },
+    "shake": "Camera shake",
+    "motionHelp": "Reduced motion stops camera shake and ambient movement. Combat remains visible.",
+    "unsaved": "Settings apply now, but could not be saved. Change a setting to retry."
   }
 }

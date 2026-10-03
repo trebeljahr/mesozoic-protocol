@@ -12,6 +12,7 @@ import { FullscreenToggle } from "./FullscreenToggle";
 import { LanguageControls } from "./LanguageControls";
 import { IconBook, IconMap, IconRefresh, IconTrophy } from "./MenuIcons";
 import { MenuOverlay } from "./MenuOverlay";
+import { PresentationControls } from "./PresentationControls";
 import { SoundControls } from "./SoundControls";
 import { useBackNavigation } from "./useBackNavigation";
 import { useKeyboardHintsVisible } from "./useInputMode";
@@ -76,6 +77,7 @@ export const PauseMenu = ({ onResume }: Props) => {
           }
         />
         <SoundControls />
+        <PresentationControls />
         <FullscreenToggle />
         <LanguageControls />
         {isDebug && <DebugProgressSettings />}

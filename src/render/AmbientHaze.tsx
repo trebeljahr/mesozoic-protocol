@@ -5,8 +5,9 @@ import * as THREE from "three";
 import { BIOME_PAINTED } from "../biomes";
 import { MAP_HEIGHT, MAP_WIDTH } from "../level";
 import { useGame } from "../store";
+import { useReducedMotion } from "../ui/useReducedMotion";
 import {
-  GRAPHICS_QUALITY,
+  getGraphicsQuality,
   HAZE_DRIFT,
   HAZE_LIFE,
   HAZE_POOL,
@@ -50,6 +51,7 @@ const spawn = (p: Particle) => {
 };
 
 export const AmbientHaze = () => {
+  const reducedMotion = useReducedMotion();
   const biome = useGame((s) => s.world.biome);
   const palette = BIOME_PAINTED[biome];
   const status = useGame((s) => s.world.status);
@@ -61,7 +63,7 @@ export const AmbientHaze = () => {
   const colorTmp = useMemo(() => new THREE.Color(), []);
 
   const poolSize = useMemo(() => {
-    const max = HAZE_POOL[GRAPHICS_QUALITY];
+    const max = HAZE_POOL[getGraphicsQuality()];
     return Math.max(0, Math.round(max * palette.dustDensity));
   }, [palette.dustDensity]);
 
@@ -105,7 +107,7 @@ export const AmbientHaze = () => {
     // covers waiting + paused + lost — we still want drift during waiting so
     // the level intro reads as atmospheric, only pause/results freeze it).
     const frozen = status === "lost" || status === "won";
-    if (poolSize === 0) {
+    if (poolSize === 0 || reducedMotion) {
       mesh.visible = false;
       return;
     }

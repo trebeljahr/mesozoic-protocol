@@ -1,24 +1,24 @@
 import { useLoader, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 
-const LOW = GRAPHICS_QUALITY === "low";
 const ROOT = "/textures/terrain/";
-const MAPS = [
+const terrainMaps = (low: boolean) => [
   "brown-mud/albedo.jpg",
   "compacted-dirt/albedo.jpg",
   "leaf-litter/albedo.jpg",
   "grass/albedo.jpg",
-  ...(LOW ? [] : ["brown-mud/normal.jpg"]),
+  ...(low ? [] : ["brown-mud/normal.jpg"]),
 ];
 
 // Same photographic soils and stochastic patching as the battlefield, with
 // vertex habitat weights spanning all six regions in one shadowed draw call.
 export const WorldMapSoilMaterial = () => {
+  const low = getGraphicsQuality() === "low";
   const sources = useLoader(
     THREE.TextureLoader,
-    MAPS.map((name) => ROOT + name),
+    terrainMaps(low).map((name) => ROOT + name),
   );
   const gl = useThree((s) => s.gl);
   const surface = useMemo(() => {
@@ -26,7 +26,7 @@ export const WorldMapSoilMaterial = () => {
       const texture = source.clone();
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
       texture.colorSpace = i < 4 ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-      texture.anisotropy = Math.min(LOW ? 2 : 4, gl.capabilities.getMaxAnisotropy());
+      texture.anisotropy = Math.min(low ? 2 : 4, gl.capabilities.getMaxAnisotropy());
       texture.needsUpdate = true;
       return texture;
     });
@@ -135,7 +135,7 @@ export const WorldMapSoilMaterial = () => {
     };
     material.customProgramCacheKey = () => "world-map-habitats-v2";
     return { material, textures };
-  }, [sources, gl]);
+  }, [sources, gl, low]);
   useEffect(
     () => () => {
       surface.material.dispose();

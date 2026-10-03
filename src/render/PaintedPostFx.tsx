@@ -32,7 +32,7 @@ import {
   GRADE_CONTRAST,
   GRADE_HUE,
   GRADE_SATURATION,
-  GRAPHICS_QUALITY,
+  getGraphicsQuality,
   OUTLINE_BLUR,
   OUTLINE_EDGE_STRENGTH,
   OUTLINE_HIDDEN_COLOR,
@@ -195,11 +195,11 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
   const bloomIntensity = BLOOM_INTENSITY * palette.bloomBias;
   const drawingBufferPixels = size.width * size.height * dpr * dpr;
   const includeOutline =
-    GRAPHICS_QUALITY !== "low" &&
+    getGraphicsQuality() !== "low" &&
     drawingBufferPixels > 0 &&
     drawingBufferPixels <= OUTLINE_MAX_DRAWING_BUFFER_PIXELS;
   const includeGodRays =
-    GRAPHICS_QUALITY === "high" &&
+    getGraphicsQuality() === "high" &&
     sunMesh !== null &&
     drawingBufferPixels > 0 &&
     drawingBufferPixels <= GODRAYS_MAX_DRAWING_BUFFER_PIXELS;
@@ -216,7 +216,7 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
         luminanceThreshold={BLOOM_THRESHOLD}
         luminanceSmoothing={BLOOM_SMOOTHING}
         intensity={bloomIntensity}
-        kernelSize={BLOOM_KERNEL[GRAPHICS_QUALITY]}
+        kernelSize={BLOOM_KERNEL[getGraphicsQuality()]}
         mipmapBlur
       />
       {includeGodRays && sunMesh && (
@@ -245,7 +245,7 @@ export const PaintedPostFx = ({ enabled = true }: Props) => {
           edgeStrength={OUTLINE_EDGE_STRENGTH}
           visibleEdgeColor={OUTLINE_VISIBLE_COLOR}
           hiddenEdgeColor={OUTLINE_HIDDEN_COLOR}
-          kernelSize={OUTLINE_KERNEL[GRAPHICS_QUALITY]}
+          kernelSize={OUTLINE_KERNEL[getGraphicsQuality()]}
           blur={OUTLINE_BLUR}
           resolutionScale={OUTLINE_RESOLUTION_SCALE}
           pulseSpeed={0}

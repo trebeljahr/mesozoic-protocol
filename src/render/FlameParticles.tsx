@@ -4,10 +4,9 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Particle } from "../sim/types";
 import { useGame } from "../store";
-import { BLOOM_LAYER, GRAPHICS_QUALITY } from "./effectsTunables";
+import { BLOOM_LAYER, getGraphicsQuality } from "./effectsTunables";
 import { softParticleShader, useSoftParticles } from "./SoftParticles";
 
-const CAPACITY = GRAPHICS_QUALITY === "low" ? 384 : 768;
 const ATLAS_URL = "/textures/fx/flame-billow-atlas.png";
 const vertexShader = `
 attribute vec3 flameState;
@@ -53,9 +52,10 @@ void main() {
 // one instanced draw per scene pass. A depth-only GPU copy supplies soft
 // intersections without a second scene render or per-particle raycasts.
 export const FlameParticles = () => {
+  const CAPACITY = getGraphicsQuality() === "low" ? 384 : 768;
   const atlas = useTexture(ATLAS_URL);
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const data = useMemo(() => new Float32Array(CAPACITY * 3), []);
+  const data = useMemo(() => new Float32Array(CAPACITY * 3), [CAPACITY]);
   const soft = useSoftParticles();
   const uniforms = useMemo(
     () => ({ ...soft.uniforms, atlas: { value: atlas } }),
@@ -66,7 +66,7 @@ export const FlameParticles = () => {
   const cameraInverse = useMemo(() => new THREE.Quaternion(), []);
   const slots = useMemo(
     () => Array.from({ length: CAPACITY }, () => ({ particle: null as Particle | null, depth: 0 })),
-    [],
+    [CAPACITY],
   );
   const visible = useMemo<(typeof slots)[number][]>(() => [], []);
 
@@ -90,7 +90,10 @@ export const FlameParticles = () => {
     }
     // Thin evenly over the entire pool under load so every tower retains a
     // stream, rather than allowing the first towers to consume all slots.
-    const budget = Math.min(CAPACITY, GRAPHICS_QUALITY === "low" ? Math.ceil(total / 2) : total);
+    const budget = Math.min(
+      CAPACITY,
+      getGraphicsQuality() === "low" ? Math.ceil(total / 2) : total,
+    );
     const stride = total / Math.max(1, budget);
     let candidate = 0;
     let next = 0;

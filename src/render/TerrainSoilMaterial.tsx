@@ -2,18 +2,17 @@ import { useLoader, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { Biome } from "../biomes";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 import { TERRAIN_PALETTE } from "./terrainPalette";
 
-const LOW = GRAPHICS_QUALITY === "low";
 const ROOT = "/textures/terrain/";
-const MAPS = [
+const terrainMaps = (low: boolean) => [
   "brown-mud/albedo.jpg",
   "brown-mud/roughness.jpg",
   "compacted-dirt/albedo.jpg",
   "leaf-litter/albedo.jpg",
   "grass/albedo.jpg",
-  ...(LOW
+  ...(low
     ? []
     : [
         "brown-mud/normal.jpg",
@@ -32,9 +31,10 @@ export const TerrainSoilMaterial = ({
   groundColor: string;
   biome: Biome;
 }) => {
+  const low = getGraphicsQuality() === "low";
   const sources = useLoader(
     THREE.TextureLoader,
-    MAPS.map((name) => ROOT + name),
+    terrainMaps(low).map((name) => ROOT + name),
   );
   const gl = useThree((s) => s.gl);
   const material = useMemo(() => {
@@ -42,7 +42,7 @@ export const TerrainSoilMaterial = ({
       // Cached source images are shared; sampler state and GPU handles are owned.
       const texture = source.clone();
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.anisotropy = Math.min(LOW ? 2 : 4, gl.capabilities.getMaxAnisotropy());
+      texture.anisotropy = Math.min(low ? 2 : 4, gl.capabilities.getMaxAnisotropy());
       texture.colorSpace =
         index === 0 || (index >= 2 && index <= 4) ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       texture.needsUpdate = true;
@@ -207,7 +207,7 @@ export const TerrainSoilMaterial = ({
     mat.customProgramCacheKey = () =>
       `terrain-stochastic-biomes-v3-${forest ? "forest" : "mineral"}`;
     return { mat, textures };
-  }, [sources, gl, groundColor, biome]);
+  }, [sources, gl, groundColor, biome, low]);
   useEffect(
     () => () => {
       material.mat.dispose();

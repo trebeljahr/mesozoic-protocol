@@ -5,7 +5,7 @@ import { useWorldMapEditor } from "../editor/worldMapEditorStore";
 import { LEVELS } from "../levels";
 import type { SlotId } from "../progress";
 import { useGame } from "../store";
-import { useMediaQuery } from "../ui/useMediaQuery";
+import { useReducedMotion } from "../ui/useReducedMotion";
 import { initialDiscovery, type MapDiscovery, mapDiscovery } from "./worldMapDiscovery";
 import { mapLevelPosition } from "./worldMapLayout";
 
@@ -18,7 +18,7 @@ export const WorldMapFog = () => {
   const progress = useGame((s) => s.progress);
   const slot = useGame((s) => s.activeSlot);
   const editing = useWorldMapEditor((s) => s.active);
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const reducedMotion = useReducedMotion();
   const target = useMemo(() => mapDiscovery(progress), [progress]);
   // WorldMapScene keys this component by slot. Material/uniforms persist across
   // star updates so reveal radii can interpolate without reallocating GPU data.

@@ -1,4 +1,5 @@
 import { KernelSize } from "postprocessing";
+import type { GraphicsQuality } from "../preferences";
 
 // Painted-look post-processing tunables. All magic numbers in one place so a
 // single-file pass is enough to retune the whole pipeline. Per-biome bias
@@ -13,23 +14,9 @@ import { KernelSize } from "postprocessing";
 export const BLOOM_LAYER = 11;
 export const OUTLINE_LAYER = 12;
 
-// Quality tiers. Driven by GRAPHICS_QUALITY (auto-detected from input mode +
-// hardware concurrency at import time). Steam Deck APU is the explicit
-// minimum target — "low" gates the expensive passes off so the frame budget
-// stays under ~13ms with many enemies on screen.
-export type GraphicsQuality = "low" | "medium" | "high";
-
-const detectGraphicsQuality = (): GraphicsQuality => {
-  if (typeof navigator === "undefined") return "medium";
-  const cores = navigator.hardwareConcurrency ?? 8;
-  const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-  const mobileUA = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-  if (touch || mobileUA || cores <= 4) return "low";
-  if (cores >= 8) return "high";
-  return "medium";
-};
-
-export const GRAPHICS_QUALITY: GraphicsQuality = detectGraphicsQuality();
+// Preset reads happen when render resources mount. App remounts the renderer
+// on a preset change without resetting the simulation or save.
+export { type GraphicsQuality, getGraphicsQuality } from "../preferences";
 
 // Selective bloom — only meshes on BLOOM_LAYER pass through. Threshold stays
 // at HDR white: selection alone also includes non-emissive model bodies.

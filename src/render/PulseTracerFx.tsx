@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { Projectile } from "../sim/types";
 import { useGame } from "../store";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 import { BLOOM_LAYER } from "./PaintedPostFx";
 import { pulseMuzzles } from "./pulseMuzzles";
 
@@ -130,7 +130,7 @@ export const PulseTracerFx = () => {
     const bolt = boltRef.current;
     if (!core || !halo || !muzzle || !ring || !bolt) return;
     const now = world.time;
-    const drawImpactRing = GRAPHICS_QUALITY !== "low";
+    const drawImpactRing = getGraphicsQuality() !== "low";
 
     // 1) Walk projectiles, classify pulse-owned, update trails.
     seen.clear();

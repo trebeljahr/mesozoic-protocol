@@ -2,7 +2,7 @@ import { useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 
 const SMOKE_SLOTS = ["one", "two", "three", "four", "five", "six", "seven"];
 
@@ -57,7 +57,7 @@ export const BattleDamage = ({
   seed?: number;
 }) => {
   const texture = useTexture("/textures/fx/whitepuff15.png");
-  const count = GRAPHICS_QUALITY === "low" ? 4 : 7;
+  const count = getGraphicsQuality() === "low" ? 4 : 7;
   const smoke = useRef<(THREE.Sprite | null)[]>([]);
   const uniforms = useMemo(() => ({ time: { value: seed } }), [seed]);
   useFrame(({ clock }) => {

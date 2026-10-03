@@ -17,7 +17,7 @@ import { EditorEasterEggMarkers } from "./EditorEasterEggMarkers";
 import { EditorProps } from "./EditorProps";
 import { Effects } from "./Effects";
 import { EnemyRenderPartitionProvider } from "./EnemyRenderPartitionProvider";
-import { GRAPHICS_QUALITY } from "./effectsTunables";
+import { getGraphicsQuality } from "./effectsTunables";
 import { FlowFeatures } from "./FlowFeatures";
 import { Ground } from "./Ground";
 import { HealAuras } from "./HealAuras";
@@ -73,8 +73,8 @@ export const PlayScene = () => {
         intensity={3.0}
         color={biome === "snow" ? "#f3f7ff" : "#ffe8cf"}
         castShadow
-        shadow-mapSize-width={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
-        shadow-mapSize-height={GRAPHICS_QUALITY === "low" ? 1024 : 2048}
+        shadow-mapSize-width={getGraphicsQuality() === "low" ? 1024 : 2048}
+        shadow-mapSize-height={getGraphicsQuality() === "low" ? 1024 : 2048}
         shadow-camera-left={-MAP_HEIGHT}
         shadow-camera-right={MAP_HEIGHT}
         shadow-camera-top={MAP_HEIGHT}
