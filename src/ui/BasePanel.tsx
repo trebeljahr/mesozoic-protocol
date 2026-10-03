@@ -27,7 +27,7 @@ export const BasePanel = () => {
   const hqCount = state.world.paths.length;
 
   return (
-    <RightOverlay className="tower-panel">
+    <RightOverlay className="tower-panel base-panel">
       <div className="panel-header">
         <div className="panel-title">
           <div className="panel-name">

@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useGamepadInput } from "../input/gamepad";
 import { useKeyBindings } from "../input/keyBindings";
 import { isMenuFrameHandled, useGamepadMenuNavigation } from "../input/useGamepadMenuNavigation";
 import { totalStars } from "../progress";
-import { HIVE_BASE_SERVICE_BUFF, HIVE_MAX_DRONES_PER_TOWER } from "../sim/world";
+import {
+  HEAL_AURA_RATE,
+  HIVE_BASE_SERVICE_BUFF,
+  HIVE_MAX_DRONES_PER_TOWER,
+  REGEN_RATE,
+  SHIELD_REGEN_DELAY,
+} from "../sim/world";
 import { useGame } from "../store";
 import { MenuOverlay } from "../ui/MenuOverlay";
 import { activeModal } from "../ui/modalFocus";
@@ -99,6 +105,7 @@ export const TutorialPanelPrompt = () => {
 export const TutorialUI = () => {
   const { t } = useTranslation();
   const tutorial = useGame((s) => s.tutorial);
+  const world = useGame((s) => s.world);
   const focused = useGame((s) => s.tutorialControlsFocused);
   const status = useGame((s) => s.ui.status);
   const labOpen = useGame((s) => s.skillTreeOpen);
@@ -108,10 +115,32 @@ export const TutorialUI = () => {
   );
   const input = useInputMode();
   const bindings = useKeyBindings((s) => s.bindings);
+  const objectiveRef = useRef<HTMLElement>(null);
+  const [objectiveHeight, setObjectiveHeight] = useState<number>();
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const lesson = tutorial ? lessonFor(tutorial) : null;
   const modal = labOpen || shopOpen || otherModal;
   const running = !!tutorial && status === "running" && !modal;
+
+  useLayoutEffect(() => {
+    if (!running) return;
+    const objective = objectiveRef.current;
+    const robot = document.querySelector(".robot-panel");
+    if (!objective || !robot) return;
+    const measure = () => {
+      const top = objective.getBoundingClientRect().top;
+      const robotTop = robot.getBoundingClientRect().top;
+      setObjectiveHeight(Math.max(60, robotTop - top - 8));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(robot);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [running]);
 
   useGamepadInput((frame) => {
     if (activeModal() || isMenuFrameHandled(frame)) return;
@@ -145,6 +174,27 @@ export const TutorialUI = () => {
 
   if (!tutorial || !lesson || modal || status === "paused") return null;
   const id = lesson.id;
+  const completion = id === "complete" || id.endsWith("Complete");
+  const optional = lesson.chapter === "targeting" || lesson.chapter === "combat";
+  const visibleLessons = optional
+    ? LESSONS.filter((item) => item.chapter === lesson.chapter)
+    : LESSONS.slice(0, LESSONS.findIndex((item) => item.id === "complete") + 1);
+  const number = visibleLessons.findIndex((item) => item.id === id) + 1;
+  const tower = world.towerById.get(tutorial.towerId!);
+  const details = {
+    buff: HIVE_BASE_SERVICE_BUFF * 100,
+    cap: HIVE_MAX_DRONES_PER_TOWER,
+    healRate: HEAL_AURA_RATE,
+    regenRate: REGEN_RATE,
+    shieldDelay: SHIELD_REGEN_DELAY,
+    freezeChance: Math.round((tower?.freezeChance ?? 0) * 100),
+    burnDps: tower?.flameIgniteDps ?? 0,
+    burnUpgrade: t("upgrades:tower.flame.a.tier.2.name"),
+    cryoUpgrade: t("upgrades:tower.cryo.a.tier.2.name"),
+    shieldUpgrade: t("upgrades:tower.mortar.b.tier.2.name"),
+    stripUpgrade: t("upgrades:tower.chain.b.tier.2.name"),
+    pierceUpgrade: t("upgrades:tower.pulse.a.tier.2.name"),
+  };
   const mode =
     input.mode === "gamepad"
       ? "gamepad"
@@ -167,93 +217,147 @@ export const TutorialUI = () => {
       if (hive) s.selectTower(hive.id);
     } else if (session.towerId !== null) s.selectTower(session.towerId);
   };
-  const hasTarget = [
-    "inspectTower",
-    "upgrade",
-    "target",
-    "vulnerable",
-    "assign",
-    "reassign",
-    "spot",
-    "prop",
-    "base",
-    "sell",
-    "enemy",
-  ].includes(id);
+  const hasTarget =
+    [
+      "inspectTower",
+      "upgrade",
+      "target",
+      "vulnerable",
+      "assign",
+      "reassign",
+      "spot",
+      "prop",
+      "base",
+      "sell",
+      "enemy",
+    ].includes(id) ||
+    (optional && tutorial.towerId !== null && !completion);
   return (
-    <aside className="tutorial-objective" aria-label={t("tutorial.entry")}>
-      <div className="tutorial-heading">
-        <span>{t("tutorial.practice")}</span>
-        <span>
-          {tutorial.step + 1} / {LESSONS.length}
-        </span>
-      </div>
-      <div key={id} className="tutorial-step" role="status" aria-live="polite" aria-atomic="true">
-        <h2>{t(`tutorial.lessons.${id}.objective`)}</h2>
-        <p>
-          {t(`tutorial.lessons.${id}.detail`, {
-            buff: HIVE_BASE_SERVICE_BUFF * 100,
-            cap: HIVE_MAX_DRONES_PER_TOWER,
-          })}
-        </p>
-      </div>
-      <p className="tutorial-input">
-        {t(`tutorial.hints.${mode}`, tutorialKeyboardHints(bindings))}
-      </p>
-      {input.mode === "gamepad" && (
-        <p className="tutorial-input">
-          {t(focused ? "tutorial.controlsFocused" : "tutorial.fieldFocused")}
-        </p>
-      )}
-      <div className="tutorial-actions">
-        {hasTarget && (
-          <button type="button" className="btn btn-ghost" onClick={openTarget}>
-            {t("tutorial.inspectMarked")}
-          </button>
-        )}
-        {id === "lab" && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => useGame.getState().setSkillTreeOpen(true)}
+    <>
+      <aside
+        ref={objectiveRef}
+        style={{ maxHeight: objectiveHeight }}
+        className="tutorial-objective"
+        aria-label={t("tutorial.entry")}
+      >
+        <div className="tutorial-body">
+          <div className="tutorial-heading">
+            <span>{t("tutorial.practice")}</span>
+            <span>
+              {number} / {visibleLessons.length}
+            </span>
+          </div>
+          <div
+            key={id}
+            className="tutorial-step"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
           >
-            {t("worldMap.lab")}
-          </button>
-        )}
-        {id === "robotSkill" && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => useGame.getState().setRobotShopOpen(true)}
-          >
-            {t("worldMap.robots")}
-          </button>
-        )}
-        {id !== "complete" && (
+            <h2>{t(`tutorial.lessons.${id}.objective`, details)}</h2>
+            <p>{t(`tutorial.lessons.${id}.detail`, details)}</p>
+          </div>
+          <p className="tutorial-input">
+            {t(`tutorial.hints.${mode}`, tutorialKeyboardHints(bindings))}
+          </p>
+          {input.mode === "gamepad" && (
+            <p className="tutorial-input">
+              {t(focused ? "tutorial.controlsFocused" : "tutorial.fieldFocused")}
+            </p>
+          )}
+        </div>
+        <div className="tutorial-actions">
+          {hasTarget && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              title={t("tutorial.inspectMarked")}
+              aria-label={t("tutorial.inspectMarked")}
+              onClick={openTarget}
+            >
+              <span className="tutorial-button-icon" aria-hidden="true">
+                ◎
+              </span>
+              <span className="tutorial-button-text">{t("tutorial.inspectMarked")}</span>
+            </button>
+          )}
+          {optional && tutorial.targetId !== null && !completion && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              title={t("tutorial.inspectEnemy")}
+              aria-label={t("tutorial.inspectEnemy")}
+              onClick={() => {
+                const state = useGame.getState();
+                const enemy = state.world.enemyById.get(state.tutorial?.targetId ?? -1);
+                if (enemy) state.inspectEnemy(enemy.id, enemy.kind, enemy.maxHp, null);
+              }}
+            >
+              <span className="tutorial-button-icon" aria-hidden="true">
+                ⓘ
+              </span>
+              <span className="tutorial-button-text">{t("tutorial.inspectEnemy")}</span>
+            </button>
+          )}
+          {id === "lab" && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => useGame.getState().setSkillTreeOpen(true)}
+            >
+              {t("worldMap.lab")}
+            </button>
+          )}
+          {id === "robotSkill" && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => useGame.getState().setRobotShopOpen(true)}
+            >
+              {t("worldMap.robots")}
+            </button>
+          )}
+          {!completion && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              title={t("tutorial.retry")}
+              aria-label={t("tutorial.retry")}
+              onClick={() => useGame.getState().restartTutorialLesson()}
+            >
+              <span className="tutorial-button-icon" aria-hidden="true">
+                ↺
+              </span>
+              <span className="tutorial-button-text">{t("tutorial.retry")}</span>
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => useGame.getState().restartTutorialLesson()}
+            title={t("tutorial.chapters")}
+            aria-label={t("tutorial.chapters")}
+            aria-expanded={chaptersOpen}
+            onClick={() => setChaptersOpen(!chaptersOpen)}
           >
-            {t("tutorial.retry")}
+            <span className="tutorial-button-icon" aria-hidden="true">
+              ☷
+            </span>
+            <span className="tutorial-button-text">{t("tutorial.chapters")}</span>
           </button>
-        )}
-        <button
-          type="button"
-          className="btn btn-ghost"
-          aria-expanded={chaptersOpen}
-          onClick={() => setChaptersOpen(!chaptersOpen)}
-        >
-          {t("tutorial.chapters")}
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => useGame.getState().exitTutorial()}
-        >
-          {t("tutorial.exit")}
-        </button>
-      </div>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            title={t("tutorial.exit")}
+            aria-label={t("tutorial.exit")}
+            onClick={() => useGame.getState().exitTutorial()}
+          >
+            <span className="tutorial-button-icon" aria-hidden="true">
+              ×
+            </span>
+            <span className="tutorial-button-text">{t("tutorial.exit")}</span>
+          </button>
+        </div>
+      </aside>
       {chaptersOpen && (
         <MenuOverlay title={t("tutorial.chapters")} onClose={() => setChaptersOpen(false)}>
           <nav aria-label={t("tutorial.chapters")} className="tutorial-chapters">
@@ -273,6 +377,6 @@ export const TutorialUI = () => {
           </nav>
         </MenuOverlay>
       )}
-    </aside>
+    </>
   );
 };

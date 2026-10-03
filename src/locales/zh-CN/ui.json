@@ -674,7 +674,9 @@
       "drones": "3 · Support drones",
       "field": "4 · Mortar, props and HQ",
       "waves": "5 · Resistances and waves",
-      "progression": "6 · Stars, bolts and XP"
+      "progression": "6 · Stars, bolts and XP",
+      "targeting": "Optional · Target priorities",
+      "combat": "Optional · Combat and defenses"
     },
     "hints": {
       "mouse": "Click controls and amber field markers. {{robot}} selects Leela; {{abilities}} use her abilities.",
@@ -784,13 +786,82 @@
       },
       "complete": {
         "objective": "Training complete.",
-        "detail": "You moved, fought, built, supported and upgraded using real controls. Exit to your unchanged save, or replay any chapter. Mission gold resets; stars, bolts and robot XP persist in campaign play."
+        "detail": "You practiced movement, abilities, building and progression. Optional chapters teach every shooting priority and tower combat against enemy defenses. Open Chapters or exit to your unchanged save."
       },
       "defend": {
         "objective": "Let your defense defeat a wave enemy.",
         "detail": "Watch the wave you started. Your Pulse fires when enemies enter range. This lesson waits for a real kill."
+      },
+      "aimNear": {
+        "objective": "Choose Near and hit the closest target.",
+        "detail": "The center target is closest to Pulse. Select Near; wait for its shot to land. The amber ring marks the expected target."
+      },
+      "aimFirst": {
+        "objective": "Choose End and hit the lead target.",
+        "detail": "End favors the enemy farthest along its path toward HQ. Choose End and watch the rightmost target take damage."
+      },
+      "aimLast": {
+        "objective": "Choose Start and hit the rear target.",
+        "detail": "Start favors the enemy nearest the start of its path. Choose Start and watch Pulse hit the leftmost target."
+      },
+      "aimStrong": {
+        "objective": "Choose Strong and hit the largest HP pool.",
+        "detail": "The left target has the highest maximum HP. Strong uses maximum HP, even when another target has less health remaining."
+      },
+      "aimWeak": {
+        "objective": "Choose Weak and hit the wounded target.",
+        "detail": "The right target has the least current HP. Weak favors low current HP; shielded enemies use maximum HP while their shield remains."
+      },
+      "aimVulnerable": {
+        "objective": "Choose Vuln and hit the Triceratops.",
+        "detail": "Pulse deals kinetic damage. This target takes more kinetic damage than the nearby raptors. Inspect its multipliers, then choose Vuln."
+      },
+      "aimSpot": {
+        "objective": "Use Spot to hit both clustered targets.",
+        "detail": "Select Spot, then aim at the amber ring. Wait for Mortar’s shell to explode and damage both nearby targets."
+      },
+      "targetingComplete": {
+        "objective": "Target priorities practiced.",
+        "detail": "You used every shooting priority and observed its result. Open Chapters for optional combat drills, replay a chapter, or exit to your save."
+      },
+      "chainHits": {
+        "objective": "Build Chain and hit three enemies at once.",
+        "detail": "Place Chain in the amber ring. Its electric attack jumps between nearby targets. Wait for one volley to damage all three."
+      },
+      "burnRegen": {
+        "objective": "Buy {{burnUpgrade}} and suppress regeneration.",
+        "detail": "This practice Pyre has Lab Ignite. Buy its final Combustion upgrade. Direct fire then pauses so you can see its {{burnDps}} DPS burn continue and prevent regeneration."
+      },
+      "cryoFreeze": {
+        "objective": "Buy {{cryoUpgrade}} and freeze a moving target.",
+        "detail": "This Cryo has Lab Flash Freeze: {{freezeChance}}% chance per hit. Buy its final Subzero upgrade. Watch moving targets slow, stop healing, and eventually freeze."
+      },
+      "shieldBreak": {
+        "objective": "Buy {{shieldUpgrade}} and crack the shield.",
+        "detail": "Upgrade Mortar’s Breach branch, then watch its shell break the blue shield. Shields can start regenerating {{shieldDelay}} seconds after a break."
+      },
+      "healerPriority": {
+        "objective": "Use Weak to defeat the healer.",
+        "detail": "The marked healer restores {{healRate}} HP per second to nearby allies. Its own HP is lowest. Choose Weak to remove it and stop the healing."
+      },
+      "resistStrip": {
+        "objective": "Buy {{stripUpgrade}} and strip electric resistance.",
+        "detail": "This raptor carries an electric resistance chip. Buy Chain’s final Voltage upgrade. Inspect the target as real hits weaken that chip."
+      },
+      "armorPierce": {
+        "objective": "Buy {{pierceUpgrade}} and bypass the resistance chip.",
+        "detail": "This raptor resists kinetic hits through an extra chip. Buy Pulse’s final Ballistics upgrade and watch a full-strength shot land. Native species resistance still applies."
+      },
+      "adaptMix": {
+        "objective": "Add Chain against kinetic adaptation.",
+        "detail": "This practice herd adapted after a kinetic-heavy wave. Inspect its extra resistance, then build Chain in the amber ring. Finish by dealing both kinetic and electric damage."
+      },
+      "combatComplete": {
+        "objective": "Combat drills complete.",
+        "detail": "You used chain attacks, burn, slow, freeze, shield breaking, healer priority and resistance counters. Reset or replay any chapter from Chapters. Exit restores your original session."
       }
-    }
+    },
+    "inspectEnemy": "Inspect enemy"
   },
   "report": {
     "title": "After-action report",

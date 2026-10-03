@@ -4,11 +4,27 @@ import { emptyProgress, type ProgressData } from "../progress";
 import { startWave } from "../sim/spawner";
 import type { GameEvent, TowerKind, Vec2, World } from "../sim/types";
 import { createTower, createWorld, spawnEnemy } from "../sim/world";
+import {
+  ADVANCED_LESSONS,
+  type AdvancedState,
+  advancedSatisfied,
+  maintainAdvanced,
+  prepareAdvanced,
+} from "./advanced";
 
 // Public persistence boundary: checkpoint/reward code must exclude worlds with
 // sessionKind === "tutorial". The store also clears activeSlot during training.
 export const isTutorialWorld = (world: World): boolean => world.sessionKind === "tutorial";
-export const CHAPTERS = ["robot", "towers", "drones", "field", "waves", "progression"] as const;
+export const CHAPTERS = [
+  "robot",
+  "towers",
+  "drones",
+  "field",
+  "waves",
+  "progression",
+  "targeting",
+  "combat",
+] as const;
 export type TutorialChapter = (typeof CHAPTERS)[number];
 export const LESSONS = [
   { id: "selectRobot", chapter: "robot", highlight: ".robot-portrait" },
@@ -38,9 +54,11 @@ export const LESSONS = [
   { id: "lab", chapter: "progression", highlight: ".skill-tree-panel" },
   { id: "robotSkill", chapter: "progression", highlight: ".robot-shop-panel" },
   { id: "complete", chapter: "progression", highlight: "" },
+  ...ADVANCED_LESSONS,
 ] as const;
 export type LessonId = (typeof LESSONS)[number]["id"];
 export type TutorialSignal =
+  | "mode"
   | "move"
   | "inspectTower"
   | "upgrade"
@@ -65,6 +83,7 @@ export type TutorialSession = {
   targetId: number | null;
   towerId: number | null;
   baselineDamage: number;
+  advanced?: AdvancedState;
 };
 export const lessonFor = (session: TutorialSession) => LESSONS[session.step];
 export const TRAINING_LEVEL: LevelConfig = {
@@ -96,6 +115,10 @@ const clearEnemies = (w: World) => {
   w.enemyById.clear();
   w.projectiles = [];
   w.beams = [];
+  w.cryoWaves = [];
+  w.explosions = [];
+  w.coalEmbers = [];
+  w.robotCraters = [];
   w.spawnQueue = [];
   w.robot.pendingShots = [];
   w.robot.payload = null;
@@ -164,6 +187,13 @@ export const prepareLesson = (w: World, s: TutorialSession) => {
   w.robot.moveTarget = null;
   w.robot.selfBuff = null;
   w.robot.payload = null;
+  s.advanced = undefined;
+  if (lessonFor(s).chapter === "targeting" || lessonFor(s).chapter === "combat") {
+    clearEnemies(w);
+    clearTowers(w);
+    prepareAdvanced(w, s, id);
+    return;
+  }
   if (id === "selectRobot") {
     w.robot.selected = false;
     s.marker = { ...w.robot.pos };
@@ -291,6 +321,7 @@ export const recordTutorialEvents = (s: TutorialSession, events: GameEvent[], wo
 };
 export const tutorialStepSatisfied = (w: World, s: TutorialSession): boolean => {
   const id = lessonFor(s).id;
+  if (s.advanced) return advancedSatisfied(w, s);
   const near = (p: Vec2, q: Vec2, distance = 1) => Math.hypot(p.x - q.x, p.y - q.y) < distance;
   if (id === "selectRobot") return w.robot.selected;
   if (id === "moveRobot") return s.signals.has("move") && near(w.robot.pos, s.marker!);
@@ -309,7 +340,7 @@ export const tutorialStepSatisfied = (w: World, s: TutorialSession): boolean => 
   if (id === "mortar") return w.towers.some((t) => t.kind === "mortar");
   if (id === "counter") return w.towers.some((t) => t.kind === "pulse" && t.damageDealt > 0);
   if (id === "complete") return false;
-  return s.signals.has(id);
+  return [...s.signals].some((signal) => signal === id);
 };
 
 export const maintainTraining = (w: World, s: TutorialSession) => {
@@ -321,6 +352,11 @@ export const maintainTraining = (w: World, s: TutorialSession) => {
   if (w.gold < 1000) w.gold = 3000;
   const id = lessonFor(s).id;
   if (id === "early" && w.wave === 1 && !w.waveActive) w.nextWaveIn = 20;
+  if (s.advanced) {
+    maintainAdvanced(w, s);
+    if (w.status === "won" || w.status === "lost") w.status = "running";
+    return;
+  }
   // A target killed by experimentation is replaced; no lesson can lose its target.
   if (s.targetId !== null && !w.enemies.some((e) => e.id === s.targetId && e.alive)) {
     const e = dummy(

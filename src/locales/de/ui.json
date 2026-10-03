@@ -674,7 +674,9 @@
       "drones": "3 · Unterstützungsdrohnen",
       "field": "4 · Mörser, Hindernisse und HQ",
       "waves": "5 · Resistenzen und Wellen",
-      "progression": "6 · Sterne, Bolzen und EP"
+      "progression": "6 · Sterne, Bolzen und EP",
+      "targeting": "Optional · Zielprioritäten",
+      "combat": "Optional · Kampf und Abwehr"
     },
     "hints": {
       "mouse": "Klicke auf Bedienelemente und gelbe Feldmarkierungen. {{robot}} wählt Leela; {{abilities}} nutzt ihre Fähigkeiten.",
@@ -784,13 +786,82 @@
       },
       "complete": {
         "objective": "Training abgeschlossen.",
-        "detail": "Du hast dich bewegt, gekämpft, gebaut und verbessert. Kehre zum unveränderten Spielstand zurück oder wiederhole ein Kapitel. Missionsgold wird zurückgesetzt; Sterne, Bolzen und Roboter-EP bleiben in der Kampagne."
+        "detail": "Du hast Bewegung, Fähigkeiten, Bau und Fortschritt geübt. Optionale Kapitel vermitteln jede Zielpriorität sowie Türme und Gegnerabwehr. Wähle Kapitel oder kehre zu deinem unveränderten Spielstand zurück."
       },
       "defend": {
         "objective": "Lass deine Verteidigung einen Gegner ausschalten.",
         "detail": "Beobachte die gestartete Welle. Dein Pulse schießt automatisch, sobald Gegner in Reichweite sind. Die nächste Lektion wartet auf einen echten Abschuss."
+      },
+      "aimNear": {
+        "objective": "Wähle Nah und triff das nächste Ziel.",
+        "detail": "Das mittlere Ziel steht Pulse am nächsten. Wähle Nah und warte auf den Treffer. Der gelbe Ring markiert das erwartete Ziel."
+      },
+      "aimFirst": {
+        "objective": "Wähle Ende und triff das vorderste Ziel.",
+        "detail": "Ende bevorzugt den Gegner, der auf seinem Weg zum HQ am weitesten ist. Wähle Ende und beobachte den Treffer ganz rechts."
+      },
+      "aimLast": {
+        "objective": "Wähle Anfang und triff das hinterste Ziel.",
+        "detail": "Anfang bevorzugt den Gegner am Anfang seines Weges. Wähle Anfang und beobachte, wie Pulse das linke Ziel trifft."
+      },
+      "aimStrong": {
+        "objective": "Wähle Stark und triff das größte LP-Maximum.",
+        "detail": "Das linke Ziel hat die höchsten maximalen LP. Stark nutzt das Maximum, auch wenn ein anderes Ziel weniger verbleibende LP hat."
+      },
+      "aimWeak": {
+        "objective": "Wähle Schwach und triff das verletzte Ziel.",
+        "detail": "Das rechte Ziel hat die wenigsten aktuellen LP. Schwach nutzt aktuelle LP; bei aktivem Schild zählen stattdessen die maximalen LP."
+      },
+      "aimVulnerable": {
+        "objective": "Wähle Verw. und triff den Triceratops.",
+        "detail": "Pulse verursacht kinetischen Schaden. Dieses Ziel nimmt davon mehr Schaden als die Raptoren. Prüfe seine Multiplikatoren und wähle Verw."
+      },
+      "aimSpot": {
+        "objective": "Triff mit Punkt beide Ziele der Gruppe.",
+        "detail": "Wähle Punkt und ziele auf den gelben Ring. Warte, bis die Mörsergranate explodiert und beide nahen Ziele beschädigt."
+      },
+      "targetingComplete": {
+        "objective": "Zielprioritäten geübt.",
+        "detail": "Du hast jede Zielpriorität genutzt und ihre Wirkung gesehen. Öffne Kapitel für optionale Kampfübungen oder kehre zu deinem Spielstand zurück."
+      },
+      "chainHits": {
+        "objective": "Baue Chain und triff drei Gegner zugleich.",
+        "detail": "Platziere Chain im gelben Ring. Sein elektrischer Angriff springt zwischen nahen Zielen. Warte, bis eine Salve alle drei beschädigt."
+      },
+      "burnRegen": {
+        "objective": "Kaufe {{burnUpgrade}} gegen Regeneration.",
+        "detail": "Dieser Übungs-Pyre besitzt Entzünden aus dem Labor. Kaufe die letzte Verbrennungsstufe. Danach pausiert Direktfeuer: Der Brand verursacht weiter {{burnDps}} Schaden pro Sekunde und verhindert Regeneration."
+      },
+      "cryoFreeze": {
+        "objective": "Kaufe {{cryoUpgrade}} und friere ein Ziel ein.",
+        "detail": "Dieses Cryo besitzt Blitzfrost aus dem Labor: {{freezeChance}}% Chance pro Treffer. Kaufe die letzte Unterkühlungsstufe. Ziele werden langsamer, heilen nicht mehr und frieren schließlich ein."
+      },
+      "shieldBreak": {
+        "objective": "Kaufe {{shieldUpgrade}} und brich den Schild.",
+        "detail": "Verbessere den Durchbruch-Zweig des Mörsers. Beobachte, wie eine Granate den blauen Schild bricht. Nach {{shieldDelay}} Sekunden kann er sich regenerieren."
+      },
+      "healerPriority": {
+        "objective": "Besiege den Heiler mit Schwach.",
+        "detail": "Der markierte Heiler gibt nahen Verbündeten {{healRate}} LP pro Sekunde zurück. Er selbst hat die wenigsten LP. Wähle Schwach, um ihn zu beseitigen."
+      },
+      "resistStrip": {
+        "objective": "Kaufe {{stripUpgrade}} gegen elektrische Resistenz.",
+        "detail": "Dieser Raptor trägt einen elektrischen Resistenzchip. Kaufe Chains letzte Spannungsstufe. Untersuche das Ziel, während echte Treffer seinen Chip schwächen."
+      },
+      "armorPierce": {
+        "objective": "Kaufe {{pierceUpgrade}} und umgehe den Chip.",
+        "detail": "Dieser Raptor trägt einen kinetischen Resistenzchip. Kaufe Pulses letzte Ballistikstufe und beobachte einen unverminderten Treffer. Natürliche Artresistenzen gelten weiterhin."
+      },
+      "adaptMix": {
+        "objective": "Ergänze Chain gegen kinetische Anpassung.",
+        "detail": "Diese Übungsherde hat sich nach einer kinetisch geprägten Welle angepasst. Prüfe ihre Zusatzresistenz, baue Chain im Ring und verursache kinetischen sowie elektrischen Schaden."
+      },
+      "combatComplete": {
+        "objective": "Kampfübungen abgeschlossen.",
+        "detail": "Du hast Kettenangriffe, Brand, Verlangsamung, Frost, Schildbruch, Heilerpriorität und Resistenzkonter eingesetzt. Wiederhole Kapitel oder verlasse das Training, um deine ursprüngliche Sitzung fortzusetzen."
       }
-    }
+    },
+    "inspectEnemy": "Gegner untersuchen"
   },
   "report": {
     "title": "Einsatzbericht",

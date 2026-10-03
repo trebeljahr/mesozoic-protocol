@@ -1,7 +1,8 @@
 # Interactive training integration
 
-`lessons.ts` owns the ordered lesson metadata, chapter entry points, board staging,
-action evidence and success checks. Localized copy lives under `ui.tutorial` in
+`lessons.ts` owns the core lesson metadata, chapter entry points, board staging,
+action evidence and success checks. `advanced.ts` owns the optional targeting and
+combat drills. Localized copy lives under `ui.tutorial` in
 the four catalogs. English and German are translated; the two existing stub
 catalogs retain matching keys.
 
@@ -53,10 +54,39 @@ The map offers training without forcing it. The optional first-time prompt uses
 one device-local dismissal preference, separate from campaign saves. Every
 chapter and current lesson can be restarted with fresh prerequisites.
 
+## Optional drill contract
+
+The 27-step core path stops at `complete`. The chapter picker separately enters
+`targeting` (seven actions plus completion) or `combat` (eight actions plus
+completion). Neither optional completion automatically enters another chapter.
+
+- Priorities use contrasting path progress, distance, maximum/current HP and
+  species resistance. A committed mode change must produce a real hit on the
+  expected target; Mortar Spot must damage two targets through one splash area.
+- Combat stages stock Chain, tier-two towers awaiting a real tier-three purchase,
+  and genuine Lab Ignite/Flash Freeze effects. Pyre pauses direct fire after
+  ignition so its lingering damage is visible. Cryo uses the normal freeze roll;
+  moving targets loop within range until both slow and freeze have occurred.
+- Shield, healer, regen and resistance chips use production spawn options and
+  simulation effects. Adaptation starts from an authored previous-wave damage
+  history, uses the production dominant-type selector and adapted-spawn sampler,
+  then requires both kinetic and electric damage in the new practice wave. The
+  temporary level used for sampling is restored before installing/rendering the
+  practice world; it remains excluded from checkpoints throughout.
+- Success holds the result on screen for 1.2 simulation seconds before advancing.
+  Missing targets restage their original modifiers and action gates. Empty
+  adaptive samples retry, without substituting synthetic resistance values.
+- Copy reads live tuning values and localized upgrade names. Scenario modifiers
+  never grant saved Lab progression or campaign rewards.
+
+The objective measures the robot HUD's top edge, scrolls its instructions within
+that space and keeps actions visible. Short landscapes use labelled icon controls;
+chapter dialogs are siblings of the objective so they retain shared modal stacking.
+
 ## Focused regression command
 
 ```sh
-node node_modules/vitest/vitest.mjs run src/tutorial/tutorial.test.ts src/tutorial/integration.test.ts src/persistence/storeCheckpoint.test.ts src/persistence/recovery.test.ts src/sessionPause.test.ts src/ui/modalFocus.test.ts src/locales/locales.test.ts --maxWorkers=1
+node node_modules/vitest/vitest.mjs run src/tutorial/advanced.test.ts src/tutorial/tutorial.test.ts src/tutorial/integration.test.ts src/persistence/storeCheckpoint.test.ts src/persistence/recovery.test.ts src/sessionPause.test.ts src/ui/modalFocus.test.ts src/locales/locales.test.ts --maxWorkers=1
 ```
 
 Tests exercise actual store commands and simulation ticks through every chapter,

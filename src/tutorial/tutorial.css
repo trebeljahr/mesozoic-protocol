@@ -2,14 +2,18 @@
   position: fixed; top: 100px; left: 16px; z-index: 18;
   width: min(310px, 32vw); padding: 12px 14px; color: var(--color-fg, #e1e8ef);
   background: rgba(10, 16, 24, .94); border-left: 3px solid #ffc66b;
-  max-height: calc(100dvh - 220px); overflow-y: auto;
+  display: flex; flex-direction: column;
+  max-height: calc(100dvh - 220px); overflow: hidden;
   border-radius: 4px; pointer-events: auto; font-size: var(--fs-md);
 }
+.tutorial-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.tutorial-heading > :last-child { white-space: nowrap; flex-shrink: 0; margin-left: 8px; }
+.tutorial-button-icon { display: none; }
 .tutorial-heading { display: flex; justify-content: space-between; color: #ffc66b; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .08em; }
 .tutorial-objective h2 { margin: 8px 0 5px; font-size: var(--fs-xl); line-height: 1.3; }
 .tutorial-objective p { margin: 5px 0; line-height: 1.4; }
 .tutorial-input { color: #a7b6c6; font-size: var(--fs-sm); }
-.tutorial-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.tutorial-actions { flex-shrink: 0; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
 .tutorial-actions .btn, .tutorial-chapters .btn { min-height: max(32px, 2.25rem); padding: 5px 8px; font-size: var(--fs-sm); }
 .tutorial-chapters { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .tutorial-highlight { outline: 2px solid #ffc66b !important; outline-offset: 3px; animation: tutorial-cue 1.5s ease-in-out infinite alternate; }
@@ -20,9 +24,15 @@
 @keyframes tutorial-cue { from { outline-color: #ffc66b; } to { outline-color: #9b793f; } }
 @keyframes tutorial-enter { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @media (max-height: 600px), (max-width: 800px) {
-  .tutorial-objective { top: 70px; left: 8px; width: min(270px, 34vw); padding: 8px 10px; font-size: var(--fs-sm); max-height: calc(100dvh - 170px); overflow-y: auto; }
+  .tutorial-objective { top: 70px; left: 8px; width: min(270px, 34vw); padding: 8px 10px; font-size: var(--fs-sm); max-height: calc(100dvh - 220px); }
   .tutorial-objective h2 { font-size: var(--fs-base); }
   .tutorial-objective .tutorial-input { font-size: var(--fs-xs); }
   .tutorial-actions .btn { min-height: max(36px, 2.25rem); }
+}
+@media (max-height: 600px) {
+  .tutorial-objective .tutorial-button-icon { display: inline; font-size: var(--fs-xl); }
+  .tutorial-objective .tutorial-button-text { display: none; }
+  .tutorial-objective .tutorial-actions { flex-wrap: nowrap; gap: 4px; margin-top: 4px; }
+  .tutorial-objective .tutorial-actions .btn { min-width: 36px; padding: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .tutorial-highlight, .tutorial-step { animation: none; } }

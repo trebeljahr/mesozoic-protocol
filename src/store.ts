@@ -137,6 +137,7 @@ import {
   TREE_REMOVE_COST,
   towerKindAtBuildLimit,
 } from "./sim/world";
+import { advancedAction, trainingBuildKind, trainingUpgradeAllowed } from "./tutorial/advanced";
 import {
   createTraining,
   isTutorialWorld,
@@ -1957,13 +1958,7 @@ export const useGame = create<GameStore>((set, get) => ({
     // the picker both route through here, so this is the single chokepoint.
     if (kind !== null && !isTowerKindAllowed(world, kind)) return;
     if (kind !== null && s.tutorial) {
-      const allowed: Record<string, TowerKind> = {
-        build: "pulse",
-        hive: "hive",
-        mortar: "mortar",
-        counter: "pulse",
-      };
-      if (allowed[lessonFor(s.tutorial).id] !== kind) return;
+      if (trainingBuildKind(lessonFor(s.tutorial).id) !== kind) return;
     }
     if (kind !== null) {
       world.selectedTowerId = null;
@@ -2589,6 +2584,7 @@ export const useGame = create<GameStore>((set, get) => ({
           sel.targetSpot = { x: pos.x, y: pos.y };
           if (s.tutorial?.marker && distSq(s.tutorial.marker, pos) < 2.25)
             signalTutorial(s.tutorial, "spot");
+          advancedAction(s.world, s.tutorial);
           sel.targetId = null;
           const newVersion = s.towerVersion + 1;
           set({
@@ -2723,9 +2719,16 @@ export const useGame = create<GameStore>((set, get) => ({
     if (s.world.selectedTowerId === null) return;
     const t = s.world.towerById.get(s.world.selectedTowerId);
     if (!t) return;
-    if (s.tutorial && lessonFor(s.tutorial).id !== "upgrade") return;
+    if (
+      s.tutorial &&
+      (s.tutorial.advanced
+        ? !trainingUpgradeAllowed(s.tutorial, t, branch)
+        : lessonFor(s.tutorial).id !== "upgrade")
+    )
+      return;
     if (applyUpgrade(s.world, t, branch)) {
       signalTutorial(s.tutorial, "upgrade");
+      advancedAction(s.world, s.tutorial);
       // Hive drone-bay path adds an idle drone slot. Leave it idle so the
       // player assigns it deliberately via the hive panel — auto-routing
       // the extra drone to whatever neighbour had room read as the tower
@@ -2784,6 +2787,8 @@ export const useGame = create<GameStore>((set, get) => ({
     if (mode === "vulnerable") signalTutorial(s.tutorial, "vulnerable");
     t.targetingMode = mode;
     t.targetId = null;
+    signalTutorial(s.tutorial, "mode");
+    advancedAction(s.world, s.tutorial);
     const newVersion = s.towerVersion + 1;
     set({
       spotSelecting: false,
