@@ -39,6 +39,7 @@ src-tauri/gen
 steam_appid.txt
 steam/app_build_*.vdf
 steam-build-output/
+release-candidates/
 # Override global `Icon?` glob (matches macOS resource fork) so generated icon
 # directories stay tracked.
 !src-tauri/icons/

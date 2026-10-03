@@ -5,9 +5,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_ME_RUN_TAURI_SIGNER_GENERATE",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFQzY2NzU1MEI4MDM4MzAKUldRd09JQUxWV2ZHYnRSYnhzdEo2VkFwZ2xkQ1N4YmE0UkhkMmF3MWlaMG9ZWVcrN3Zmc285M1EK",
       "endpoints": [
-        "https://github.com/trebeljahr/extinction-protocol/releases/latest/download/latest.json"
+        "https://github.com/trebeljahr/mesozoic-protocol/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

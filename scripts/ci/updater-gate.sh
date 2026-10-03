@@ -47,6 +47,10 @@ emit() {
 }
 
 disabled() {
+  if [ "${REQUIRE_UPDATER:-false}" = "true" ]; then
+    echo "::error::Signed release builds require the updater: $1"
+    exit 1
+  fi
   echo "::notice::Auto-updater not built — $1 See DISTRIBUTION.md → \"Auto-update\" for the one-time activation."
   emit false ""
   exit 0
@@ -58,9 +62,32 @@ if grep -q "$PLACEHOLDER_PUBKEY" "$CONFIG"; then
   disabled "$CONFIG still carries the placeholder pubkey."
 fi
 
+# CI permits the initial setup state, but once a public key is committed a
+# missing secret must never silently ship a permanently non-updating build.
+if [ "${REQUIRE_UPDATER:-false}" = "auto" ]; then
+  REQUIRE_UPDATER=true
+fi
+
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
   disabled "the TAURI_SIGNING_PRIVATE_KEY secret is not set."
 fi
+
+# Parse the config rather than accepting an empty endpoint array or a key in a
+# comment. Malformed updater configuration must fail before expensive builds.
+node --input-type=module - "$CONFIG" <<'NODE'
+import { readFileSync } from 'node:fs';
+const config = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const { pubkey, endpoints } = config.plugins?.updater ?? {};
+const decoded = Buffer.from(pubkey ?? '', 'base64').toString('utf8').trim().split(/\r?\n/);
+if (decoded.length !== 2 || !decoded[0].startsWith('untrusted comment:') ||
+    Buffer.from(decoded[1] ?? '', 'base64').length !== 42) {
+  throw new Error('Invalid Tauri/minisign updater public key.');
+}
+if (!Array.isArray(endpoints) || !endpoints.length ||
+    endpoints.some(value => new URL(value).protocol !== 'https:')) {
+  throw new Error('At least one HTTPS updater endpoint is required.');
+}
+NODE
 
 # A pubkey without an endpoint produces installers that can never be updated,
 # and the mistake is invisible until someone in the wild never gets an update.

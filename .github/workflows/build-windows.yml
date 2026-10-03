@@ -7,6 +7,7 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -47,7 +48,7 @@ jobs:
         run: node scripts/sync-version.mjs --check
 
       - name: Unit tests
-        run: pnpm test
+        run: pnpm test --maxWorkers=2
 
   build:
     needs: preflight
@@ -115,6 +116,7 @@ jobs:
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          REQUIRE_UPDATER: auto
         run: bash scripts/ci/updater-gate.sh
 
       - name: Azure login with repository OIDC identity

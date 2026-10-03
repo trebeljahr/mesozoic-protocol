@@ -27,12 +27,24 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload the verified IPA to TestFlight
+        required: true
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      upload:
+        description: Upload the verified IPA to TestFlight
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-ios-${{ github.ref }}
+  group: build-ios
   cancel-in-progress: false
 
 jobs:
@@ -58,6 +70,7 @@ jobs:
           APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
           APPSTORE_API_KEY_P8_BASE64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+          UPLOAD_TO_TESTFLIGHT: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.upload }}
         run: |
           set -euo pipefail
           required=(
@@ -67,10 +80,10 @@ jobs:
             APPLE_PROVISIONING_PROFILE_B64
             APPLE_PROVISIONING_PROFILE_NAME
             APPLE_KEYCHAIN_PASSWORD
-            APPSTORE_API_KEY_ID
-            APPSTORE_API_ISSUER_ID
-            APPSTORE_API_KEY_P8_BASE64
           )
+          if [ "$UPLOAD_TO_TESTFLIGHT" = "true" ]; then
+            required+=(APPSTORE_API_KEY_ID APPSTORE_API_ISSUER_ID APPSTORE_API_KEY_P8_BASE64)
+          fi
           missing=()
           for name in "${required[@]}"; do
             [ -n "${!name:-}" ] || missing+=("$name")
@@ -109,10 +122,12 @@ jobs:
         run: node scripts/sync-version.mjs --check
 
       - name: Unit tests
-        run: pnpm test
+        run: pnpm test --maxWorkers=2
 
       - name: Release version tests
-        run: node --test scripts/ci/mobile-build-version.test.mjs
+        run: |
+          node --test scripts/ci/mobile-build-version.test.mjs scripts/ci/android-signing.test.mjs
+          python3 scripts/ci/ios-signing.test.py
 
   build:
     needs: preflight
@@ -151,16 +166,19 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
+          umask 077
           CERT_PATH="$RUNNER_TEMP/cert.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
           echo -n "$CERT_B64" | base64 --decode > "$CERT_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           # Public certificate metadata identifies which portal certificate
           # the distribution profile must include; no private key is exported.
-          openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -passin env:CERT_PASSWORD | openssl x509 -noout -enddate -fingerprint -sha256
+          openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -passin env:CERT_PASSWORD | openssl x509 -outform DER -out "$RUNNER_TEMP/signing-cert.der"
+          openssl x509 -inform DER -in "$RUNNER_TEMP/signing-cert.der" -checkend 0 -noout
+          openssl x509 -inform DER -in "$RUNNER_TEMP/signing-cert.der" -noout -enddate -fingerprint -sha256
           keychains=()
           while IFS= read -r path; do
             keychains+=("$path")
@@ -177,25 +195,10 @@ jobs:
           mkdir -p "$PROFILE_DIR"
           echo -n "$PROFILE_B64" | base64 --decode > "$PROFILE_DIR/dist.mobileprovision"
           security cms -D -i "$PROFILE_DIR/dist.mobileprovision" > "$RUNNER_TEMP/profile.plist"
-          python3 <<'PY'
-          import os, plistlib
-          from pathlib import Path
-          profile = plistlib.loads((Path(os.environ['RUNNER_TEMP']) / 'profile.plist').read_bytes())
-          expected = os.environ['APPLE_TEAM_ID'] + '.com.ricoslabs.mesozoicprotocol'
-          if profile['Entitlements'].get('application-identifier') != expected:
-              raise SystemExit('::error::Provisioning profile does not match the Mesozoic Protocol bundle ID and team.')
-          if profile['Name'] != os.environ['APPLE_PROVISIONING_PROFILE_NAME']:
-              raise SystemExit('::error::Provisioning profile name does not match the configured name.')
-          PY
+          python3 scripts/ci/ios-signing.py profile
 
       - name: Render ExportOptions.plist
-        run: |
-          sed \
-            -e "s/__APPLE_TEAM_ID__/${APPLE_TEAM_ID}/g" \
-            -e "s/__APPLE_PROVISIONING_PROFILE_NAME__/${APPLE_PROVISIONING_PROFILE_NAME}/g" \
-            scripts/ios-ExportOptions.plist.template \
-            > "$RUNNER_TEMP/ExportOptions.plist"
-          cat "$RUNNER_TEMP/ExportOptions.plist"
+        run: python3 scripts/ci/ios-signing.py export-options
 
       - name: Resolve store version and build number
         run: node scripts/ci/mobile-build-version.mjs
@@ -227,6 +230,9 @@ jobs:
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
           ls -lah "$RUNNER_TEMP/ipa"
 
+      - name: Verify exported IPA identity and signature
+        run: python3 scripts/ci/ios-signing.py verify
+
       - uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
@@ -234,6 +240,7 @@ jobs:
           if-no-files-found: error
 
       - name: Decode App Store Connect private key
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.upload
         id: api-key
         env:
           API_KEY_B64: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
@@ -249,6 +256,7 @@ jobs:
           NODE
 
       - name: Upload to TestFlight
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || inputs.upload
         uses: apple-actions/upload-testflight-build@v3
         with:
           app-path: ${{ runner.temp }}/ipa/App.ipa
@@ -256,9 +264,13 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ steps.api-key.outputs.private-key }}
 
-      - name: Clean up keychain
+      - name: Clean up signing material
         if: always()
-        env:
-          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
         run: |
           security delete-keychain "$RUNNER_TEMP/build.keychain" || true
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/signing-cert.der" "$RUNNER_TEMP/profile.plist" "$RUNNER_TEMP/ExportOptions.plist"
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/dist.mobileprovision"
+
+      - name: Finish reserved build-number minute
+        if: always() && env.MOBILE_BUILD_SLOT_END != ''
+        run: node scripts/ci/mobile-build-version.mjs --finish-build-slot

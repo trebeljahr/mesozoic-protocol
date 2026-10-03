@@ -19,7 +19,7 @@ Use the existing main branch for a test upload without creating a public
 release tag:
 
 ```bash
-gh workflow run build-ios.yml --repo trebeljahr/mesozoic-protocol --ref main
+gh workflow run build-ios.yml --repo trebeljahr/mesozoic-protocol --ref main -f upload=true
 gh workflow run build-android.yml --repo trebeljahr/mesozoic-protocol --ref main -f upload=true -f track=internal
 ```
 
@@ -34,8 +34,8 @@ upload still needs processing in TestFlight, a tester group, and device QA.
 Match the App Store version draft to the build's marketing version before
 submission; do not equate an internal build with a production release.
 
-The Android workflow saves a signature-verified AAB before upload; iOS saves
-an IPA before upload. If upload fails, preserve the artifact and inspect the
+Both manual workflows default to `upload=false`. The Android workflow saves
+a signature-verified APK and AAB before upload; iOS saves a verified IPA. If upload fails, preserve the artifact and inspect the
 store response before rebuilding. Reruns get a higher build number.
 
 For rollback, pause a bad testing rollout or restore a previously tested
@@ -369,7 +369,7 @@ Bundle ID is `com.ricoslabs.mesozoicprotocol` (matches the Tauri identifier and 
 
 It was `com.mesozoicprotocol.app` until 2026-09-22, when it moved before anything had shipped, so there is no compatibility shim anywhere. The new id is registered under the Ricos Labs LLC Apple team (`4BHY8H2J25`) and is the Google Play package name (Play app id `4972014174140347180`); the App Store Connect record already points at it. Registered is final: an App ID, an App Store Connect record and a Play package name cannot be renamed, so the id is now a contract — the Xcode project, `capacitor.config.ts`, `android/app/build.gradle`, the `MainActivity` package, `strings.xml`, the Tauri identifier, the export-options template and both store workflows all state it.
 
-Automated in [.github/workflows/build-ios.yml](.github/workflows/build-ios.yml). Flow: build web bundle → `npx cap sync ios` → import distribution cert into a temp keychain → install provisioning profile → render `ExportOptions.plist` from [scripts/ios-ExportOptions.plist.template](scripts/ios-ExportOptions.plist.template) → `xcodebuild archive` → `xcodebuild -exportArchive` → upload .ipa to TestFlight via the App Store Connect API.
+Automated in [.github/workflows/build-ios.yml](.github/workflows/build-ios.yml). Flow: build web bundle → `npx cap sync ios` → import distribution cert into a temp keychain → install provisioning profile → render `ExportOptions.plist` with [scripts/ci/ios-signing.py](scripts/ci/ios-signing.py) → `xcodebuild archive` → `xcodebuild -exportArchive` → upload .ipa to TestFlight via the App Store Connect API.
 
 **One-time Apple setup:**
 
@@ -388,13 +388,13 @@ base64 -i profile.mobileprovision | pbcopy     # → APPLE_PROVISIONING_PROFILE_
 base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy       # → APPSTORE_API_KEY_P8_BASE64
 ```
 
-`CFBundleVersion` is set to `GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT` so every TestFlight upload has a fresh build number. `MARKETING_VERSION` (the visible version) lives in `project.pbxproj` and is written by [scripts/sync-version.mjs](scripts/sync-version.mjs) — see [Versioning](#versioning). The workflow's preflight job runs `--check`, so a tag whose pbxproj was not bumped fails before the archive starts rather than shipping a mislabelled TestFlight build.
+`CFBundleVersion` uses elapsed UTC minutes since 2020, split into Apple’s 4.2.2 digit format. Platform-wide concurrency reserves each minute until it ends, so retries and reusable workflow callers do not reuse a build number. `MARKETING_VERSION` (the visible version) lives in `project.pbxproj` and is written by [scripts/sync-version.mjs](scripts/sync-version.mjs) — see [Versioning](#versioning). The workflow's preflight job runs `--check`, so a tag whose pbxproj was not bumped fails before the archive starts rather than shipping a mislabelled TestFlight build.
 
 **Local fallback:** Xcode → set Team, Product → Archive → Distribute App → App Store Connect.
 
 ### Android distribution — Play Console via CI
 
-Automated in [.github/workflows/build-android.yml](.github/workflows/build-android.yml). Flow: build web bundle → `npx cap sync android` → decode keystore from secrets → write `android/keystore.properties` → `./gradlew bundleRelease` → upload signed `.aab` to the Play Console internal track.
+Automated in [.github/workflows/build-android.yml](.github/workflows/build-android.yml). Flow: build web bundle → `npx cap sync android` → decode keystore from secrets → write `android/keystore.properties` → `./gradlew bundleRelease assembleRelease` → verify both signatures → optionally upload signed `.aab` to the Play Console internal track.
 
 **One-time setup:**
 
@@ -413,7 +413,7 @@ Automated in [.github/workflows/build-android.yml](.github/workflows/build-andro
 
 **Required GitHub secrets:** `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `PLAY_SERVICE_ACCOUNT_JSON`.
 
-`versionCode` is `GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT`, so a retry gets a new build number. `versionName` comes from `package.json` for both tagged and manual builds. The helper rejects a release tag that does not match that version. Both values reach [android/app/build.gradle](android/app/build.gradle) through environment variables.
+`versionCode` is elapsed UTC minutes since 2020. Platform-wide concurrency reserves each minute until it ends, so retries and reusable workflow callers do not reuse a build number. `versionName` comes from `package.json` for both tagged and manual builds. The helper rejects a release tag that does not match that version. Both values reach [android/app/build.gradle](android/app/build.gradle) through environment variables.
 
 For the first upload, dispatch **Build Android** with `upload=false` (the default). The four Android signing secrets are required; the Play service-account secret is only required when uploading. Download the signed `android-aab` artifact and upload it in Play Console. Later dispatches can set `upload=true` and select a track. Tag builds upload to internal testing. Signed AAB and IPA artifacts are preserved before store upload, so a store rejection does not discard the build.
 
@@ -503,6 +503,45 @@ Android backup is scoped to match: [backup_rules.xml](android/app/src/main/res/x
 
 - Plausible analytics defaults to `play.mesozoicprotocol.com` and the self-hosted script at `https://plausible.trebeljahr.com`. The loader and event wrapper both require the current hostname to match `VITE_PLAUSIBLE_DOMAIN`, so local previews and mobile/native shells stay silent.
 - Android manifest (`android/app/src/main/AndroidManifest.xml`) already has `INTERNET` permission for analytics. Add no others unless required by future plugins.
+
+## Signed candidates for all platforms
+
+Run **Signed release candidate** on `main` to build one commit for macOS
+(Intel and Apple Silicon), Windows x64, Linux x64, Android, and iOS:
+
+```bash
+gh workflow run release-candidate.yml --ref main -R trebeljahr/mesozoic-protocol
+```
+
+The workflow reuses the platform builders and disables mobile store uploads.
+It does not create a tag, publish a release, or upload to Steam or itch.io.
+Every platform must succeed before the combined `signed-candidate-<commit>`
+artifact is uploaded. It contains the signed/notarized macOS DMG and app
+archive, signed Windows MSI and EXE, Linux AppImage and DEB, signed Android
+APK and AAB, and Apple Distribution signed IPA. The IPA requires TestFlight
+or App Store distribution; it is not an unrestricted sideload build. The APK
+uses the upload certificate, so it does not replace a Play-installed copy
+when Play App Signing uses a different certificate.
+
+`candidate.json` records the commit, run, file hashes, and signing types.
+`SHA256SUMS.txt` checks download integrity. GitHub's signed provenance binds
+each payload and manifest to this workflow and commit, including Linux
+packages, which do not use Apple or Windows code-signing identities:
+
+```bash
+gh run download RUN_ID -R trebeljahr/mesozoic-protocol -n signed-candidate-COMMIT
+shasum -a 256 -c SHA256SUMS.txt
+gh attestation verify FILE -R trebeljahr/mesozoic-protocol \
+  --signer-workflow trebeljahr/mesozoic-protocol/.github/workflows/release-candidate.yml
+```
+
+After downloading a Linux AppImage, run `chmod +x FILE.AppImage`; Actions archives do not preserve executable permissions.
+
+Artifacts are retained for 90 days. Keep downloaded copies separately, or
+publish a reviewed release for permanent downloads. The `.signing/` folder
+contains private material and must never be included with candidate files.
+Updater signatures are required once a real updater public key is committed;
+before that setup is approved, native signatures and provenance still apply.
 
 ## Releasing
 
@@ -602,10 +641,10 @@ Release does not. [tauri-plugin-updater](https://v2.tauri.app/plugin/updater/)
 closes that gap: the app asks a signed JSON manifest whether a newer version
 exists, and installs it in place.
 
-**None of it is switched on yet, and nothing here needs it to be.** The signing
-keypair is secret material that has to be generated by hand, so every piece
-below is wired but inert, and the whole thing turns on with one commit plus two
-repository secrets.
+The updater public key and its two GitHub Actions secrets are configured.
+Desktop CI builds the updater and signs its payloads. Updates become available
+when a newer reviewed GitHub Release publishes a complete `latest.json` and
+its payloads; a candidate build alone does not offer an update to installed users.
 
 ### The activation gate
 
@@ -629,9 +668,11 @@ whether to pass that flag. It requires **both**:
 - the `TAURI_SIGNING_PRIVATE_KEY` secret to be set, and
 - the overlay's `pubkey` to no longer be the shipped placeholder.
 
-If either is missing it prints a `::notice::` and the build proceeds without
-the updater — the same soft-skip idiom as `steam.yml` and the itch job. When
-both are present it emits `--config src-tauri/tauri.updater.conf.json
+Desktop CI uses `REQUIRE_UPDATER=auto`: the placeholder public key permits
+the initial setup state, but after a real key is committed, a missing private
+key fails the build. `REQUIRE_UPDATER=true` also rejects the placeholder;
+local use without this flag may omit the updater. When both keys are present
+the gate emits `--config src-tauri/tauri.updater.conf.json
 --features updater`, so the compiled code and the config can never disagree:
 one gate turns on both. It also fails loudly if the overlay carries a real
 pubkey but no endpoints, or if a `github.com` endpoint names a different

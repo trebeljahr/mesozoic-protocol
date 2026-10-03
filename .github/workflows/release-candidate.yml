@@ -1,0 +1,105 @@
+name: Signed release candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signed-release-candidate
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/build-macos.yml
+    secrets: inherit
+
+  windows:
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/build-windows.yml
+    secrets: inherit
+
+  linux:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/build-linux.yml
+    secrets: inherit
+
+  android:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/build-android.yml
+    with:
+      upload: false
+    secrets: inherit
+
+  ios:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/build-ios.yml
+    with:
+      upload: false
+    secrets: inherit
+
+  collect:
+    needs: [macos, windows, linux, android, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Require all platform outputs from this commit
+        env:
+          COMMIT: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          UPDATER=$(node -p "!require('./src-tauri/tauri.updater.conf.json').plugins.updater.pubkey.startsWith('REPLACE_ME')")
+          node scripts/ci/collect-release-candidate.mjs \
+            --artifacts artifacts --out candidate --commit "$COMMIT" \
+            --run-id "$RUN_ID" --version "$VERSION" --require-updater "$UPDATER"
+      # These signatures bind each file to this repository, workflow and commit.
+      # Linux packages use this provenance signature rather than Authenticode.
+      - name: Sign build provenance for every candidate file
+        id: attest
+        uses: actions/attest@v4
+        with:
+          subject-path: candidate/*
+      - name: Preserve offline attestation evidence
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" candidate/attestation.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-candidate-${{ github.sha }}
+          path: candidate/*
+          retention-days: 90
+          if-no-files-found: error
+      - name: Record download and verification instructions
+        env:
+          COMMIT: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          {
+            echo "All five platforms built from commit $COMMIT."
+            echo 'No store upload or public release was performed.'
+            echo
+            echo 'Download:'
+            echo "\`gh run download $RUN_ID -R $GITHUB_REPOSITORY -n signed-candidate-$COMMIT\`"
+            echo
+            echo 'Verify any payload or manifest (the attestation bundle is separate evidence):'
+            echo "\`gh attestation verify <file> -R $GITHUB_REPOSITORY --signer-workflow $GITHUB_REPOSITORY/.github/workflows/release-candidate.yml\`"
+            echo
+            echo 'The iOS IPA is App Store distribution signed; install through TestFlight or the App Store.'
+          } >> "$GITHUB_STEP_SUMMARY"

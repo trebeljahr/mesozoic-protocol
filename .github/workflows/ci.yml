@@ -62,10 +62,12 @@ jobs:
         run: node scripts/sync-version.mjs --check
 
       - name: Unit tests
-        run: pnpm test
+        run: pnpm test --maxWorkers=2
 
-      - name: Release version tests
-        run: node --test scripts/ci/mobile-build-version.test.mjs
+      - name: Release pipeline tests
+        run: |
+          node --test scripts/ci/*.test.mjs scripts/release.test.mjs
+          python3 scripts/ci/ios-signing.test.py
 
       - name: Build web bundle
         run: pnpm build
