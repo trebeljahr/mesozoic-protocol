@@ -1,3 +1,4 @@
+import { archiveTowerContribution } from "./runReport";
 import type { Base, Tower, TowerKind, World } from "./types";
 import { emit } from "./world";
 
@@ -640,6 +641,8 @@ export const applyBaseUpgrade = (world: World, branch: BranchId): boolean => {
 export const sellRefund = (tower: Tower) => Math.floor(tower.totalSpent * 0.65);
 
 export const sellTower = (world: World, tower: Tower) => {
+  if (!world.towerById.has(tower.id)) return;
+  archiveTowerContribution(world, tower);
   if (tower.flameActive) {
     tower.flameActive = false;
     emit(world, { type: "flame-stop", towerId: tower.id });

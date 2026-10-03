@@ -2,6 +2,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
+import { canReplayEpilogue } from "../campaignSummary";
 import { isDebug } from "../debug";
 import { DEMO_MAX_LEVEL, IS_DEMO } from "../demo";
 import { useWorldMapEditor } from "../editor/worldMapEditorStore";
@@ -20,6 +21,7 @@ import { spentMetaStars } from "../sim/metaSkills";
 import { useGame } from "../store";
 import { TutorialEntry, TutorialWelcome } from "../tutorial/TutorialUI";
 import { isTauriShell } from "../updater";
+import { CampaignEpilogue } from "./CampaignEpilogue";
 import { DebugProgressSettings } from "./DebugProgressSettings";
 import { DifficultyButton } from "./DifficultyButton";
 import { EndlessUnlockedModal } from "./EndlessUnlockedModal";
@@ -77,6 +79,7 @@ export const WorldMapUI = () => {
   const setEndlessPickerOpen = useGame((s) => s.setEndlessPickerOpen);
   const goToSlots = useGame((s) => s.goToSlots);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [epilogueOpen, setEpilogueOpen] = useState(false);
   // One-shot explainer for Breach + Containment once the player has earned
   // 3 stars on any level. Skipped if the slot has already dismissed it.
   const showModesUnlocked =
@@ -292,6 +295,15 @@ export const WorldMapUI = () => {
               <MapDeveloperTools onClose={() => setMenuOpen(false)} />
             )}
             <div className="menu-panel-actions">
+              {canReplayEpilogue(progress, { debug: isDebug, demo: IS_DEMO }) && (
+                <button
+                  type="button"
+                  className="btn btn-ghost w-full"
+                  onClick={() => setEpilogueOpen(true)}
+                >
+                  {t("epilogue.replay")}
+                </button>
+              )}
               <button
                 type="button"
                 className="world-map-utility-btn bg-surface-1 border border-border rounded-md px-3.5 py-2 backdrop-blur-sm flex items-center gap-2 pointer-events-auto cursor-pointer font-[inherit] text-fg-secondary transition-colors hover:border-blue hover:text-white"
@@ -406,6 +418,7 @@ export const WorldMapUI = () => {
         </div>
       )}
 
+      {epilogueOpen && <CampaignEpilogue onClose={() => setEpilogueOpen(false)} />}
       {showModesUnlocked && <ModesUnlockedModal />}
       {showEndlessUnlocked && <EndlessUnlockedModal />}
     </div>

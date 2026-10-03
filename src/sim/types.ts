@@ -979,6 +979,7 @@ export type World = {
   selectedTowerId: EntityId | null;
   selectedBase: boolean;
   base: Base;
+  runHistory: import("./runReport").RunHistory;
   runEnemyKinds: Partial<Record<EnemyKind, boolean>>;
   runTowerKinds: Partial<Record<TowerKind, boolean>>;
   easterEggs: EasterEgg[];

@@ -1,11 +1,14 @@
 import type React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { audio } from "../audio/AudioManager";
 import { DEMO_MAX_LEVEL, IS_DEMO, STEAM_STORE_READY, STEAM_STORE_URL } from "../demo";
 import { LEVELS } from "../levels";
 import { isLevelUnlocked } from "../progress";
 import { useGame } from "../store";
+import { AfterActionReport } from "./AfterActionReport";
+import { CampaignEpilogue } from "./CampaignEpilogue";
+import { activeModal } from "./modalFocus";
 import { STAR_STAGGER_MS, StarDisplay } from "./StarDisplay";
 
 // The result-cue stinger must fire exactly once per game-end. This component
@@ -18,6 +21,7 @@ import { STAR_STAGGER_MS, StarDisplay } from "./StarDisplay";
 // reference we last cued — at module scope, surviving remounts — guarantees a
 // single play per run.
 let cuedResult: unknown = null;
+const dismissedEpilogues = new WeakSet<object>();
 
 export const ResultsScreen = () => {
   const { t } = useTranslation();
@@ -26,6 +30,11 @@ export const ResultsScreen = () => {
   const retry = useGame((s) => s.retryCurrentLevel);
   const goToMap = useGame((s) => s.goToWorldMap);
   const startLevel = useGame((s) => s.startLevel);
+
+  const [dismissedEpilogue, setDismissedEpilogue] = useState<typeof result>(() =>
+    result && dismissedEpilogues.has(result) ? result : null,
+  );
+  const showEpilogue = !!result?.campaignCompleted && dismissedEpilogue !== result;
 
   const nextLevel = result ? LEVELS.find((l) => l.id === result.levelId + 1) : undefined;
   // Breach/containment don't gate next-level unlock (normal 3-star already did), so
@@ -40,6 +49,12 @@ export const ResultsScreen = () => {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (activeModal() || e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (
+        (e.code === "Enter" || e.code === "NumpadEnter") &&
+        (e.target as HTMLElement)?.closest("button, a, summary")
+      )
+        return;
       if (e.code === "KeyR") {
         e.preventDefault();
         retry();
@@ -94,7 +109,7 @@ export const ResultsScreen = () => {
     const en = result.endless;
     return (
       <div className="overlay">
-        <div className="overlay-card min-w-[420px] px-10 py-8">
+        <div className="overlay-card !min-w-0 !w-[min(600px,calc(100vw-24px))] !max-h-[calc(100dvh-24px)] overflow-y-auto px-5 py-4 sm:px-8 sm:py-6">
           <div className="flex items-center justify-center gap-3 mb-1">
             <h1 className="!mb-0">{t("results.endless.overrun")}</h1>
             {en.newBest && (
@@ -121,7 +136,8 @@ export const ResultsScreen = () => {
             <ResultRow label={t("results.endless.enemiesKilled")} value={`${en.enemiesKilled}`} />
           </div>
 
-          <div className="flex gap-2.5 justify-center">
+          <AfterActionReport report={result.report} />
+          <div className="flex flex-wrap gap-2.5 justify-center">
             <button type="button" onClick={retry} className="btn">
               {t("results.endless.playAgain")}
               <span className="kbd-only"> (R)</span>
@@ -138,7 +154,7 @@ export const ResultsScreen = () => {
 
   return (
     <div className="overlay">
-      <div className="overlay-card min-w-[420px] px-10 py-8">
+      <div className="overlay-card !min-w-0 !w-[min(600px,calc(100vw-24px))] !max-h-[calc(100dvh-24px)] overflow-y-auto px-5 py-4 sm:px-8 sm:py-6">
         <div className="flex items-center justify-center gap-4 mb-1">
           <h1 className="!mb-0">{result.won ? t("results.won") : t("results.lost")}</h1>
           {result.mode === "normal" ? (
@@ -178,6 +194,17 @@ export const ResultsScreen = () => {
           )}
         </div>
 
+        <AfterActionReport report={result.report} />
+        {result.campaignCompleted && (
+          <button
+            type="button"
+            className="btn btn-secondary mb-4"
+            onClick={() => setDismissedEpilogue(null)}
+          >
+            {t("epilogue.replay")}
+          </button>
+        )}
+
         {showDemoCta && (
           <div className="bg-[rgba(10,40,60,0.55)] border border-blue/50 rounded-lg px-4 py-3.5 mb-5 text-center">
             <div className="text-sm font-bold text-cyan mb-1">{t("demo.resultsTitle")}</div>
@@ -197,7 +224,7 @@ export const ResultsScreen = () => {
           </div>
         )}
 
-        <div className="flex gap-2.5 justify-center">
+        <div className="flex flex-wrap gap-2.5 justify-center">
           {showNext && (
             <button type="button" onClick={() => startLevel(nextLevel!.id)} className="btn">
               {t("results.nextLevel")}
@@ -218,6 +245,14 @@ export const ResultsScreen = () => {
           </button>
         </div>
       </div>
+      {showEpilogue && (
+        <CampaignEpilogue
+          onClose={() => {
+            dismissedEpilogues.add(result);
+            setDismissedEpilogue(result);
+          }}
+        />
+      )}
     </div>
   );
 };

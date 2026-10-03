@@ -52,6 +52,7 @@ import {
   xpForEnemyKill,
 } from "./robotSkills";
 import { ROBOT_SPECS } from "./robotVariants";
+import { createRunHistory, towerContributor } from "./runReport";
 import type {
   AuthoredLake,
   AutoBridge,
@@ -1010,6 +1011,7 @@ export const createWorld = (
       }
     : null;
   return {
+    runHistory: createRunHistory(),
     time: 0,
     tickCount: 0,
     levelId: level.id,
@@ -1844,7 +1846,7 @@ export const applyDamage = (
     }
     if (dmg <= 0) {
       if (hitOpts?.attackerTowerId !== undefined && hitOpts.attackerTowerId !== null) {
-        const attacker = world.towerById.get(hitOpts.attackerTowerId);
+        const attacker = towerContributor(world, hitOpts.attackerTowerId);
         if (attacker) attacker.damageDealt += dealt;
       }
       if (hitOpts?.fromRobot) world.robot.damageDealt += dealt;
@@ -1881,10 +1883,9 @@ export const applyDamage = (
   // Damage attribution mirrors kill attribution — chain ricochets,
   // cryo/flame ticks, and projectile splash all funnel through here
   // with attackerTowerId set by the firing tower. The tower may have
-  // been sold between fire and impact, so a missing lookup is silently
-  // ignored.
+  // been sold between fire and impact; the run ledger retains its credit.
   if (hitOpts?.attackerTowerId !== undefined && hitOpts.attackerTowerId !== null) {
-    const attacker = world.towerById.get(hitOpts.attackerTowerId);
+    const attacker = towerContributor(world, hitOpts.attackerTowerId);
     if (attacker) attacker.damageDealt += dealt;
   }
   if (hitOpts?.fromRobot) world.robot.damageDealt += dealt;
@@ -1893,7 +1894,7 @@ export const applyDamage = (
     enemy.alive = false;
     world.gold += enemy.bounty;
     if (hitOpts?.attackerTowerId !== undefined && hitOpts.attackerTowerId !== null) {
-      const attacker = world.towerById.get(hitOpts.attackerTowerId);
+      const attacker = towerContributor(world, hitOpts.attackerTowerId);
       if (attacker) attacker.kills += 1;
     }
     // Robot XP + kill credit — both gated on the killing blow coming from
@@ -1904,9 +1905,14 @@ export const applyDamage = (
     // the accounting trivial and matches tower kill-credit semantics.
     if (hitOpts?.fromRobot) {
       world.robot.kills += 1;
-      world.robot.xp += xpForEnemyKill(enemy.maxHp);
+      const xp = xpForEnemyKill(enemy.maxHp);
+      world.robot.xp += xp;
+      const variant = world.robot.variant;
+      world.runHistory.robotXpEarned[variant] = (world.runHistory.robotXpEarned[variant] ?? 0) + xp;
     }
     const bolts = rollDinoBoltDrop(enemy.kind);
+    world.runHistory.boltsEarned += bolts;
+    world.runHistory.enemiesKilled += 1;
     spawnParticles(world, enemy.pos, deathParticles, deathColor);
     if (bolts > 0) {
       const metalFlecks = Math.min(18, 3 + Math.ceil(bolts / 12));

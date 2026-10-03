@@ -788,5 +788,45 @@
         "detail": "Watch the wave you started. Your Pulse fires when enemies enter range. This lesson waits for a real kill."
       }
     }
+  },
+  "report": {
+    "title": "After-action report",
+    "wave": "Wave {{wave}} / {{total}} reached",
+    "endlessWave": "Wave {{wave}} reached",
+    "bolts": "+{{count}} bolts",
+    "xp": "+{{count}} robot XP",
+    "stars": "{{stars}} stars this run · {{newStars}} new",
+    "rewardUse": "Spend new stars in the Lab. Spend bolts on robots and robot skills. Robot XP grants levels and skill points.",
+    "nextStar": "Next best: {{stars}} stars. Win with at least {{lives}} lives remaining.",
+    "allStars": "All stars for this mode are already earned.",
+    "leakConclusion": "Largest life loss: {{count}} × {{species}}, {{lives}} lives lost.",
+    "inspectLeaks": "Inspect enemy defenses before retrying",
+    "noLeaks": "No enemies reached HQ.",
+    "topTower": "Leading tower: {{tower}} dealt {{damage}} damage and made {{kills}} kills.",
+    "sold": "(sold)",
+    "details": "Leaks and combat contributions",
+    "leakRow": "{{count}} leaks · {{lives}} lives lost",
+    "contribution": "{{damage}} damage · {{kills}} kills",
+    "robot": "Robot",
+    "base": "HQ",
+    "supportNote": "Damage includes shields and excludes overkill. Slows, freezes, and support effects are not measured here.",
+    "robotXp": "{{robot}} +{{count}} XP"
+  },
+  "epilogue": {
+    "title": "The last directive",
+    "subtitle": "Outpost 30 · Final field report",
+    "body1": "The apex specimen is down. The revival site is quiet. Beyond the perimeter, the biocrust still spreads.",
+    "body2": "Vance’s recording remains in the station archive. We add the engagement log beneath it. No new order arrives.",
+    "signoff": "The operator closes the channel. The outpost holds.",
+    "summary": "Your campaign record",
+    "outposts": "Outposts cleared",
+    "normalStars": "Normal stars",
+    "replayGoals": "Return to the line",
+    "starGoal": "{{count}} normal stars remain. Finish each outpost with all 20 lives for three stars.",
+    "starsComplete": "Every outpost has three normal stars. Try another robot or a higher difficulty.",
+    "challengeGoal": "{{count}} challenge stars remain. Three normal stars at an outpost open its Breach and Containment modes.",
+    "challengesComplete": "Every Breach and Containment challenge is complete. Try a different robot for your next defense.",
+    "revisit": "Replay this ending from the world-map menu.",
+    "replay": "Campaign epilogue"
   }
 }

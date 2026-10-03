@@ -3,6 +3,7 @@ import type { AchievementId } from "./achievements";
 import { ACHIEVEMENT_BY_ID, checkAchievements } from "./achievements";
 import { track } from "./analytics";
 import { BIOME_LAYERS, BIOME_TREE_URLS, classifyPropUrl, TARGET_SIZE_BY_ROLE } from "./biomes";
+import { isCampaignFinale } from "./campaignSummary";
 import { isDebug } from "./debug";
 import { deriveSuggestedDebugLoadout, type PlannerTrace } from "./debugPlannerTrace";
 import { IS_DEMO } from "./demo";
@@ -84,6 +85,7 @@ import {
   xpProgressInLevel,
 } from "./sim/robotSkills";
 import { ROBOT_SPECS, ROBOT_VARIANTS } from "./sim/robotVariants";
+import { buildRunReport, type RunReport, resultAnalytics } from "./sim/runReport";
 import {
   canCallEarly,
   earlyCallGoldReward,
@@ -149,6 +151,8 @@ export type CompendiumSection = "enemy" | "tower" | "mechanic" | "robot" | "lore
 export type AchievementToast = { id: AchievementId; key: number };
 
 export type LastResult = {
+  report: RunReport;
+  campaignCompleted: boolean;
   levelId: number;
   levelName: string;
   won: boolean;
@@ -1722,7 +1726,7 @@ export const useGame = create<GameStore>((set, get) => ({
             bolts: progress.bolts + ev.bolts,
           };
         }
-        if (ev.type === "game-over") {
+        if (ev.type === "game-over" && !lastResult) {
           const w = s.world;
           if (w.endless) {
             // Endless never "wins" — game-over here always means lives ran
@@ -1730,16 +1734,18 @@ export const useGame = create<GameStore>((set, get) => ({
             // per-arena best and surface a new-best flag.
             const en = w.endless;
             const waveReached = w.wave;
-            let enemiesKilled = w.robot.kills + w.base.kills;
-            for (const t of w.towers) enemiesKilled += t.kills;
+            const report = buildRunReport(w, s.runMinDifficulty ?? progress.difficulty, 0, 0);
+            const enemiesKilled = report.enemiesKilled;
             const prevBest = getEndlessBest(progress, en.mapId, progress.difficulty);
             const newBest = waveReached > prevBest;
             progress = recordEndlessResult(progress, en.mapId, progress.difficulty, waveReached);
             lastResult = {
               levelId: w.levelId,
+              report,
+              campaignCompleted: false,
               levelName: en.mapName,
               won: false,
-              livesRemaining: w.lives,
+              livesRemaining: Math.max(0, w.lives),
               startingLives: w.startLives,
               mode: "normal",
               stars: 0,
@@ -1763,7 +1769,7 @@ export const useGame = create<GameStore>((set, get) => ({
                 set({ screen: "results" });
               }
             }, 1300);
-            track("endless_failed", { map_id: en.mapId, wave_reached: waveReached });
+            track("endless_failed", { map_id: en.mapId, ...resultAnalytics(report) });
           } else {
             const mode: LevelMode = w.mode;
             const stars = starsForRun(mode, w.lives, ev.won);
@@ -1784,11 +1790,22 @@ export const useGame = create<GameStore>((set, get) => ({
             }
             const level = LEVELS.find((l) => l.id === w.levelId);
             const bestStars = Math.max(prev, ev.won ? stars : 0);
+            const report = buildRunReport(
+              w,
+              s.runMinDifficulty ?? progress.difficulty,
+              stars,
+              prev,
+            );
             lastResult = {
               levelId: w.levelId,
+              report,
+              campaignCompleted: isCampaignFinale(w.levelId, mode, ev.won, {
+                debug: isDebug,
+                demo: IS_DEMO,
+              }),
               levelName: level?.name ?? `Level ${w.levelId}`,
               won: ev.won,
-              livesRemaining: w.lives,
+              livesRemaining: Math.max(0, w.lives),
               startingLives: w.startLives,
               mode,
               stars,
@@ -1813,13 +1830,14 @@ export const useGame = create<GameStore>((set, get) => ({
             if (ev.won) {
               track("level_complete", {
                 level_id: w.levelId,
+                ...resultAnalytics(report),
                 waves_survived: w.totalWaves,
                 stars,
               });
             } else {
               track("level_failed", {
                 level_id: w.levelId,
-                wave_reached: w.wave,
+                ...resultAnalytics(report),
               });
             }
           }

@@ -788,5 +788,45 @@
         "detail": "Beobachte die gestartete Welle. Dein Pulse schießt automatisch, sobald Gegner in Reichweite sind. Die nächste Lektion wartet auf einen echten Abschuss."
       }
     }
+  },
+  "report": {
+    "title": "Einsatzbericht",
+    "wave": "Welle {{wave}} / {{total}} erreicht",
+    "endlessWave": "Welle {{wave}} erreicht",
+    "bolts": "+{{count}} Bolzen",
+    "xp": "+{{count}} Roboter-EP",
+    "stars": "{{stars}} Sterne in diesem Einsatz · {{newStars}} neu",
+    "rewardUse": "Gib neue Sterne im Labor aus. Kaufe mit Bolzen Roboter und Roboterfähigkeiten. Roboter-EP geben Stufen und Fähigkeitspunkte.",
+    "nextStar": "Nächste Bestleistung: {{stars}} Sterne. Gewinne mit mindestens {{lives}} verbleibenden Leben.",
+    "allStars": "Alle Sterne für diesen Modus sind bereits verdient.",
+    "leakConclusion": "Größter Lebensverlust: {{count}} × {{species}}, {{lives}} Leben verloren.",
+    "inspectLeaks": "Vor dem nächsten Versuch die Gegnerabwehr prüfen",
+    "noLeaks": "Kein Gegner erreichte das HQ.",
+    "topTower": "Führender Turm: {{tower}} verursachte {{damage}} Schaden und erzielte {{kills}} Abschüsse.",
+    "sold": "(verkauft)",
+    "details": "Durchbrüche und Kampfbeiträge",
+    "leakRow": "{{count}} Durchbrüche · {{lives}} Leben verloren",
+    "contribution": "{{damage}} Schaden · {{kills}} Abschüsse",
+    "robot": "Roboter",
+    "base": "HQ",
+    "supportNote": "Schaden zählt Schilde, aber keinen Überschussschaden. Verlangsamung, Einfrieren und Unterstützung werden hier nicht gemessen.",
+    "robotXp": "{{robot}} +{{count}} EP"
+  },
+  "epilogue": {
+    "title": "Der letzte Befehl",
+    "subtitle": "Außenposten 30 · Letzter Feldbericht",
+    "body1": "Das Apex-Exemplar ist tot. Am Wiederbelebungsstandort herrscht Ruhe. Jenseits des Perimeters breitet sich die Biokruste weiter aus.",
+    "body2": "Vances Aufnahme bleibt im Stationsarchiv. Wir legen das Einsatzprotokoll darunter ab. Kein neuer Befehl trifft ein.",
+    "signoff": "Der Operator schließt den Kanal. Der Außenposten hält.",
+    "summary": "Deine Kampagnenbilanz",
+    "outposts": "Abgeschlossene Außenposten",
+    "normalStars": "Sterne im Normalmodus",
+    "replayGoals": "Zurück an die Linie",
+    "starGoal": "{{count}} Sterne im Normalmodus fehlen. Schließe jeden Außenposten mit allen 20 Leben ab, um drei Sterne zu erhalten.",
+    "starsComplete": "Jeder Außenposten hat drei Sterne im Normalmodus. Probiere einen anderen Roboter oder eine höhere Schwierigkeit.",
+    "challengeGoal": "{{count}} Herausforderungssterne fehlen. Drei Sterne im Normalmodus öffnen Durchbruch und Eindämmung am jeweiligen Außenposten.",
+    "challengesComplete": "Alle Herausforderungen in Durchbruch und Eindämmung sind abgeschlossen. Probiere für die nächste Verteidigung einen anderen Roboter.",
+    "revisit": "Öffne diesen Abschluss erneut über das Weltkartenmenü.",
+    "replay": "Kampagnenabschluss"
   }
 }

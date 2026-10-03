@@ -1,4 +1,5 @@
 import { advanceAlongPath, pathProgress, samplePath, segmentLength, smoothDirection } from "./path";
+import { recordLeak } from "./runReport";
 import { IGNITE_TICK_INTERVAL } from "./towers";
 import type { Enemy, EnemyKind, Vec2, World } from "./types";
 import { clamp01 } from "./vec2";
@@ -45,6 +46,7 @@ const pathEndDirection = (path: Vec2[]): Vec2 => {
 };
 
 const applyLeakHit = (world: World, e: Enemy) => {
+  recordLeak(world, e.kind, world.invincible ? 0 : Math.min(Math.max(0, world.lives), e.damage));
   if (!world.invincible) world.lives -= e.damage;
   // Record which HQ took the killing leak. checkRunEnd reads this in the
   // same tick to gate the death explosion to that endpoint only — without
