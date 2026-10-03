@@ -4,7 +4,7 @@ import { getLevel } from "../levels";
 import { starsForRun } from "../progress";
 import { updateEnemies } from "./enemies";
 import { xpForEnemyKill } from "./robotSkills";
-import { buildRunReport, nextStarGoal, resultAnalytics } from "./runReport";
+import { buildRunReport, mvpTowerOnField, nextStarGoal, resultAnalytics } from "./runReport";
 import type { EnemyKind, World } from "./types";
 import { sellTower } from "./upgrades";
 import { applyDamage, createTower, createWorld, spawnEnemy } from "./world";
@@ -74,6 +74,19 @@ describe("after-action run history", () => {
     ]);
     expect(report.enemiesKilled).toBe(1);
     expect(report.loadout).toEqual(["pulse"]);
+  });
+
+  it("features the highest-damage tower still on the field", () => {
+    const world = createWorld(getLevel(1));
+    const sold = createTower(world, "pulse", { x: 0, y: 0 });
+    const featured = createTower(world, "chain", { x: 3, y: 2 });
+    sold.damageDealt = 300;
+    featured.damageDealt = 120;
+    sellTower(world, sold);
+    const report = buildRunReport(world, "medium", 0, 0);
+    expect(mvpTowerOnField(report, world)).toBe(featured);
+    featured.damageDealt = 0;
+    expect(mvpTowerOnField(buildRunReport(world, "medium", 0, 0), world)).toBeNull();
   });
 
   it("records the actual bolt roll and robot-earned XP without rewarding repeated damage or report reads", () => {

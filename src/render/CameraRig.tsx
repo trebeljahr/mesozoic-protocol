@@ -5,6 +5,7 @@ import type { OrthographicCamera as OrthographicCameraImpl } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useEditor } from "../editor/editorStore";
 import { usePresentation } from "../preferences";
+import { mvpTowerOnField } from "../sim/runReport";
 import { useGame } from "../store";
 import { useReducedMotion } from "../ui/useReducedMotion";
 import {
@@ -34,6 +35,8 @@ export const CameraRig = () => {
   );
   const selectedKind = useGame((s) => s.selectedKind);
   const status = useGame((s) => s.world.status);
+  const screen = useGame((s) => s.screen);
+  const lastResult = useGame((s) => s.lastResult);
   // While a robot dash aim is armed, single-finger touch is reserved for
   // dragging the dash direction (handled by the placement plane), so the
   // camera must not pan or rotate under the gesture.
@@ -115,6 +118,22 @@ export const CameraRig = () => {
     }
   }, [levelId, startZoom]);
 
+  // Frame the actual winning tower in the live battlefield for the result view.
+  // ResultsScreen leaves the middle of the screen clear for this close-up.
+  useEffect(() => {
+    if (screen !== "results" || !lastResult) return;
+    const tower = mvpTowerOnField(lastResult.report, useGame.getState().world);
+    const cam = cameraRef.current;
+    const ctrls = controlsRef.current;
+    if (!tower || !cam || !ctrls) return;
+    const { x, y } = tower.pos;
+    cam.position.set(x, 24, y + 20);
+    cam.zoom = Math.min(72, Math.max(startZoom * 3, 44));
+    cam.updateProjectionMatrix();
+    ctrls.target.set(x, 0, y);
+    ctrls.update();
+  }, [screen, lastResult, startZoom]);
+
   useFrame(() => {
     const cam = cameraRef.current;
     if (!cam) return;
@@ -184,9 +203,9 @@ export const CameraRig = () => {
         ref={controlsRef}
         panLimitX={0}
         panLimitZ={0}
-        panLimitFor={panLimitFor}
+        panLimitFor={screen === "results" ? () => ({ x: Infinity, z: Infinity }) : panLimitFor}
         minZoom={fitZoom}
-        maxZoom={maxZoom}
+        maxZoom={screen === "results" ? Math.max(maxZoom, 72) : maxZoom}
         panSpeed={1.4}
         zoomSpeed={0.9}
         reserveLeftClick

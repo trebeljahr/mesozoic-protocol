@@ -5,6 +5,8 @@ import { audio } from "../audio/AudioManager";
 import { DEMO_MAX_LEVEL, IS_DEMO, STEAM_STORE_READY, STEAM_STORE_URL } from "../demo";
 import { LEVELS } from "../levels";
 import { isLevelUnlocked } from "../progress";
+import { mvpTowerOnField } from "../sim/runReport";
+import { TOWER_LABEL } from "../sim/world";
 import { useGame } from "../store";
 import { AfterActionReport } from "./AfterActionReport";
 import { CampaignEpilogue } from "./CampaignEpilogue";
@@ -102,6 +104,102 @@ export const ResultsScreen = () => {
   }, [result, stars, won]);
 
   if (!result) return null;
+
+  const mvpTower = mvpTowerOnField(result.report, useGame.getState().world);
+  if (mvpTower) {
+    return (
+      <div className="results-mvp-overlay">
+        <header className="results-mvp-header">
+          <div className="flex items-center justify-center gap-3">
+            <h1>
+              {result.endless
+                ? t("results.endless.overrun")
+                : result.won
+                  ? t("results.won")
+                  : t("results.lost")}
+            </h1>
+            {!result.endless &&
+              (result.mode === "normal" ? (
+                <StarDisplay count={result.stars as 0 | 1 | 2 | 3} size={24} animate />
+              ) : (
+                <ModeBadge mode={result.mode} earned={result.stars >= 1} />
+              ))}
+          </div>
+          <p>{result.endless ? result.endless.mapName : result.levelName}</p>
+        </header>
+
+        <div className="results-mvp-spacer" aria-hidden="true" />
+
+        <div className="results-mvp-footer">
+          <div className="results-mvp-stats">
+            <div>
+              <div className="results-mvp-label">{t("results.mvpTower")}</div>
+              <div className="results-mvp-name">{TOWER_LABEL[mvpTower.kind]}</div>
+              <div className="results-mvp-damage">
+                <strong>{Math.round(mvpTower.damageDealt).toLocaleString()}</strong>
+                <span>{t("results.damageDealt")}</span>
+              </div>
+            </div>
+            <AfterActionReport report={result.report} />
+          </div>
+          {showDemoCta && (
+            <div className="results-mvp-demo">
+              <span>{t("demo.resultsTitle")}</span>
+              {STEAM_STORE_READY ? (
+                <a
+                  href={STEAM_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-blue"
+                >
+                  {t("demo.wishlist")}
+                </a>
+              ) : (
+                <span>{t("demo.storeSoon")}</span>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2.5 justify-center">
+            {showNext && (
+              <button type="button" onClick={() => startLevel(nextLevel!.id)} className="btn">
+                {t("results.nextLevel")}
+                <span className="kbd-only"> (Enter)</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={goToMap}
+              className={showNext ? "btn btn-secondary" : "btn"}
+            >
+              {t("results.worldMap")}
+              <span className="kbd-only"> (Esc)</span>
+            </button>
+            <button type="button" onClick={retry} className="btn btn-secondary">
+              {t(result.endless ? "results.endless.playAgain" : "results.retry")}
+              <span className="kbd-only"> (R)</span>
+            </button>
+            {result.campaignCompleted && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDismissedEpilogue(null)}
+              >
+                {t("epilogue.replay")}
+              </button>
+            )}
+          </div>
+        </div>
+        {showEpilogue && (
+          <CampaignEpilogue
+            onClose={() => {
+              dismissedEpilogues.add(result);
+              setDismissedEpilogue(result);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   // Endless runs have no stars and no "next level" — just the wave reached,
   // the running best, and a new-best flag.

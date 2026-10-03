@@ -475,6 +475,8 @@
   "results": {
     "won": "Outpost held.",
     "lost": "Extinction complete.",
+    "mvpTower": "最佳防御塔",
+    "damageDealt": "伤害",
     "livesRemaining": "Lives remaining",
     "unlocked": "Unlocked: {{level}}",
     "nextLevel": "Next Level",

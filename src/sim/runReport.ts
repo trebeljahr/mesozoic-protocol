@@ -44,6 +44,15 @@ export const archiveTowerContribution = (world: World, tower: Tower): void => {
 export const towerContributor = (world: World, id: number) =>
   world.towerById.get(id) ?? world.runHistory.soldTowers[id];
 
+// The result camera can only feature a tower that is still on the field.
+// Report entries are already ordered by damage, including sold towers.
+export const mvpTowerOnField = (report: RunReport, world: World): Tower | null => {
+  const entry = report.towers.find(
+    (tower) => !tower.sold && tower.damageDealt > 0 && world.towerById.has(tower.id),
+  );
+  return entry ? (world.towerById.get(entry.id) ?? null) : null;
+};
+
 export type RunReport = {
   historyComplete: boolean;
   waveReached: number;

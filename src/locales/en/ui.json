@@ -475,6 +475,8 @@
   "results": {
     "won": "Outpost held.",
     "lost": "Extinction complete.",
+    "mvpTower": "MVP tower",
+    "damageDealt": "damage",
     "livesRemaining": "Lives remaining",
     "unlocked": "Unlocked: {{level}}",
     "nextLevel": "Next Level",

@@ -475,6 +475,8 @@
   "results": {
     "won": "Outpost held.",
     "lost": "Extinction complete.",
+    "mvpTower": "Torre destaque",
+    "damageDealt": "de dano",
     "livesRemaining": "Lives remaining",
     "unlocked": "Unlocked: {{level}}",
     "nextLevel": "Next Level",

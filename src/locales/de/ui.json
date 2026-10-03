@@ -475,6 +475,8 @@
   "results": {
     "won": "Außenposten gehalten.",
     "lost": "Auslöschung abgeschlossen.",
+    "mvpTower": "Bester Turm",
+    "damageDealt": "Schaden",
     "livesRemaining": "Verbleibende Leben",
     "unlocked": "Freigeschaltet: {{level}}",
     "nextLevel": "Nächstes Level",
