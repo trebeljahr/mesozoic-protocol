@@ -6486,43 +6486,123 @@
 
 @layer components {
   .presentation-controls {
+    background: rgba(8, 12, 18, 0.45);
+    border: 1px solid rgba(120, 160, 200, 0.14);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .presentation-controls .presentation-title {
+    margin: 0 0 16px;
+    color: var(--color-gold);
+    font-size: calc(10px * var(--text-scale));
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  fieldset.presentation-setting {
+    min-width: 0;
+    margin-inline: 0;
+    padding: 0;
+    border: 0;
+  }
+  .presentation-setting + .presentation-setting {
     border-top: 1px solid var(--color-border);
-    padding: 16px 0;
-    margin-bottom: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
   }
-  .presentation-controls h2 {
-    margin: 0 0 12px;
-    font-size: calc(14px * var(--text-scale));
+  .presentation-label {
+    display: block;
     color: var(--color-fg-secondary);
-  }
-  .presentation-controls label {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    margin: 10px 0;
-    font-size: calc(13px * var(--text-scale));
-  }
-  .presentation-controls select {
-    min-height: 40px;
-    max-width: 58%;
-    padding: 6px 10px;
-    color: var(--color-fg);
-    background: #101a24;
-    border: 1px solid var(--color-border-strong);
-    border-radius: 5px;
-  }
-  .presentation-controls input[type="checkbox"] {
-    width: 22px;
-    height: 22px;
-    accent-color: var(--color-blue);
-  }
-  .presentation-controls p {
     font-size: calc(12px * var(--text-scale));
-    line-height: 1.5;
-    color: var(--color-fg-muted);
-    margin: 6px 0 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 9px;
   }
+  .presentation-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .presentation-option {
+    min-height: 40px;
+    flex: 1 1 auto;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-surface-1);
+    color: var(--color-fg-secondary);
+    font: inherit;
+    font-size: calc(12px * var(--text-scale));
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 120ms, border-color 120ms, color 120ms;
+  }
+  .presentation-option:hover, .presentation-switch:hover {
+    border-color: var(--color-blue);
+    color: white;
+  }
+  .presentation-option[aria-pressed="true"] {
+    border-color: rgba(61, 209, 255, 0.4);
+    background: rgba(61, 209, 255, 0.12);
+    color: var(--color-cyan);
+  }
+  .presentation-controls .presentation-help {
+    margin: 8px 0 0;
+    color: var(--color-fg-muted);
+    font-size: calc(11px * var(--text-scale));
+    line-height: 1.45;
+  }
+  .presentation-setting--switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .presentation-setting--switch .presentation-label { margin: 0; }
+  .presentation-switch {
+    display: flex;
+    align-items: center;
+    width: 52px;
+    height: 32px;
+    padding: 3px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 18px;
+    background: var(--color-surface-1);
+    cursor: pointer;
+    transition: background-color 120ms, border-color 120ms;
+  }
+  .presentation-switch[aria-checked="true"] {
+    border-color: rgba(61, 209, 255, 0.5);
+    background: rgba(61, 209, 255, 0.22);
+  }
+  .presentation-switch-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-fg-secondary);
+    transition: transform 120ms, background-color 120ms;
+  }
+  .presentation-switch[aria-checked="true"] .presentation-switch-thumb {
+    transform: translateX(20px);
+    background: var(--color-cyan);
+  }
+  .presentation-option:focus-visible, .presentation-switch:focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 2px;
+  }
+  .presentation-controls .keyboard-controls {
+    margin: 18px 0 0;
+    padding: 16px 0 0;
+    border: 0;
+    border-top: 1px solid var(--color-border);
+    border-radius: 0;
+    background: none;
+  }
+  .keyboard-controls summary { color: var(--color-fg-secondary); cursor: pointer; font-weight: 700; }
+  .keyboard-controls fieldset { border: 0; padding: 0; margin: 12px 0; }
+  .keyboard-controls label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; }
+  .keyboard-controls p { color: var(--color-fg-muted); font-size: calc(11px * var(--text-scale)); line-height: 1.45; }
   body.reduced-motion *,
   body.reduced-motion *::before,
   body.reduced-motion *::after {
