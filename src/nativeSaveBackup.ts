@@ -15,13 +15,14 @@ import { clearSaveIssue, reportSaveIssue } from "./persistence/storageHealth";
 // from that mirror at boot whenever localStorage has come up empty. The browser
 // build is untouched: every entry point below no-ops off-native.
 //
-// Only the `mesozoic-protocol:` namespace is mirrored (save slots, progress,
-// language, audio, fullscreen preference). The editor's `mz:` keys are
-// authoring scratch data — large, regenerable, and not shipped-player state.
+// Mirror player preferences and saves, including old-prefix entries until
+// their verified migration removes them. Editor scratch data is excluded.
 
 const MIRRORED_PREFIX = "mesozoic-protocol:";
 const MIRROR_KEY = "localstorage-mirror:v1";
-const FLUSH_DEBOUNCE_MS = 1500;
+const FLUSH_INTERVAL_MS = 1500;
+const isMirroredKey = (key: string) =>
+  key.startsWith(MIRRORED_PREFIX) || key.startsWith("extinction-protocol:");
 
 const isNative = (): boolean => {
   try {
@@ -35,7 +36,7 @@ const readMirroredEntries = (): Record<string, string> => {
   const out: Record<string, string> = {};
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = window.localStorage.key(i);
-    if (!key?.startsWith(MIRRORED_PREFIX)) continue;
+    if (!key || !isMirroredKey(key)) continue;
     const value = window.localStorage.getItem(key);
     if (value !== null) out[key] = value;
   }
@@ -43,35 +44,74 @@ const readMirroredEntries = (): Record<string, string> => {
 };
 
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
-let flushInFlight: Promise<void> = Promise.resolve();
+let operations: Promise<void> = Promise.resolve();
+let restoreState: "unread" | "blocked" | "ready" = "unread";
+let mirrorInstalled = false;
+let mirrorRequested = false;
 
-// Serialized behind `flushInFlight` so a burst of writes can never interleave
-// two snapshots and persist a torn one.
-const flushNow = (): Promise<void> => {
+// Reads and writes share a queue. A pending restore can never race a seed
+// snapshot, and slow native writes cannot overtake one another.
+const serialize = <T>(operation: () => Promise<T>): Promise<T> => {
+  const next = operations.then(operation);
+  operations = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
+};
+
+const reportNativeFailure = () => {
+  reportSaveIssue({ key: MIRROR_KEY, reason: "native" }, async () => {
+    if (restoreState !== "ready") await restoreNativeSaveBackup();
+    if (restoreState !== "ready") return false;
+    if (mirrorRequested && !mirrorInstalled) installNativeSaveMirror();
+    if (mirrorRequested && !mirrorInstalled) return false;
+    return flushNow();
+  });
+};
+
+const flushNow = (): Promise<boolean> => {
   if (flushTimer !== null) {
     clearTimeout(flushTimer);
     flushTimer = null;
   }
-  flushInFlight = flushInFlight.then(async () => {
+  return serialize(async () => {
+    // A failed read, malformed envelope, or partial local restore must not
+    // authorize replacing the only durable source with an empty snapshot.
+    if (restoreState !== "ready") {
+      reportNativeFailure();
+      return false;
+    }
     try {
       await Preferences.set({ key: MIRROR_KEY, value: JSON.stringify(readMirroredEntries()) });
       clearSaveIssue(MIRROR_KEY);
+      return true;
     } catch {
-      reportSaveIssue({ key: MIRROR_KEY, reason: "native" }, async () => {
-        await flushNow();
-        return true;
-      });
+      reportNativeFailure();
+      return false;
     }
   });
-  return flushInFlight;
 };
 
 const scheduleFlush = (): void => {
-  if (flushTimer !== null) clearTimeout(flushTimer);
+  // First write starts a fixed deadline. Later writes join its snapshot
+  // instead of resetting the timer and starving continuous checkpoints.
+  if (flushTimer !== null) return;
   flushTimer = setTimeout(() => {
     flushTimer = null;
     void flushNow();
-  }, FLUSH_DEBOUNCE_MS);
+  }, FLUSH_INTERVAL_MS);
+};
+
+const parseMirror = (raw: string): Record<string, string> => {
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error("Invalid native mirror envelope");
+  for (const [key, entry] of Object.entries(parsed)) {
+    if (!isMirroredKey(key) || typeof entry !== "string")
+      throw new Error("Invalid native mirror entry");
+  }
+  return parsed as Record<string, string>;
 };
 
 /**
@@ -85,46 +125,61 @@ const scheduleFlush = (): void => {
  */
 export const restoreNativeSaveBackup = async (): Promise<void> => {
   if (!isNative()) return;
-  try {
-    const { value } = await Preferences.get({ key: MIRROR_KEY });
-    if (!value) return;
-    const parsed: unknown = JSON.parse(value);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
-    for (const [key, entry] of Object.entries(parsed as Record<string, unknown>)) {
-      if (
-        (!key.startsWith(MIRRORED_PREFIX) && !key.startsWith("extinction-protocol:")) ||
-        typeof entry !== "string"
-      )
-        continue;
-      if (window.localStorage.getItem(key) !== null) continue;
-      window.localStorage.setItem(key, entry);
+  await serialize(async () => {
+    restoreState = "blocked";
+    try {
+      const { value } = await Preferences.get({ key: MIRROR_KEY });
+      // Only null means there was no backup. An empty/invalid string is
+      // unreadable data and must remain intact until recovery succeeds.
+      const entries = value === null ? {} : parseMirror(value);
+      const ls = window.localStorage;
+      for (const [key, entry] of Object.entries(entries)) {
+        if (ls.getItem(key) !== null) continue;
+        // New-prefix values, including deletion tombstones, also outrank
+        // old-prefix counterparts in a mirror restored after a failed boot.
+        const nextKey = key.replace(/^extinction-protocol:/, MIRRORED_PREFIX);
+        if (nextKey !== key && ls.getItem(nextKey) !== null) continue;
+        ls.setItem(key, entry);
+        if (ls.getItem(key) !== entry) throw new Error("Native restore verification failed");
+      }
+      restoreState = "ready";
+      clearSaveIssue(MIRROR_KEY);
+      if (mirrorInstalled) scheduleFlush();
+    } catch {
+      reportNativeFailure();
     }
-  } catch {
-    // Corrupt or unreadable mirror: boot with whatever localStorage has.
-  }
+  });
 };
 
 /**
- * Patches localStorage's mutating methods so every write schedules a debounced
+ * Patches localStorage's mutating methods so every write schedules a bounded
  * snapshot, and flushes on backgrounding. Patching the instance is the one
  * choke point that covers all ~18 call sites without threading an async
  * storage API through the save layer.
  */
 export const installNativeSaveMirror = (): void => {
   if (!isNative()) return;
-
-  const ls = window.localStorage;
+  mirrorRequested = true;
+  if (mirrorInstalled) return;
+  let ls: Storage;
+  try {
+    ls = window.localStorage;
+  } catch {
+    reportNativeFailure();
+    return;
+  }
   const setItem = ls.setItem.bind(ls);
   const removeItem = ls.removeItem.bind(ls);
   const clear = ls.clear.bind(ls);
+  mirrorInstalled = true;
 
   ls.setItem = (key: string, value: string): void => {
     setItem(key, value);
-    if (key.startsWith(MIRRORED_PREFIX)) scheduleFlush();
+    if (isMirroredKey(key)) scheduleFlush();
   };
   ls.removeItem = (key: string): void => {
     removeItem(key);
-    if (key.startsWith(MIRRORED_PREFIX)) scheduleFlush();
+    if (isMirroredKey(key)) scheduleFlush();
   };
   ls.clear = (): void => {
     clear();
