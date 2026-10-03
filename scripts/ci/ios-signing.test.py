@@ -1,13 +1,31 @@
 import copy
 import datetime
 import importlib.util
+import os
 from pathlib import Path
 import plistlib
+import sys
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location("ios_signing", Path(__file__).with_name("ios-signing.py"))
 signing = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(signing)
+
+
+class CodesignTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "darwin", "requires Apple's codesign utility")
+    def test_extracts_public_certificate_from_signed_app(self):
+        # Apple's sealed-system apps can omit their certificate chain. Use an
+        # explicitly selected signed app; no keychain or private key is read.
+        fixture = os.environ.get("CODESIGN_TEST_APP")
+        if not fixture:
+            self.skipTest("set CODESIGN_TEST_APP to a certificate-signed app")
+        app = Path(fixture)
+        with tempfile.TemporaryDirectory(prefix="signer path with spaces ") as directory:
+            certificate = signing.extract_signer_certificate(app, directory)
+            self.assertGreater(len(certificate), 100)
+            self.assertEqual(certificate[0], 0x30)  # DER sequence
 
 
 class ProfileTests(unittest.TestCase):

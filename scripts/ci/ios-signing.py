@@ -53,6 +53,14 @@ def command(arguments):
     return result
 
 
+def extract_signer_certificate(app, directory):
+    prefix = Path(directory) / "signer-"
+    # codesign treats this as an optional argument: it must be attached to the
+    # option, otherwise the prefix is interpreted as another code object.
+    command(["codesign", "--display", f"--extract-certificates={prefix}", str(app)])
+    return (Path(directory) / "signer-0").read_bytes()
+
+
 def verify_ipa(ipa, team, name, expected_certificate, version, build):
     with tempfile.TemporaryDirectory(prefix="ipa-verification-", dir=os.environ.get("RUNNER_TEMP")) as directory:
         root = Path(directory)
@@ -76,9 +84,7 @@ def verify_ipa(ipa, team, name, expected_certificate, version, build):
             raise ValueError("Exported IPA signing entitlements do not match.")
         if entitlements.get("get-task-allow", False) is not False:
             raise ValueError("Exported IPA permits debugging.")
-        prefix = root / "signer-"
-        command(["codesign", "--display", "--extract-certificates", str(prefix), str(app)])
-        if (root / "signer-0").read_bytes() != expected_certificate:
+        if extract_signer_certificate(app, root) != expected_certificate:
             raise ValueError("Exported IPA signer does not match the configured certificate.")
         profile_bytes = command(["security", "cms", "-D", "-i", str(app / "embedded.mobileprovision")]).stdout
         validate_profile(plistlib.loads(profile_bytes), team, name, expected_certificate)
