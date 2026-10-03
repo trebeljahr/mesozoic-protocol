@@ -25,6 +25,9 @@ RUN apk add --no-cache curl
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY scripts/nginx-drain.sh /usr/local/bin/nginx-drain.sh
+# nginx:alpine defaults to QUIT; the wrapper needs TERM to withdraw
+# readiness and drain before sending nginx its own graceful QUIT.
+STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=2s --timeout=5s --start-period=15s --retries=5 \
   CMD curl --fail --silent --show-error http://127.0.0.1/healthz >/dev/null || exit 1
 CMD ["/usr/local/bin/nginx-drain.sh"]
