@@ -6367,7 +6367,7 @@
       rgba(4, 8, 12, 0.98) 70%
     );
     z-index: 44;
-    animation: levelLoadFadeIn 0.16s ease-out;
+    opacity: 1;
     pointer-events: auto;
   }
 
@@ -6435,11 +6435,6 @@
     text-transform: uppercase;
     color: rgba(140, 170, 200, 0.7);
     font-variant-numeric: tabular-nums;
-  }
-
-  @keyframes levelLoadFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   @keyframes levelLoadFadeOut {

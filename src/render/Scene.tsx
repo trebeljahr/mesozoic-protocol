@@ -27,6 +27,7 @@ import { HiveDrones } from "./HiveDrones";
 import { HQBase } from "./HQBase";
 import { HQTurrets } from "./HQTurret";
 import { IncomingLaneMarkers } from "./IncomingLaneMarkers";
+import { LevelSceneReady } from "./LevelSceneReady";
 import { ModelEnemyMesh } from "./ModelEnemyMesh";
 import { ModelRobotMesh } from "./ModelRobotMesh";
 import { ModelTowerMesh } from "./ModelTowerMesh";
@@ -209,6 +210,7 @@ export const PlayScene = () => {
           this batch doesn't pile onto the same tick as the model hosts
           above. */}
       <Defer frames={3}>
+        <LevelSceneReady />
         <HiveDrones />
         <ShieldBubbles />
         <HealAuras />

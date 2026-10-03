@@ -10,11 +10,8 @@
 //    the transition appear *immediately* instead of letting the world map
 //    sit frozen on screen for ~1s while the load blocks the main thread.
 //  - Stays up through `screen === "playing"` until assets finish warming.
-//  - Hidden once the store's `assetsPrewarmed` flag flips true (set by
-//    either the worldmap idle prewarm or the PlayScene ShaderPrewarm).
-//  - When the worldmap prewarm finished before the click, the overlay
-//    is skipped entirely (assetsPrewarmed already true → never active),
-//    so the transition is fully instantaneous.
+//  - Hidden after assets are warm AND the last deferred scene group has
+//    rendered. Warm assets alone do not prevent partial first frames.
 //
 // The progress bar reads from the global LoadingManager subscription
 // in useLevelLoadProgress — it'll show network progress for any GLBs
@@ -30,13 +27,14 @@ export const LevelLoadOverlay = () => {
   const { t } = useTranslation();
   const screen = useGame((s) => s.screen);
   const ready = useGame((s) => s.assetsPrewarmed);
+  const sceneReady = useGame((s) => s.levelSceneReady);
   const pending = useGame((s) => s.levelLoadPending);
   const progress = useGame((s) => s.levelLoadProgress);
 
   // Active from the click (pending) through the play scene mounting, until
-  // assets finish warming. `pending` covers the gap before `screen` flips to
+  // assets and the scene are ready. `pending` covers the gap before `screen` flips to
   // "playing" so the overlay paints before the heavy build, not after.
-  const active = !ready && (pending || screen === "playing");
+  const active = pending || (screen === "playing" && (!ready || !sceneReady));
 
   const [mounted, setMounted] = useState(active);
   const [exiting, setExiting] = useState(false);
@@ -63,20 +61,22 @@ export const LevelLoadOverlay = () => {
 
   return (
     <div className={`level-load-overlay ${exiting ? "level-load-overlay-exit" : ""}`}>
-      <div className="level-load-card">
-        <div className="level-load-eyebrow">{t("levelLoad.eyebrow")}</div>
-        <div className="level-load-bar">
-          <div
-            className={`level-load-bar-fill ${pct === null ? "is-indeterminate" : ""}`}
-            style={pct !== null ? { width: `${pct.toFixed(1)}%` } : undefined}
-          />
+      {!ready && (
+        <div className="level-load-card">
+          <div className="level-load-eyebrow">{t("levelLoad.eyebrow")}</div>
+          <div className="level-load-bar">
+            <div
+              className={`level-load-bar-fill ${pct === null ? "is-indeterminate" : ""}`}
+              style={pct !== null ? { width: `${pct.toFixed(1)}%` } : undefined}
+            />
+          </div>
+          <div className="level-load-status">
+            {pct === null
+              ? t("levelLoad.compiling")
+              : t("levelLoad.loading", { pct: Math.round(pct) })}
+          </div>
         </div>
-        <div className="level-load-status">
-          {pct === null
-            ? t("levelLoad.compiling")
-            : t("levelLoad.loading", { pct: Math.round(pct) })}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

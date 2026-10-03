@@ -569,9 +569,9 @@ type GameStore = {
   autoPausedForNewEnemy: boolean;
   levelIntroVisible: boolean;
   // Tracks whether the heavy level-scene shaders (towers + dinos) have
-  // been compiled into the WebGL context. Set true by either the
-  // worldmap idle prewarm or the PlayScene ShaderPrewarm. Drives the
-  // LevelLoadOverlay — when true at level start the overlay is skipped.
+  // been uploaded into the WebGL context. Set true by either the
+  // worldmap idle prewarm or the PlayScene ShaderPrewarm. The load cover
+  // also waits for a complete frame from the new scene.
   assetsPrewarmed: boolean;
   markAssetsPrewarmed: () => void;
   // True between a cold (not-yet-prewarmed) level click and the play scene
@@ -579,6 +579,9 @@ type GameStore = {
   // heavy buildWorldForLevel + PlayScene mount runs, so the map doesn't sit
   // frozen on screen during the load. Cleared once the level scene is entered.
   levelLoadPending: boolean;
+  // Cleared for each new world; set after its last deferred scene group has rendered.
+  levelSceneReady: boolean;
+  markLevelSceneReady: (world: World) => void;
   // GLB / texture download progress reported by THREE.DefaultLoadingManager
   // while the LevelLoadOverlay is on screen. null when nothing is in-flight.
   levelLoadProgress: { loaded: number; total: number } | null;
@@ -976,6 +979,7 @@ export const useGame = create<GameStore>((set, get) => ({
       lastResult: null,
       levelIntroVisible: false,
       levelLoadPending: false,
+      levelSceneReady: false,
       newEnemyQueue: [],
       deferredNewEnemyQueue: [],
       autoPausedForNewEnemy: false,
@@ -1089,6 +1093,7 @@ export const useGame = create<GameStore>((set, get) => ({
   levelIntroVisible: false,
   assetsPrewarmed: false,
   levelLoadPending: false,
+  levelSceneReady: false,
   levelLoadProgress: null,
   treeClickCounts: {},
   rockClickCounts: {},
@@ -1139,6 +1144,7 @@ export const useGame = create<GameStore>((set, get) => ({
         autoPausedForNewEnemy: false,
         levelIntroVisible: showIntro,
         levelLoadPending: false,
+        levelSceneReady: false,
         screen: "playing",
         treeClickCounts: {},
         rockClickCounts: {},
@@ -1249,6 +1255,7 @@ export const useGame = create<GameStore>((set, get) => ({
       autoPausedForNewEnemy: false,
       levelIntroVisible: false,
       screen: "playing",
+      levelSceneReady: false,
       treeClickCounts: {},
       rockClickCounts: {},
       runMinDifficulty: progress.difficulty,
@@ -1369,6 +1376,7 @@ export const useGame = create<GameStore>((set, get) => ({
         autoPausedForNewEnemy: false,
         levelIntroVisible: false,
         levelLoadPending: false,
+        levelSceneReady: false,
         runMinDifficulty: checkpoint.minDifficulty,
         treeClickCounts: {},
         rockClickCounts: {},
@@ -2231,6 +2239,11 @@ export const useGame = create<GameStore>((set, get) => ({
   markAssetsPrewarmed: () => {
     if (get().assetsPrewarmed) return;
     set({ assetsPrewarmed: true });
+  },
+
+  markLevelSceneReady: (world) => {
+    if (get().world !== world || get().levelSceneReady) return;
+    set({ levelSceneReady: true });
   },
 
   setLevelLoadProgress: (p) => {
