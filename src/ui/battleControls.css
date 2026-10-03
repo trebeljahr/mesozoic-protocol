@@ -1,4 +1,4 @@
-.battle-planning {
+.battle-controls {
   position: absolute;
   display: flex;
   flex-direction: column;
@@ -12,7 +12,7 @@
   font-size: var(--fs-md);
 }
 
-.battle-planning-row {
+.battle-controls-row {
   display: flex;
   flex-shrink: 0;
   gap: 5px;
@@ -43,17 +43,6 @@
 .battle-control:focus-visible, .incoming-lane-button:focus-visible {
   outline: 2px solid #ffd66a;
   outline-offset: 2px;
-}
-
-.planning-notice {
-  min-height: 0;
-  overflow-y: auto;
-  max-width: 310px;
-  margin: 5px 0;
-  padding: 7px 9px;
-  border-left: 2px solid #ffd66a;
-  background: rgba(10, 16, 24, 0.94);
-  color: #ffd66a;
 }
 
 .incoming-wave-panel {
@@ -123,7 +112,7 @@
 }
 
 @media (max-width: 720px), (pointer: coarse) and (max-width: 1024px), (max-height: 500px) and (max-width: 1024px) {
-  .battle-planning {
+  .battle-controls {
     top: calc(64px + var(--safe-top, 0px));
     left: calc(8px + var(--safe-left, 0px));
     font-size: var(--fs-sm);
@@ -131,8 +120,5 @@
   .battle-control {
     min-height: 36px;
     padding: 5px 8px;
-  }
-  .planning-notice {
-    max-width: 270px;
   }
 }

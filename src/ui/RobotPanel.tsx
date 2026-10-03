@@ -112,7 +112,7 @@ export const RobotPanel = () => {
           const hint = showKeyboardHints ? ` [${key}]` : "";
           const abilityLabel = t(`robots:variants.${variant}.abilityLabel.${slot}`);
           const title = !running
-            ? t("planning.abilitiesPaused")
+            ? t("battleControls.abilitiesPaused")
             : active
               ? t("robotShop.abilityActiveTitle", {
                   label: abilityLabel,

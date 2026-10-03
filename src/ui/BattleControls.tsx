@@ -9,9 +9,9 @@ import { useGame } from "../store";
 import { useBattleView } from "./battleView";
 import { activeModal } from "./modalFocus";
 import { useIncomingWave } from "./useIncomingWave";
-import "./battlePlanning.css";
+import "./battleControls.css";
 
-export function BattlePlanningControls() {
+export function BattleControls() {
   const { t } = useTranslation();
   const panelId = useId();
   const sectionRef = useRef<HTMLElement>(null);
@@ -19,7 +19,6 @@ export function BattlePlanningControls() {
   const bindings = useKeyBindings((s) => s.bindings);
   const world = useGame((s) => s.world);
   const usable = useGame(canUseBattlefield);
-  const planning = useGame((s) => s.planningPaused);
   const speed = useGame((s) => s.simulationSpeed);
   const screen = useGame((s) => s.screen);
   const training = isTrainingSession(world);
@@ -49,10 +48,6 @@ export function BattlePlanningControls() {
       const action = actionForKey(event, bindings);
       const state = useGame.getState();
       if (!canUseBattlefield(state) || isTrainingSession(state.world)) return;
-      if (action === "planning") {
-        event.preventDefault();
-        state.togglePlanningPause();
-      }
       if (action === "speed") {
         event.preventDefault();
         state.setSimulationSpeed(state.simulationSpeed === 1 ? 2 : 1);
@@ -92,37 +87,20 @@ export function BattlePlanningControls() {
   return (
     <section
       ref={sectionRef}
-      className="battle-planning"
+      className="battle-controls"
       style={{ maxHeight: availableHeight }}
-      aria-label={t("planning.controls")}
+      aria-label={t("battleControls.controls")}
     >
-      <div className="battle-planning-row">
+      <div className="battle-controls-row">
         <button
           type="button"
           className="battle-control"
-          aria-pressed={planning}
+          aria-label={t("battleControls.speedLabel", { speed })}
           disabled={!usable || training}
           title={
             training
-              ? t("planning.training")
-              : t("planning.shortcut", {
-                  planning: keyLabel(bindings.planning),
-                  menu: keyLabel(bindings.menu),
-                })
-          }
-          onClick={() => useGame.getState().togglePlanningPause()}
-        >
-          {planning ? t("planning.resume") : t("planning.pause")}
-        </button>
-        <button
-          type="button"
-          className="battle-control"
-          aria-label={t("planning.speedLabel", { speed })}
-          disabled={!usable || training}
-          title={
-            training
-              ? t("planning.training")
-              : t("planning.speedHint", { key: keyLabel(bindings.speed) })
+              ? t("battleControls.training")
+              : t("battleControls.speedHint", { key: keyLabel(bindings.speed) })
           }
           onClick={() => useGame.getState().setSimulationSpeed(speed === 1 ? 2 : 1)}
         >
@@ -140,11 +118,6 @@ export function BattlePlanningControls() {
           {t("wavePreview.button", { wave: preview?.number ?? "—" })}
         </button>
       </div>
-      {planning && !(open && usable) && (
-        <p className="planning-notice" role="status">
-          {t("planning.active")}
-        </p>
-      )}
       {open && usable && (
         <div className="incoming-wave-panel" id={panelId}>
           <div className="incoming-wave-heading">
@@ -196,11 +169,6 @@ export function BattlePlanningControls() {
             <p className="wave-preview-help">{t("wavePreview.adaptive")}</p>
           )}
           {preview && <p className="wave-preview-help">{t("wavePreview.countHint")}</p>}
-          {planning && (
-            <p className="planning-notice" role="status">
-              {t("planning.active")}
-            </p>
-          )}
         </div>
       )}
     </section>

@@ -174,10 +174,6 @@ export const Placement = () => {
       state.togglePause();
       return;
     }
-    if (frame.buttonPressed("select")) {
-      state.togglePlanningPause();
-      return;
-    }
     if (frame.buttonPressed("y")) state.callWaveEarly();
 
     const cycleTower = (direction: -1 | 1) => {

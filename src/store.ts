@@ -67,7 +67,6 @@ import { segmentLength } from "./sim/path";
 import {
   canUseBattlefield,
   effectiveSimulationSpeed,
-  isTrainingSession,
   type SimulationSpeed,
 } from "./sim/playControl";
 import {
@@ -645,9 +644,7 @@ type GameStore = {
 
   reset: () => void;
   setInterruptionBlocked: (reason: InterruptionReason, blocked: boolean) => void;
-  planningPaused: boolean;
   simulationSpeed: SimulationSpeed;
-  togglePlanningPause: () => void;
   setSimulationSpeed: (speed: SimulationSpeed) => void;
   togglePause: () => void;
   tick: (realTimeSec: number) => void;
@@ -849,7 +846,6 @@ const buildWorldForLevel = (
   });
   return {
     world,
-    planningPaused: false,
     simulationSpeed: 1 as SimulationSpeed,
     ui: snapshot(world, 0, 0, emptyInspect),
     towerVersion: 0,
@@ -960,7 +956,6 @@ export const useGame = create<GameStore>((set, get) => ({
     sessionPause.enforce(built.world);
     s.engine.reset();
     set({
-      planningPaused: false,
       simulationSpeed: 1,
       tutorialReturnState: s.tutorialReturnState ?? s,
       tutorial: built.session,
@@ -1056,7 +1051,6 @@ export const useGame = create<GameStore>((set, get) => ({
     restored.engine.reset();
     set({
       ...restored,
-      planningPaused: false,
       simulationSpeed: 1,
       ui: snapshot(
         restored.world,
@@ -1234,7 +1228,6 @@ export const useGame = create<GameStore>((set, get) => ({
     beginMission(s.activeSlot, world, progress);
     set({
       world,
-      planningPaused: false,
       simulationSpeed: 1,
       ui: snapshot(world, 0, 0, emptyInspect),
       towerVersion: 0,
@@ -1574,24 +1567,9 @@ export const useGame = create<GameStore>((set, get) => ({
     // Preserve the resume latch on a suspended campaign too. Foregrounding
     // training must not make the restored live mission resume implicitly.
     if (s.tutorialReturnState) sessionPause.enforce(s.tutorialReturnState.world);
-    if (blocked) set({ planningPaused: false });
     // Discard elapsed wall time, including when requestAnimationFrame was suspended.
     s.engine.reset();
     set({ ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy) });
-  },
-
-  togglePlanningPause: () => {
-    const s = get();
-    if (!canUseBattlefield(s) || isTrainingSession(s.world) || !sessionPause.canAutoResume(s.world))
-      return;
-    if (s.planningPaused) {
-      if (!sessionPause.resume(s.world)) return;
-    } else s.world.status = "paused";
-    s.engine.reset();
-    set({
-      planningPaused: !s.planningPaused,
-      ui: snapshot(s.world, s.towerVersion, s.treeVersion, s.inspectedEnemy),
-    });
   },
 
   setSimulationSpeed: (speed) => {
@@ -1604,11 +1582,6 @@ export const useGame = create<GameStore>((set, get) => ({
   togglePause: () => {
     const s = get();
     const { world } = s;
-    if (s.planningPaused) {
-      // Menu pause replaces planning; closing it requires a deliberate resume.
-      set({ planningPaused: false });
-      return;
-    }
     if (world.status === "running") world.status = "paused";
     else if (world.status === "paused") {
       if (
@@ -2631,7 +2604,7 @@ export const useGame = create<GameStore>((set, get) => ({
       }
       return;
     }
-    // Tactical placement is available during live combat and planning.
+    // Tactical placement is available during live combat.
     // The shared access gate above excludes all modal/interruption pauses.
     // Mode rule check before spending gold. The HUD greys out denied
     // kinds, but a stale picker selection (e.g. the player armed a kind
@@ -3323,11 +3296,10 @@ if (import.meta.hot) {
   (globalThis as HMRGlobal)[HMR_STORE_KEY] = useGame;
 }
 
-// Run controls are transient. Any world replacement (campaign, Endless,
-// training, checkpoint restore, or editor rebuild) starts from normal speed
-// with no planning ownership carried over from the previous world.
+// Run speed is transient. Any world replacement (campaign, Endless,
+// training, checkpoint restore, or editor rebuild) starts from normal speed.
 useGame.subscribe((state, previous) => {
-  if (state.world !== previous.world && (state.planningPaused || state.simulationSpeed !== 1)) {
-    useGame.setState({ planningPaused: false, simulationSpeed: 1 });
+  if (state.world !== previous.world && state.simulationSpeed !== 1) {
+    useGame.setState({ simulationSpeed: 1 });
   }
 });

@@ -651,7 +651,6 @@
       "ability2": "Fähigkeit 2",
       "ability3": "Fähigkeit 3",
       "ability4": "Ultimative Fähigkeit",
-      "planning": "Planungspause",
       "speed": "Simulationsgeschwindigkeit wechseln",
       "preview": "Nächste Welle anzeigen"
     }
@@ -905,17 +904,6 @@
     "revisit": "Öffne diesen Abschluss erneut über das Weltkartenmenü.",
     "replay": "Kampagnenabschluss"
   },
-  "planning": {
-    "controls": "Kampfsteuerung",
-    "pause": "Planen",
-    "resume": "Verteidigung fortsetzen",
-    "active": "Planungspause · Bauen, aufrüsten, verkaufen und Drohnen zuweisen. Danach bewusst fortsetzen.",
-    "shortcut": "Planungspause ({{planning}} / Controller Select). Menüpause: {{menu}} / Start.",
-    "speedLabel": "Simulationsgeschwindigkeit: {{speed}}×. Geschwindigkeit ändern.",
-    "speedHint": "Zwischen 1× und 2× wechseln ({{key}}). In der Pause bleibt die Zeit stehen.",
-    "training": "Das Training bestimmt Tempo und verfügbare Aktionen.",
-    "abilitiesPaused": "Verteidigung fortsetzen, um Fähigkeiten zu nutzen."
-  },
   "wavePreview": {
     "button": "Ankommend {{wave}}",
     "heading": "Welle {{wave}} · {{count}} geplant",
@@ -940,5 +928,12 @@
     "adaptive": "Einige Gegner können sich zusätzlich an deine bisherigen Schadensarten anpassen.",
     "countHint": "Die Zahlen umfassen geplante Gegner. Beschworene Gegner und laufende Bosseskorten kommen hinzu.",
     "shortcut": "Nächste Welle anzeigen ({{key}})."
+  },
+  "battleControls": {
+    "controls": "Kampfsteuerung",
+    "speedLabel": "Simulationsgeschwindigkeit: {{speed}}×. Geschwindigkeit ändern.",
+    "speedHint": "Zwischen 1× und 2× wechseln ({{key}}). In der Pause bleibt die Zeit stehen.",
+    "training": "Das Training bestimmt Tempo und verfügbare Aktionen.",
+    "abilitiesPaused": "Verteidigung fortsetzen, um Fähigkeiten zu nutzen."
   }
 }

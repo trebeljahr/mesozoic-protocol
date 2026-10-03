@@ -15,7 +15,6 @@ export const effectiveSimulationSpeed = (
 export type BattleAccess = {
   world: World;
   screen: string;
-  planningPaused: boolean;
   levelIntroVisible: boolean;
   newEnemyQueue: readonly unknown[];
   difficultyPickerOpen: boolean;
@@ -29,8 +28,7 @@ export type BattleAccess = {
 export const canUseBattlefield = (s: BattleAccess) =>
   s.screen === "playing" &&
   sessionPause.canAutoResume(s.world) &&
-  (s.world.status === "running" ||
-    (s.world.status === "paused" && s.planningPaused && !isTrainingSession(s.world))) &&
+  s.world.status === "running" &&
   !s.levelIntroVisible &&
   s.newEnemyQueue.length === 0 &&
   !s.difficultyPickerOpen &&

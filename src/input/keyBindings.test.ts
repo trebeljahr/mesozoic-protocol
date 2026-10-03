@@ -48,21 +48,14 @@ it("keeps working on write failure and restores defaults on reset", () => {
   expect(useKeyBindings.getState().storageFailed).toBe(false);
 });
 
-it("adds remappable tactical controls without overriding saved bindings", () => {
-  const old = { ...DEFAULT_BINDINGS, menu: "KeyT" };
-  delete (old as Partial<typeof old>).planning;
-  const bindings = normalizeBindings(old);
+it("keeps saved shortcuts when removing the former planning action", () => {
+  const bindings = normalizeBindings({ ...DEFAULT_BINDINGS, menu: "KeyT", planning: "KeyH" });
   expect(bindings.menu).toBe("KeyT");
-  expect(bindings.planning).not.toBe("KeyT");
+  expect(
+    actionForKey(
+      { code: "KeyH", ctrlKey: false, altKey: false, metaKey: false, repeat: false },
+      bindings,
+    ),
+  ).toBeUndefined();
   expect(new Set(Object.values(bindings)).size).toBe(BINDING_ACTIONS.length);
-  const event = {
-    code: bindings.planning,
-    ctrlKey: false,
-    altKey: false,
-    metaKey: false,
-    repeat: false,
-  };
-  expect(actionForKey(event, bindings)).toBe("planning");
-  expect(actionForKey({ ...event, code: bindings.speed }, bindings)).toBe("speed");
-  expect(actionForKey({ ...event, code: bindings.preview }, bindings)).toBe("preview");
 });

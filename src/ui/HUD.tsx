@@ -8,7 +8,7 @@ import type { TowerKind } from "../sim/types";
 import { TOWER_BUILD_LIMIT, TOWER_LABEL, towerPillInfo } from "../sim/world";
 import { useGame } from "../store";
 import { BasePanel } from "./BasePanel";
-import { BattlePlanningControls } from "./BattlePlanningControls";
+import { BattleControls } from "./BattleControls";
 import { BossBanner } from "./BossBanner";
 import { DamageIcon } from "./DamageIcon";
 import { DifficultyButton } from "./DifficultyButton";
@@ -87,7 +87,6 @@ export const HUD = () => {
     ? t("hud.endless")
     : `${t("hud.outpost")}${levelOrdinalLabel ? ` ${levelOrdinalLabel}` : ""}`;
   const paused = status === "paused";
-  const planningPaused = useGame((s) => s.planningPaused);
   // On the final wave the label embeds the n/m count, so the value
   // slot is free to show the wave state ("ACTIVE") rather than just
   // re-stating the same count. The non-final path keeps the original
@@ -495,7 +494,7 @@ export const HUD = () => {
         </div>
       )}
 
-      <BattlePlanningControls />
+      <BattleControls />
       <TowerPanel />
       <BasePanel />
       <EnemyPanel />
@@ -506,7 +505,6 @@ export const HUD = () => {
       <DroneAssignNotice />
 
       {paused &&
-        !planningPaused &&
         !compendiumOpen &&
         !levelIntroVisible &&
         !newEnemyAlertVisible &&
