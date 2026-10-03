@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { activeModal, focusableElements } from "../ui/modalFocus";
 import { dispatchGamepadKeyboard } from "../ui/useInputMode";
 import { type GamepadInputFrame, snapGamepadDirection, useGamepadInput } from "./gamepad";
+import { activateGamepadControl, adjustGamepadControl } from "./gamepadFormControls";
 
 const handledFrames = new WeakSet<GamepadInputFrame>();
 export const isMenuFrameHandled = (frame: GamepadInputFrame) => handledFrames.has(frame);
@@ -27,6 +28,7 @@ const focusWithGamepad = (el: HTMLElement) => {
   document.body.classList.add("using-gamepad");
   el.classList.add(GAMEPAD_FOCUS_CLASS);
   el.focus({ preventScroll: true });
+  el.scrollIntoView({ block: "nearest", inline: "nearest" });
 };
 
 const focusRelative = (direction: -1 | 1) => {
@@ -45,6 +47,8 @@ const focusRelative = (direction: -1 | 1) => {
 
 const activateFocused = () => {
   const active = document.activeElement;
+  if (visibleFocusableElements().includes(active as HTMLElement) && activateGamepadControl(active))
+    return;
   if (
     visibleFocusableElements().includes(active as HTMLElement) &&
     (active instanceof HTMLButtonElement || active instanceof HTMLAnchorElement)
@@ -61,7 +65,9 @@ const activateFocused = () => {
   dispatchGamepadKeyboard("Enter");
 };
 
-const menuDirection = (frame: GamepadInputFrame): -1 | 0 | 1 => {
+const menuDirection = (
+  frame: GamepadInputFrame,
+): { direction: -1 | 0 | 1; horizontal: boolean } => {
   const dpadX = Number(frame.buttonDown("right")) - Number(frame.buttonDown("left"));
   const dpadY = Number(frame.buttonDown("down")) - Number(frame.buttonDown("up"));
   const stickX = snapGamepadDirection(frame.axis("leftX"));
@@ -69,37 +75,51 @@ const menuDirection = (frame: GamepadInputFrame): -1 | 0 | 1 => {
   const x = dpadX || stickX;
   const y = dpadY || stickY;
 
-  if (Math.abs(y) >= Math.abs(x) && y !== 0) return y > 0 ? 1 : -1;
-  if (x !== 0) return x > 0 ? 1 : -1;
-  return 0;
+  if (Math.abs(y) >= Math.abs(x) && y !== 0)
+    return { direction: y > 0 ? 1 : -1, horizontal: false };
+  if (x !== 0) return { direction: x > 0 ? 1 : -1, horizontal: true };
+  return { direction: 0, horizontal: false };
 };
 
 export const useGamepadMenuNavigation = (enabled: boolean, options: MenuBridgeOptions = {}) => {
-  const repeatRef = useRef<{ direction: -1 | 1 | 0; nextAt: number }>({
+  const repeatRef = useRef<{ direction: -1 | 1 | 0; nextAt: number; horizontal: boolean }>({
     direction: 0,
     nextAt: 0,
+    horizontal: false,
   });
 
   useGamepadInput((frame) => {
     if (handledFrames.has(frame)) return;
     handledFrames.add(frame);
     if (!frame.gamepad) {
-      repeatRef.current = { direction: 0, nextAt: 0 };
+      repeatRef.current = { direction: 0, nextAt: 0, horizontal: false };
       return;
     }
 
-    const direction = menuDirection(frame);
+    const { direction, horizontal } = menuDirection(frame);
     if (direction === 0) {
-      repeatRef.current = { direction: 0, nextAt: 0 };
+      repeatRef.current = { direction: 0, nextAt: 0, horizontal: false };
     } else {
       const repeat = repeatRef.current;
-      if (direction !== repeat.direction || frame.timestamp >= repeat.nextAt) {
-        focusRelative(direction);
+      if (
+        direction !== repeat.direction ||
+        horizontal !== repeat.horizontal ||
+        frame.timestamp >= repeat.nextAt
+      ) {
+        const active = document.activeElement;
+        const adjusted =
+          horizontal &&
+          visibleFocusableElements().includes(active as HTMLElement) &&
+          adjustGamepadControl(active, direction);
+        if (!adjusted) focusRelative(direction);
         repeatRef.current = {
           direction,
+          horizontal,
           nextAt:
             frame.timestamp +
-            (direction === repeat.direction ? MENU_REPEAT_MS : MENU_INITIAL_REPEAT_MS),
+            (direction === repeat.direction && horizontal === repeat.horizontal
+              ? MENU_REPEAT_MS
+              : MENU_INITIAL_REPEAT_MS),
         };
       }
     }
